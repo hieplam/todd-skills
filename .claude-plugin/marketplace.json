@@ -8,6 +8,16 @@
       "name": "splitting-plans",
       "source": "./plugins/splitting-plans",
       "description": "Split large monolithic implementation plans into isolated, dependency-aware sub-plans for parallel subagents"
+    },
+    {
+      "name": "check-diff-coverage",
+      "source": "./plugins/check-diff-coverage",
+      "description": "Measure uncovered diff vs main and drive a remediation loop. Supports .NET and Go."
+    },
+    {
+      "name": "refactor-for-testability",
+      "source": "./plugins/refactor-for-testability",
+      "description": "Refactor untestable code into a shape that can be tested before changing behaviour."
     }
   ]
 }
