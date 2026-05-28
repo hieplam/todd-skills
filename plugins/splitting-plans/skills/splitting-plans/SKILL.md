@@ -1,3 +1,8 @@
+---
+name: splitting-plans
+description: Split a large monolithic implementation plan into isolated, dependency-aware sub-plans that parallel subagents can pick up. Use when a plan exceeds ~500 lines, when tasks need clear definitions-of-done with verify/validate steps, or when the user wants to divide-and-conquer a long plan across parallel agents.
+---
+
 # Brainstorm — Split a 3000-line Plan into Isolated Parallel Sub-plans
 
 **Source session:** `d833cb7a-7b7b-4dfc-8c4d-9ac71cfd02a8`

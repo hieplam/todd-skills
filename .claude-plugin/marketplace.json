@@ -1,0 +1,13 @@
+{
+  "name": "todd-skills",
+  "owner": {
+    "name": "Todd Lam"
+  },
+  "plugins": [
+    {
+      "name": "splitting-plans",
+      "source": "./plugins/splitting-plans",
+      "description": "Split large monolithic implementation plans into isolated, dependency-aware sub-plans for parallel subagents"
+    }
+  ]
+}
