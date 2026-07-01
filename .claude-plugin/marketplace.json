@@ -18,6 +18,11 @@
       "name": "refactor-for-testability",
       "source": "./plugins/refactor-for-testability",
       "description": "Refactor untestable code into a shape that can be tested before changing behaviour."
+    },
+    {
+      "name": "research-to-blog",
+      "source": "./plugins/research-to-blog",
+      "description": "Turn a session insight or a bare topic into a bilingual EN+VI research note and published GitHub Pages blog posts (agent; auto-detects format-and-publish vs self-run deep research)."
     }
   ]
 }
