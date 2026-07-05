@@ -1,0 +1,5 @@
+{
+  "name": "tribe",
+  "description": "A Shaman agent that answers What & Why (never How) for a product: understands the codebase, aligns on constraints, then produces a ranked, dependency-sequenced backlog of full-context idea cards with measurable goals and a shaman-vs-owner decision-authority split.",
+  "version": "1.0.0"
+}
