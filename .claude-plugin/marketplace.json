@@ -38,6 +38,11 @@
       "name": "tribe",
       "source": "./plugins/tribe",
       "description": "Three agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter): the Shaman is the owner's delegate for What & Why and runs the campaign; the Warchief turns one idea card at a time into a merged, evidenced PR via TDD Hunters; the Hunter implements one task under strict TDD. Questions flow up as statuses, decisions flow down as cards and briefs."
+    },
+    {
+      "name": "simple-image-video",
+      "source": "./plugins/simple-image-video",
+      "description": "Animate one still image into a long, seamlessly-looping video with music (e.g. game key-art → 1-hour ambient YouTube loop) via sine-driven Remotion effects: halos, auras, particles, breathing."
     }
   ]
 }
