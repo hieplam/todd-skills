@@ -1,0 +1,5 @@
+{
+  "name": "adversarial-reviewer",
+  "description": "An adversarial self-audit agent that does NOT trust \"done\". Before any work is claimed complete, it finds the spec + plan for the current branch (superpowers convention: docs/superpowers/specs + plans), re-derives the requirements itself, and verifies the implementation against them — plus the repo's governance (CLAUDE.md, .claude/rules/, C3 rules) — by RUNNING the proof (tests, typecheck, lint, build), never by reading claims. Returns PASS/FAIL with a conformance matrix and file:line evidence; biases toward FAIL when anything is unverified; review-only, never mutates, never steers next steps. Used by the tribe plugin's Warchief to grade every Hunter deliverable, and by any workflow honoring a \"self-audit before claiming done\" rule.",
+  "version": "1.0.0"
+}

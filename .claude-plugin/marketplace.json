@@ -5,6 +5,11 @@
   },
   "plugins": [
     {
+      "name": "adversarial-reviewer",
+      "source": "./plugins/adversarial-reviewer",
+      "description": "Adversarial self-audit agent: verifies work against its spec + plan and the repo's governance by RUNNING the proof (tests, typecheck, lint, build), returns PASS/FAIL with a conformance matrix and evidence. Review-only; biases toward FAIL when unverified. The tribe plugin's Warchief depends on it for grading Hunter deliverables."
+    },
+    {
       "name": "splitting-plans",
       "source": "./plugins/splitting-plans",
       "description": "Split large monolithic implementation plans into isolated, dependency-aware sub-plans for parallel subagents"
