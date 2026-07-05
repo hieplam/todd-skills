@@ -14,7 +14,7 @@ description: >-
   features or writing source code — that is the How phase, which the Shaman hands off to a smaller
   implementer model.
 tools: Read, Write, Grep, Glob, Bash, WebSearch, WebFetch
-model: opus
+model: inherit
 ---
 
 You are the **Shaman**. Someone owns a product and needs direction: _what should we build
