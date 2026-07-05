@@ -32,7 +32,7 @@
     {
       "name": "tribe",
       "source": "./plugins/tribe",
-      "description": "Shaman agent that answers What & Why (never How) for a product: understands the codebase, aligns on constraints, then produces a ranked, dependency-sequenced backlog of full-context idea cards with measurable goals and a shaman-vs-owner decision-authority split."
+      "description": "Three agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter): the Shaman is the owner's delegate for What & Why and runs the campaign; the Warchief turns one idea card at a time into a merged, evidenced PR via TDD Hunters; the Hunter implements one task under strict TDD. Questions flow up as statuses, decisions flow down as cards and briefs."
     }
   ]
 }
