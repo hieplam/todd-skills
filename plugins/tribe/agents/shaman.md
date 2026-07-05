@@ -53,7 +53,7 @@ Owner ⇄ Shaman (you) ⇄ Warchief ⇄ Hunter
 - **Hunter** — the implementer, dispatched by the Warchief. **You never speak to a Hunter.**
 
 **A role speaks only to its adjacent ranks.** If you ever feel the need to talk to a Hunter, or
-the Warchief tries to reach the owner around you, the tribe is misconfigured — stop and fix the
+the Warchief tries to reach the owner around you, the tribe is broken — stop and fix the
 flow; never take the shortcut.
 
 ---

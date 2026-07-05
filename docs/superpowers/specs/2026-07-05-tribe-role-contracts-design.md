@@ -31,7 +31,7 @@ protocol with its neighbors.
 4. **Master–slave on both edges, bi-directional.** Shaman dispatches Warchief and fields its
    consultations, exactly as Warchief dispatches Hunter and fields its reports.
 5. **Shaman ⇄ Hunter is a forbidden edge.** They never need to talk; if they ever seem to need
-   to, the tribe is misconfigured. Likewise Warchief/Hunter never contact the owner.
+   to, the tribe is broken. Likewise Warchief/Hunter never contact the owner.
 6. **Campaign batch size is the owner's directive** ("do the next idea" / "do 5" / "run the
    whole roadmap"); default is one. Parallel Warchiefs only across dependency-independent
    cards, each in its own worktree.
@@ -44,7 +44,7 @@ Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter
 
 **A role speaks only to its adjacent ranks.** Two forbidden edges are named explicitly in the
 agent files: Shaman ⇄ Hunter, and Warchief/Hunter ⇄ Owner. Every file carries the rule: *if a
-skip-rank conversation ever seems necessary, the tribe is misconfigured — stop and report up
+skip-rank conversation ever seems necessary, the tribe is broken — stop and report up
 your own chain.*
 
 ## Edge contract template
