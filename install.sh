@@ -8,7 +8,7 @@
 #
 # Usage:
 #   ./install.sh                 install ALL plugins
-#   ./install.sh tribe ymir      install only the named plugins
+#   ./install.sh tribe adversarial-reviewer    install only the named plugins
 #   ./install.sh --list          show available plugins and their components
 #
 # Behavior:
