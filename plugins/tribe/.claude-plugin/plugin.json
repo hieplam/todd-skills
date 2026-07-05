@@ -1,5 +1,5 @@
 {
   "name": "tribe",
-  "description": "A tribe of collaborating agents for product delivery. The Shaman answers What & Why — a ranked, dependency-sequenced backlog of full-context idea cards with a decision-authority split. The Warchief answers How — it turns an approved idea into a context-full spec + bite-sized TDD plan, orchestrates the build, audits it with the adversarial-reviewer, and lands a green PR with before/after evidence — while delegating the actual coding to a Hunter implementer and never writing feature source itself.",
-  "version": "1.1.0"
+  "description": "A tribe of collaborating agents for product delivery, split by responsibility. The Shaman answers What & Why — a ranked, dependency-sequenced backlog of full-context idea cards with a decision-authority split. The Warchief answers How — it turns an approved idea into a context-full spec + bite-sized TDD plan, orchestrates the build, audits it with the adversarial-reviewer, and lands a green PR with before/after evidence, never writing feature source itself. The Hunter is the implementer — dispatched by the Warchief (always as subagent_type hunter, never a generic implementer) to build one task at a time under strict TDD, staying inside its brief and reporting back. Questions flow up the chain (Hunter → Warchief → Shaman → owner); code flows only from the Hunter.",
+  "version": "1.2.0"
 }
