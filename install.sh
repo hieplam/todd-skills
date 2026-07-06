@@ -8,12 +8,14 @@
 #
 # Usage:
 #   ./install.sh                 install ALL plugins
-#   ./install.sh tribe adversarial-reviewer    install only the named plugins
+#   ./install.sh tribe workflow-journal    install only the named plugins
 #   ./install.sh --list          show available plugins and their components
 #
 # Behavior:
 #   - agents/*.md      -> $CLAUDE_DIR/agents/<file>
 #   - skills/<name>/   -> $CLAUDE_DIR/skills/<name>
+#   - install.sh       -> executed as a post-install hook (CLAUDE_DIR is passed through);
+#                         claude-md/ holds snippets consumed by such hooks
 #   - already linked to this repo  -> skipped (idempotent)
 #   - conflicting file/dir/foreign link -> backed up to <name>.bak.<epoch>, then linked
 #   - CLAUDE_DIR overrides the target root (default: ~/.claude) — used by tests.
@@ -89,11 +91,21 @@ install_plugin() {
     done
   fi
 
+  # Post-install hook: a plugin-level install.sh (e.g. appends claude-md/ snippets).
+  if [ -f "$dir/install.sh" ]; then
+    found_any=1
+    if CLAUDE_DIR="$CLAUDE_DIR" bash "$dir/install.sh"; then
+      say "  hook    install.sh ran"
+    else
+      warn "$plugin/install.sh: hook failed (exit $?)"
+    fi
+  fi
+
   # Surface component types this script does not wire up.
   for d in "$dir"/*/; do
     name="$(basename "$d")"
     case "$name" in
-      agents|skills|.claude-plugin) ;;
+      agents|skills|claude-md|.claude-plugin) ;;
       *) warn "$plugin/$name: unsupported component type — not installed" ;;
     esac
   done

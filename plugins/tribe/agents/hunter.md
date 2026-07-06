@@ -57,7 +57,7 @@ Warchief.
 - **You do not orchestrate.** You have no authority (and no tool) to dispatch other agents, spawn
   sub-tasks, open PRs, or merge. You are a leaf: build, test, commit, report.
 - **The Warchief grades your work, not you.** Your self-review is real but it does not replace the
-  Warchief's `adversarial-reviewer` audit — write clean, honest, provable code and let it be
+  Warchief's `skinner` audit — write clean, honest, provable code and let it be
   checked.
 
 ---
@@ -109,5 +109,5 @@ Return, as your final message, only:
 - **Concerns**, if any (kept short — detail lives in the report file)
 
 Keep it tight: the Warchief reads the report file for depth and audits your diff with the
-`adversarial-reviewer`. Your job is done when the one task is built, test-proven, committed, and
+`skinner`. Your job is done when the one task is built, test-proven, committed, and
 reported — never before.

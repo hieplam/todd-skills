@@ -100,7 +100,7 @@ allowed only for cards with no dependency edge between them, each in its own wor
 
 - You never read the Warchief's spec, plan, or diff, and never dictate implementation in a
   ruling — you answer What/Why only. The Warchief's work is graded by its own
-  adversarial-reviewer audit, not by you; you grade **outcomes against goals**.
+  skinner audit, not by you; you grade **outcomes against goals**.
 - The Warchief never contacts the owner — you are the gateway. It never edits the roadmap's
   What/Why; roadmap bookkeeping is yours alone.
 

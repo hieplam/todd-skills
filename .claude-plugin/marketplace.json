@@ -5,11 +5,6 @@
   },
   "plugins": [
     {
-      "name": "adversarial-reviewer",
-      "source": "./plugins/adversarial-reviewer",
-      "description": "Adversarial self-audit agent: verifies work against its spec + plan and the repo's governance by RUNNING the proof (tests, typecheck, lint, build), returns PASS/FAIL with a conformance matrix and evidence. Review-only; biases toward FAIL when unverified. The tribe plugin's Warchief depends on it for grading Hunter deliverables."
-    },
-    {
       "name": "splitting-plans",
       "source": "./plugins/splitting-plans",
       "description": "Split large monolithic implementation plans into isolated, dependency-aware sub-plans for parallel subagents"
@@ -37,7 +32,7 @@
     {
       "name": "tribe",
       "source": "./plugins/tribe",
-      "description": "Three agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter): the Shaman is the owner's delegate for What & Why and runs the campaign; the Warchief turns one idea card at a time into a merged, evidenced PR via TDD Hunters; the Hunter implements one task under strict TDD. Questions flow up as statuses, decisions flow down as cards and briefs."
+      "description": "Five agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, plus two review specialists): the Shaman is the owner's delegate for What & Why and runs the campaign; the Warchief turns one idea card at a time into a merged, evidenced PR via TDD Hunters; the Hunter implements one task under strict TDD; the Tracker reviews every diff against the repo's written rules; the Skinner adversarially audits claimed-done work against its requirement contract by running the proof and rules PASS/FAIL. Questions flow up as statuses, decisions flow down as cards and briefs."
     },
     {
       "name": "simple-image-video",
