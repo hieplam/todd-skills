@@ -22,18 +22,33 @@ USAGE
 CHOOSE OUTPUT DIR (works with every mode above):
   --out DIR  /  -o DIR  /  --out=DIR     CLI flag, highest priority
   export WF_EXPORT_DIR=DIR               env var (use this for the Stop hook)
-  precedence:  --out  >  $WF_EXPORT_DIR  >  ~/workflow-journal
+  precedence:  --out  >  $WF_EXPORT_DIR  >  $WF_JOURNAL_REPO/workflow-journal  >  ~/workflow-journal
+
+OPT-IN GIT AUTO-SYNC:
+  export WF_JOURNAL_REPO=/path/to/repo   render into <repo>/workflow-journal and,
+                                         after each export, git add+commit+push it.
+  export WF_JOURNAL_NO_PUSH=1            commit locally but skip the push.
+  A fresh install syncs with no wrapper/hand-wiring — just set WF_JOURNAL_REPO.
 
 OUTPUT  <out>/<ts>__<name>__<runId>.md
 STATE   <out>/.state/<runId>.exported    (exactly-once marker)
 LOG     <out>/.state/export.log
 """
-import sys, os, json, glob, re, datetime
+import sys, os, json, glob, re, datetime, subprocess
 
 HOME = os.path.expanduser("~")
 DEFAULT_OUT = os.path.join(HOME, "workflow-journal")
-# Export dir precedence:  --out FLAG  >  $WF_EXPORT_DIR  >  ~/workflow-journal
-OUT_DIR = os.path.abspath(os.path.expanduser(os.environ.get("WF_EXPORT_DIR") or DEFAULT_OUT))
+
+# Opt-in git auto-sync. Point WF_JOURNAL_REPO at a git repo and completed runs are
+# rendered into <repo>/workflow-journal and committed+pushed after each export, so a
+# fresh install syncs with zero hand-wiring. Unset -> plain local render (old behaviour).
+JOURNAL_REPO = os.environ.get("WF_JOURNAL_REPO")
+JOURNAL_REPO = os.path.abspath(os.path.expanduser(JOURNAL_REPO)) if JOURNAL_REPO else None
+_repo_out = os.path.join(JOURNAL_REPO, "workflow-journal") if JOURNAL_REPO else None
+
+# Export dir precedence:  --out FLAG  >  $WF_EXPORT_DIR  >  $WF_JOURNAL_REPO/workflow-journal  >  ~/workflow-journal
+OUT_DIR = os.path.abspath(os.path.expanduser(
+    os.environ.get("WF_EXPORT_DIR") or _repo_out or DEFAULT_OUT))
 STATE_DIR = os.path.join(OUT_DIR, ".state")
 LOG = os.path.join(STATE_DIR, "export.log")
 PROJECTS = os.path.join(HOME, ".claude", "projects")
@@ -258,6 +273,55 @@ def export_session_dir(session_dir, only_new=False):
     return done
 
 
+def git_sync(exported):
+    """Opt-in git sync: commit newly-exported journals to $WF_JOURNAL_REPO and push.
+
+    No-op unless $WF_JOURNAL_REPO is set. Set $WF_JOURNAL_NO_PUSH to commit locally
+    without pushing. Local-only .state/ (markers + log) is kept out of history.
+    Never raises and bounds every git call with a timeout, so it can't wedge Stop.
+    """
+    if not JOURNAL_REPO or not exported:
+        return
+    if not OUT_DIR.startswith(JOURNAL_REPO + os.sep):
+        log(f"git sync skipped: out dir {OUT_DIR} is outside WF_JOURNAL_REPO {JOURNAL_REPO}")
+        return
+    if not os.path.isdir(os.path.join(JOURNAL_REPO, ".git")):
+        log(f"git sync skipped: {JOURNAL_REPO} is not a git repo")
+        return
+
+    def git(*args, timeout=30):
+        return subprocess.run(
+            ("git", "-C", JOURNAL_REPO) + args,
+            capture_output=True, text=True, timeout=timeout,
+        )
+
+    try:
+        # self-healing on a fresh repo: keep exactly-once markers/log untracked
+        gi = os.path.join(OUT_DIR, ".gitignore")
+        if not os.path.exists(gi):
+            os.makedirs(OUT_DIR, exist_ok=True)
+            with open(gi, "w") as f:
+                f.write(".state/\n")
+        rel = os.path.relpath(OUT_DIR, JOURNAL_REPO)
+        git("add", "--", rel)
+        if git("diff", "--cached", "--quiet").returncode == 0:
+            return  # export changed nothing tracked; nothing to commit
+        branch = (git("rev-parse", "--abbrev-ref", "HEAD").stdout or "").strip() or "HEAD"
+        n = len(exported)
+        git("commit", "-q", "-m",
+            f"[{branch}] chore: auto-sync workflow-journal ({n} run{'s' if n != 1 else ''})")
+        if os.environ.get("WF_JOURNAL_NO_PUSH"):
+            log(f"git sync: committed {n} run(s) to {branch} (push disabled)")
+            return
+        p = git("push", "origin", "HEAD", timeout=60)
+        if p.returncode == 0:
+            log(f"git sync: pushed {n} run(s) to origin/{branch}")
+        else:
+            log(f"git sync: committed {n} run(s); push failed: {(p.stderr or '').strip()[:200]}")
+    except Exception as ex:
+        log(f"git sync error: {ex}")
+
+
 def list_runs():
     """Print every workflow run found on disk: when | taskId | runId | status | agents | tokens | name."""
     rows = []
@@ -305,7 +369,8 @@ def hook_mode():
     if not session_dir:
         sys.exit(0)  # nothing to do; never block Stop
     try:
-        export_session_dir(session_dir, only_new=True)
+        done = export_session_dir(session_dir, only_new=True)
+        git_sync(done)
     except Exception as ex:
         log(f"hook error: {ex}")
     sys.exit(0)
@@ -353,6 +418,7 @@ def main():
         outs = [export_run(jp)]
     for o in outs:
         print(o)
+    git_sync(outs)  # manual backfill also syncs when WF_JOURNAL_REPO is set
 
 
 if __name__ == "__main__":

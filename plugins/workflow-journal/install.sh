@@ -24,7 +24,10 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 # The exporter is reached through the skill symlink the top-level install.sh
 # creates — one source of truth, no copied script to drift. Home-relative so the
 # command is portable to any machine/user (the exporter expanduser()s ~ itself).
-HOOK_CMD="python3 ~/.claude/skills/workflow-journal/scripts/wf-export.py --hook --out ~/workflow-journal"
+# No --out: the exporter resolves the output dir from env ($WF_EXPORT_DIR >
+# $WF_JOURNAL_REPO/workflow-journal > ~/workflow-journal). Set WF_JOURNAL_REPO
+# (e.g. in settings.json "env") to render into a repo and auto commit+push it.
+HOOK_CMD="python3 ~/.claude/skills/workflow-journal/scripts/wf-export.py --hook"
 
 # We only know how to edit the standard ~/.claude location portably. A custom
 # CLAUDE_DIR (e.g. test harness) gets the native hooks.json path instead — skip.

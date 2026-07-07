@@ -51,10 +51,11 @@ That symlinks the skill and wires the `Stop` hook. Nothing else to do.
 
 ### Manual wiring (if you're not using this repo's install.sh)
 
-Add (or merge) this into `~/.claude/settings.json`. On every session Stop it exports any **newly-completed** runs in that session, exactly once, and never blocks Stop:
+Add (or merge) this into `~/.claude/settings.json`. On every session Stop it exports any **newly-completed** runs in that session, exactly once, and never blocks Stop. The output dir comes from env (see below); add the optional `env` block to render into a git repo and auto commit+push:
 
 ```json
 {
+  "env": { "WF_JOURNAL_REPO": "/Users/you/my-claude-workflows" },
   "hooks": {
     "Stop": [
       {
@@ -62,7 +63,7 @@ Add (or merge) this into `~/.claude/settings.json`. On every session Stop it exp
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/skills/workflow-journal/scripts/wf-export.py --hook --out ~/workflow-journal"
+            "command": "python3 ~/.claude/skills/workflow-journal/scripts/wf-export.py --hook"
           }
         ]
       }
@@ -71,15 +72,36 @@ Add (or merge) this into `~/.claude/settings.json`. On every session Stop it exp
 }
 ```
 
+Drop the `env` block for a plain local render to `~/workflow-journal`.
+
 ### Output directory
 
-`--out ~/workflow-journal` above is the destination. Precedence, highest first:
+The render destination. Precedence, highest first:
 
 | Source | How |
 |---|---|
-| `--out DIR` / `-o DIR` / `--out=DIR` | CLI flag (used in the hook above) |
+| `--out DIR` / `-o DIR` / `--out=DIR` | CLI flag |
 | `$WF_EXPORT_DIR` | env var — handy if you'd rather not hard-code the path in the hook |
+| `$WF_JOURNAL_REPO/workflow-journal` | when git auto-sync is enabled (below) |
 | `~/workflow-journal` | built-in default |
+
+### Git auto-sync (opt-in) — "install and it syncs"
+
+Set **`WF_JOURNAL_REPO=/path/to/repo`** and the exporter renders into
+`<repo>/workflow-journal` and, after each export, `git add` + commit + `git push origin HEAD`.
+No wrapper, no hand-wired hook — the plugin's own Stop hook does it. Unset the var and
+behaviour is unchanged (plain local render to `~/workflow-journal`).
+
+- Set it once in `~/.claude/settings.json` so every session's hook sees it:
+  ```json
+  { "env": { "WF_JOURNAL_REPO": "/Users/you/my-claude-workflows" } }
+  ```
+- The commit is `[<branch>] chore: auto-sync workflow-journal (N runs)`; push targets
+  `origin` / the current branch. Set **`WF_JOURNAL_NO_PUSH=1`** to commit locally only.
+- Requirements: the path is a git repo with a pushable `origin` + non-interactive git auth
+  (SSH key). Local-only `.state/` is auto-gitignored, so markers/logs never get committed.
+- Never blocks Stop: every git call is timeout-bounded and all errors are swallowed to
+  `.state/export.log`. A failed push leaves a local commit the next run pushes.
 
 ### Verify
 
