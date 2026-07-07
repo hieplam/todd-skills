@@ -249,37 +249,56 @@ rounds.
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
   evidence embedded, the gate results with numbers, and the review outcome.
 - **Wait for CI green — block, don't poll.** Do not spend turns manually re-checking run status.
-  Use `gh pr checks --watch --fail-fast` to block and return control the moment the PR's *full*
-  check set concludes. Prefer this over `gh run watch` (the mechanism `research-to-blog` uses):
-  `gh run watch` blocks on a single named run, which is fine for `research-to-blog` because it
-  pins one known workflow (`--workflow=deploy.yml`) in a repo with exactly one — but Warchief
-  operates on arbitrary target repos that commonly run several workflows (lint/test/build) per
-  push, and watching only one of them can report "green" while the others are still pending or
-  later fail. `gh pr checks --watch` aggregates every check GitHub reports on the PR instead.
-  Right after a push, GitHub can take a few seconds to register checks at all, so `gh pr checks`
-  errors immediately with "no checks reported" rather than waiting for them to appear — guard
-  against reading that as a real CI failure by retrying a few times with a short pause before
-  concluding CI actually failed, e.g.:
+  The mechanism is `gh run watch <run-id> --exit-status` — the exact command `research-to-blog`
+  uses to block on CI — looped over every run GitHub attaches to the PR's head commit. Warchief
+  targets arbitrary repos that commonly run several workflows (lint/test/build) per push, unlike
+  `research-to-blog`'s one pinned `deploy.yml`, so watching a single hardcoded run is not enough;
+  looping `gh run watch` over each run tied to the head SHA keeps the same blocking mechanism
+  while covering the full check set:
   ```
+  SHA=$(gh pr view --json headRefOid -q .headRefOid)
+  RUN_IDS=""
   for i in 1 2 3 4 5 6; do
-    out=$(gh pr checks --watch --fail-fast 2>&1); ec=$?
-    [ $ec -eq 0 ] && break
-    echo "$out" | grep -qi "no checks reported" && { sleep 5; continue; }
-    echo "$out"; break
+    RUN_IDS=$(gh run list --commit "$SHA" --json databaseId -q '.[].databaseId')
+    [ -n "$RUN_IDS" ] && break
+    sleep 5
   done
+  if [ -z "$RUN_IDS" ]; then
+    echo "NO CI REGISTERED for $SHA after 30s — do not squash-merge on this silence."
+    # Terminal behavior, not a silent fall-through: confirm by hand (gh pr checks / gh run
+    # list) whether this target repo has any CI wired to this branch at all. If it genuinely
+    # has none, record that explicitly in the PR/report and proceed. If CI was expected but
+    # never registered, treat this as BLOCKED / NEEDS_DIRECTION — never merge on an empty
+    # run list.
+  else
+    FAILED=0
+    for RID in $RUN_IDS; do
+      timeout 20m gh run watch "$RID" --exit-status || FAILED=1
+    done
+  fi
   ```
-  Only once checks have actually registered and then failed does "Fix real failures (via a
-  Hunter) rather than forcing through" apply; then re-push and watch again. If addressing review
-  comments or CI fixes stretches over several minutes of back-and-forth rather than one
-  watch-and-fix cycle, don't manually re-poll status
-  between fixes — repeat the same push → watch cycle for each new commit; each blocking watch
-  call stands in for one iteration of a fixed interval, without spending a turn re-deriving the
-  check. You don't carry the `Skill` tool (see your tools line), so you cannot invoke `/loop`
-  yourself — that mechanism is for whoever *is* driving the PR interactively with `Skill`
-  available (e.g. a human at the top-level session). For that case, the canonical shape from the
-  article is a plain fixed interval, never `ScheduleWakeup` (it does not persist across restarts
-  and cannot be cancelled by ID): `/loop 5m check my PR, address review comments, fix failing
-  CI`.
+  A single `gh run watch` call can run long on target repos you don't control (matrix builds,
+  E2E suites, flaky retries) — and while blocked inside it you have no turn to append a
+  heartbeat line, which would otherwise read as dead under the 30-minute staleness rule above.
+  Bound each watch under a timeout shorter than that threshold (`timeout 20m ...` shown above;
+  substitute your shell's equivalent, e.g. `gtimeout` on macOS without GNU coreutils). If a
+  `timeout` exit (124) fires before the run concludes, append a heartbeat line ("still waiting
+  on run `$RID`") and re-invoke `gh run watch` on the same run ID — this keeps the check-in
+  cadence at ~20 minutes instead of every turn, satisfying both "block, don't poll" and the
+  Shaman's liveness contract. For the common case (CI finishing well under 20 minutes) this is
+  indistinguishable from one unbounded blocking call.
+
+  Only once a run has actually failed does "Fix real failures (via a Hunter) rather than forcing
+  through" apply; then re-push and repeat the watch loop for the new commit. If addressing
+  review comments or CI fixes stretches over several minutes of back-and-forth rather than one
+  watch-and-fix cycle, don't manually re-poll status between fixes — repeat the same push →
+  watch-loop cycle for each new commit; each blocking watch call stands in for one iteration of
+  a fixed interval, without spending a turn re-deriving the check. You don't carry the `Skill`
+  tool (see your tools line), so you cannot invoke `/loop` yourself — that mechanism is for
+  whoever *is* driving the PR interactively with `Skill` available (e.g. a human at the
+  top-level session). For that case, the canonical shape from the article is a plain fixed
+  interval, never `ScheduleWakeup` (it does not persist across restarts and cannot be cancelled
+  by ID): `/loop 5m check my PR, address review comments, fix failing CI`.
 - **Squash-merge** into the default branch once green.
 
 ### 8. Report back to the Shaman
