@@ -360,6 +360,16 @@ See per-bundle template in §4.2.
 - Lock change is intentionally tiny (a single name + timestamp; in git, a one-line YAML diff) → minimal contention.
 - `owns_files` (= owned tools) disjointness means parallel cooks never reach for the same pan in the first place.
 
+### Validate the board mechanically
+
+Don't re-derive lock consistency by re-reading every bundle's prose each time — run
+`plugins/splitting-plans/skills/splitting-plans/scripts/validate-locks.sh <bundles-dir>`. It
+checks, across all bundles at once: status is a valid value, `LOCKED` has non-empty
+`locked_by`/`locked_at` and isn't stale (§11's 30-minute threshold), `AVAILABLE` never carries
+lock fields, `LOCKED`/`DONE` bundles have every `prereqs` entry actually `DONE`, and `owns_files`
+is disjoint across the whole board. It prints a JSON verdict (`pass`/`fail`/`noop`) plus a
+`violations` list — run it before picking a bundle and again before sign-off.
+
 ## 6. Cross-bundle Contracts (drift control)
 
 Maintain a table in the main README listing every shared parameter (a setting, a unit, a count, a convention) that more than one bundle depends on, with **defined-in bundle** and **used-by bundles**. Rule: a cook who changes one of these MUST update every dependent sub-plan in the same commit / chalkboard pass.
@@ -508,7 +518,7 @@ Phrased in kitchen terms; software equivalent in parentheses.
 
 - **How many tasks per bundle?** Breakfast model: 1 dish per bundle. Software equivalent: usually 1 code file + 1 test file per bundle. Larger dishes (a multi-stage stew = a complex feature) might warrant more.
 - **What if there is no chalkboard?** (No git / no shared status mechanism.) Need a substitute: a sticky note per bundle, or a tracker file the kitchen shares. Skill should not assume git.
-- **Stale LOCKED — cook walked out mid-shift.** Bundle says LOCKED-BY-Alice-07:10 but Alice never came back. **Committed threshold: 30 minutes.** No status change since `locked_at` for 30 minutes → treat the lock as stale; another cook may take over after marking `BLOCKED` + reason (the same 30-minute no-new-heartbeat threshold the tribe's Shaman↔Warchief liveness check uses — not an example, the number).
+- **Stale LOCKED — cook walked out mid-shift.** Bundle says LOCKED-BY-Alice-07:10 but Alice never came back. **Committed threshold: 30 minutes.** No status change since `locked_at` for 30 minutes → treat the lock as stale; another cook may take over after marking `BLOCKED` + reason (the same 30-minute no-new-heartbeat threshold the tribe's Shaman↔Warchief liveness check uses — not an example, the number). `scripts/validate-locks.sh` flags this mechanically as a `stale_lock` violation — don't eyeball `locked_at` by hand.
 - **BLOCKED semantics — when does a cook set it vs. just abort?** Recommendation: set `BLOCKED` when the prereq says `DONE` but the actual handoff is missing/spoiled (eggs were marked done but pan is empty). Plain abort (drop the lock, take nothing) is fine for honest race losses.
 - **How to rename a shared parameter without breaking dependent bundles?** Recommendation: a rename is its own bundle whose owned scope lists every recipe card that mentions the old name. One cook, one pass, all references updated together.
 

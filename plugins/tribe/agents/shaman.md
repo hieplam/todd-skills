@@ -114,13 +114,15 @@ allowed only for cards with no dependency edge between them, each in its own wor
   heartbeat**: the Warchief appends a timestamped line at every milestone (dispatch received →
   spec → plan → task N → audit → PR → merged).
 - **Silence is not status.** A quiet Warchief is neither presumed working nor presumed dead —
-  read its report-file heartbeat. Recent progress → leave it alone. **No new heartbeat line for
-  30 minutes while mid-milestone = dead** (the tribe's one committed staleness threshold — same
-  number `splitting-plans` uses for a stale lock). Once dead, re-dispatch a fresh Warchief
-  pointed at the saved worktree path, spec path, plan path, and the exact last heartbeat line
-  verbatim — not a summary of it. Checking liveness and the resume point is operational
-  diagnostics, NOT reviewing the How — you are reading how far it got, not grading its spec or
-  plan.
+  read its report-file heartbeat. Run `plugins/tribe/scripts/heartbeat-check.sh <report-file>`
+  instead of eyeballing timestamps — it prints `alive`/`stale`/`unknown` plus the exact last
+  heartbeat line as JSON, so the 30-minute rule is applied the same way every time. Recent
+  progress → leave it alone. **No new heartbeat line for 30 minutes while mid-milestone = dead**
+  (the tribe's one committed staleness threshold — same number `splitting-plans` uses for a
+  stale lock). Once dead, re-dispatch a fresh Warchief pointed at the saved worktree path, spec
+  path, plan path, and the exact last heartbeat line verbatim — not a summary of it. Checking
+  liveness and the resume point is operational diagnostics, NOT reviewing the How — you are
+  reading how far it got, not grading its spec or plan.
 - **Your own upward channel mirrors this.** If YOU were spawned as a background teammate (your
   system prompt names a team lead and `SendMessage`), report to your dispatcher via
   `SendMessage`; your final message still carries your report. **Never spawn an agent to deliver
