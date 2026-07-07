@@ -3,7 +3,9 @@
 # splitting-plans bundle folder, instead of re-deriving lock consistency by prose reasoning
 # every time a cook or the head chef reads the status board.
 #
-# Checks, per sub-plan bundle (`<NN>-<title>.md` files with the §4.1 YAML frontmatter):
+# Checks, per sub-plan bundle (`<NN>-<title>.md` files with the §4.1 YAML frontmatter — the
+# glob is restricted to that numbered-filename shape, so the folder's non-bundle `README.md`
+# orchestrator, which carries no frontmatter, is never picked up as a bundle):
 #   - status is one of AVAILABLE | LOCKED | DONE | BLOCKED
 #   - LOCKED requires non-empty locked_by + locked_at; a lock older than the staleness
 #     threshold (default 30 minutes, same number the tribe's Shaman<->Warchief heartbeat uses)
@@ -112,7 +114,7 @@ def parse_frontmatter(path):
             fm[key] = val.strip('"\'')
     return fm, None
 
-bundle_paths = sorted(glob.glob(os.path.join(bundles_dir, "*.md")))
+bundle_paths = sorted(glob.glob(os.path.join(bundles_dir, "[0-9][0-9]-*.md")))
 now = datetime.now(timezone.utc)
 
 bundles = {}

@@ -7,7 +7,10 @@
 #   - at least one task section exists (a heading whose text contains "Task")
 #   - a "Global Constraints" section exists and names the hunter subagent as the implementer
 #     (the exact line warchief.md's plan step requires)
-#   - no placeholder markers survive (TODO, TBD, FIXME, XXX, PLACEHOLDER, "...", "<...>")
+#   - no placeholder markers survive (TODO, TBD, FIXME, XXX, PLACEHOLDER, "...", "<...>") — the
+#     "<...>" check ignores CLI-usage notation written as inline code or inside a fenced code
+#     block (e.g. `heartbeat-check.sh <report-file>`), since that's this repo's own convention
+#     for documenting a script's arguments, not an unfinished placeholder
 #   - each task section carries at least one fenced code block (actual commands/code, not
 #     prose-only) and mentions an expected result ("expected")
 #
@@ -49,9 +52,11 @@ with open(plan_file, "r", errors="replace") as f:
     text = f.read()
 lines = text.splitlines()
 
-PLACEHOLDER_RE = re.compile(
-    r"\b(TODO|TBD|FIXME|XXX|PLACEHOLDER)\b|<[a-zA-Z_ -]{2,40}>|\.\.\.(?!\))",
-)
+WORD_PLACEHOLDER_RE = re.compile(r"\b(TODO|TBD|FIXME|XXX|PLACEHOLDER)\b")
+ELLIPSIS_RE = re.compile(r"\.\.\.(?!\))")
+ANGLE_PLACEHOLDER_RE = re.compile(r"<[a-zA-Z_ -]{2,40}>")
+INLINE_CODE_RE = re.compile(r"`[^`]*`")
+CODE_FENCE_MARKER_RE = re.compile(r"^\s*```")
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
@@ -104,9 +109,25 @@ else:
     })
 
 # 3. no placeholder markers anywhere in the file
+# Angle-bracket notation (`<report-file>`) is this repo's own convention for documenting a
+# script's CLI arguments — it is not a placeholder when it's written as inline code or sits
+# inside a fenced code block, so that check is skipped there. TODO/TBD/etc and "..." are real
+# placeholder markers regardless of code formatting, so those are still checked everywhere.
+in_fence = False
 placeholder_hits = []
 for i, line in enumerate(lines, start=1):
-    for m in PLACEHOLDER_RE.finditer(line):
+    for m in WORD_PLACEHOLDER_RE.finditer(line):
+        placeholder_hits.append({"line": i, "match": m.group(0)})
+    for m in ELLIPSIS_RE.finditer(line):
+        placeholder_hits.append({"line": i, "match": m.group(0)})
+
+    if CODE_FENCE_MARKER_RE.match(line):
+        in_fence = not in_fence
+        continue
+    if in_fence:
+        continue
+    stripped = INLINE_CODE_RE.sub("", line)
+    for m in ANGLE_PLACEHOLDER_RE.finditer(stripped):
         placeholder_hits.append({"line": i, "match": m.group(0)})
 checks.append({
     "name": "no_placeholders",

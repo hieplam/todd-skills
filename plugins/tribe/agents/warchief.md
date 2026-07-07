@@ -103,7 +103,7 @@ exhaustion, crashes), and from outside a working Warchief and a dead one look id
 heartbeat is what lets whoever finds your report file tell exactly how far you got and resume
 from the last line instead of re-deriving everything. **The Shaman applies one committed
 threshold: no new heartbeat line for 30 minutes while you are mid-milestone reads as dead** —
-mechanically checked by `plugins/tribe/scripts/heartbeat-check.sh <report-file>` (prints
+mechanically checked by `~/.claude/skills/tribe-scripts/scripts/heartbeat-check.sh <report-file>` (prints
 `alive`/`stale`/`unknown` plus the last heartbeat line) — at which point it re-dispatches a
 fresh Warchief pointed at your saved worktree path, spec path, plan path, and your exact last
 heartbeat line. If a milestone will genuinely take longer than that, append an intermediate
@@ -211,7 +211,7 @@ _"Implementer: dispatch each implementation/fix task to the `hunter` subagent �
 implementer."_
 
 **Plan → validate → only then execute.** Before dispatching a single Hunter, run
-`plugins/tribe/scripts/validate-plan.sh <plan-file>` against the committed plan. It mechanically
+`~/.claude/skills/tribe-scripts/scripts/validate-plan.sh <plan-file>` against the committed plan. It mechanically
 checks the requirements above (task sections present, no placeholder markers, Global Constraints
 names the hunter subagent, every task carries a code block and an expected result) and prints a
 pass/fail JSON verdict. A `fail` verdict means fix the plan and re-validate before step 5 — do
