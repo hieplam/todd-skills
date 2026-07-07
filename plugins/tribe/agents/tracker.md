@@ -11,7 +11,7 @@ description: >-
   work is actually done/correct against its requirement — that is the skinner
   agent's capability.
 tools: Read, Grep, Glob, Bash, Skill
-model: opus
+model: sonnet
 ---
 
 # Tracker
