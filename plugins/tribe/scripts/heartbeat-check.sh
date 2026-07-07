@@ -36,6 +36,7 @@ done
 
 [[ -n "$REPORT_FILE" ]] || DIE "usage: heartbeat-check.sh <report-file-path> [--threshold-minutes N]"
 [[ -f "$REPORT_FILE" ]] || DIE "report file not found: $REPORT_FILE"
+[[ "$THRESHOLD_MINUTES" =~ ^[0-9]+(\.[0-9]+)?$ ]] || DIE "invalid --threshold-minutes: '$THRESHOLD_MINUTES' (must be a non-negative number)"
 command -v python3 >/dev/null 2>&1 || DIE "python3 is required but not on PATH"
 
 python3 - "$REPORT_FILE" "$THRESHOLD_MINUTES" <<'PY'

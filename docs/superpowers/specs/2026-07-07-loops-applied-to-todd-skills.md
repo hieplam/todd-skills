@@ -236,6 +236,24 @@ plan-validator script location TBD at implementation. Referencing edits to
 `shaman.md`/`warchief.md`/`splitting-plans/SKILL.md` to invoke the new scripts, but no change
 to the underlying gate semantics (status vocabulary, lock rules) they check.
 
+**Scope amendment (recorded during implementation, round 3 review):** `validate-locks.sh`
+lives under `splitting-plans/skills/splitting-plans/scripts/`, an existing *real* skill (has a
+SKILL.md), so it's already reachable via `install.sh`'s existing skills-symlink support with no
+installer change. `heartbeat-check.sh` and `validate-plan.sh`, however, are fixed by this card
+to a bare `plugins/tribe/scripts/` path — `tribe` has no `skills/` directory, so no existing
+installer mechanism makes that path resolve to anything under `~/.claude`. Two approaches were
+tried and rejected before this amendment: (1) leave the scripts at their repo-relative path and
+have `shaman.md`/`warchief.md` invoke them there — reverted, unreachable from a dispatched
+agent's cwd; (2) nest them under a `skills/tribe-scripts/` directory with no `SKILL.md` to ride
+the generic skills-symlink loop — rejected as a fake skill masquerading as a real one. The
+amendment: root `install.sh` gains `scripts` as a recognized-but-not-installed component type
+(so it no longer prints a spurious "unsupported component type" warning for `tribe/scripts/`),
+and `plugins/tribe/install.sh` (the plugin's own post-install hook, an already-precedented
+extension point per its `claude-md/` snippet loop) symlinks `scripts/` to
+`~/.claude/scripts/tribe`. This is the smallest change that makes the card's own named file
+paths actually reachable; it does not touch any other plugin's installer behavior or any gate
+semantics.
+
 **Priority:** Enhancement — depends on item 2 for the heartbeat threshold it encodes.
 
 ---
