@@ -105,7 +105,7 @@ install_plugin() {
   for d in "$dir"/*/; do
     name="$(basename "$d")"
     case "$name" in
-      agents|skills|claude-md|.claude-plugin) ;;
+      agents|skills|claude-md|hooks|.claude-plugin) ;;
       *) warn "$plugin/$name: unsupported component type — not installed" ;;
     esac
   done

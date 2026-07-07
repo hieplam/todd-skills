@@ -1,0 +1,21 @@
+{
+  "description": "Auto-capture every completed Workflow run as readable Markdown. Fires on Stop; the exporter reads only local run journals and self-limits to exactly-once per run, so it never blocks Stop.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/skills/workflow-journal/scripts/wf-export.py",
+              "--hook",
+              "--out",
+              "~/workflow-journal"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

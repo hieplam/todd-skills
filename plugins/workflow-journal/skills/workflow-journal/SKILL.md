@@ -31,24 +31,27 @@ Nothing is sent anywhere; it is a pure local render.
 
 ---
 
-## Setup (one-time)
+## Setup
 
-### 1. Install the script to a stable path
+The auto-capture `Stop` hook ships **with the plugin** — installing the plugin is the whole setup. It's wired two ways so it works on any machine (only Python 3 stdlib is used — no `pip install`):
 
-The `Stop` hook needs a fixed path, so copy the bundled script to `~/.claude/scripts/`:
+- **`hooks/hooks.json`** — a native plugin hook (`${CLAUDE_PLUGIN_ROOT}/skills/workflow-journal/scripts/wf-export.py --hook`). It activates when workflow-journal loads as a real plugin (a marketplace install, or a whole-plugin `@skills-dir` symlink where `.claude-plugin/plugin.json` travels with `hooks/`).
+- **`install.sh`** (this plugin's post-install hook) — the fallback for the repo's default install path, where only the inner `skills/workflow-journal/` folder is symlinked into `~/.claude/skills/` and the native hook isn't discovered. It idempotently wires the same `Stop` hook straight into `~/.claude/settings.json`, pointing at the exporter through the skill symlink (`~/.claude/skills/workflow-journal/scripts/wf-export.py`) — one source of truth, no copied script to drift.
+
+Both are idempotent and the exporter is exactly-once per run, so if both ever fire the second is a harmless no-op.
+
+### Install (fresh machine)
 
 ```bash
-mkdir -p ~/.claude/scripts
-# $SRC = this skill's bundled script. In a clone of todd-skills:
-cp plugins/workflow-journal/skills/workflow-journal/scripts/wf-export.py ~/.claude/scripts/wf-export.py
-chmod +x ~/.claude/scripts/wf-export.py
+git clone <todd-skills> && cd todd-skills
+./install.sh workflow-journal      # symlinks the skill + runs the post-install hook
 ```
 
-(Only Python 3 stdlib is used — no `pip install`.)
+That symlinks the skill and wires the `Stop` hook. Nothing else to do.
 
-### 2. Wire the Stop hook in `~/.claude/settings.json`
+### Manual wiring (if you're not using this repo's install.sh)
 
-Add (or merge) this `Stop` hook. On every session Stop it exports any **newly-completed** runs in that session, exactly once, and never blocks Stop:
+Add (or merge) this into `~/.claude/settings.json`. On every session Stop it exports any **newly-completed** runs in that session, exactly once, and never blocks Stop:
 
 ```json
 {
@@ -59,7 +62,7 @@ Add (or merge) this `Stop` hook. On every session Stop it exports any **newly-co
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/scripts/wf-export.py --hook --out ~/workflow-journal"
+            "command": "python3 ~/.claude/skills/workflow-journal/scripts/wf-export.py --hook --out ~/workflow-journal"
           }
         ]
       }
@@ -68,7 +71,7 @@ Add (or merge) this `Stop` hook. On every session Stop it exports any **newly-co
 }
 ```
 
-### 3. Pick your output directory
+### Output directory
 
 `--out ~/workflow-journal` above is the destination. Precedence, highest first:
 
@@ -78,12 +81,13 @@ Add (or merge) this `Stop` hook. On every session Stop it exports any **newly-co
 | `$WF_EXPORT_DIR` | env var — handy if you'd rather not hard-code the path in the hook |
 | `~/workflow-journal` | built-in default |
 
-### 4. Verify
+### Verify
 
 ```bash
-python3 ~/.claude/scripts/wf-export.py --list          # every run found on disk
-python3 ~/.claude/scripts/wf-export.py <runId|taskId>  # export one now
-ls ~/workflow-journal                                  # rendered .md files land here
+SCRIPT=~/.claude/skills/workflow-journal/scripts/wf-export.py
+python3 "$SCRIPT" --list                # every run found on disk
+python3 "$SCRIPT" <runId|taskId>        # export one now
+ls ~/workflow-journal                   # rendered .md files land here
 ```
 
 ---
