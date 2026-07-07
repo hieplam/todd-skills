@@ -248,7 +248,16 @@ rounds.
   rules and verify the links resolve.
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
   evidence embedded, the gate results with numbers, and the review outcome.
-- **Wait for CI green.** Fix real failures (via a Hunter) rather than forcing through.
+- **Wait for CI green — block, don't poll.** Do not spend turns manually re-checking run status.
+  Use `gh run watch --exit-status` (the same mechanism `research-to-blog` already uses in this
+  repo) to block on the run and return control the moment it concludes: get the run ID and watch
+  it, e.g. `RID=$(gh run list -b <branch> -L 1 --json databaseId -q '.[0].databaseId') && gh run
+  watch "$RID" --exit-status`. Fix real failures (via a Hunter) rather than forcing through, then
+  re-push and watch again. If addressing review comments or CI fixes stretches over several
+  minutes of back-and-forth rather than one watch-and-fix cycle, use a fixed-interval loop instead
+  of re-deriving the check each turn — the canonical shape from the article: `/loop 5m check my
+  PR, address review comments, fix failing CI` (a plain interval; do not reach for
+  `ScheduleWakeup` for this — it does not persist across restarts and cannot be cancelled by ID).
 - **Squash-merge** into the default branch once green.
 
 ### 8. Report back to the Shaman
