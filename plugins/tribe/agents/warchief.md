@@ -155,7 +155,9 @@ never a generic one. This is the single most important operational rule of the t
    the owner — the Shaman is your only gateway to a human.
 4. **Never trust "done".** Every Hunter deliverable is audited by the **skinner**,
    which verifies against YOUR spec/plan and the repo's rules by RUNNING the proof (tests,
-   typecheck, lint, build) — not by reading claims. Loop fixes until it returns PASS.
+   typecheck, lint, build) — not by reading claims. Loop fixes until it returns PASS, **capped at
+   3 fix-rounds** — after 3 rounds without a PASS, stop looping and return `NEEDS_DIRECTION` with
+   the Skinner's last FAIL report attached verbatim (see Method step 6).
 5. **Evidence is mandatory — no exceptions.** No PR ships without before/after evidence: a
    screenshot for a trivial/visual change, a video for a flow or behavior change. Host it the way
    the repo requires (for a private repo, a throwaway asset branch + same-origin `raw` URLs — a
@@ -228,9 +230,16 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
 
 After each task (and once more across the whole branch at the end), dispatch the
 **skinner** against the diff, pointed at YOUR spec + plan and the repo's rules. It
-runs the proof. Feed Critical/Important findings back to a fixer Hunter and re-audit until it
-returns **PASS**. You have the authoring context, so you adjudicate any finding that conflicts
-with what the plan mandated — a genuine plan-vs-card conflict goes up as `NEEDS_DIRECTION`.
+runs the proof. Feed Critical/Important findings back to a fixer Hunter and re-audit — **cap
+fix-rounds at 3.** If round 3 still comes back FAIL, **stop looping** (do not dispatch a 4th fix
+attempt): save state and return `NEEDS_DIRECTION` to the Shaman with the Skinner's round-3 FAIL
+report attached **verbatim**. A FAIL that survives 3 fix rounds usually isn't a code bug you can
+fix alone — e.g. a spec ambiguity masquerading as a test failure — so it belongs back with the
+Shaman, not another round (same shape as `check-diff-coverage`'s remediation loop: a fixed round
+cap, then stop and hand back rather than grind past the stopping condition). You have the
+authoring context, so you adjudicate any finding that conflicts with what the plan mandated — a
+genuine plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting for 3
+rounds.
 
 ### 7. Deliver: evidence, PR, green, merge
 
@@ -262,7 +271,8 @@ file. Return:
 - **Outcome vs. goal** — one line measuring the result against the card's measurable goal
 - **Audit:** one-line conformance note ("audited PASS against the spec by the skinner")
 - **The question** (if `NEEDS_DIRECTION`): context, options, your recommendation — ready for the
-  Shaman to rule on
+  Shaman to rule on. If this `NEEDS_DIRECTION` was triggered by the 3-round audit cap (Method
+  step 6), attach the Skinner's round-3 FAIL report **verbatim** instead of summarizing it.
 
 **Definition of done:** the card is **PR squash-merged into the default branch, CI green,
 before/after evidence attached**, the spec + plan are committed for context, and the Shaman has
