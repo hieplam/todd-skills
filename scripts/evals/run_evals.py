@@ -23,8 +23,14 @@ For every case, up to two configurations are run:
                      `--agent`, independent of whether it happens to be
                      symlink-installed locally — the eval targets the agent
                      definition in this repo, not the local install state.
-  without_skill  a plain `claude -p` call with nothing registered — the
-                 baseline a benchmark compares against.
+  without_skill  a `claude -p --safe-mode` call — nothing registered AND all
+                 user-level customizations (CLAUDE.md, skills, plugins, hooks,
+                 MCP servers, custom commands/agents) disabled, so a skill
+                 that also happens to be installed at user scope on the
+                 machine running this harness (common when dogfooding this
+                 repo's own marketplace) cannot silently fire and collapse
+                 the baseline into the with_skill run. This is the baseline
+                 a benchmark compares against.
 
 Each run's transcript and the token/duration numbers `claude -p --output-format
 json` already reports (duration_ms, usage, total_cost_usd — no separate
@@ -114,7 +120,7 @@ def parse_frontmatter(path: Path) -> tuple[dict, str]:
 
 def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
                 agents_json: dict | None = None, agent_name: str | None = None,
-                tools: str | None = None) -> dict:
+                tools: str | None = None, safe_mode: bool = False) -> dict:
     """Run one isolated `claude -p` process and return its parsed result.
 
     Returns a dict with at least: ok (bool), events (list, may be empty on
@@ -129,6 +135,17 @@ def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
         cmd += ["--agent", agent_name]
     if tools is not None:
         cmd += ["--tools", tools]
+    if safe_mode:
+        # Disables CLAUDE.md, skills, plugins, hooks, MCP servers, custom
+        # commands/agents — i.e. everything installed at user/project scope
+        # on the host machine, not just "nothing extra registered for this
+        # call". Without this, a skill that is also symlink-installed at
+        # user scope (the normal state when dogfooding this repo) fires for
+        # the without_skill baseline too, collapsing the with/without
+        # comparison. Only ever passed for the without_skill configuration —
+        # with_skill needs the throwaway project command / --agents payload
+        # to actually be visible, which --safe-mode would itself suppress.
+        cmd += ["--safe-mode"]
 
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
@@ -333,6 +350,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         exec_run = run_claude(
             case["prompt"], cwd=scratch, timeout=timeout, model=exec_model,
             agents_json=agents_json, agent_name=agent_name,
+            safe_mode=(configuration == "without_skill"),
         )
         if not exec_run["ok"]:
             return {"error": exec_run["error"], "configuration": configuration}
@@ -432,6 +450,19 @@ def fmt_delta(with_val: float, without_val: float) -> str:
     return f"{'+' if d >= 0 else ''}{d:.2f}" if abs(d) < 10 else f"{'+' if d >= 0 else ''}{d:.1f}"
 
 
+def display_path(path: Path) -> str:
+    """Path for printing/JSON: repo-relative when possible, absolute otherwise.
+
+    `--out-dir` is a documented flag with no repo-relative constraint (CI
+    artifact dirs, /tmp scratch, etc. are normal uses), so paths under it
+    must never assume they live inside REPO_ROOT.
+    """
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
 # ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
@@ -495,10 +526,10 @@ def main() -> int:
         kind, skill_dir, agents_dir = derive_kind_and_dirs(evals_path, data.get("kind"))
         cases = [c for c in data["evals"] if wanted_ids is None or c["id"] in wanted_ids]
         metadata["evals_run"].append({"skill_name": skill_name, "kind": kind,
-                                        "evals_json": str(evals_path.relative_to(REPO_ROOT)),
+                                        "evals_json": display_path(evals_path),
                                         "case_ids": [c["id"] for c in cases]})
 
-        print(f"== {skill_name} ({kind}) — {len(cases)} case(s) from {evals_path.relative_to(REPO_ROOT)} ==")
+        print(f"== {skill_name} ({kind}) — {len(cases)} case(s) from {display_path(evals_path)} ==")
 
         for case in cases:
             print(f"  eval {case['id']}: {case['name']}")
@@ -557,7 +588,7 @@ def main() -> int:
     out_root.mkdir(parents=True, exist_ok=True)
     benchmark_path = out_root / "benchmark.json"
     benchmark_path.write_text(json.dumps(benchmark, indent=2))
-    print(f"\nWrote {len(all_runs)} run(s) -> {benchmark_path.relative_to(REPO_ROOT)}")
+    print(f"\nWrote {len(all_runs)} run(s) -> {display_path(benchmark_path)}")
 
     return 0
 

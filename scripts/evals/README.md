@@ -48,7 +48,12 @@ session — a genuinely clean context per skill-creator's own `run_eval.py` patt
   uses, so triggering is genuine, not forced); agent cases pass the named agent's real
   frontmatter + body straight through `--agents`/`--agent`, independent of whether it
   happens to be symlink-installed locally.
-- **without_skill** — a plain `claude -p` call, nothing registered. The baseline.
+- **without_skill** — a `claude -p --safe-mode` call: nothing registered *and* every
+  user/project-scope customization (CLAUDE.md, skills, plugins, hooks, MCP servers,
+  custom commands/agents) disabled. Plain `claude -p` alone isn't a clean baseline when
+  the skill under test is also symlink-installed at user scope (the normal state when
+  dogfooding this repo's own marketplace) — it would fire anyway and collapse the
+  comparison. `--safe-mode` is what actually makes this the baseline.
 
 Both configurations' token usage and wall-clock duration come straight from
 `claude -p --output-format json`'s own `result` event (`duration_ms`, `usage`,
@@ -80,9 +85,11 @@ configuration, for variance), `--timeout SECONDS` (per `claude -p` call), `--exe
 / `--grader-model` (default: your configured model — pin to something cheap for a smoke
 pass), `--eval-id 1,3` (restrict to specific case ids).
 
-Output lands in `scripts/evals/runs/<UTC-timestamp>/` (git-ignored — reproducible from
-`evals.json` + this script, not checked in): per-case `transcript.md` / `metrics.json` /
-`grading.json`, plus one rolled-up `benchmark.json` at the run root.
+Output lands in `scripts/evals/runs/<UTC-timestamp>/` by default (git-ignored —
+reproducible from `evals.json` + this script, not checked in), or under `--out-dir PATH`
+(any path, including outside the repo, e.g. a CI artifacts dir): per-case
+`transcript.md` / `metrics.json` / `grading.json`, plus one rolled-up `benchmark.json`
+at the run root.
 
 ## Cost note
 
