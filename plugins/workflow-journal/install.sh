@@ -61,23 +61,38 @@ except (json.JSONDecodeError, OSError) as e:
 hooks = settings.setdefault("hooks", {})
 stop = hooks.setdefault("Stop", [])
 
-# Idempotent: if any existing Stop hook already runs the exporter (this machine
-# may already have a hand-wired one pointing at ~/.claude/scripts/wf-export.py),
-# leave it alone rather than adding a duplicate.
-def mentions_exporter(group):
+# Idempotent AND self-healing: find any existing Stop hook that runs the exporter
+# (a hand-wired one, or an OLD install carrying a stale `--out ~/workflow-journal`
+# that would override WF_JOURNAL_REPO). Rewrite it to the current command so a
+# re-run upgrades an old machine in place. Only append if none exists.
+changed = False
+found = False
+for group in stop:
     for h in group.get("hooks", []):
         if "wf-export.py" in (h.get("command") or ""):
-            return True
-    return False
+            found = True
+            if h.get("command") != hook_cmd:
+                h["command"] = hook_cmd   # migrate stale command (drops old --out)
+                changed = True
 
-if any(mentions_exporter(g) for g in stop):
-    print("  ok      workflow-journal: Stop hook already present in settings.json")
+if not found:
+    stop.append({
+        "matcher": "",
+        "hooks": [{"type": "command", "command": hook_cmd}],
+    })
+    changed = True
+
+# Optionally wire git auto-sync in one shot:  WF_JOURNAL_REPO=/path ./install.sh workflow-journal
+repo = os.environ.get("WF_JOURNAL_REPO")
+if repo:
+    env = settings.setdefault("env", {})
+    if env.get("WF_JOURNAL_REPO") != repo:
+        env["WF_JOURNAL_REPO"] = repo
+        changed = True
+
+if not changed:
+    print("  ok      workflow-journal: Stop hook already current in settings.json")
     sys.exit(0)
-
-stop.append({
-    "matcher": "",
-    "hooks": [{"type": "command", "command": hook_cmd}],
-})
 
 # Write via temp + atomic replace, keeping a one-shot backup.
 tmp = settings_path + ".tmp"
@@ -90,5 +105,7 @@ if os.path.exists(settings_path):
     except OSError:
         pass
 os.replace(tmp, settings_path)
-print("  linked  workflow-journal: Stop hook wired into settings.json (auto-capture on)")
+print("  linked  workflow-journal: Stop hook wired/updated in settings.json (auto-capture on)")
+if repo:
+    print(f"  env     workflow-journal: WF_JOURNAL_REPO={repo} (git auto-sync on)")
 PY

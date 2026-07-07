@@ -100,8 +100,23 @@ behaviour is unchanged (plain local render to `~/workflow-journal`).
   `origin` / the current branch. Set **`WF_JOURNAL_NO_PUSH=1`** to commit locally only.
 - Requirements: the path is a git repo with a pushable `origin` + non-interactive git auth
   (SSH key). Local-only `.state/` is auto-gitignored, so markers/logs never get committed.
+- **Multi-machine safe.** Before pushing, the sync `git fetch`es + rebases onto `origin/<branch>`,
+  so several machines can journal into the same repo without non-fast-forward rejections. Run
+  filenames are per-run unique (`…__<runId>.md`), so history diverges but content never collides.
+  A rebase conflict (rare) aborts cleanly and retries next run.
 - Never blocks Stop: every git call is timeout-bounded and all errors are swallowed to
   `.state/export.log`. A failed push leaves a local commit the next run pushes.
+
+### Upgrading a machine that has an older workflow-journal
+
+Two steps — `install.sh` alone is not enough, because it wires *settings*, not plugin *code*:
+
+1. **Update the code:** `git pull` in your `todd-skills` checkout (the skill is symlinked, so the
+   pull makes the new exporter live — no reinstall needed for code).
+2. **Migrate the hook + turn on sync:** `WF_JOURNAL_REPO=/path/to/repo ./install.sh workflow-journal`.
+   Re-running now **rewrites** a stale hook (e.g. an old `--out ~/workflow-journal` that would
+   otherwise override `WF_JOURNAL_REPO`) to the current command, and writes `WF_JOURNAL_REPO`
+   into settings.json `env`. It's a no-op if already current.
 
 ### Verify
 

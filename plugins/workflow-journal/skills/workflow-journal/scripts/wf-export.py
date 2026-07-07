@@ -313,11 +313,25 @@ def git_sync(exported):
         if os.environ.get("WF_JOURNAL_NO_PUSH"):
             log(f"git sync: committed {n} run(s) to {branch} (push disabled)")
             return
+        # Integrate other machines' pushes FIRST so our push fast-forwards. Other
+        # machines journal into the same branch; filenames are per-run unique, so
+        # history diverges but content won't conflict — rebase replays our commit on
+        # top. On the rare conflict, abort cleanly and let the next run retry.
+        if branch != "HEAD":
+            f = git("fetch", "origin", branch, timeout=60)
+            if f.returncode == 0:
+                rb = git("rebase", "FETCH_HEAD")
+                if rb.returncode != 0:
+                    git("rebase", "--abort")
+                    log(f"git sync: committed {n} run(s); rebase onto origin/{branch} "
+                        f"conflicted — left local commit, will retry next run")
+                    return
         p = git("push", "origin", "HEAD", timeout=60)
         if p.returncode == 0:
             log(f"git sync: pushed {n} run(s) to origin/{branch}")
         else:
-            log(f"git sync: committed {n} run(s); push failed: {(p.stderr or '').strip()[:200]}")
+            log(f"git sync: committed {n} run(s); push rejected/failed "
+                f"(will retry next run): {(p.stderr or '').strip()[:200]}")
     except Exception as ex:
         log(f"git sync error: {ex}")
 
