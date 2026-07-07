@@ -320,7 +320,7 @@ def build_agents_payload(agent_fields: dict, agent_body: str) -> dict:
 
 def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | None,
              configuration: str, timeout: int, exec_model: str | None,
-             grader_model: str | None, out_dir: Path, verbose: bool) -> dict:
+             grader_model: str | None, out_dir: Path, verbose: bool, run_idx: int = 0) -> dict:
     scratch = Path(tempfile.mkdtemp(prefix="todd-skills-eval-"))
     try:
         agents_json = None
@@ -366,7 +366,12 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         )
         grader_seconds = time.time() - grader_start
 
-        run_dir = out_dir / f"eval-{case['id']}-{case['name']}" / configuration
+        # `run-{N}` (1-based) is always part of the path — not only when --runs > 1 —
+        # so a single, consistent layout is used regardless of --runs, and repeat
+        # runs of the same case+configuration never overwrite each other's
+        # transcript.md/metrics.json/grading.json (the per-run evidence trail the
+        # card requires).
+        run_dir = out_dir / f"eval-{case['id']}-{case['name']}" / configuration / f"run-{run_idx + 1}"
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "transcript.md").write_text(
             f"# {case['name']} — {configuration}\n\n## Prompt\n{case['prompt']}\n\n"
@@ -546,7 +551,7 @@ def main() -> int:
                         case, kind, skill_dir, agents_dir, configuration,
                         timeout=args.timeout, exec_model=args.exec_model,
                         grader_model=args.grader_model or args.exec_model,
-                        out_dir=out_dir, verbose=args.verbose,
+                        out_dir=out_dir, verbose=args.verbose, run_idx=run_idx,
                     )
                     if "error" in result:
                         print(f"    [{configuration}] ERROR: {result['error']}", file=sys.stderr)

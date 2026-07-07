@@ -87,9 +87,11 @@ pass), `--eval-id 1,3` (restrict to specific case ids).
 
 Output lands in `scripts/evals/runs/<UTC-timestamp>/` by default (git-ignored —
 reproducible from `evals.json` + this script, not checked in), or under `--out-dir PATH`
-(any path, including outside the repo, e.g. a CI artifacts dir): per-case
-`transcript.md` / `metrics.json` / `grading.json`, plus one rolled-up `benchmark.json`
-at the run root.
+(any path, including outside the repo, e.g. a CI artifacts dir): per-case, per-run
+`transcript.md` / `metrics.json` / `grading.json` under
+`<skill_name>/eval-<id>-<name>/<configuration>/run-<N>/` (1-based `run-<N>`, always
+present even for the default `--runs 1`, so repeats never overwrite each other's
+evidence), plus one rolled-up `benchmark.json` at the run root.
 
 ## Cost note
 
