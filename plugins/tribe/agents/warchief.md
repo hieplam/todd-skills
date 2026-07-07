@@ -254,10 +254,15 @@ rounds.
   it, e.g. `RID=$(gh run list -b <branch> -L 1 --json databaseId -q '.[0].databaseId') && gh run
   watch "$RID" --exit-status`. Fix real failures (via a Hunter) rather than forcing through, then
   re-push and watch again. If addressing review comments or CI fixes stretches over several
-  minutes of back-and-forth rather than one watch-and-fix cycle, use a fixed-interval loop instead
-  of re-deriving the check each turn — the canonical shape from the article: `/loop 5m check my
-  PR, address review comments, fix failing CI` (a plain interval; do not reach for
-  `ScheduleWakeup` for this — it does not persist across restarts and cannot be cancelled by ID).
+  minutes of back-and-forth rather than one watch-and-fix cycle, don't manually re-poll status
+  between fixes — repeat the same push → `gh run watch --exit-status` cycle for each new commit;
+  each blocking watch call stands in for one iteration of a fixed interval, without spending a
+  turn re-deriving the check. You don't carry the `Skill` tool (see your tools line), so you
+  cannot invoke `/loop` yourself — that mechanism is for whoever *is* driving the PR interactively
+  with `Skill` available (e.g. a human at the top-level session). For that case, the canonical
+  shape from the article is a plain fixed interval, never `ScheduleWakeup` (it does not persist
+  across restarts and cannot be cancelled by ID): `/loop 5m check my PR, address review comments,
+  fix failing CI`.
 - **Squash-merge** into the default branch once green.
 
 ### 8. Report back to the Shaman
