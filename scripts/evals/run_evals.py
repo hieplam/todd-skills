@@ -55,9 +55,9 @@ For every case, up to two configurations are run:
                  a benchmark compares against.
 
 Each run's transcript and the token/duration numbers `claude -p --output-format
-json` already reports (duration_ms, usage, total_cost_usd — no separate
-instrumentation needed) are graded by a second, tool-less `claude -p` call (the
-"grader"), scored against the case's expected_output. Results are written as
+stream-json --verbose` already reports (duration_ms, usage, total_cost_usd — no
+separate instrumentation needed) are graded by a second, tool-less `claude -p`
+call (the "grader"), scored against the case's expected_output. Results are written as
 grading.json per run (schema: skill-creator's references/schemas.md
 `grading.json`) and rolled up into one benchmark.json per invocation (schema:
 skill-creator's `benchmark.json`, with_skill vs without_skill).
@@ -149,7 +149,20 @@ def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
     Returns a dict with at least: ok (bool), events (list, may be empty on
     timeout/error), error (str|None).
     """
-    cmd = ["claude", "-p", prompt, "--output-format", "json", "--no-session-persistence"]
+    # --output-format stream-json (NOT plain "json"), always paired with --verbose:
+    # verified empirically that plain `--output-format json` silently collapses from
+    # the full per-turn event array to a single bare `{"type":"result",...}` dict
+    # whenever `--setting-sources` excludes "user" — exactly the isolate_user_scope
+    # leg below (`--setting-sources project`). Isolated further: `--strict-mcp-config`
+    # alone does NOT trigger the collapse; only omitting "user" from
+    # `--setting-sources` does. stream-json does not exhibit this collapse under the
+    # identical `--setting-sources project --strict-mcp-config` flags (one JSON
+    # object per stdout line, always including system/assistant/user/result events,
+    # confirmed system-event `plugins`/`mcp_servers` still read `[]` for isolation),
+    # so it is used unconditionally for both configurations here rather than only for
+    # the affected leg, to keep with_skill and without_skill parsed identically.
+    cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
+           "--no-session-persistence"]
     if model:
         cmd += ["--model", model]
     if agents_json:
@@ -210,13 +223,18 @@ def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
         return {"ok": False, "events": [], "error": f"exit {proc.returncode}: {proc.stderr[-2000:]}",
                 "wall_seconds": wall}
 
-    try:
-        events = json.loads(proc.stdout)
-        if isinstance(events, dict):
-            events = [events]
-    except json.JSONDecodeError as e:
-        return {"ok": False, "events": [], "error": f"bad JSON from claude -p: {e}",
-                "wall_seconds": wall, "raw_stdout": proc.stdout[-2000:]}
+    # stream-json emits one JSON object per stdout line (not one JSON array/value for
+    # the whole call) — parse line-by-line rather than json.loads() on the full blob.
+    events = []
+    for line_no, line in enumerate(proc.stdout.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError as e:
+            return {"ok": False, "events": [], "error": f"bad JSON on stdout line {line_no}: {e}",
+                    "wall_seconds": wall, "raw_stdout": proc.stdout[-2000:]}
 
     return {"ok": True, "events": events, "error": None, "wall_seconds": wall}
 
@@ -559,6 +577,12 @@ def main() -> int:
     out_root = Path(args.out_dir) if args.out_dir else REPO_ROOT / "scripts" / "evals" / "runs" / timestamp
 
     all_runs: list[dict] = []
+    # Anything appended here means "the harness itself failed to execute a case as
+    # intended" (missing evals.json, missing agent file, claude CLI error, bad JSON,
+    # timeout, ...) as distinct from "a case ran and was graded FAIL on its merits" —
+    # see the exit-code decision at the end of main().
+    setup_errors: list[str] = []
+    total_cases_matched = 0
     metadata = {
         "timestamp": timestamp,
         "runs_per_configuration": args.runs,
@@ -568,12 +592,15 @@ def main() -> int:
 
     for evals_path in evals_paths:
         if not evals_path.exists():
-            print(f"WARN: {evals_path} does not exist, skipping", file=sys.stderr)
+            msg = f"{evals_path} does not exist"
+            print(f"WARN: {msg}, skipping", file=sys.stderr)
+            setup_errors.append(msg)
             continue
         data = json.loads(evals_path.read_text())
         skill_name = data["skill_name"]
         kind, skill_dir, agents_dir = derive_kind_and_dirs(evals_path, data.get("kind"))
         cases = [c for c in data["evals"] if wanted_ids is None or c["id"] in wanted_ids]
+        total_cases_matched += len(cases)
         metadata["evals_run"].append({"skill_name": skill_name, "kind": kind,
                                         "evals_json": display_path(evals_path),
                                         "case_ids": [c["id"] for c in cases]})
@@ -598,7 +625,10 @@ def main() -> int:
                         out_dir=out_dir, verbose=args.verbose, run_idx=run_idx,
                     )
                     if "error" in result:
+                        msg = (f"{skill_name} eval {case['id']} ({case['name']}) "
+                               f"[{configuration}]: {result['error']}")
                         print(f"    [{configuration}] ERROR: {result['error']}", file=sys.stderr)
+                        setup_errors.append(msg)
                         continue
                     result["run_number"] = run_idx + 1
                     result["skill_name"] = skill_name
@@ -607,8 +637,16 @@ def main() -> int:
                     print(f"    [{configuration}] {verdict}  "
                           f"{result['result']['time_seconds']}s  {result['result']['tokens']} tokens")
 
+    # Zero cases matched at all (e.g. a --eval-id that names no real case, or every
+    # evals.json path given was missing) is itself a setup failure distinct from "ran
+    # 0 cases on purpose" — there is no such intentional mode.
+    if total_cases_matched == 0:
+        msg = "no eval cases matched (bad --eval-id, --evals path, or empty evals.json?)"
+        print(f"ERROR: {msg}", file=sys.stderr)
+        setup_errors.append(msg)
+
     if args.dry_run:
-        return 0
+        return 2 if setup_errors else 0
 
     with_runs = [r for r in all_runs if r["configuration"] == "with_skill"]
     without_runs = [r for r in all_runs if r["configuration"] == "without_skill"]
@@ -631,6 +669,7 @@ def main() -> int:
         "metadata": metadata,
         "runs": all_runs,
         "run_summary": run_summary,
+        "setup_errors": setup_errors,
         "notes": [],
     }
 
@@ -639,6 +678,18 @@ def main() -> int:
     benchmark_path.write_text(json.dumps(benchmark, indent=2))
     print(f"\nWrote {len(all_runs)} run(s) -> {display_path(benchmark_path)}")
 
+    # Exit code reflects whether the harness itself ran cleanly, never whether
+    # individual cases passed/failed grading (that's data, in benchmark.json, not a
+    # process-failure signal) — same convention this repo's own
+    # check-diff-coverage/scripts/measure.sh documents ("exit code 0 regardless of
+    # pass/fail, 2 only on setup error"). A caller (CI, a wrapper script) gating on
+    # exit code must be able to tell "ran, everything graded on its merits" apart
+    # from "claude CLI missing/broken/misconfigured, 0 cases actually executed" —
+    # which a bare `return 0` here could never distinguish.
+    if setup_errors:
+        print(f"\n{len(setup_errors)} setup error(s) — see setup_errors in benchmark.json "
+              f"and stderr above.", file=sys.stderr)
+        return 2
     return 0
 
 

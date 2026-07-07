@@ -56,8 +56,13 @@ session — a genuinely clean context per skill-creator's own `run_eval.py` patt
   comparison. `--safe-mode` is what actually makes this the baseline.
 
 Both configurations' token usage and wall-clock duration come straight from
-`claude -p --output-format json`'s own `result` event (`duration_ms`, `usage`,
-`total_cost_usd`) — no separate instrumentation. A second, tool-less `claude -p` call
+`claude -p --output-format stream-json --verbose`'s own `result` event (`duration_ms`,
+`usage`, `total_cost_usd`) — no separate instrumentation. `stream-json` (one JSON
+object per stdout line), not plain `json`, is used deliberately: plain
+`--output-format json` silently collapses to a single bare `result` object (no
+assistant/tool-call events at all) whenever `--setting-sources` excludes `"user"` —
+exactly what the `with_skill` leg's isolation flags do — which would otherwise starve
+every `with_skill` grading verdict of transcript/tool-call evidence. A second, tool-less `claude -p` call
 (the grader) scores the transcript against `expected_output` and writes `grading.json`
 with evidence. Everything rolls up into one `benchmark.json` per invocation.
 
