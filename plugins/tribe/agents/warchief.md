@@ -99,7 +99,12 @@ each milestone happens — dispatch received, spec committed, plan committed, ta
 task N audited PASS/FAIL, PR opened, CI green, merged, final status. Agents die silently
 (context exhaustion, crashes), and from outside a working Warchief and a dead one look
 identical — the heartbeat is what lets whoever finds your report file tell exactly how far you
-got and resume from the last line instead of re-deriving everything.
+got and resume from the last line instead of re-deriving everything. **The Shaman applies one
+committed threshold: no new heartbeat line for 30 minutes while you are mid-milestone reads as
+dead**, at which point it re-dispatches a fresh Warchief pointed at your saved worktree path,
+spec path, plan path, and your exact last heartbeat line. If a milestone will genuinely take
+longer than that, append an intermediate progress line rather than going quiet until it
+finishes.
 
 ---
 

@@ -508,7 +508,7 @@ Phrased in kitchen terms; software equivalent in parentheses.
 
 - **How many tasks per bundle?** Breakfast model: 1 dish per bundle. Software equivalent: usually 1 code file + 1 test file per bundle. Larger dishes (a multi-stage stew = a complex feature) might warrant more.
 - **What if there is no chalkboard?** (No git / no shared status mechanism.) Need a substitute: a sticky note per bundle, or a tracker file the kitchen shares. Skill should not assume git.
-- **Stale LOCKED — cook walked out mid-shift.** Bundle says LOCKED-BY-Alice-07:10 but Alice never came back. Recommend a timeout (e.g. older than 30 min → another cook may take over after marking BLOCKED + reason).
+- **Stale LOCKED — cook walked out mid-shift.** Bundle says LOCKED-BY-Alice-07:10 but Alice never came back. **Committed threshold: 30 minutes.** No status change since `locked_at` for 30 minutes → treat the lock as stale; another cook may take over after marking `BLOCKED` + reason (the same 30-minute no-new-heartbeat threshold the tribe's Shaman↔Warchief liveness check uses — not an example, the number).
 - **BLOCKED semantics — when does a cook set it vs. just abort?** Recommendation: set `BLOCKED` when the prereq says `DONE` but the actual handoff is missing/spoiled (eggs were marked done but pan is empty). Plain abort (drop the lock, take nothing) is fine for honest race losses.
 - **How to rename a shared parameter without breaking dependent bundles?** Recommendation: a rename is its own bundle whose owned scope lists every recipe card that mentions the old name. One cook, one pass, all references updated together.
 
