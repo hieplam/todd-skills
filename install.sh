@@ -13,7 +13,10 @@
 #
 # Behavior:
 #   - agents/*.md      -> $CLAUDE_DIR/agents/<file>
-#   - skills/<name>/   -> $CLAUDE_DIR/skills/<name>
+#   - skills/<name>/   -> $CLAUDE_DIR/skills/<name> (must have a SKILL.md — this is a real skill)
+#   - scripts/         -> not installed here; a plugin's own install.sh hook symlinks it
+#                         (e.g. tribe/scripts/ -> $CLAUDE_DIR/scripts/tribe). Bare scripts have
+#                         no SKILL.md, so they must not masquerade as a skills/<name>/ dir.
 #   - install.sh       -> executed as a post-install hook (CLAUDE_DIR is passed through);
 #                         claude-md/ holds snippets consumed by such hooks
 #   - already linked to this repo  -> skipped (idempotent)
@@ -102,10 +105,14 @@ install_plugin() {
   fi
 
   # Surface component types this script does not wire up.
+  # scripts/ is recognized-but-not-installed-here: a bare scripts/ dir has no SKILL.md, so it
+  # must not be a skills/ subdir (that would make the generic skills/ loop above symlink it as
+  # a fake "skill"). Instead a plugin ships it via its own install.sh hook (see tribe/install.sh
+  # for the pattern), which already ran above — so no warning for it.
   for d in "$dir"/*/; do
     name="$(basename "$d")"
     case "$name" in
-      agents|skills|claude-md|hooks|.claude-plugin) ;;
+      agents|skills|claude-md|hooks|scripts|.claude-plugin) ;;
       *) warn "$plugin/$name: unsupported component type — not installed" ;;
     esac
   done

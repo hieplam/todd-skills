@@ -96,16 +96,14 @@ You may be run two ways, and your contract return must survive both:
 
 **The report file is a heartbeat, not a eulogy.** Append a timestamped status line the moment
 each milestone happens — dispatch received, spec committed, plan committed, task N dispatched,
-task N audited PASS/FAIL, PR opened, CI green, merged, final status. Format each line
-`[<ISO8601 UTC>] <milestone>`, e.g. `[2026-07-07T14:32:00Z] plan committed` — that's what makes
-the heartbeat machine-checkable, not just human-readable. Agents die silently (context
-exhaustion, crashes), and from outside a working Warchief and a dead one look identical — the
-heartbeat is what lets whoever finds your report file tell exactly how far you got and resume
-from the last line instead of re-deriving everything. **The Shaman applies one committed
-threshold: no new heartbeat line for 30 minutes while you are mid-milestone reads as dead** —
-mechanically checked by `~/.claude/skills/tribe-scripts/scripts/heartbeat-check.sh <report-file>` (prints
-`alive`/`stale`/`unknown` plus the last heartbeat line) — at which point it re-dispatches a
-fresh Warchief pointed at your saved worktree path, spec path, plan path, and your exact last
+task N audited PASS/FAIL, PR opened, CI green, merged, final status. Agents die silently
+(context exhaustion, crashes), and from outside a working Warchief and a dead one look
+identical — the heartbeat is what lets whoever finds your report file tell exactly how far you
+got and resume from the last line instead of re-deriving everything. **The Shaman applies one
+committed threshold: no new heartbeat line for 30 minutes while you are mid-milestone reads as
+dead** — mechanically checked by `~/.claude/scripts/tribe/heartbeat-check.sh <report-file>`
+(prints `alive`/`stale`/`unknown` plus the last heartbeat line) — at which point it re-dispatches
+a fresh Warchief pointed at your saved worktree path, spec path, plan path, and your exact last
 heartbeat line. If a milestone will genuinely take longer than that, append an intermediate
 progress line rather than going quiet until it finishes.
 
@@ -211,7 +209,7 @@ _"Implementer: dispatch each implementation/fix task to the `hunter` subagent �
 implementer."_
 
 **Plan → validate → only then execute.** Before dispatching a single Hunter, run
-`~/.claude/skills/tribe-scripts/scripts/validate-plan.sh <plan-file>` against the committed plan. It mechanically
+`~/.claude/scripts/tribe/validate-plan.sh <plan-file>` against the committed plan. It mechanically
 checks the requirements above (task sections present, no placeholder markers, Global Constraints
 names the hunter subagent, every task carries a code block and an expected result) and prints a
 pass/fail JSON verdict. A `fail` verdict means fix the plan and re-validate before step 5 — do

@@ -4,15 +4,21 @@
 # buildable?" by prose reasoning on every dispatch. Plan -> validate -> only then execute.
 #
 # Checks, against the plan file's Markdown:
-#   - at least one task section exists (a heading whose text contains "Task")
+#   - at least one task section exists (a heading whose text starts with "Task N", per the
+#     writing-plans skill's "### Task N: [Component Name]" template — a heading that merely
+#     mentions the word "task" in passing, e.g. an overview heading like "## Task Breakdown",
+#     does not count)
 #   - a "Global Constraints" section exists and names the hunter subagent as the implementer
 #     (the exact line warchief.md's plan step requires)
 #   - no placeholder markers survive (TODO, TBD, FIXME, XXX, PLACEHOLDER, "...", "<...>") — the
-#     "<...>" check ignores CLI-usage notation written as inline code or inside a fenced code
-#     block (e.g. `heartbeat-check.sh <report-file>`), since that's this repo's own convention
-#     for documenting a script's arguments, not an unfinished placeholder
+#     "..." and "<...>" checks both ignore matches written as inline code or inside a fenced
+#     code block (e.g. `heartbeat-check.sh <report-file>`, or code using `...args`/`Ellipsis`/
+#     `Callable[..., int]`), since those are legitimate code idioms and this repo's own
+#     convention for documenting a script's arguments — not unfinished placeholders. TODO/TBD/
+#     FIXME/XXX/PLACEHOLDER are still checked everywhere, code or not.
 #   - each task section carries at least one fenced code block (actual commands/code, not
-#     prose-only) and mentions an expected result ("expected")
+#     prose-only, whether or not the fence is indented under a list item) and mentions an
+#     expected result ("expected")
 #
 # This does not (and cannot) judge whether the plan is *good* — only whether it is mechanically
 # well-formed enough to hand to a Hunter. Judgment stays with the Warchief/Skinner.
@@ -31,7 +37,7 @@ DIE() { LOG "ERROR: $*"; exit 2; }
 PLAN_FILE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     -*)         DIE "unknown flag: $1" ;;
     *)
       if [[ -n "$PLAN_FILE" ]]; then DIE "unexpected extra argument: $1"; fi
@@ -58,6 +64,11 @@ ANGLE_PLACEHOLDER_RE = re.compile(r"<[a-zA-Z_ -]{2,40}>")
 INLINE_CODE_RE = re.compile(r"`[^`]*`")
 CODE_FENCE_MARKER_RE = re.compile(r"^\s*```")
 
+# A real per-task section per the writing-plans skill's "### Task N: [Component Name]"
+# template — the title must *start* with "Task <number>", not merely contain the word
+# "task" (which would also sweep in an unrelated overview heading like "## Task Breakdown").
+TASK_HEADING_RE = re.compile(r"^task\s+\d+\b", re.IGNORECASE)
+
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
 # Split the file into (heading_level, heading_text, start_line, body_lines) sections.
@@ -76,7 +87,7 @@ if current is not None:
 if not sections:
     sections = [{"level": 0, "title": "(no headings)", "line": 1, "body": lines}]
 
-task_sections = [s for s in sections if re.search(r"\btask\b", s["title"], re.IGNORECASE)]
+task_sections = [s for s in sections if TASK_HEADING_RE.match(s["title"])]
 
 checks = []
 
@@ -110,15 +121,15 @@ else:
 
 # 3. no placeholder markers anywhere in the file
 # Angle-bracket notation (`<report-file>`) is this repo's own convention for documenting a
-# script's CLI arguments — it is not a placeholder when it's written as inline code or sits
-# inside a fenced code block, so that check is skipped there. TODO/TBD/etc and "..." are real
-# placeholder markers regardless of code formatting, so those are still checked everywhere.
+# script's CLI arguments, and "..." shows up in legitimate code (JS/TS rest/spread params like
+# `function foo(...args)`, Python `Callable[..., int]`/`Ellipsis`/`arr[..., 0]`) — neither is a
+# placeholder when it's written as inline code or sits inside a fenced code block, so both
+# checks are skipped there. TODO/TBD/FIXME/XXX/PLACEHOLDER are real placeholder markers
+# regardless of code formatting, so those are still checked everywhere.
 in_fence = False
 placeholder_hits = []
 for i, line in enumerate(lines, start=1):
     for m in WORD_PLACEHOLDER_RE.finditer(line):
-        placeholder_hits.append({"line": i, "match": m.group(0)})
-    for m in ELLIPSIS_RE.finditer(line):
         placeholder_hits.append({"line": i, "match": m.group(0)})
 
     if CODE_FENCE_MARKER_RE.match(line):
@@ -127,6 +138,8 @@ for i, line in enumerate(lines, start=1):
     if in_fence:
         continue
     stripped = INLINE_CODE_RE.sub("", line)
+    for m in ELLIPSIS_RE.finditer(stripped):
+        placeholder_hits.append({"line": i, "match": m.group(0)})
     for m in ANGLE_PLACEHOLDER_RE.finditer(stripped):
         placeholder_hits.append({"line": i, "match": m.group(0)})
 checks.append({
@@ -136,12 +149,14 @@ checks.append({
 })
 
 # 4. each task section carries a fenced code block and an expected-result mention
-CODE_FENCE_RE = re.compile(r"^```")
+# Reuses CODE_FENCE_MARKER_RE (leading whitespace allowed) rather than requiring column 0, so a
+# fence indented under a list item (e.g. nested under "- [ ] **Step 1: ...**", as the
+# writing-plans template's bullet-based Task Structure naturally invites) still counts.
 tasks_missing_code = []
 tasks_missing_expected = []
 for s in task_sections:
     body_text = "\n".join(s["body"])
-    fence_count = sum(1 for b in s["body"] if CODE_FENCE_RE.match(b))
+    fence_count = sum(1 for b in s["body"] if CODE_FENCE_MARKER_RE.match(b))
     if fence_count < 2:  # opening + closing fence == 1 code block minimum
         tasks_missing_code.append(s["title"])
     if not re.search(r"\bexpected\b", body_text, re.IGNORECASE):
