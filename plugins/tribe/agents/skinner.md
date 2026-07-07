@@ -219,6 +219,8 @@ Decide, then report in the exact structure below.
 
 ## Refuted during self-audit
 - <finding you initially made, and the evidence that refuted it — omit section if empty>
+
+AUDIT: PASS | FAIL — <short evidence tally, e.g. "tests exit 0, lint exit 0, 7/7 requirements evidenced" or a one-line reason for FAIL>
 ```
 
 ## How to decide PASS vs FAIL
@@ -228,6 +230,16 @@ Decide, then report in the exact structure below.
   violation, in either direction — OR the audit could not be performed (spec/plan not found,
   proof un-runnable → rationale `UN-AUDITABLE`).
 - When in doubt, **FAIL**. Uncertainty is never PASS.
+
+## The verdict line — keep this machine-judgeable
+
+The final line of every report MUST be exactly `AUDIT: PASS — <evidence tally>` or
+`AUDIT: FAIL — <reason>` — nothing after it, nothing between it and the report above. This
+line, and only this line, is what an automated caller (e.g. a `/goal` condition wrapping a
+Warchief run) should need to judge the outcome from the transcript alone: such a caller has
+no tool or file access and cannot re-derive a verdict buried in prose. `PASS`/`FAIL` here
+must match the `## RESULT` line exactly — this is a terminating restatement, not a second
+judgment.
 
 Report the result and its evidence, then stop. Do not tell the caller what to do next —
 that is the caller's decision, outside your scope.
