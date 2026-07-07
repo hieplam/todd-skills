@@ -11,7 +11,8 @@ reusing a session) instead of inventing a new mechanism.
 For every case, up to two configurations are run:
 
   with_skill     the skill/agent under test is made available for this invocation
-                 only:
+                 only, and nothing else installed at user scope on the host
+                 machine leaks in:
                    - skill evals (kind: "skill") register a throwaway project
                      command file under .claude/commands/ whose `description:`
                      is the real SKILL.md description, exactly like
@@ -23,6 +24,27 @@ For every case, up to two configurations are run:
                      `--agent`, independent of whether it happens to be
                      symlink-installed locally — the eval targets the agent
                      definition in this repo, not the local install state.
+                   - both call `claude -p` with `--setting-sources project
+                     --strict-mcp-config` (never `--safe-mode`, which would
+                     also suppress the throwaway command / --agents payload
+                     this leg depends on). `--setting-sources project` loads
+                     only the scratch cwd's own `.claude/` — i.e. the one
+                     throwaway command we just wrote there — and excludes the
+                     user-scope settings source entirely, so every other
+                     locally-installed marketplace plugin/skill (this repo's
+                     own tribe/splitting-plans/check-diff-coverage/
+                     refactor-for-testability included, plus anything else
+                     symlink-installed at user scope) is invisible for this
+                     run; `--strict-mcp-config` with no `--mcp-config` drops
+                     every user-configured MCP server the same way. Verified
+                     empirically: registering a throwaway command and running
+                     `claude -p ... --setting-sources project
+                     --strict-mcp-config` reports exactly the built-in
+                     baseline slash_commands plus the one throwaway command
+                     (`plugins: []`, `mcp_servers: []` in the `system`/`init`
+                     event) — none of the other locally-installed marketplace
+                     plugins appear, unlike an unflagged call which reports
+                     all of them simultaneously.
   without_skill  a `claude -p --safe-mode` call — nothing registered AND all
                  user-level customizations (CLAUDE.md, skills, plugins, hooks,
                  MCP servers, custom commands/agents) disabled, so a skill
@@ -120,7 +142,8 @@ def parse_frontmatter(path: Path) -> tuple[dict, str]:
 
 def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
                 agents_json: dict | None = None, agent_name: str | None = None,
-                tools: str | None = None, safe_mode: bool = False) -> dict:
+                tools: str | None = None, safe_mode: bool = False,
+                isolate_user_scope: bool = False) -> dict:
     """Run one isolated `claude -p` process and return its parsed result.
 
     Returns a dict with at least: ok (bool), events (list, may be empty on
@@ -146,6 +169,26 @@ def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
         # with_skill needs the throwaway project command / --agents payload
         # to actually be visible, which --safe-mode would itself suppress.
         cmd += ["--safe-mode"]
+    if isolate_user_scope:
+        # with_skill's equivalent of --safe-mode: keep the one throwaway
+        # project command / --agents payload visible (--safe-mode would
+        # suppress those too) while still excluding every OTHER
+        # locally-installed marketplace plugin/skill and every
+        # user-configured MCP server, so the comparison isn't confounded by
+        # whatever else happens to be symlink-installed on the machine
+        # running the harness.
+        #   --setting-sources project   loads only the scratch cwd's own
+        #     .claude/ (the throwaway command file we just wrote there);
+        #     the user-scope settings source — where this repo's own
+        #     marketplace plugins are normally installed — is excluded.
+        #   --strict-mcp-config         with no --mcp-config passed, drops
+        #     every user-configured MCP server the same way.
+        # Verified empirically: with these two flags, the `system`/`init`
+        # event's `plugins` and `mcp_servers` are both `[]` and
+        # `slash_commands` is exactly the built-in baseline plus the one
+        # throwaway command — none of the other locally-installed
+        # marketplace plugins (e.g. superpowers:writing-plans) appear.
+        cmd += ["--setting-sources", "project", "--strict-mcp-config"]
 
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
@@ -351,6 +394,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             case["prompt"], cwd=scratch, timeout=timeout, model=exec_model,
             agents_json=agents_json, agent_name=agent_name,
             safe_mode=(configuration == "without_skill"),
+            isolate_user_scope=(configuration == "with_skill"),
         )
         if not exec_run["ok"]:
             return {"error": exec_run["error"], "configuration": configuration}
