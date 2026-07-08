@@ -96,35 +96,73 @@ def parse_frontmatter(path):
     if end is None:
         return None, "missing frontmatter (no closing '---')"
 
-    fm = {}
-    current_list_key = None
-    for raw in lines[1:end]:
+    def clean(raw):
+        """Return (indent, comment-stripped-stripped-text) for a raw frontmatter line, or
+        None if the line is blank/comment-only."""
         line = raw.rstrip("\n")
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
-            continue
-        # comment stripping for inline `key: value  # comment`
+            return None
         if " #" in stripped:
             stripped = stripped.split(" #", 1)[0].rstrip()
+        indent = len(line) - len(line.lstrip())
+        return indent, stripped
 
-        if stripped.startswith("- ") and current_list_key:
-            fm.setdefault(current_list_key, []).append(stripped[2:].strip().strip('"\''))
+    block = lines[1:end]
+    fm = {}
+    i, n = 0, len(block)
+    while i < n:
+        cur = clean(block[i])
+        if cur is None:
+            i += 1
+            continue
+        indent, stripped = cur
+
+        # An orphan `- item` with no preceding scalar-turned-list key: ignore.
+        if stripped.startswith("- "):
+            i += 1
             continue
 
         m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", stripped)
         if not m:
+            i += 1
             continue
         key, val = m.group(1), m.group(2).strip()
+
         if val == "":
-            fm[key] = []
-            current_list_key = key
+            # Value-less scalar (`locked_by:`) vs. start of a nested list (`owns_files:`
+            # followed by `- item`) look identical on this line alone. Disambiguate by
+            # looking ahead: only a `- `-prefixed line indented deeper than this key
+            # makes it a list; anything else (including EOF, a same/lower-indent line,
+            # e.g. the next key) means the scalar's value is empty ("", falsy) rather
+            # than the truthy `[]` a naive read would produce.
+            items = []
+            j = i + 1
+            while j < n:
+                nxt = clean(block[j])
+                if nxt is None:
+                    j += 1
+                    continue
+                nxt_indent, nxt_stripped = nxt
+                if nxt_stripped.startswith("- ") and nxt_indent > indent:
+                    items.append(nxt_stripped[2:].strip().strip('"\''))
+                    j += 1
+                    continue
+                break
+            if items:
+                fm[key] = items
+                i = j
+                continue
+            fm[key] = ""
+            i += 1
             continue
-        current_list_key = None
+
         if val.startswith("[") and val.endswith("]"):
             inner = val[1:-1].strip()
             fm[key] = [v.strip().strip('"\'') for v in inner.split(",") if v.strip()] if inner else []
         else:
             fm[key] = val.strip('"\'')
+        i += 1
     return fm, None
 
 # Bundle filename shape per SKILL.md §4.1: one-or-more leading digits, a dash, a title, `.md`.

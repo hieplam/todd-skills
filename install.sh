@@ -106,6 +106,9 @@ install_plugin() {
     name="$(basename "$d")"
     case "$name" in
       agents|skills|claude-md|hooks|.claude-plugin) ;;
+      # scripts/ holds validator scripts invoked from the repo checkout
+      # directly (not symlinked); intentionally not installed, skip silently.
+      scripts) ;;
       *) warn "$plugin/$name: unsupported component type — not installed" ;;
     esac
   done

@@ -100,6 +100,23 @@ if current is not None:
 if not sections:
     sections = [{"level": 0, "title": "(no headings)", "line": 1, "body": lines}]
 
+# A Task's own body (`section["body"]`) stops at the very next heading of ANY level, so a Task
+# whose steps use nested subheadings (e.g. "#### Step 1: ...") has that step's fenced code block
+# and "Expected:" line split off into the subheading's own section — never seen by a check that
+# only reads the Task's own body. Fold every subheading strictly deeper than a section's level
+# into that section's `full_body`, so nested content is attributed to its nearest ancestor
+# (stopping at the next heading of the same or shallower level, which starts a sibling/parent
+# section instead). `full_body` is additive — `body` is left untouched for callers that want the
+# section's direct-only content.
+for idx, s in enumerate(sections):
+    full_body = list(s["body"])
+    for other in sections[idx + 1:]:
+        if other["level"] <= s["level"]:
+            break
+        full_body.append(other["title"])
+        full_body.extend(other["body"])
+    s["full_body"] = full_body
+
 task_sections = [s for s in sections if TASK_HEADING_RE.match(s["title"])]
 
 checks = []
@@ -178,8 +195,8 @@ checks.append({
 tasks_missing_code = []
 tasks_missing_expected = []
 for s in task_sections:
-    body_text = "\n".join(s["body"])
-    fence_count = sum(1 for b in s["body"] if CODE_FENCE_MARKER_RE.match(b))
+    body_text = "\n".join(s["full_body"])
+    fence_count = sum(1 for b in s["full_body"] if CODE_FENCE_MARKER_RE.match(b))
     if fence_count < 2:  # opening + closing fence == 1 code block minimum
         tasks_missing_code.append(s["title"])
     if not re.search(r"\bexpected\b", body_text, re.IGNORECASE):
