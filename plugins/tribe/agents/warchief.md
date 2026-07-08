@@ -227,13 +227,19 @@ _"Implementer: dispatch each implementation/fix task to the `hunter` subagent �
 implementer."_
 
 **Plan → validate → only then execute.** Before dispatching a single Hunter, run
-`validate-plan.sh <plan-file>` against the committed plan — resolve its path the same way as
-`heartbeat-check.sh` above (`dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"`,
-then `"$dir/validate-plan.sh" <plan-file>`). It mechanically checks the requirements above (task
-sections present, no placeholder markers, Global Constraints names the hunter subagent, every
-task carries a code block and an expected result) and prints a pass/fail JSON verdict. A `fail`
-verdict means fix the plan and re-validate before step 5 — do not proceed to orchestration on an
-unvalidated plan.
+`validate-plan.sh <plan-file>` against the committed plan — resolve its path exactly the same way
+as `heartbeat-check.sh` above, trying both install mechanisms this repo supports, in order:
+`dir="${CLAUDE_PLUGIN_ROOT:-}/scripts"; [ -f "$dir/validate-plan.sh" ] || dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"`.
+As above, `$CLAUDE_PLUGIN_ROOT` is tried first (covers a native-plugin/marketplace-cache install,
+whose cache copies the whole plugin directory tree so `scripts/` lands as a sibling of `agents/`
+there too), and the `readlink -f` derivation is the fallback for the local symlink-install path.
+**If neither yields an existing `$dir/validate-plan.sh`, stop and return `NEEDS_DIRECTION`**
+("plan validator not found under either install path") — never fall through to invoking a path
+that doesn't exist. Once resolved, invoke `"$dir/validate-plan.sh" <plan-file>`. It mechanically
+checks the requirements above (task sections present, no placeholder markers, Global Constraints
+names the hunter subagent, every task carries a code block and an expected result) and prints a
+pass/fail JSON verdict. A `fail` verdict means fix the plan and re-validate before step 5 — do not
+proceed to orchestration on an unvalidated plan.
 
 ### 4. Set up isolation
 

@@ -102,16 +102,10 @@ install_plugin() {
   fi
 
   # Surface component types this script does not wire up.
-  #
-  # `scripts/` is a recognized no-op: helper scripts an agent/skill's own prose resolves
-  # at invocation time (via $CLAUDE_PLUGIN_ROOT or a readlink derivation off its own
-  # installed file), not something this installer needs to symlink separately — it rides
-  # along for free as a plain sibling directory in the repo. Anything else here really is
-  # unwired and should keep warning.
   for d in "$dir"/*/; do
     name="$(basename "$d")"
     case "$name" in
-      agents|skills|claude-md|hooks|.claude-plugin|scripts) ;;
+      agents|skills|claude-md|hooks|.claude-plugin) ;;
       *) warn "$plugin/$name: unsupported component type — not installed" ;;
     esac
   done

@@ -14,8 +14,12 @@
 #     "..." and "<...>" checks both ignore matches written as inline code or inside a fenced
 #     code block (e.g. `heartbeat-check.sh <report-file>`, or code using `...args`/`Ellipsis`/
 #     `Callable[..., int]`), since those are legitimate code idioms and this repo's own
-#     convention for documenting a script's arguments — not unfinished placeholders. TODO/TBD/
-#     FIXME/XXX/PLACEHOLDER are still checked everywhere, code or not.
+#     convention for documenting a script's arguments — not unfinished placeholders. The "..."
+#     check additionally only fires when the ellipsis trails off the line (nothing but
+#     whitespace/punctuation after it) — an ellipsis followed by more prose on the same line is
+#     ordinary punctuation (a quoted excerpt or a pause), not a placeholder, and flagging it
+#     false-positives on normal writing. TODO/TBD/FIXME/XXX/PLACEHOLDER are still checked
+#     everywhere, code or not.
 #   - each task section carries at least one fenced code block (actual commands/code, not
 #     prose-only, whether or not the fence is indented under a list item) and mentions an
 #     expected result ("expected")
@@ -148,6 +152,16 @@ for i, line in enumerate(lines, start=1):
         continue
     stripped = INLINE_CODE_RE.sub("", line)
     for m in ELLIPSIS_RE.finditer(stripped):
+        # A "trailing" ellipsis — nothing but whitespace/punctuation after it on this line —
+        # reads as content trailing off unfinished ("Run the deploy steps..."), the actual
+        # placeholder this check exists to catch. An ellipsis followed by more prose on the
+        # same line ("reads every rule source fresh... derives a checklist... reviews the
+        # diff") is ordinary punctuation quoting an excerpt or marking a pause, not a
+        # placeholder — flagging it produces false positives on normal writing (this repo's
+        # own roadmap spec uses it exactly this way), so it's excluded.
+        tail = stripped[m.end():]
+        if re.search(r"[A-Za-z0-9]", tail):
+            continue
         placeholder_hits.append({"line": i, "match": m.group(0)})
     for m in ANGLE_PLACEHOLDER_RE.finditer(stripped):
         placeholder_hits.append({"line": i, "match": m.group(0)})

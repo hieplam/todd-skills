@@ -236,26 +236,6 @@ plan-validator script location TBD at implementation. Referencing edits to
 `shaman.md`/`warchief.md`/`splitting-plans/SKILL.md` to invoke the new scripts, but no change
 to the underlying gate semantics (status vocabulary, lock rules) they check.
 
-**Reachability note (resolved in-fence, round-2 fix — supersedes the round-3 "scope amendment"
-that briefly lived here):** `validate-locks.sh` lives under
-`splitting-plans/skills/splitting-plans/scripts/`, an existing *real* skill (has a SKILL.md), so
-it's already reachable via `install.sh`'s existing skills-symlink support with no installer
-change. `heartbeat-check.sh` and `validate-plan.sh` are fixed by this card to a bare
-`plugins/tribe/scripts/` path — `tribe` has no `skills/` directory, so there's no
-symlink-the-whole-plugin mechanism for it. A prior round patched this by adding a `scripts`
-component type to root `install.sh` and a second symlinking job to `plugins/tribe/install.sh` —
-that touched files outside this card's scope fence and was never ratified by a card/spec owner,
-so it was reverted. The actual fix needs no installer change at all: `install.sh` already
-symlinks each `agents/*.md` file individually (e.g. `~/.claude/agents/warchief.md` ->
-`<repo>/plugins/tribe/agents/warchief.md`), so an agent can resolve its own real (repo) path
-with `readlink -f` and derive the sibling `scripts/` directory from it —
-`dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"` — entirely
-at invocation time, in the agent's own instructions, with zero installer involvement. Verified by
-symlinking `tribe`'s agents into a scratch `CLAUDE_DIR` and confirming the derived path lands on
-`plugins/tribe/scripts/{heartbeat-check.sh,validate-plan.sh}` regardless of the agent's cwd.
-`shaman.md` and `warchief.md` now use this derivation instead of a hardcoded
-`~/.claude/scripts/tribe/...` path.
-
 **Priority:** Enhancement — depends on item 2 for the heartbeat threshold it encodes.
 
 ---
