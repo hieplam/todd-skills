@@ -114,11 +114,28 @@ allowed only for cards with no dependency edge between them, each in its own wor
   heartbeat**: the Warchief appends a timestamped line at every milestone (dispatch received →
   spec → plan → task N → audit → PR → merged).
 - **Silence is not status.** A quiet Warchief is neither presumed working nor presumed dead —
-  read its report-file heartbeat. Recent progress → leave it alone. **No new heartbeat line for
-  30 minutes while mid-milestone = dead** (the tribe's one committed staleness threshold — same
-  number `splitting-plans` uses for a stale lock). Once dead, re-dispatch a fresh Warchief
-  pointed at the saved worktree path, spec path, plan path, and the exact last heartbeat line
-  verbatim — not a summary of it. Checking liveness and the resume point is operational
+  read its report-file heartbeat. Resolve the checker's path once per session, trying both install
+  mechanisms this repo supports, in order:
+  `dir="${CLAUDE_PLUGIN_ROOT:-}/scripts"; [ -f "$dir/heartbeat-check.sh" ] || dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/shaman.md)")")/scripts"`.
+  `$CLAUDE_PLUGIN_ROOT` is Claude Code's own plugin-root variable, set when tribe loads as a
+  native plugin — including a marketplace/plugin-cache install, whose cache copies the *whole*
+  plugin directory tree, so `scripts/` still lands as a sibling of `agents/` there too. The
+  `readlink -f` fallback instead walks the symlink `install.sh` creates for `agents/shaman.md`
+  back to the repo, covering the local symlink-install path. **If neither yields an existing
+  `$dir/heartbeat-check.sh`, do not guess or skip the check** — treat it like `unknown` below and
+  say so explicitly rather than silently invoking a path that doesn't exist. Once resolved, run
+  `"$dir/heartbeat-check.sh" <report-file>` instead of eyeballing timestamps — it prints
+  `alive`/`stale`/`unknown` plus the exact last heartbeat line as JSON, so the 30-minute rule is
+  applied the same way every time. Recent progress (`alive`) → leave it alone. **No new heartbeat
+  line for 30 minutes while mid-milestone = dead** (`stale`; the tribe's one committed staleness
+  threshold — same number `splitting-plans` uses for a stale lock). **`unknown` (no parseable
+  ISO-8601 timestamp found on any line) is treated the same as `stale`, not as a third
+  do-nothing case** — a report file with no readable heartbeat is exactly as unusable as a dead
+  one. In both `stale` and `unknown` cases, re-dispatch a fresh Warchief pointed at the saved
+  worktree path, spec path, plan path, and the exact last heartbeat line verbatim (or, if
+  `unknown`, the exact last non-empty line, whatever its format) — not a summary of it; for
+  `unknown` specifically, the re-dispatched Warchief's first job is to correct the report file's
+  timestamp format going forward. Checking liveness and the resume point is operational
   diagnostics, NOT reviewing the How — you are reading how far it got, not grading its spec or
   plan.
 - **Your own upward channel mirrors this.** If YOU were spawned as a background teammate (your
@@ -297,10 +314,11 @@ The owner has approved the roadmap and set the batch. Now you are the master run
      shipped; re-sequence if the ship revealed new information. A `verify-shipped` `FAIL` is not
      `SHIPPED` — treat it like `BLOCKED` and send it back to the Warchief with the failing check
      attached.
-   - Silence → not a status: read the Warchief's report-file heartbeat (see Channels &
-     liveness). Progressing → wait; **no new line for 30 minutes while mid-milestone → dead** —
-     re-dispatch a fresh Warchief from the saved worktree path, spec path, plan path, and the
-     exact last heartbeat line, and log what happened.
+   - Silence → not a status: run `heartbeat-check.sh <report-file>` exactly as resolved and
+     invoked under **Channels & liveness** above — never eyeball timestamps here either.
+     `alive` → wait. `stale` or `unknown` → re-dispatch a fresh Warchief from the saved worktree
+     path, spec path, plan path, and the exact last heartbeat line the script printed, and log
+     what happened.
 4. **Continue** until the batch is done, then report to the owner: shipped cards with PR links
    and evidence, the rulings you made on their behalf, any escalations still pending, and your
    recommended next batch.
