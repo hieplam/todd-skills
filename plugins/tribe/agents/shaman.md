@@ -331,11 +331,21 @@ default:
   conversation transcript, with no tool or file access to check the escalation register itself,
   so the literal marker — not the bare word `NEEDS_DIRECTION` or `BLOCKED`, which also appear on
   every routine, non-halting round — is the only signal it can act on to stop the loop.
-- **Unattended-safe by construction.** An automated fire must never stall on a prompt nobody is
-  there to answer. Set `disallowed-tools: AskUserQuestion` on the dispatched agents for the
-  duration of the routine, so a run can't block on the question tool — anything that would have
-  gone to the owner becomes a Decision Log entry awaiting their return, per the escalation
-  register, instead of a hung process.
+- **Unattended-safe already, by construction — verify, don't edit.** An automated fire must
+  never stall on a prompt nobody is there to answer. Check this before wiring anything, don't
+  add a gate for it: the Warchief's `tools:` frontmatter (`Read, Write, Edit, Grep, Glob, Bash,
+  Task, TodoWrite, SendMessage`) and the Hunter's (`Read, Write, Edit, Grep, Glob, Bash`) never
+  included `AskUserQuestion` to begin with, on master or on any branch — and Claude Code agent
+  `tools:` is a strict allow-list, so neither can call it, with or without any `/schedule` or
+  `/loop` wrapping. There is nothing to disable here; do not edit those files' frontmatter for
+  this reason. Doing so would be a no-op for the tool gap and, worse, out of this card's
+  documentation-only scope fence if actually carried out — a frontmatter change persists for
+  every future invocation of those agents, not just "the duration of the routine." Everything
+  that would otherwise have gone to the owner already becomes a Decision Log entry awaiting
+  their return, per the escalation register, because the tool was never reachable to begin
+  with. The real place an unattended run can stall is a **tool-use permission prompt** — Bash or
+  Edit awaiting an approve/deny click nobody is there to give — and that risk is exactly what
+  the next bullet's permission-mode choice closes.
 - **Permission posture propagates down the chain.** A subagent inherits the lead's permission
   mode at spawn time, so whatever mode you launch the routine in is the mode the Warchief and
   Hunter it dispatches will run under too — choose that mode deliberately for unattended runs
