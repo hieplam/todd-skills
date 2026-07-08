@@ -253,8 +253,10 @@ rounds.
   uses to block on CI — looped over every run GitHub attaches to the PR's head commit. Warchief
   targets arbitrary repos that commonly run several workflows (lint/test/build) per push, unlike
   `research-to-blog`'s one pinned `deploy.yml`, so watching a single hardcoded run is not enough;
-  looping `gh run watch` over each run tied to the head SHA keeps the same blocking mechanism
-  while covering the full check set:
+  looping `gh run watch` over each run tied to the head SHA, and re-polling `gh run list` after
+  each pass until no run beyond the ones already watched shows up, keeps the same blocking
+  mechanism while covering the full check set — including runs that register late (e.g. a
+  `workflow_run`-gated workflow that only starts once an earlier one concludes):
   ```
   SHA=$(gh pr view --json headRefOid -q .headRefOid)
   RUN_IDS=""
@@ -272,8 +274,31 @@ rounds.
     # run list.
   else
     FAILED=0
-    for RID in $RUN_IDS; do
-      timeout 20m gh run watch "$RID" --exit-status || FAILED=1
+    WATCHED=""
+    PENDING="$RUN_IDS"
+    while [ -n "$PENDING" ]; do
+      for RID in $PENDING; do
+        # A `timeout` exit (124) means the run is merely still in progress after 20m — that is
+        # NOT a failure: log a heartbeat and re-watch the same run ID. Only a non-124 non-zero
+        # exit is an actual CI failure.
+        while true; do
+          timeout 20m gh run watch "$RID" --exit-status
+          STATUS=$?
+          if [ "$STATUS" -eq 124 ]; then
+            echo "still waiting on run $RID"
+            continue
+          elif [ "$STATUS" -ne 0 ]; then
+            FAILED=1
+          fi
+          break
+        done
+        WATCHED="$WATCHED $RID"
+      done
+      # Re-poll: a run can attach to this head SHA after the last snapshot (late-registering
+      # workflow_run-gated job, bot-added required check, re-run). Keep looping only over IDs
+      # not yet watched; stop once a poll turns up nothing new.
+      ALL_RUN_IDS=$(gh run list --commit "$SHA" --json databaseId -q '.[].databaseId')
+      PENDING=$(comm -13 <(echo "$WATCHED" | tr ' ' '\n' | sort -u) <(echo "$ALL_RUN_IDS" | tr ' ' '\n' | sort -u))
     done
   fi
   ```
@@ -281,12 +306,12 @@ rounds.
   E2E suites, flaky retries) — and while blocked inside it you have no turn to append a
   heartbeat line, which would otherwise read as dead under the 30-minute staleness rule above.
   Bound each watch under a timeout shorter than that threshold (`timeout 20m ...` shown above;
-  substitute your shell's equivalent, e.g. `gtimeout` on macOS without GNU coreutils). If a
-  `timeout` exit (124) fires before the run concludes, append a heartbeat line ("still waiting
-  on run `$RID`") and re-invoke `gh run watch` on the same run ID — this keeps the check-in
-  cadence at ~20 minutes instead of every turn, satisfying both "block, don't poll" and the
-  Shaman's liveness contract. For the common case (CI finishing well under 20 minutes) this is
-  indistinguishable from one unbounded blocking call.
+  substitute your shell's equivalent, e.g. `gtimeout` on macOS without GNU coreutils). The loop
+  above already re-invokes `gh run watch` on the same run ID when `timeout` fires (exit 124) and
+  logs the heartbeat itself — this keeps the check-in cadence at ~20 minutes instead of every
+  turn, satisfying both "block, don't poll" and the Shaman's liveness contract, while a genuine
+  CI failure (any other non-zero exit) is what actually sets `FAILED=1`. For the common case (CI
+  finishing well under 20 minutes) this is indistinguishable from one unbounded blocking call.
 
   Only once a run has actually failed does "Fix real failures (via a Hunter) rather than forcing
   through" apply; then re-push and repeat the watch loop for the new commit. If addressing
