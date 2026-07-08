@@ -231,9 +231,17 @@ existing isolation and refuse to create another — "Do NOT create another workt
 what it will tell you, which would silently defeat this whole step. Instead, create each
 sub-plan's worktree with a **direct git command**, run from inside your current worktree (a
 linked worktree's `git` shares the common `.git` with the main checkout, so `git worktree add`
-from here registers correctly regardless of which worktree you run it in):
+from here registers correctly regardless of which worktree you run it in).
+
+**Make creation resume-safe.** A re-dispatched Warchief resuming mid-campaign will hit this
+step again with the same `<path-per-sub-plan>`/`<branch-per-sub-plan>` names it used before —
+`git worktree add` on an existing path or `-b` on an existing branch is a hard failure, not a
+no-op, so a naive re-run deadlocks. Before adding, clear any stale worktree/branch left at that
+path from a prior attempt (harmless if neither exists yet):
 
 ```bash
+git worktree remove <path-per-sub-plan> --force 2>/dev/null || true
+git branch -D <branch-per-sub-plan> 2>/dev/null || true
 git worktree add <path-per-sub-plan> -b <branch-per-sub-plan> <recorded-base-commit-sha>
 ```
 
@@ -267,7 +275,20 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
   integration point every wave merges into and the branch step 7 opens the one PR from. Between
   wave N and wave N+1:
 
-  1. Wait for every Hunter in wave N to report (audited per step 6).
+  1. Wait for every Hunter in wave N to report, each audited per step 6.
+
+     **Mixed-outcome wave (must-handle):** a wave is not done when some sub-plans pass and
+     others don't — audit each sub-plan independently, and if **any** sub-plan in the wave
+     exhausts step 6's 3-round fix cap and comes back FAIL, treat the **whole wave** as failed
+     integration, even the sub-plans that passed. **Do not merge any of the wave's branches** —
+     partial integration would land an unreviewable mix and make the failing sub-plan someone
+     else's problem to untangle later. Instead: leave every wave-N worktree and branch exactly
+     as it is (do not remove them — the passing work must survive to resume), record in the
+     report file which sub-plans passed and which hit the cap (with the Skinner's round-3 FAIL
+     report attached verbatim, per step 6), and save state + return `NEEDS_DIRECTION` to the
+     Shaman with that mixed status. This is the same 3-round-cap → `NEEDS_DIRECTION` escalation
+     as step 6, just evaluated per-wave instead of per-sub-plan. Only proceed to step 2 once
+     **every** sub-plan in the wave has passed its audit.
   2. From inside your own worktree, merge each of wave N's sub-plan branches into it, one at a
      time (fixed order, e.g. sub-plan order in the plan):
      ```bash
@@ -276,14 +297,26 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
      Sub-plans in the same wave have disjoint `owns_files`, so this should never conflict; if a
      merge does conflict, that means `owns_files` was wrong — do not guess at a resolution,
      save state and return `NEEDS_DIRECTION` to the Shaman instead.
-  3. Once every wave-N branch is merged, re-record the base commit as your worktree's new HEAD:
+
+     **Clean up the merged worktree immediately** — it is now fully folded into your own
+     branch, so leaving it around only leaks disk state and, worse, blocks a resumed Warchief
+     from reusing the same path/branch names for a future wave:
+     ```bash
+     git worktree remove <path-per-sub-plan> --force
+     git branch -D <branch-per-sub-plan>
+     ```
+     Do this per sub-plan right after its merge lands, before moving to the next sub-plan's
+     merge.
+  3. Once every wave-N branch is merged (and its worktree/branch cleaned up), re-record the
+     base commit as your worktree's new HEAD:
      ```bash
      git -C <your-worktree-path> rev-parse HEAD
      ```
      This new SHA is what step 4 uses as "the currently-recorded base commit" for wave N+1 — it
      is what wave N+1's per-sub-plan worktrees are created from, so wave N+1 builds on wave N's
      merged output instead of on stale pre-wave-1 code.
-  4. Only now create wave N+1's per-sub-plan worktrees (step 4) and dispatch its Hunters.
+  4. Only now create wave N+1's per-sub-plan worktrees (step 4 — whose creation is itself
+     resume-safe) and dispatch its Hunters.
 
   A plan with only one wave, or a wave of one sub-plan, has nothing to integrate mid-flight — its
   single branch (or your own worktree, if there was never a second worktree) simply carries

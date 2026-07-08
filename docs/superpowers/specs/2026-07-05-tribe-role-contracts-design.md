@@ -131,22 +131,34 @@ its worktree + spec + plan + report file. Every dispatch grounds the receiver in
 - **Nested dispatch depth.** Shaman → Warchief → Hunter is two levels of Task nesting;
   Warchief → Hunter is proven in this repo, the extra level is not. Smoke-test after landing.
   Documented fallback: run the Shaman in the main conversation when campaigning.
-  - **Smoke-test result (2026-07-08): PASSED.** Ran a cheap, bounded 2-level nesting probe —
-    a headless `claude -p` invocation (`--model haiku`, `--allowedTools Task`,
-    `--dangerously-skip-permissions`, `--output-format json`) whose only instruction was to
-    dispatch a level-1 `general-purpose` subagent that itself dispatched a level-2
-    `general-purpose` subagent. The level-2 agent replied a canary string
-    (`CANARY-7f3a1c`); the level-1 agent relayed it verbatim; the top-level run's final
-    result was `RESULT=CANARY-7f3a1c` — an exact match end to end, `is_error: false`,
-    `permission_denials: []`, 3 turns, ~34s wall time, $0.22 total cost (Claude Code
-    2.1.204). This confirms the platform mechanism two-level `Task`/Agent nesting and
-    message relay both work as of this version; it does **not** by itself validate that the
-    real `shaman.md` → `warchief.md` → `hunter.md` prompts behave correctly at that depth —
-    only that the nesting depth itself is not the platform-level blocker the Risks section
-    flagged it as. The documented fallback (run the Shaman in the main conversation when
-    campaigning) remains available and is not withdrawn by this result. This unblocks
-    card 10 of `docs/superpowers/specs/2026-07-07-loops-applied-to-todd-skills.md` (parallel
-    Hunter dispatch), whose prerequisite was exactly this smoke test.
+  - **Smoke-test result (2026-07-08): PASSED, artifact-backed.** An earlier self-reported
+    pass (commit 3d443db, unaudited) was superseded because its methodology could not rule
+    out a "collapsed" single-dispatch false pass — a canary relayed end-to-end looks
+    identical whether it traversed two real nesting levels or the runtime silently
+    flattened the dispatch to one. This result replaces that claim with a run whose
+    evidence is committed at
+    `docs/superpowers/evidence/2026-07-08-nesting-smoke-test.json` and was audited by
+    inspecting raw transcripts rather than trusting either agent's self-report.
+    **Audit method:** dispatch a level-1 `general-purpose` subagent that itself dispatches
+    a level-2 `general-purpose` subagent, then inspect L1's own transcript for exactly one
+    `Agent` tool_use (proving L1 issued a real nested dispatch, not just forwarding a
+    prompt), and confirm L2's session is registered **under L1's session's `subagents/`
+    directory** rather than under the top-level session. That placement is the
+    discriminator: a collapsed single dispatch would register L2 directly under the top
+    session with no corresponding `Agent` tool_use in L1's transcript, while genuine
+    2-level nesting registers L2 under L1. In the committed artifact, L1 (session
+    `bb81300c-5573-4c8d-bc6a-8c06769de4c3`) shows exactly one `Agent` tool_use dispatching
+    L2 (`agentId a824966139fdfdac8`, `spawnDepth 1`), L2 is registered under L1's session's
+    `subagents/` dir, and L2 returned the canary `NEST-OK-13442-ZULU` — ruling out the
+    level-collapse failure mode the earlier unaudited record could not exclude. This
+    confirms the platform mechanism two-level `Task`/Agent nesting and message relay both
+    work; it does **not** by itself validate that the real `shaman.md` → `warchief.md` →
+    `hunter.md` prompts behave correctly at that depth — only that the nesting depth itself
+    is not the platform-level blocker the Risks section flagged it as. The documented
+    fallback (run the Shaman in the main conversation when campaigning) remains available
+    and is not withdrawn by this result. This unblocks card 10 of
+    `docs/superpowers/specs/2026-07-07-loops-applied-to-todd-skills.md` (parallel Hunter
+    dispatch), whose prerequisite was exactly this smoke test.
 - **Fresh-instance drift.** A re-dispatched Warchief re-grounds from files; if state isn't
   committed before `NEEDS_DIRECTION`, context is lost. Mitigated by making state-saving a
   contract requirement.

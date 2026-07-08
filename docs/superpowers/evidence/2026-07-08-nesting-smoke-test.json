@@ -1,0 +1,16 @@
+{
+  "test": "2-level Task nesting (subagent dispatches subagent)",
+  "method": "main-session -> L1 general-purpose agent -> L2 general-purpose agent; verified by inspecting L1 transcript for its OWN Agent tool_use and confirming L2 transcript is registered under L1 session subagents (not main session)",
+  "L1_session": "bb81300c-5573-4c8d-bc6a-8c06769de4c3",
+  "L1_agent_tool_use_count": 1,
+  "L1_dispatched": [
+    {
+      "subagent_type": "general-purpose",
+      "prompt": "You are the level-2 agent. Compute the sum 4127 + 9315 and reply with exactly this format and nothing else: NEST-OK-<sum>-ZULU. Do not explain."
+    }
+  ],
+  "L2_agentId": "a824966139fdfdac8",
+  "L2_meta": "spawnDepth:1, under L1 session subagents/ dir",
+  "L2_returned": "NEST-OK-13442-ZULU",
+  "verdict": "PASS \u2014 genuine 2-level nesting; L1 issued its own Agent call and L2 is a subagent OF L1, ruling out the level-collapse failure mode"
+}
