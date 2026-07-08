@@ -13,12 +13,15 @@ For every case, up to two configurations are run:
   with_skill     the skill/agent under test is made available for this invocation
                  only, and nothing else installed at user scope on the host
                  machine leaks in:
-                   - skill evals (kind: "skill") register a throwaway project
-                     command file under .claude/commands/ whose `description:`
-                     is the real SKILL.md description, exactly like
-                     run_eval.py's run_single_query() does — so the skill can
-                     genuinely trigger (or fail to) via the normal Skill tool,
-                     not be force-fed.
+                   - skill evals (kind: "skill") copy the ENTIRE real skill
+                     directory (SKILL.md + references/, scripts/, assets — not
+                     just the frontmatter `description:`) into the scratch
+                     cwd's project scope under .claude/skills/<name>/, exactly
+                     like skill-creator's own eval loop installs the skill
+                     under test — so the skill can genuinely trigger (or fail
+                     to) via the normal Skill tool and exercise its real body
+                     (thresholds, phase names, round caps, references,
+                     anti-patterns), not dead-end at a one-line stub.
                    - agent evals (kind: "agent", tribe) pass the named agent's
                      real frontmatter + body straight through `--agents` /
                      `--agent`, independent of whether it happens to be
@@ -84,7 +87,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -304,21 +306,28 @@ def extract_metrics(run: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Skill registration (mirrors skill-creator's run_eval.py exactly)
+# Skill registration
 # ---------------------------------------------------------------------------
 
-def register_skill_command(scratch_dir: Path, skill_name: str, description: str) -> Path:
-    unique = uuid.uuid4().hex[:8]
-    clean_name = f"{skill_name}-eval-{unique}"
-    cmd_dir = scratch_dir / ".claude" / "commands"
-    cmd_dir.mkdir(parents=True, exist_ok=True)
-    cmd_file = cmd_dir / f"{clean_name}.md"
-    indented = "\n  ".join(description.split("\n"))
-    cmd_file.write_text(
-        f"---\ndescription: |\n  {indented}\n---\n\n# {skill_name}\n\n"
-        f"This skill handles: {description}\n"
-    )
-    return cmd_file
+def install_skill(scratch_dir: Path, skill_dir: Path, skill_name: str) -> Path:
+    """Install the REAL skill into the scratch project scope for the with_skill leg.
+
+    A description-only stub command can't exercise a skill's real procedure
+    (thresholds, phase names, round caps, references/*.md, anti-patterns) — it
+    just dead-ends and the executor falls back to generic answers, which
+    measures nothing. Instead, copy the whole skill directory (SKILL.md +
+    references/, scripts/, assets) to .claude/skills/<skill_name>/ under the
+    scratch cwd, which run_claude() already points at via `--setting-sources
+    project` — the normal on-disk shape Claude Code discovers project skills
+    from, so the executor loads and can genuinely trigger the real skill
+    through the ordinary Skill mechanism. The eval fixtures directory itself
+    (evals/, containing this case's own expected_output) is excluded so it
+    never leaks into the executor's working tree.
+    """
+    dest = scratch_dir / ".claude" / "skills" / skill_name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(skill_dir, dest, ignore=shutil.ignore_patterns("evals"))
+    return dest
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +363,15 @@ def grade(prompt: str, expected_output: str, transcript: str, final_result: str,
         transcript=transcript[:20000] or "(no assistant output captured)",
         final_result=final_result[:4000],
     )
-    run = run_claude(grader_prompt, cwd=cwd, timeout=timeout, model=model, tools="")
+    # Isolated exactly like the with_skill executor leg: without this, the grader
+    # inherits the operator's own ~/.claude (global CLAUDE.md, plugins, skills, MCP)
+    # since it otherwise runs with default --setting-sources (includes "user"), and
+    # its verdict can cite host-ambient rules that have nothing to do with the eval
+    # case (observed: a grader citing a global "always use C3" rule while judging an
+    # unrelated C# typo task). The transcript + expected_output the grader needs are
+    # already embedded in grader_prompt above, so isolation costs it nothing.
+    run = run_claude(grader_prompt, cwd=cwd, timeout=timeout, model=model, tools="",
+                      isolate_user_scope=True)
     if not run["ok"]:
         return {"passed": False, "evidence": f"grader failed to run: {run['error']}"}
 
@@ -392,7 +409,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             fields, _ = parse_frontmatter(skill_dir / "SKILL.md")
             skill_name = fields.get("name", skill_dir.name)
             if configuration == "with_skill":
-                register_skill_command(scratch, skill_name, fields.get("description", ""))
+                install_skill(scratch, skill_dir, skill_name)
         elif kind == "agent":
             agent_key = case["agent"]
             agent_path = agents_dir / f"{agent_key}.md"
