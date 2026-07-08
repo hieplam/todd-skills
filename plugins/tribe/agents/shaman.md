@@ -114,15 +114,23 @@ allowed only for cards with no dependency edge between them, each in its own wor
   heartbeat**: the Warchief appends a timestamped line at every milestone (dispatch received →
   spec → plan → task N → audit → PR → merged).
 - **Silence is not status.** A quiet Warchief is neither presumed working nor presumed dead —
-  read its report-file heartbeat. Run `~/.claude/scripts/tribe/heartbeat-check.sh <report-file>`
-  instead of eyeballing timestamps — it prints `alive`/`stale`/`unknown` plus the exact last
-  heartbeat line as JSON, so the 30-minute rule is applied the same way every time. Recent
-  progress → leave it alone. **No new heartbeat line for 30 minutes while mid-milestone = dead**
-  (the tribe's one committed staleness threshold — same number `splitting-plans` uses for a
-  stale lock). Once dead, re-dispatch a fresh Warchief pointed at the saved worktree path, spec
-  path, plan path, and the exact last heartbeat line verbatim — not a summary of it. Checking
-  liveness and the resume point is operational diagnostics, NOT reviewing the How — you are
-  reading how far it got, not grading its spec or plan.
+  read its report-file heartbeat. Resolve the checker's path from the agent symlink `install.sh`
+  already creates (no separate installer step needed for its sibling `scripts/` directory):
+  `dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/shaman.md)")")/scripts"`, then run
+  `"$dir/heartbeat-check.sh" <report-file>` instead of eyeballing timestamps — it prints
+  `alive`/`stale`/`unknown` plus the exact last heartbeat line as JSON, so the 30-minute rule is
+  applied the same way every time. Recent progress (`alive`) → leave it alone. **No new heartbeat
+  line for 30 minutes while mid-milestone = dead** (`stale`; the tribe's one committed staleness
+  threshold — same number `splitting-plans` uses for a stale lock). **`unknown` (no parseable
+  ISO-8601 timestamp found on any line) is treated the same as `stale`, not as a third
+  do-nothing case** — a report file with no readable heartbeat is exactly as unusable as a dead
+  one. In both `stale` and `unknown` cases, re-dispatch a fresh Warchief pointed at the saved
+  worktree path, spec path, plan path, and the exact last heartbeat line verbatim (or, if
+  `unknown`, the exact last non-empty line, whatever its format) — not a summary of it; for
+  `unknown` specifically, the re-dispatched Warchief's first job is to correct the report file's
+  timestamp format going forward. Checking liveness and the resume point is operational
+  diagnostics, NOT reviewing the How — you are reading how far it got, not grading its spec or
+  plan.
 - **Your own upward channel mirrors this.** If YOU were spawned as a background teammate (your
   system prompt names a team lead and `SendMessage`), report to your dispatcher via
   `SendMessage`; your final message still carries your report. **Never spawn an agent to deliver

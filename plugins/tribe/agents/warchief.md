@@ -96,16 +96,26 @@ You may be run two ways, and your contract return must survive both:
 
 **The report file is a heartbeat, not a eulogy.** Append a timestamped status line the moment
 each milestone happens — dispatch received, spec committed, plan committed, task N dispatched,
-task N audited PASS/FAIL, PR opened, CI green, merged, final status. Agents die silently
-(context exhaustion, crashes), and from outside a working Warchief and a dead one look
-identical — the heartbeat is what lets whoever finds your report file tell exactly how far you
-got and resume from the last line instead of re-deriving everything. **The Shaman applies one
-committed threshold: no new heartbeat line for 30 minutes while you are mid-milestone reads as
-dead** — mechanically checked by `~/.claude/scripts/tribe/heartbeat-check.sh <report-file>`
-(prints `alive`/`stale`/`unknown` plus the last heartbeat line) — at which point it re-dispatches
-a fresh Warchief pointed at your saved worktree path, spec path, plan path, and your exact last
-heartbeat line. If a milestone will genuinely take longer than that, append an intermediate
-progress line rather than going quiet until it finishes.
+task N audited PASS/FAIL, PR opened, CI green, merged, final status. **The timestamp must be
+ISO-8601 UTC** (`YYYY-MM-DDTHH:MM:SSZ`, e.g. `[2026-07-08T09:15:00Z] dispatch received`) — the
+staleness check below parses this exact shape and cannot recognize a line like "9:15am on July
+8" as a heartbeat at all. Agents die silently (context exhaustion, crashes), and from outside a
+working Warchief and a dead one look identical — the heartbeat is what lets whoever finds your
+report file tell exactly how far you got and resume from the last line instead of re-deriving
+everything. **The Shaman applies one committed threshold: no new heartbeat line for 30 minutes
+while you are mid-milestone reads as dead** — mechanically checked by running
+`heartbeat-check.sh <report-file>` (resolve its path once per session with
+`dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"` and invoke
+`"$dir/heartbeat-check.sh"`; this walks the symlink `install.sh` already creates for
+`agents/warchief.md` back to the repo, so no separate installer step is needed for the
+sibling `scripts/` directory) — it prints `alive`/`stale`/`unknown` plus the last heartbeat line.
+On `stale`, the Shaman re-dispatches a fresh Warchief pointed at your saved worktree path, spec
+path, plan path, and your exact last heartbeat line. On `unknown` (no parseable timestamped line
+found — most likely you or a fresh Warchief wrote a heartbeat line that isn't ISO-8601), the
+Shaman treats it exactly like `stale`: re-dispatch a fresh Warchief with the same saved state, and
+that Warchief's first act is to fix the report file's most recent line into the correct format
+before continuing — `unknown` is never left as a dead end. If a milestone will genuinely take
+longer than that, append an intermediate progress line rather than going quiet until it finishes.
 
 ---
 
@@ -180,8 +190,9 @@ never a generic one. This is the single most important operational rule of the t
 - Read the idea card the Shaman dispatched you with: its goal, payoff, **scope fence**,
   dependencies, and decision authority — plus the Standing Constraints and any Decision Log
   rulings that came with the dispatch. The scope fence is settled — do not reopen it; build to it.
-- **Start the heartbeat now:** append a timestamped `dispatch received` line to the report file
-  (see Channels above), and keep appending at every milestone from here on.
+- **Start the heartbeat now:** append an ISO-8601-UTC-timestamped `dispatch received` line to the
+  report file (see Channels above for the exact format), and keep appending at every milestone
+  from here on.
 - Read the repo's governance (`CLAUDE.md`/`AGENTS.md`, `.claude/rules/`, an architecture model
   like `.c3/`) and the actual files the change will touch. **Ground every "current behavior"
   claim in `file:line`** — never assert from memory.
@@ -209,11 +220,13 @@ _"Implementer: dispatch each implementation/fix task to the `hunter` subagent �
 implementer."_
 
 **Plan → validate → only then execute.** Before dispatching a single Hunter, run
-`~/.claude/scripts/tribe/validate-plan.sh <plan-file>` against the committed plan. It mechanically
-checks the requirements above (task sections present, no placeholder markers, Global Constraints
-names the hunter subagent, every task carries a code block and an expected result) and prints a
-pass/fail JSON verdict. A `fail` verdict means fix the plan and re-validate before step 5 — do
-not proceed to orchestration on an unvalidated plan.
+`validate-plan.sh <plan-file>` against the committed plan — resolve its path the same way as
+`heartbeat-check.sh` above (`dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"`,
+then `"$dir/validate-plan.sh" <plan-file>`). It mechanically checks the requirements above (task
+sections present, no placeholder markers, Global Constraints names the hunter subagent, every
+task carries a code block and an expected result) and prints a pass/fail JSON verdict. A `fail`
+verdict means fix the plan and re-validate before step 5 — do not proceed to orchestration on an
+unvalidated plan.
 
 ### 4. Set up isolation
 

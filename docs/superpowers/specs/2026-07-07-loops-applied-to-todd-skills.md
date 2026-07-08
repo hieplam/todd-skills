@@ -235,33 +235,26 @@ contract the three new scripts above should copy.
 plan-validator script location TBD at implementation. Referencing edits to
 `shaman.md`/`warchief.md`/`splitting-plans/SKILL.md` to invoke the new scripts, but no change
 to the underlying gate semantics (status vocabulary, lock rules) they check.
-**⚠️ Amended beyond this fence during implementation — see "Scope amendment" immediately below;
-that expansion (root `install.sh` + `plugins/tribe/install.sh`) is self-documented, not
-pre-approved, and needs explicit sign-off from whoever owns this card/spec.**
 
-**Scope amendment (recorded during implementation, round 3 review) — NEEDS EXPLICIT SIGN-OFF
-FROM THE CARD/SPEC OWNER, not yet ratified:** this amendment was authored and merged by the same
-implementation pass it amends the scope for, without a separate approval step. It is recorded
-here for visibility and to justify why the code exists, but the self-authorship means it must
-still be reviewed and explicitly ratified (or reverted in favor of an alternative) by a human
-owner before it can be considered settled — do not treat its presence in this doc as approval.
-`validate-locks.sh`
-lives under `splitting-plans/skills/splitting-plans/scripts/`, an existing *real* skill (has a
-SKILL.md), so it's already reachable via `install.sh`'s existing skills-symlink support with no
-installer change. `heartbeat-check.sh` and `validate-plan.sh`, however, are fixed by this card
-to a bare `plugins/tribe/scripts/` path — `tribe` has no `skills/` directory, so no existing
-installer mechanism makes that path resolve to anything under `~/.claude`. Two approaches were
-tried and rejected before this amendment: (1) leave the scripts at their repo-relative path and
-have `shaman.md`/`warchief.md` invoke them there — reverted, unreachable from a dispatched
-agent's cwd; (2) nest them under a `skills/tribe-scripts/` directory with no `SKILL.md` to ride
-the generic skills-symlink loop — rejected as a fake skill masquerading as a real one. The
-amendment: root `install.sh` gains `scripts` as a recognized-but-not-installed component type
-(so it no longer prints a spurious "unsupported component type" warning for `tribe/scripts/`),
-and `plugins/tribe/install.sh` (the plugin's own post-install hook, an already-precedented
-extension point per its `claude-md/` snippet loop) symlinks `scripts/` to
-`~/.claude/scripts/tribe`. This is the smallest change that makes the card's own named file
-paths actually reachable; it does not touch any other plugin's installer behavior or any gate
-semantics.
+**Reachability note (resolved in-fence, round-2 fix — supersedes the round-3 "scope amendment"
+that briefly lived here):** `validate-locks.sh` lives under
+`splitting-plans/skills/splitting-plans/scripts/`, an existing *real* skill (has a SKILL.md), so
+it's already reachable via `install.sh`'s existing skills-symlink support with no installer
+change. `heartbeat-check.sh` and `validate-plan.sh` are fixed by this card to a bare
+`plugins/tribe/scripts/` path — `tribe` has no `skills/` directory, so there's no
+symlink-the-whole-plugin mechanism for it. A prior round patched this by adding a `scripts`
+component type to root `install.sh` and a second symlinking job to `plugins/tribe/install.sh` —
+that touched files outside this card's scope fence and was never ratified by a card/spec owner,
+so it was reverted. The actual fix needs no installer change at all: `install.sh` already
+symlinks each `agents/*.md` file individually (e.g. `~/.claude/agents/warchief.md` ->
+`<repo>/plugins/tribe/agents/warchief.md`), so an agent can resolve its own real (repo) path
+with `readlink -f` and derive the sibling `scripts/` directory from it —
+`dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"` — entirely
+at invocation time, in the agent's own instructions, with zero installer involvement. Verified by
+symlinking `tribe`'s agents into a scratch `CLAUDE_DIR` and confirming the derived path lands on
+`plugins/tribe/scripts/{heartbeat-check.sh,validate-plan.sh}` regardless of the agent's cwd.
+`shaman.md` and `warchief.md` now use this derivation instead of a hardcoded
+`~/.claude/scripts/tribe/...` path.
 
 **Priority:** Enhancement — depends on item 2 for the heartbeat threshold it encodes.
 
