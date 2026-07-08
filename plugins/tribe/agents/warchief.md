@@ -248,7 +248,58 @@ rounds.
   rules and verify the links resolve.
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
   evidence embedded, the gate results with numbers, and the review outcome.
-- **Wait for CI green.** Fix real failures (via a Hunter) rather than forcing through.
+- **Wait for CI green — block, don't poll.** Do not spend turns manually re-checking run status.
+  The mechanism is `gh run watch <run-id> --exit-status` — the exact command `research-to-blog`
+  uses to block on CI. Warchief targets arbitrary repos that commonly run several workflows
+  (lint/test/build) per push, unlike `research-to-blog`'s one pinned `deploy.yml`, so loop the
+  same command over every run already attached to the head SHA instead of hardcoding one ID.
+  Bound each watch to 20 minutes and retry on timeout, so a single long-running run can never
+  push your report file (`REPORT_FILE` below — your report-file path from dispatch) past the
+  Shaman's 30-minute staleness threshold (Channels, above) without a fresh heartbeat line:
+  ```bash
+  SHA=$(gh pr view --json headRefOid -q .headRefOid)
+  RUN_IDS=$(gh run list --commit "$SHA" --json databaseId -q '.[].databaseId')
+  if [ -z "$RUN_IDS" ]; then exit 2; fi   # 2 = no CI registered — never merge on this
+  FAILED=0
+  for RID in $RUN_IDS; do
+    while : ; do
+      timeout 20m gh run watch "$RID" --exit-status; rc=$?
+      [ "$rc" -eq 124 ] || break                 # 124 = timed out, run still going
+      printf '%s  still watching CI run %s\n' "$(date -u +%FT%TZ)" "$RID" >> "$REPORT_FILE"
+    done
+    [ "$rc" -eq 0 ] || FAILED=1
+  done
+  exit "$FAILED"
+  ```
+  Each `gh run watch` call now blocks for at most 20 minutes at a stretch (bounded comfortably
+  under the 30-minute heartbeat threshold on purpose) without spending a turn on manual
+  re-checking — the same blocking mechanism `research-to-blog` uses, just looped and bounded.
+  `timeout`'s exit code `124` means the run itself is still going, not that it failed: append a
+  heartbeat line to your report file and re-enter `gh run watch` on the same run ID. Read the
+  loop's own exit status when it finishes: **`0` means every run watched above finished green,
+  and this only applies when `RUN_IDS` was non-empty** — proceed to squash-merge. Non-zero and
+  not `2` means at least one run genuinely failed: fix it via a Hunter (never force through),
+  then re-push and repeat this same block against the new head SHA.
+
+  `exit 2` is a distinct, earlier exit reached *before* any success path: `RUN_IDS` came back
+  empty, the loop body never ran, and `FAILED` never had a chance to flip — so `2` is not a
+  variant of "green," it means no CI has registered for this SHA yet. Never squash-merge on it.
+  Confirm by hand (`gh pr checks` / `gh run list`) whether this repo has any CI wired up at all:
+  if it genuinely has none, record that in the PR/report and proceed; if CI was expected and
+  never showed up, treat it as `BLOCKED` / `NEEDS_DIRECTION` rather than merging on an empty run
+  list.
+
+  This is a single snapshot of `gh run list` — it does not chase a workflow that registers
+  *after* that snapshot (e.g. a `workflow_run`-gated job that only starts once an earlier run
+  concludes). Do not hand-roll a poll/retry/diff loop to cover that case: a late-registering run,
+  or addressing review comments while CI reruns over several minutes, is exactly the
+  turn-by-turn case the article's canonical loop names — `/loop 5m check my PR, address review
+  comments, fix failing CI`, a fixed interval, never `ScheduleWakeup` (it does not persist across
+  restarts and cannot be cancelled by ID). You don't carry the `Skill` tool yourself (see your
+  tools line), so invoking `/loop` is for whoever *is* driving the PR interactively with `Skill`
+  available (a human at the top-level session, or the Shaman re-dispatching you); for your own
+  dispatch, notice the late run with a fresh `gh run list` and simply re-run the watch block
+  above against it.
 - **Squash-merge** into the default branch once green.
 
 ### 8. Report back to the Shaman
