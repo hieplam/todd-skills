@@ -104,11 +104,18 @@ working Warchief and a dead one look identical — the heartbeat is what lets wh
 report file tell exactly how far you got and resume from the last line instead of re-deriving
 everything. **The Shaman applies one committed threshold: no new heartbeat line for 30 minutes
 while you are mid-milestone reads as dead** — mechanically checked by running
-`heartbeat-check.sh <report-file>` (resolve its path once per session with
-`dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"` and invoke
-`"$dir/heartbeat-check.sh"`; this walks the symlink `install.sh` already creates for
-`agents/warchief.md` back to the repo, so no separate installer step is needed for the
-sibling `scripts/` directory) — it prints `alive`/`stale`/`unknown` plus the last heartbeat line.
+`heartbeat-check.sh <report-file>` (resolve its path once per session, trying both install
+mechanisms this repo supports, in order:
+`dir="${CLAUDE_PLUGIN_ROOT:-}/scripts"; [ -f "$dir/heartbeat-check.sh" ] || dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"`.
+`$CLAUDE_PLUGIN_ROOT` is Claude Code's own plugin-root variable, set when tribe loads as a native
+plugin — including a marketplace/plugin-cache install, whose cache copies the *whole* plugin
+directory tree, so `scripts/` still lands as a sibling of `agents/` there too. The `readlink -f`
+fallback instead walks the symlink `install.sh` creates for `agents/warchief.md` back to the
+repo, covering the local symlink-install path. **If neither yields an existing
+`$dir/heartbeat-check.sh`, stop and return `NEEDS_DIRECTION`** ("heartbeat checker not found under
+either install path") — never fall through to invoking a path that doesn't exist. Once resolved,
+invoke `"$dir/heartbeat-check.sh" <report-file>`) — it prints `alive`/`stale`/`unknown` plus the
+last heartbeat line.
 On `stale`, the Shaman re-dispatches a fresh Warchief pointed at your saved worktree path, spec
 path, plan path, and your exact last heartbeat line. On `unknown` (no parseable timestamped line
 found — most likely you or a fresh Warchief wrote a heartbeat line that isn't ISO-8601), the
