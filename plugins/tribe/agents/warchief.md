@@ -212,6 +212,13 @@ implementer."_
 Ensure an isolated worktree exists (worktree-first per repo convention). Install dependencies so
 tests and gates can run. Record the branch base commit.
 
+**If `splitting-plans` produced 2+ dependency-independent sub-plans**, its README's dependency
+waves diagram and each sub-plan's `owns_files` already tell you which bundles can run at once (a
+wave containing ≥2 bundles with disjoint `owns_files`). For such a wave, set up **one additional
+isolated worktree per sub-plan in that wave**, all branched from the same recorded base commit
+(see the **using-git-worktrees** skill). This is the only case where more than one Hunter runs at
+once — never let two concurrent Hunters share a worktree.
+
 ### 5. Orchestrate the build via Hunters — do not build it yourself
 
 Run the plan subagent-driven (see the **subagent-driven-development** skill for the loop):
@@ -221,10 +228,20 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
   contract above) — with: where the task fits, the brief (its requirements, verbatim), the
   interfaces/decisions earlier tasks produced, and the report-file path. When a Hunter returns
   `NEEDS_CONTEXT`, answer by amending the brief and dispatching a fresh Hunter.
-- Hunters follow **TDD** (red → green → commit). One Hunter in flight at a time (no parallel
-  writers on the same tree).
+- Hunters follow **TDD** (red → green → commit). **One Hunter in flight per worktree** — never
+  two writers in the same tree. For a single plan (or a wave of one sub-plan), that means one
+  Hunter at a time, as before. For a **wave of 2+ dependency-independent sub-plans** with
+  disjoint `owns_files` (the isolation step 4 set up worktrees for), dispatch **one Hunter per
+  sub-plan concurrently**, each pointed at its own worktree and briefed to touch only its
+  sub-plan's `owns_files` — nothing else changes about how you brief or audit each one. Waves
+  stay ordered by their declared `prereqs`: wait for every Hunter in the current wave to report
+  and for each worktree's branch to be merged back before dispatching the next wave.
 - Pick the least-powerful model that fits each task; state it explicitly when dispatching (the
   Hunter inherits your model unless you override it — override it to match task complexity).
+  Do this per Hunter even under concurrent dispatch: route mechanical/small tasks to a smaller
+  model, each Hunter in its own isolated context — the same anti-self-preferential-bias pattern
+  already used for the judgment call in step 6, which stays on the **skinner** (`model:
+  inherit`, unchanged by this).
 
 ### 6. Audit every deliverable with the skinner
 
