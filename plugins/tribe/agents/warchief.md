@@ -243,8 +243,49 @@ proceed to orchestration on an unvalidated plan.
 
 ### 4. Set up isolation
 
-Ensure an isolated worktree exists (worktree-first per repo convention). Install dependencies so
-tests and gates can run. Record the branch base commit.
+Ensure an isolated worktree exists (worktree-first per repo convention, via the
+**using-git-worktrees** skill or a native tool like `EnterWorktree`). Install dependencies so
+tests and gates can run. Record the branch base commit (the SHA your own worktree branched
+from) — every additional worktree created for the **current wave** branches from that same SHA.
+
+**This recorded base commit is re-recorded after every wave (see step 5's integration
+procedure) — it is never reused stale across waves.** Sub-plan worktrees are created
+**just-in-time, one wave at a time**: only the current wave's worktrees exist at any point; a
+later wave's worktrees are not created until its predecessor wave has merged back and the base
+commit has been updated to point at that merge, so later waves build on earlier waves' file
+changes instead of on pre-wave-1 code.
+
+**If `splitting-plans` produced 2+ dependency-independent sub-plans**, its README's dependency
+waves diagram and each sub-plan's `owns_files` already tell you which bundles can run at once (a
+wave containing ≥2 bundles with disjoint `owns_files`). For the wave you are about to dispatch,
+set up **one additional worktree per sub-plan in that wave** — but do **not** re-invoke the
+using-git-worktrees skill or `EnterWorktree` for these. You are already inside your own isolated
+worktree, so Step 0 of that skill (and `EnterWorktree`'s own precondition) will detect your
+existing isolation and refuse to create another — "Do NOT create another worktree" is exactly
+what it will tell you, which would silently defeat this whole step. Instead, create each
+sub-plan's worktree with a **direct git command**, run from inside your current worktree (a
+linked worktree's `git` shares the common `.git` with the main checkout, so `git worktree add`
+from here registers correctly regardless of which worktree you run it in).
+
+**Make creation resume-safe.** A re-dispatched Warchief resuming mid-campaign will hit this
+step again with the same `<path-per-sub-plan>`/`<branch-per-sub-plan>` names it used before —
+`git worktree add` on an existing path or `-b` on an existing branch is a hard failure, not a
+no-op, so a naive re-run deadlocks. Before adding, clear any stale worktree/branch left at that
+path from a prior attempt (harmless if neither exists yet):
+
+```bash
+git worktree remove <path-per-sub-plan> --force 2>/dev/null || true
+git branch -D <branch-per-sub-plan> 2>/dev/null || true
+git worktree add <path-per-sub-plan> -b <branch-per-sub-plan> <recorded-base-commit-sha>
+```
+
+Do this once per sub-plan in the wave you are about to dispatch, all pointed at the
+**currently-recorded** base commit (the original SHA for wave 1; wave N's post-merge SHA for
+wave N+1 — see step 5), before dispatching any Hunter in that wave. Then, **for each new
+worktree**, still apply the using-git-worktrees skill's Step 2 onward (project setup / install
+dependencies) inside that worktree's own directory — only its Step 0/1 (detect-or-create) is
+bypassed here, because you performed the equivalent creation yourself with the direct command
+above. Never let two concurrent Hunters share a worktree.
 
 ### 5. Orchestrate the build via Hunters — do not build it yourself
 
@@ -255,10 +296,71 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
   contract above) — with: where the task fits, the brief (its requirements, verbatim), the
   interfaces/decisions earlier tasks produced, and the report-file path. When a Hunter returns
   `NEEDS_CONTEXT`, answer by amending the brief and dispatching a fresh Hunter.
-- Hunters follow **TDD** (red → green → commit). One Hunter in flight at a time (no parallel
-  writers on the same tree).
+- Hunters follow **TDD** (red → green → commit). **One Hunter in flight per worktree** — never
+  two writers in the same tree. For a single plan (or a wave of one sub-plan), that means one
+  Hunter at a time, as before. For a **wave of 2+ dependency-independent sub-plans** with
+  disjoint `owns_files` (the isolation step 4 set up worktrees for), dispatch **one Hunter per
+  sub-plan concurrently**, each pointed at its own worktree and briefed to touch only its
+  sub-plan's `owns_files` — nothing else changes about how you brief or audit each one.
+
+  **Waves stay ordered by their declared `prereqs`, and each wave integrates into your own
+  worktree branch before the next wave starts — never a separate PR per sub-plan.** Your own
+  worktree's branch (the one from step 4, checked out at the recorded base commit) is the single
+  integration point every wave merges into and the branch step 7 opens the one PR from. Between
+  wave N and wave N+1:
+
+  1. Wait for every Hunter in wave N to report, each audited per step 6.
+
+     **Mixed-outcome wave (must-handle):** a wave is not done when some sub-plans pass and
+     others don't — audit each sub-plan independently, and if **any** sub-plan in the wave
+     exhausts step 6's 3-round fix cap and comes back FAIL, treat the **whole wave** as failed
+     integration, even the sub-plans that passed. **Do not merge any of the wave's branches** —
+     partial integration would land an unreviewable mix and make the failing sub-plan someone
+     else's problem to untangle later. Instead: leave every wave-N worktree and branch exactly
+     as it is (do not remove them — the passing work must survive to resume), record in the
+     report file which sub-plans passed and which hit the cap (with the Skinner's round-3 FAIL
+     report attached verbatim, per step 6), and save state + return `NEEDS_DIRECTION` to the
+     Shaman with that mixed status. This is the same 3-round-cap → `NEEDS_DIRECTION` escalation
+     as step 6, just evaluated per-wave instead of per-sub-plan. Only proceed to step 2 once
+     **every** sub-plan in the wave has passed its audit.
+  2. From inside your own worktree, merge each of wave N's sub-plan branches into it, one at a
+     time (fixed order, e.g. sub-plan order in the plan):
+     ```bash
+     git -C <your-worktree-path> merge --no-ff <branch-per-sub-plan>
+     ```
+     Sub-plans in the same wave have disjoint `owns_files`, so this should never conflict; if a
+     merge does conflict, that means `owns_files` was wrong — do not guess at a resolution,
+     save state and return `NEEDS_DIRECTION` to the Shaman instead.
+
+     **Clean up the merged worktree immediately** — it is now fully folded into your own
+     branch, so leaving it around only leaks disk state and, worse, blocks a resumed Warchief
+     from reusing the same path/branch names for a future wave:
+     ```bash
+     git worktree remove <path-per-sub-plan> --force
+     git branch -D <branch-per-sub-plan>
+     ```
+     Do this per sub-plan right after its merge lands, before moving to the next sub-plan's
+     merge.
+  3. Once every wave-N branch is merged (and its worktree/branch cleaned up), re-record the
+     base commit as your worktree's new HEAD:
+     ```bash
+     git -C <your-worktree-path> rev-parse HEAD
+     ```
+     This new SHA is what step 4 uses as "the currently-recorded base commit" for wave N+1 — it
+     is what wave N+1's per-sub-plan worktrees are created from, so wave N+1 builds on wave N's
+     merged output instead of on stale pre-wave-1 code.
+  4. Only now create wave N+1's per-sub-plan worktrees (step 4 — whose creation is itself
+     resume-safe) and dispatch its Hunters.
+
+  A plan with only one wave, or a wave of one sub-plan, has nothing to integrate mid-flight — its
+  single branch (or your own worktree, if there was never a second worktree) simply carries
+  through to step 7 as before.
 - Pick the least-powerful model that fits each task; state it explicitly when dispatching (the
   Hunter inherits your model unless you override it — override it to match task complexity).
+  Do this per Hunter even under concurrent dispatch: route mechanical/small tasks to a smaller
+  model, each Hunter in its own isolated context — the same anti-self-preferential-bias pattern
+  already used for the judgment call in step 6, which stays on the **skinner** (`model:
+  inherit`, unchanged by this).
 
 ### 6. Audit every deliverable with the skinner
 
