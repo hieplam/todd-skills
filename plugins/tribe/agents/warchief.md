@@ -258,6 +258,12 @@ rounds.
   mechanism while covering the full check set — including runs that register late (e.g. a
   `workflow_run`-gated workflow that only starts once an earlier one concludes):
   ```
+  # REPORT_FILE is the same report-file path you have been appending heartbeat lines to since
+  # "Start the heartbeat now" — set it to that exact path before running this block. The script
+  # appends its own heartbeat lines to that file (via shell redirection, not an agent turn) so
+  # the Shaman's file-based liveness check keeps seeing fresh lines while you are still blocked
+  # inside a single Bash tool call.
+  REPORT_FILE="<the report-file path from your dispatch>"
   SHA=$(gh pr view --json headRefOid -q .headRefOid)
   # Resolve the timeout binary once, up front. `timeout` is GNU coreutils and is not on stock
   # macOS (only `gtimeout`, and only if `brew install coreutils` was run). If neither exists,
@@ -276,15 +282,17 @@ rounds.
     [ -n "$RUN_IDS" ] && break
     sleep 5
   done
+  FAILED=0
   if [ -z "$RUN_IDS" ]; then
     echo "NO CI REGISTERED for $SHA after 30s — do not squash-merge on this silence."
     # Terminal behavior, not a silent fall-through: confirm by hand (gh pr checks / gh run
     # list) whether this target repo has any CI wired to this branch at all. If it genuinely
     # has none, record that explicitly in the PR/report and proceed. If CI was expected but
     # never registered, treat this as BLOCKED / NEEDS_DIRECTION — never merge on an empty
-    # run list.
+    # run list. Exit 2 (distinct from the 0/1 below) so the caller can tell "ambiguous, needs a
+    # human call" apart from "CI genuinely failed".
+    exit 2
   else
-    FAILED=0
     WATCHED=""
     PENDING="$RUN_IDS"
     while [ -n "$PENDING" ]; do
@@ -296,13 +304,17 @@ rounds.
           "$TIMEOUT_CMD" 20m gh run watch "$RID" --exit-status
           STATUS=$?
           if [ "$STATUS" -eq 124 ]; then
-            echo "still waiting on run $RID"
+            echo "$(date -u +%FT%TZ) still waiting on run $RID (CI watch)" >> "$REPORT_FILE"
             continue
           elif [ "$STATUS" -ne 0 ]; then
             FAILED=1
           fi
           break
         done
+        # Heartbeat here too, not only on a 20m timeout: several runs that each finish in well
+        # under 20m (e.g. two sequential ~18m runs) would otherwise go ~36m between file writes
+        # and read as dead under the 30-minute staleness rule even though nothing timed out.
+        echo "$(date -u +%FT%TZ) run $RID watch finished (status $STATUS)" >> "$REPORT_FILE"
         WATCHED="$WATCHED $RID"
       done
       [ "$FAILED" -eq 1 ] && break
@@ -329,22 +341,38 @@ rounds.
       PENDING=$(comm -13 <(echo "$WATCHED" | tr ' ' '\n' | sort -u) <(echo "$ALL_RUN_IDS" | tr ' ' '\n' | sort -u))
     done
   fi
+  # Propagate the outcome as the script's own exit status — FAILED dies with this subshell the
+  # instant the Bash tool call returns, so it is useless as a signal unless surfaced this way.
+  # 0 = CI green, proceed to squash-merge; 1 = a genuine CI failure or an unresolvable poll
+  # failure, dispatch a Hunter; 2 (above) = no CI ever registered, needs a human call.
+  exit "$FAILED"
   ```
   A single `gh run watch` call can run long on target repos you don't control (matrix builds,
   E2E suites, flaky retries) — and while blocked inside it you have no turn to append a
-  heartbeat line, which would otherwise read as dead under the 30-minute staleness rule above.
-  Bound each watch under a timeout shorter than that threshold (`$TIMEOUT_CMD 20m ...` shown
-  above). `$TIMEOUT_CMD` is resolved once at the top of the script rather than hardcoded, because
-  a hardcoded `timeout` silently degrades on macOS without GNU coreutils: bash reports "command
-  not found" (exit 127), and the loop's own `[ "$STATUS" -ne 0 ]` check cannot tell that apart
-  from a real CI failure — it would set `FAILED=1` and send a Hunter after nothing. Resolving
-  `$TIMEOUT_CMD` up front (falling back from `timeout` to `gtimeout`, hard-failing if neither
-  exists) removes that ambiguity before the loop ever runs. The loop above already re-invokes
-  `gh run watch` on the same run ID when the timeout fires (exit 124) and logs the heartbeat
-  itself — this keeps the check-in cadence at ~20 minutes instead of every turn, satisfying both
-  "block, don't poll" and the Shaman's liveness contract, while a genuine CI failure (any other
-  non-zero exit) is what actually sets `FAILED=1`. For the common case (CI finishing well under
-  20 minutes) this is indistinguishable from one unbounded blocking call.
+  heartbeat line through your own tool calls, which would otherwise read as dead under the
+  30-minute staleness rule above. Bound each watch under a timeout shorter than that threshold
+  (`$TIMEOUT_CMD 20m ...` shown above). `$TIMEOUT_CMD` is resolved once at the top of the script
+  rather than hardcoded, because a hardcoded `timeout` silently degrades on macOS without GNU
+  coreutils: bash reports "command not found" (exit 127), and the loop's own
+  `[ "$STATUS" -ne 0 ]` check cannot tell that apart from a real CI failure — it would set
+  `FAILED=1` and send a Hunter after nothing. Resolving `$TIMEOUT_CMD` up front (falling back
+  from `timeout` to `gtimeout`, hard-failing if neither exists) removes that ambiguity before the
+  loop ever runs.
+
+  The Shaman only ever reads the report **file** — never a Bash tool's stdout — so a heartbeat
+  that merely prints while you're blocked mid-watch satisfies nothing; the script itself must
+  append to `$REPORT_FILE` via shell redirection (`>>`), which is real file I/O the OS performs
+  while the process runs, independent of whether you have a turn free. The loop above does this
+  twice: once when a watch times out (exit 124) and once every time a run's watch call returns at
+  all, pass or fail. The second write matters even when nothing ever times out — several runs
+  that each finish comfortably under 20 minutes (e.g. two sequential ~18-minute runs) would
+  otherwise go ~36 minutes between file writes with no single call ever hitting the 20-minute
+  timeout path, which is longer than the 30-minute staleness threshold and would read as dead.
+  Writing a line after every per-run watch call, not only after a timeout, keeps the file fresh
+  in that case too. This keeps the check-in cadence at ~20 minutes instead of every turn,
+  satisfying both "block, don't poll" and the Shaman's liveness contract, while a genuine CI
+  failure (any other non-zero exit) is what actually sets `FAILED=1`. For the common case (CI
+  finishing well under 20 minutes) this is indistinguishable from one unbounded blocking call.
 
   The re-poll (`gh run list` inside the while-loop) is guarded the same way: its exit status is
   checked, not just its output, because a transient API error (rate limit, network blip) returns
@@ -353,8 +381,19 @@ rounds.
   late-registering run was ever watched. Retry the failed poll a few times; if it keeps failing,
   stop and report BLOCKED rather than silently proceeding as if CI-watching were complete.
 
-  Only once a run has actually failed does "Fix real failures (via a Hunter) rather than forcing
-  through" apply; then re-push and repeat the watch loop for the new commit. If addressing
+  **Read the Bash tool's own exit status when the call returns — `$FAILED` itself dies with the
+  subshell the instant the tool call ends, so it is not something you can inspect afterward.**
+  The script's last line is `exit "$FAILED"` (or an earlier `exit 1` / `exit 2` on the tooling-
+  missing and no-CI-registered paths), so the Bash tool's reported exit code IS the outcome:
+  `0` → CI green on every run, proceed to squash-merge; `1` → a genuine CI failure (or an
+  unresolvable re-poll failure) occurred, dispatch a Hunter rather than merging; `2` → no CI ever
+  registered for the head SHA, a case the script cannot resolve on its own — decide by hand
+  whether this repo genuinely has no CI wired up (proceed) or CI was expected and silently never
+  ran (treat as `BLOCKED` / `NEEDS_DIRECTION`, never merge on it).
+
+  Only once a run has actually failed (exit code `1`) does "Fix real failures (via a Hunter)
+  rather than forcing through" apply; then re-push and repeat the watch loop for the new commit.
+  If addressing
   review comments or CI fixes stretches over several minutes of back-and-forth rather than one
   watch-and-fix cycle, don't manually re-poll status between fixes — repeat the same push →
   watch-loop cycle for each new commit; each blocking watch call stands in for one iteration of
