@@ -61,14 +61,22 @@ WORKTREE_ARG=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' 
 
 cd "$REPO_ROOT"
 
-REPO_FLAGS=()
-[[ -n "$REPO_ARG" ]] && REPO_FLAGS=(--repo "$REPO_ARG")
-
-# ---------- fetch PR data ----------
+# Note: deliberately not using a `REPO_FLAGS=()` array + `"${REPO_FLAGS[@]}"`
+# expansion here. Under macOS's default /bin/bash (3.2.57), referencing an
+# empty array with `set -u` active throws "unbound variable" and aborts
+# before `gh` ever runs — exactly the common case where --repo is omitted
+# because we're already inside the target repo's checkout. A plain
+# if/else with two literal `gh` invocations sidesteps the bash-version trap.
 LOG "resolving PR: $PR_ARG"
-PR_JSON=$(gh pr view "$PR_ARG" "${REPO_FLAGS[@]}" \
-  --json number,url,state,mergeCommit,commits,baseRefName,headRefName,mergedAt 2>/dev/null) \
-  || DIE "gh pr view failed for $PR_ARG (not found, no auth, or not a PR)"
+if [[ -n "$REPO_ARG" ]]; then
+  PR_JSON=$(gh pr view "$PR_ARG" --repo "$REPO_ARG" \
+    --json number,url,state,mergeCommit,commits,baseRefName,headRefName,mergedAt 2>/dev/null) \
+    || DIE "gh pr view failed for $PR_ARG (not found, no auth, or not a PR)"
+else
+  PR_JSON=$(gh pr view "$PR_ARG" \
+    --json number,url,state,mergeCommit,commits,baseRefName,headRefName,mergedAt 2>/dev/null) \
+    || DIE "gh pr view failed for $PR_ARG (not found, no auth, or not a PR)"
+fi
 
 PR_NUMBER=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["number"])' "$PR_JSON")
 PR_STATE=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["state"])' "$PR_JSON")

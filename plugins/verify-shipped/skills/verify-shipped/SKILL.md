@@ -40,7 +40,7 @@ isn't available):
 ## Usage
 
 ```bash
-bash scripts/verify-shipped.sh --pr <number|url> --worktree <path> [--base master] [--repo owner/repo]
+bash ~/.claude/skills/verify-shipped/scripts/verify-shipped.sh --pr <number|url> --worktree <path> [--base master] [--repo owner/repo]
 ```
 
 - `--pr` — required. PR number or full URL.
@@ -64,7 +64,7 @@ Read the top-level `verdict` field (`PASS` only when all four checks pass) and e
 ## Example
 
 ```
-$ bash scripts/verify-shipped.sh --pr 15 --worktree /tmp/wt-card4 --repo hieplam/todd-skills
+$ bash ~/.claude/skills/verify-shipped/scripts/verify-shipped.sh --pr 15 --worktree /tmp/wt-card4 --repo hieplam/todd-skills
 {
   "pr_number": "15",
   "base_branch": "master",
