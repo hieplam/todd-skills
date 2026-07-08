@@ -131,6 +131,22 @@ its worktree + spec + plan + report file. Every dispatch grounds the receiver in
 - **Nested dispatch depth.** Shaman → Warchief → Hunter is two levels of Task nesting;
   Warchief → Hunter is proven in this repo, the extra level is not. Smoke-test after landing.
   Documented fallback: run the Shaman in the main conversation when campaigning.
+  - **Smoke-test result (2026-07-08): PASSED.** Ran a cheap, bounded 2-level nesting probe —
+    a headless `claude -p` invocation (`--model haiku`, `--allowedTools Task`,
+    `--dangerously-skip-permissions`, `--output-format json`) whose only instruction was to
+    dispatch a level-1 `general-purpose` subagent that itself dispatched a level-2
+    `general-purpose` subagent. The level-2 agent replied a canary string
+    (`CANARY-7f3a1c`); the level-1 agent relayed it verbatim; the top-level run's final
+    result was `RESULT=CANARY-7f3a1c` — an exact match end to end, `is_error: false`,
+    `permission_denials: []`, 3 turns, ~34s wall time, $0.22 total cost (Claude Code
+    2.1.204). This confirms the platform mechanism two-level `Task`/Agent nesting and
+    message relay both work as of this version; it does **not** by itself validate that the
+    real `shaman.md` → `warchief.md` → `hunter.md` prompts behave correctly at that depth —
+    only that the nesting depth itself is not the platform-level blocker the Risks section
+    flagged it as. The documented fallback (run the Shaman in the main conversation when
+    campaigning) remains available and is not withdrawn by this result. This unblocks
+    card 10 of `docs/superpowers/specs/2026-07-07-loops-applied-to-todd-skills.md` (parallel
+    Hunter dispatch), whose prerequisite was exactly this smoke test.
 - **Fresh-instance drift.** A re-dispatched Warchief re-grounds from files; if state isn't
   committed before `NEEDS_DIRECTION`, context is lost. Mitigated by making state-saving a
   contract requirement.
