@@ -315,18 +315,34 @@ Mode 2 above assumes the owner is present to say "do the next idea" each time. T
 also be automated — this is opt-in, the owner invokes it explicitly, and it is never the
 default:
 
-- **Wiring.** Wrap the same directive you'd otherwise get from the owner — "Shaman: run the
-  next roadmap idea" — in `/goal ... until verified-SHIPPED, ESCALATE-NEEDS-DIRECTION, or
-  ESCALATE-BLOCKED`, then fire it on a recurring trigger: `/schedule` for a cloud routine, or
-  `/loop` for a local one. Size that recurrence interval to the cycle, not to a convenient round
-  number: match it to how long one full "run the next roadmap idea" cycle actually takes —
-  dispatch → spec → plan → Hunter builds → audit → PR → CI → squash-merge, plausibly tens of
-  minutes to hours, not the few-minute cadence that suits a status poll like `/loop 5m` elsewhere
-  in this design. An interval shorter than one cycle risks firing a second unattended invocation
-  while the first is still mid-flight — both independently doing step 1 ("pick the next
-  unblocked card") concurrently, which can double-dispatch a Warchief onto the same card or race
-  on the roadmap/Decision-Log file this routine appends to. During the single-card pilot, confirm
-  the chosen interval against the observed cycle time before ever widening to a batch cadence.
+- **Wiring — pilot fires once, batch fires on a measured recurrence.** Wrap the same directive
+  you'd otherwise get from the owner — "Shaman: run the next roadmap idea" — in `/goal ... until
+  verified-SHIPPED, ESCALATE-NEEDS-DIRECTION, or ESCALATE-BLOCKED`. How you trigger that wrapped
+  directive differs by phase, precisely because the mandatory pilot (see the Pilot gate bullet
+  below) is what produces the one number — the observed cycle time — that a recurring trigger
+  needs to be sized safely. There is no safe way to size a recurrence before that number exists,
+  so the two phases use different triggers, not the same one at different speeds:
+  - **Pilot phase (mandatory, always first): a one-time fire, never a recurring one.** Use
+    `/schedule` with a single `fireAt` (the tool's one-time mode — no `cronExpression`), or a
+    `/loop` invocation you manually stop after its first fire. This is deliberate, not a
+    simplification: a one-time trigger cannot double-dispatch, cannot race the roadmap/Decision-Log
+    file, and — critically — cannot silently continue past the piloted card. When the piloted
+    card's `verified-SHIPPED` marker lands and the `/goal` invocation exits, there is no
+    recurring trigger left armed to pick up card #2; the routine stops because the mechanism
+    that would restart it was never configured to repeat. That stop is what makes it safe to
+    observe and report the pilot before anyone decides whether to scale it.
+  - **Batch phase (only after the pilot is observed and reported): convert to a recurring
+    trigger, sized from what the pilot measured.** Only now, with an actual dispatch → spec →
+    plan → Hunter builds → audit → PR → CI → squash-merge duration in hand from the pilot run,
+    configure `/schedule`'s `cronExpression` (cloud) or a recurring `/loop` interval (local).
+    Size it to that measured cycle — plausibly tens of minutes to hours, not the few-minute
+    cadence that suits a status poll like `/loop 5m` elsewhere in this design — with margin
+    above the observed time, never a convenient round number and never a guess made before the
+    pilot ran. An interval shorter than one cycle risks firing a second unattended invocation
+    while the first is still mid-flight — both independently doing step 1 ("pick the next
+    unblocked card") concurrently, which can double-dispatch a Warchief onto the same card or
+    race on the roadmap/Decision-Log file this routine appends to. Re-confirm the interval
+    against the next few observed runs and widen it if reality runs longer than the pilot did.
   Those three literal markers are the routine's only legitimate stop
   states, one for each of the Rule step's three possible return values above (`SHIPPED`,
   `NEEDS_DIRECTION`, `BLOCKED`) — a run that hits an unresolvable `BLOCKED` has an explicit exit
@@ -346,8 +362,11 @@ default:
   `NEEDS_DIRECTION`, `BLOCKED`, or `shipped`, all of which also appear on every routine,
   non-halting round (e.g. "mark the card shipped", Warchief returns `SHIPPED`) — is the only
   signal it can act on to stop the loop. Once the marker is emitted and this `/goal` invocation
-  exits, the recurring `/schedule`/`/loop` trigger is what starts the next unblocked card's
-  `/goal`-wrapped invocation — the marker ends this one card's run, not the whole campaign.
+  exits, what happens next depends on which phase you're in: during the pilot, nothing —
+  the one-time trigger already fired and is spent, so the routine stops outright, exactly as
+  required below. In the batch phase (post-pilot only), the recurring `/schedule`/`/loop`
+  trigger is what starts the next unblocked card's `/goal`-wrapped invocation — the marker ends
+  this one card's run, not the whole campaign.
 - **Unattended-safe already, by construction — verify, don't edit.** An automated fire must
   never stall on a prompt nobody is there to answer. Check this before wiring anything, don't
   add a gate for it: the Warchief's `tools:` frontmatter (`Read, Write, Edit, Grep, Glob, Bash,
@@ -369,9 +388,15 @@ default:
   (e.g. an isolated worktree the routine is allowed to auto-accept in), don't assume it.
 - **Pilot gate — mandatory, not a suggestion.** `/schedule` and agent-teams are both
   research-preview today. Before ever batching this mode, pilot it on exactly **one** idea
-  card, observe the run end-to-end (dispatch → rule → `verify-shipped` → report), and record
-  what happened. Only after that single pilot is observed and reported do you scale to a batch —
-  never skip straight to N cards on the strength of the design alone.
+  card, wired with the one-time trigger the Wiring bullet requires for this phase (a single
+  `fireAt`, or a `/loop` you manually stop after its first fire) — never a recurring trigger.
+  That one-time wiring is what makes the pilot self-terminating: there is no armed trigger left
+  to auto-dispatch a second card once the first ships, so the gate holds by construction, not by
+  operator discipline alone. Observe the run end-to-end (dispatch → rule → `verify-shipped` →
+  report), and record what happened. Only after that single pilot is observed and reported do
+  you take the separate, deliberate step of configuring a *recurring* trigger — sized to the
+  cycle time the pilot just measured, per the Wiring bullet — and scale to a batch; never skip
+  straight to a recurring trigger or to N cards on the strength of the design alone.
 
 This is the same Mode 2 loop described above; the only thing that changes is who pulls the
 trigger.
