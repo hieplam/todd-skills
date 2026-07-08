@@ -1,0 +1,5 @@
+{
+  "name": "verify-shipped",
+  "description": "Mechanically verify the tribe's Definition of Done: PR merged, squash strategy, master in sync with origin, worktree removed.",
+  "version": "1.0.0"
+}

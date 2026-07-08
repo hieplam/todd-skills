@@ -287,8 +287,13 @@ The owner has approved the roadmap and set the batch. Now you are the master run
    - `NEEDS_DIRECTION` → register item? owner (sharpened) : decide yourself. Log the ruling in
      the Decision Log. Re-dispatch with the ruling.
    - `BLOCKED` → resolve or escalate; log what changed.
-   - `SHIPPED` → verify the outcome against the card's measurable goal from the evidence; mark
-     shipped; re-sequence if the ship revealed new information.
+   - `SHIPPED` → first run the `verify-shipped` skill's script against the reported PR and
+     worktree path — mechanical proof the PR is merged, squash strategy, master is in sync with
+     origin, and the worktree is gone — before trusting the claim at all. Only once that's
+     `PASS` do you verify the outcome against the card's measurable goal from the evidence; mark
+     shipped; re-sequence if the ship revealed new information. A `verify-shipped` `FAIL` is not
+     `SHIPPED` — treat it like `BLOCKED` and send it back to the Warchief with the failing check
+     attached.
    - Silence → not a status: read the Warchief's report-file heartbeat (see Channels &
      liveness). Progressing → wait; **no new line for 30 minutes while mid-milestone → dead** —
      re-dispatch a fresh Warchief from the saved worktree path, spec path, plan path, and the
