@@ -323,14 +323,20 @@ default:
   needs to be sized safely. There is no safe way to size a recurrence before that number exists,
   so the two phases use different triggers, not the same one at different speeds:
   - **Pilot phase (mandatory, always first): a one-time fire, never a recurring one.** Use
-    `/schedule` with a single `fireAt` (the tool's one-time mode — no `cronExpression`), or a
-    `/loop` invocation you manually stop after its first fire. This is deliberate, not a
-    simplification: a one-time trigger cannot double-dispatch, cannot race the roadmap/Decision-Log
-    file, and — critically — cannot silently continue past the piloted card. When the piloted
-    card's `verified-SHIPPED` marker lands and the `/goal` invocation exits, there is no
-    recurring trigger left armed to pick up card #2; the routine stops because the mechanism
-    that would restart it was never configured to repeat. That stop is what makes it safe to
-    observe and report the pilot before anyone decides whether to scale it.
+    `/schedule` with a single `fireAt` (the tool's one-time mode — no `cronExpression`) as the
+    pilot trigger — its one-shot behavior is platform-enforced, not operator-enforced. This is
+    deliberate, not a simplification: a one-time trigger cannot double-dispatch, cannot race the
+    roadmap/Decision-Log file, and — critically — cannot silently continue past the piloted card.
+    When the piloted card's `verified-SHIPPED` marker lands and the `/goal` invocation exits,
+    there is no recurring trigger left armed to pick up card #2; the routine stops because the
+    mechanism that would restart it was never configured to repeat. That stop is what makes it
+    safe to observe and report the pilot before anyone decides whether to scale it. `/loop` is
+    **not** an alternative for this phase: it is a recurring, interval-based construct with no
+    one-shot mode, so "stop it after its first fire" is an operator action, not a platform
+    guarantee — if nobody is there to stop it in time, it ticks again and auto-dispatches card
+    #2, silently continuing past the piloted card exactly as the paragraph above says cannot
+    happen. That failure mode is precisely what an unattended pilot cannot risk, so `/loop`
+    belongs only to the batch phase below, never to the pilot.
   - **Batch phase (only after the pilot is observed and reported): convert to a recurring
     trigger, sized from what the pilot measured.** Only now, with an actual dispatch → spec →
     plan → Hunter builds → audit → PR → CI → squash-merge duration in hand from the pilot run,
@@ -388,11 +394,13 @@ default:
   (e.g. an isolated worktree the routine is allowed to auto-accept in), don't assume it.
 - **Pilot gate — mandatory, not a suggestion.** `/schedule` and agent-teams are both
   research-preview today. Before ever batching this mode, pilot it on exactly **one** idea
-  card, wired with the one-time trigger the Wiring bullet requires for this phase (a single
-  `fireAt`, or a `/loop` you manually stop after its first fire) — never a recurring trigger.
-  That one-time wiring is what makes the pilot self-terminating: there is no armed trigger left
-  to auto-dispatch a second card once the first ships, so the gate holds by construction, not by
-  operator discipline alone. Observe the run end-to-end (dispatch → rule → `verify-shipped` →
+  card, wired with the one-time trigger the Wiring bullet requires for this phase — `/schedule`
+  with a single `fireAt`, never a recurring trigger and never `/loop` (a recurring,
+  interval-based construct with no one-shot mode; stopping it after one fire is operator
+  discipline, not a platform guarantee, so it cannot serve this gate). That one-time wiring is
+  what makes the pilot self-terminating: there is no armed trigger left to auto-dispatch a
+  second card once the first ships, so the gate holds by construction, not by operator
+  discipline alone. Observe the run end-to-end (dispatch → rule → `verify-shipped` →
   report), and record what happened. Only after that single pilot is observed and reported do
   you take the separate, deliberate step of configuring a *recurring* trigger — sized to the
   cycle time the pilot just measured, per the Wiring bullet — and scale to a batch; never skip
