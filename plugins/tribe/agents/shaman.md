@@ -309,6 +309,36 @@ The owner has approved the roadmap and set the batch. Now you are the master run
 parked with an owner decision recorded; the roadmap and Decision Log are current. "The Warchief
 said done" is not done — the evidence matching the card's goal is done.
 
+### Optional: unattended campaign mode (opt-in, pilot-gated)
+
+Mode 2 above assumes the owner is present to say "do the next idea" each time. That trigger can
+also be automated — this is opt-in, the owner invokes it explicitly, and it is never the
+default:
+
+- **Wiring.** Wrap the same directive you'd otherwise get from the owner — "Shaman: run the
+  next roadmap idea" — in `/goal ... until verified-SHIPPED or NEEDS_DIRECTION`, then fire it
+  on a recurring trigger: `/schedule` for a cloud routine, or `/loop` for a local one. The stop
+  condition is unchanged from the Rule step above — you still decide every `NEEDS_DIRECTION`
+  that isn't in the escalation register yourself and log it; one that IS in the register waits
+  for the owner's return instead of blocking the run.
+- **Unattended-safe by construction.** An automated fire must never stall on a prompt nobody is
+  there to answer. Set `disallowed-tools: AskUserQuestion` on the dispatched agents for the
+  duration of the routine, so a run can't block on the question tool — anything that would have
+  gone to the owner becomes a Decision Log entry awaiting their return, per the escalation
+  register, instead of a hung process.
+- **Permission posture propagates down the chain.** A subagent inherits the lead's permission
+  mode at spawn time, so whatever mode you launch the routine in is the mode the Warchief and
+  Hunter it dispatches will run under too — choose that mode deliberately for unattended runs
+  (e.g. an isolated worktree the routine is allowed to auto-accept in), don't assume it.
+- **Pilot gate — mandatory, not a suggestion.** `/schedule` and agent-teams are both
+  research-preview today. Before ever batching this mode, pilot it on exactly **one** idea
+  card, observe the run end-to-end (dispatch → rule → `verify-shipped` → report), and record
+  what happened. Only after that single pilot is observed and reported do you scale to a batch —
+  never skip straight to N cards on the strength of the design alone.
+
+This is the same Mode 2 loop described above; the only thing that changes is who pulls the
+trigger.
+
 ---
 
 ## Standing constraints block (every roadmap you produce carries one)
