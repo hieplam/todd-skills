@@ -212,30 +212,38 @@ implementer."_
 Ensure an isolated worktree exists (worktree-first per repo convention, via the
 **using-git-worktrees** skill or a native tool like `EnterWorktree`). Install dependencies so
 tests and gates can run. Record the branch base commit (the SHA your own worktree branched
-from) — every additional worktree in this step branches from that same SHA.
+from) — every additional worktree created for the **current wave** branches from that same SHA.
+
+**This recorded base commit is re-recorded after every wave (see step 5's integration
+procedure) — it is never reused stale across waves.** Sub-plan worktrees are created
+**just-in-time, one wave at a time**: only the current wave's worktrees exist at any point; a
+later wave's worktrees are not created until its predecessor wave has merged back and the base
+commit has been updated to point at that merge, so later waves build on earlier waves' file
+changes instead of on pre-wave-1 code.
 
 **If `splitting-plans` produced 2+ dependency-independent sub-plans**, its README's dependency
 waves diagram and each sub-plan's `owns_files` already tell you which bundles can run at once (a
-wave containing ≥2 bundles with disjoint `owns_files`). For such a wave, set up **one additional
-worktree per sub-plan in that wave** — but do **not** re-invoke the using-git-worktrees skill or
-`EnterWorktree` for these. You are already inside your own isolated worktree, so Step 0 of that
-skill (and `EnterWorktree`'s own precondition) will detect your existing isolation and refuse to
-create another — "Do NOT create another worktree" is exactly what it will tell you, which would
-silently defeat this whole step. Instead, create each sub-plan's worktree with a **direct git
-command**, run from inside your current worktree (a linked worktree's `git` shares the common
-`.git` with the main checkout, so `git worktree add` from here registers correctly regardless of
-which worktree you run it in):
+wave containing ≥2 bundles with disjoint `owns_files`). For the wave you are about to dispatch,
+set up **one additional worktree per sub-plan in that wave** — but do **not** re-invoke the
+using-git-worktrees skill or `EnterWorktree` for these. You are already inside your own isolated
+worktree, so Step 0 of that skill (and `EnterWorktree`'s own precondition) will detect your
+existing isolation and refuse to create another — "Do NOT create another worktree" is exactly
+what it will tell you, which would silently defeat this whole step. Instead, create each
+sub-plan's worktree with a **direct git command**, run from inside your current worktree (a
+linked worktree's `git` shares the common `.git` with the main checkout, so `git worktree add`
+from here registers correctly regardless of which worktree you run it in):
 
 ```bash
 git worktree add <path-per-sub-plan> -b <branch-per-sub-plan> <recorded-base-commit-sha>
 ```
 
-Do this once per sub-plan in the wave, all pointed at the same recorded base commit, before
-dispatching any Hunter. Then, **for each new worktree**, still apply the using-git-worktrees
-skill's Step 2 onward (project setup / install dependencies) inside that worktree's own
-directory — only its Step 0/1 (detect-or-create) is bypassed here, because you performed the
-equivalent creation yourself with the direct command above. Never let two concurrent Hunters
-share a worktree.
+Do this once per sub-plan in the wave you are about to dispatch, all pointed at the
+**currently-recorded** base commit (the original SHA for wave 1; wave N's post-merge SHA for
+wave N+1 — see step 5), before dispatching any Hunter in that wave. Then, **for each new
+worktree**, still apply the using-git-worktrees skill's Step 2 onward (project setup / install
+dependencies) inside that worktree's own directory — only its Step 0/1 (detect-or-create) is
+bypassed here, because you performed the equivalent creation yourself with the direct command
+above. Never let two concurrent Hunters share a worktree.
 
 ### 5. Orchestrate the build via Hunters — do not build it yourself
 
@@ -251,9 +259,35 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
   Hunter at a time, as before. For a **wave of 2+ dependency-independent sub-plans** with
   disjoint `owns_files` (the isolation step 4 set up worktrees for), dispatch **one Hunter per
   sub-plan concurrently**, each pointed at its own worktree and briefed to touch only its
-  sub-plan's `owns_files` — nothing else changes about how you brief or audit each one. Waves
-  stay ordered by their declared `prereqs`: wait for every Hunter in the current wave to report
-  and for each worktree's branch to be merged back before dispatching the next wave.
+  sub-plan's `owns_files` — nothing else changes about how you brief or audit each one.
+
+  **Waves stay ordered by their declared `prereqs`, and each wave integrates into your own
+  worktree branch before the next wave starts — never a separate PR per sub-plan.** Your own
+  worktree's branch (the one from step 4, checked out at the recorded base commit) is the single
+  integration point every wave merges into and the branch step 7 opens the one PR from. Between
+  wave N and wave N+1:
+
+  1. Wait for every Hunter in wave N to report (audited per step 6).
+  2. From inside your own worktree, merge each of wave N's sub-plan branches into it, one at a
+     time (fixed order, e.g. sub-plan order in the plan):
+     ```bash
+     git -C <your-worktree-path> merge --no-ff <branch-per-sub-plan>
+     ```
+     Sub-plans in the same wave have disjoint `owns_files`, so this should never conflict; if a
+     merge does conflict, that means `owns_files` was wrong — do not guess at a resolution,
+     save state and return `NEEDS_DIRECTION` to the Shaman instead.
+  3. Once every wave-N branch is merged, re-record the base commit as your worktree's new HEAD:
+     ```bash
+     git -C <your-worktree-path> rev-parse HEAD
+     ```
+     This new SHA is what step 4 uses as "the currently-recorded base commit" for wave N+1 — it
+     is what wave N+1's per-sub-plan worktrees are created from, so wave N+1 builds on wave N's
+     merged output instead of on stale pre-wave-1 code.
+  4. Only now create wave N+1's per-sub-plan worktrees (step 4) and dispatch its Hunters.
+
+  A plan with only one wave, or a wave of one sub-plan, has nothing to integrate mid-flight — its
+  single branch (or your own worktree, if there was never a second worktree) simply carries
+  through to step 7 as before.
 - Pick the least-powerful model that fits each task; state it explicitly when dispatching (the
   Hunter inherits your model unless you override it — override it to match task complexity).
   Do this per Hunter even under concurrent dispatch: route mechanical/small tasks to a smaller
