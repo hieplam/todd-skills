@@ -16,6 +16,8 @@
 #   - skills/<name>/   -> $CLAUDE_DIR/skills/<name>
 #   - install.sh       -> executed as a post-install hook (CLAUDE_DIR is passed through);
 #                         claude-md/ holds snippets consumed by such hooks
+#   - evals/           -> dev-tooling fixtures for scripts/evals/run_evals.py; intentionally
+#                         not symlinked into $CLAUDE_DIR (not runtime content), no warning
 #   - already linked to this repo  -> skipped (idempotent)
 #   - conflicting file/dir/foreign link -> backed up to <name>.bak.<epoch>, then linked
 #   - CLAUDE_DIR overrides the target root (default: ~/.claude) — used by tests.
@@ -109,6 +111,7 @@ install_plugin() {
       # scripts/ holds validator scripts invoked from the repo checkout
       # directly (not symlinked); intentionally not installed, skip silently.
       scripts) ;;
+      evals) ;; # dev-tooling fixtures for scripts/evals/run_evals.py — not runtime content, intentionally not symlinked
       *) warn "$plugin/$name: unsupported component type — not installed" ;;
     esac
   done
