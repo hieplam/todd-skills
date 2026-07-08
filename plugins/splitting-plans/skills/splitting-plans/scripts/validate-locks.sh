@@ -3,9 +3,11 @@
 # splitting-plans bundle folder, instead of re-deriving lock consistency by prose reasoning
 # every time a cook or the head chef reads the status board.
 #
-# Checks, per sub-plan bundle (`<NN>-<title>.md` files with the §4.1 YAML frontmatter — the
-# glob is restricted to that numbered-filename shape, so the folder's non-bundle `README.md`
-# orchestrator, which carries no frontmatter, is never picked up as a bundle):
+# Checks, per sub-plan bundle (`<N>-<title>.md` files with the §4.1 YAML frontmatter — bundle
+# discovery matches any run of one-or-more leading digits, not a fixed two-digit width, so
+# `1-foo.md` and a hypothetical `100-foo.md` (past bundle 99) are both picked up; the folder's
+# non-bundle `README.md` orchestrator, which has no leading digit, is never picked up as a
+# bundle):
 #   - status is one of AVAILABLE | LOCKED | DONE | BLOCKED
 #   - LOCKED requires non-empty locked_by + locked_at; a lock older than the staleness
 #     threshold (default 30 minutes, same number the tribe's Shaman<->Warchief heartbeat uses)
@@ -40,11 +42,12 @@ done
 
 [[ -n "$BUNDLES_DIR" ]] || DIE "usage: validate-locks.sh <bundles-dir> [--threshold-minutes N]"
 [[ -d "$BUNDLES_DIR" ]] || DIE "bundles directory not found: $BUNDLES_DIR"
+[[ -r "$BUNDLES_DIR" ]] || DIE "bundles directory not readable (permission denied?): $BUNDLES_DIR"
 [[ "$THRESHOLD_MINUTES" =~ ^[0-9]+(\.[0-9]+)?$ ]] || DIE "invalid --threshold-minutes: '$THRESHOLD_MINUTES' (must be a non-negative number)"
 command -v python3 >/dev/null 2>&1 || DIE "python3 is required but not on PATH"
 
 python3 - "$BUNDLES_DIR" "$THRESHOLD_MINUTES" <<'PY'
-import glob, json, os, re, sys
+import json, os, re, sys
 from datetime import datetime, timezone
 
 bundles_dir, threshold_minutes = sys.argv[1], float(sys.argv[2])
@@ -70,8 +73,17 @@ def parse_ts(raw):
 def parse_frontmatter(path):
     """Minimal parser for the flat + one-level-list YAML frontmatter shape used by
     splitting-plans sub-plan templates (SKILL.md §4.1). Not a general YAML parser."""
-    with open(path, "r", errors="replace") as f:
-        lines = f.readlines()
+    # A bundle file is an externally-supplied artifact (written by another cook/process), so an
+    # I/O surprise (permission denied, vanished mid-scan, etc.) is a realistic per-file
+    # condition, not a self-inflicted one. Report it the same way a malformed-frontmatter file
+    # is reported — via parse_errors, so one unreadable bundle doesn't crash the whole run and
+    # hide every other bundle's status — instead of letting an OSError traceback escape with
+    # exit 1 and no JSON on stdout.
+    try:
+        with open(path, "r", errors="replace") as f:
+            lines = f.readlines()
+    except OSError as e:
+        return None, f"cannot read file: {e}"
 
     if not lines or lines[0].strip() != "---":
         return None, "missing frontmatter (no leading '---')"
@@ -115,7 +127,29 @@ def parse_frontmatter(path):
             fm[key] = val.strip('"\'')
     return fm, None
 
-bundle_paths = sorted(glob.glob(os.path.join(bundles_dir, "[0-9][0-9]-*.md")))
+# Bundle filename shape per SKILL.md §4.1: one-or-more leading digits, a dash, a title, `.md`.
+# A fixed-width glob like `[0-9][0-9]-*.md` would silently exclude `1-foo.md` (not zero-padded)
+# or a hypothetical `100-foo.md` (past bundle 99) — either would drop straight to a false-clean
+# `noop`/undercounted verdict rather than a loud failure, so match any digit-count instead.
+BUNDLE_NAME_RE = re.compile(r"^\d+-.*\.md$")
+try:
+    all_names = os.listdir(bundles_dir)
+except OSError as e:
+    print(json.dumps({
+        "bundles_dir": os.path.abspath(bundles_dir) if os.path.isdir(bundles_dir) else bundles_dir,
+        "threshold_minutes": threshold_minutes,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "bundle_count": 0,
+        "bundles": [],
+        "parse_errors": [{"file": None, "error": f"cannot list bundles directory: {e}"}],
+        "violations": [],
+        "verdict": "error",
+    }, indent=2))
+    sys.exit(0)
+bundle_paths = sorted(
+    (os.path.join(bundles_dir, name) for name in all_names if BUNDLE_NAME_RE.match(name)),
+    key=lambda p: (int(re.match(r"^(\d+)-", os.path.basename(p)).group(1)), os.path.basename(p)),
+)
 now = datetime.now(timezone.utc)
 
 # `entries` keeps every parsed file (even ones sharing a `bundle:` id with another file), so a

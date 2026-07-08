@@ -47,6 +47,7 @@ done
 
 [[ -n "$PLAN_FILE" ]] || DIE "usage: validate-plan.sh <plan-file-path>"
 [[ -f "$PLAN_FILE" ]] || DIE "plan file not found: $PLAN_FILE"
+[[ -r "$PLAN_FILE" ]] || DIE "plan file not readable (permission denied?): $PLAN_FILE"
 [[ -s "$PLAN_FILE" ]] || DIE "plan file is empty: $PLAN_FILE"
 command -v python3 >/dev/null 2>&1 || DIE "python3 is required but not on PATH"
 
@@ -54,8 +55,16 @@ python3 - "$PLAN_FILE" <<'PY'
 import json, re, sys
 
 plan_file = sys.argv[1]
-with open(plan_file, "r", errors="replace") as f:
-    text = f.read()
+# The bash wrapper already checked -f/-r, but that's a TOCTOU-prone check, not a guarantee
+# (the file can vanish or become unreadable between the check and this open()). Treat any
+# I/O failure here as a setup error (exit 2), matching this script family's documented
+# contract, instead of letting an unhandled traceback leak to stdout with exit 1.
+try:
+    with open(plan_file, "r", errors="replace") as f:
+        text = f.read()
+except OSError as e:
+    print(f"[validate-plan] ERROR: cannot read plan file: {e}", file=sys.stderr)
+    sys.exit(2)
 lines = text.splitlines()
 
 WORD_PLACEHOLDER_RE = re.compile(r"\b(TODO|TBD|FIXME|XXX|PLACEHOLDER)\b")

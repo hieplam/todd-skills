@@ -36,6 +36,7 @@ done
 
 [[ -n "$REPORT_FILE" ]] || DIE "usage: heartbeat-check.sh <report-file-path> [--threshold-minutes N]"
 [[ -f "$REPORT_FILE" ]] || DIE "report file not found: $REPORT_FILE"
+[[ -r "$REPORT_FILE" ]] || DIE "report file not readable (permission denied?): $REPORT_FILE"
 [[ "$THRESHOLD_MINUTES" =~ ^[0-9]+(\.[0-9]+)?$ ]] || DIE "invalid --threshold-minutes: '$THRESHOLD_MINUTES' (must be a non-negative number)"
 command -v python3 >/dev/null 2>&1 || DIE "python3 is required but not on PATH"
 
@@ -66,7 +67,16 @@ def parse_ts(raw):
 
 last_line = None
 last_ts = None
-with open(report_file, "r", errors="replace") as f:
+# The bash wrapper already checked -f/-r, but that's a TOCTOU-prone check, not a guarantee
+# (the file can vanish or become unreadable between the check and this open()). Treat any
+# I/O failure here as a setup error (exit 2), matching this script family's documented
+# contract, instead of letting an unhandled traceback leak to stdout with exit 1.
+try:
+    fh = open(report_file, "r", errors="replace")
+except OSError as e:
+    print(f"[heartbeat-check] ERROR: cannot read report file: {e}", file=sys.stderr)
+    sys.exit(2)
+with fh as f:
     for raw_line in f:
         line = raw_line.rstrip("\n")
         if not line.strip():
