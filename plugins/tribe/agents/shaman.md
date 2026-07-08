@@ -316,11 +316,21 @@ also be automated — this is opt-in, the owner invokes it explicitly, and it is
 default:
 
 - **Wiring.** Wrap the same directive you'd otherwise get from the owner — "Shaman: run the
-  next roadmap idea" — in `/goal ... until verified-SHIPPED or NEEDS_DIRECTION`, then fire it
-  on a recurring trigger: `/schedule` for a cloud routine, or `/loop` for a local one. The stop
-  condition is unchanged from the Rule step above — you still decide every `NEEDS_DIRECTION`
-  that isn't in the escalation register yourself and log it; one that IS in the register waits
-  for the owner's return instead of blocking the run.
+  next roadmap idea" — in `/goal ... until verified-SHIPPED, ESCALATE-NEEDS-DIRECTION, or
+  ESCALATE-BLOCKED`, then fire it on a recurring trigger: `/schedule` for a cloud routine, or
+  `/loop` for a local one. Those three literal markers are the routine's only legitimate stop
+  states, one for each of the Rule step's three possible return values above (`SHIPPED`,
+  `NEEDS_DIRECTION`, `BLOCKED`) — a run that hits an unresolvable `BLOCKED` has an explicit exit
+  too, not just a silent stall. The Rule step's own routing still runs first and decides which
+  outcomes are legitimate stops: a routine, self-resolved `NEEDS_DIRECTION` or a `BLOCKED` you
+  resolve yourself is never one of the three markers — you decide, log it in the Decision Log,
+  and re-dispatch, so the routine keeps running unattended exactly as it would with the owner
+  present. Only when an item genuinely needs the owner — a register `NEEDS_DIRECTION`, or a
+  `BLOCKED` you can't resolve and must carry up — do you emit the literal `ESCALATE-NEEDS-DIRECTION`
+  / `ESCALATE-BLOCKED` marker into the transcript. `/goal`'s evaluator judges only the
+  conversation transcript, with no tool or file access to check the escalation register itself,
+  so the literal marker — not the bare word `NEEDS_DIRECTION` or `BLOCKED`, which also appear on
+  every routine, non-halting round — is the only signal it can act on to stop the loop.
 - **Unattended-safe by construction.** An automated fire must never stall on a prompt nobody is
   there to answer. Set `disallowed-tools: AskUserQuestion` on the dispatched agents for the
   duration of the routine, so a run can't block on the question tool — anything that would have
