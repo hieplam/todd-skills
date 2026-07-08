@@ -327,6 +327,106 @@ The owner has approved the roadmap and set the batch. Now you are the master run
 parked with an owner decision recorded; the roadmap and Decision Log are current. "The Warchief
 said done" is not done — the evidence matching the card's goal is done.
 
+### Optional: unattended campaign mode (opt-in, pilot-gated)
+
+Mode 2 above assumes the owner is present to say "do the next idea" each time. That trigger can
+also be automated — this is opt-in, the owner invokes it explicitly, and it is never the
+default:
+
+- **Wiring — pilot fires once, batch fires on a measured recurrence.** Wrap the same directive
+  you'd otherwise get from the owner — "Shaman: run the next roadmap idea" — in `/goal ... until
+  verified-SHIPPED, ESCALATE-NEEDS-DIRECTION, or ESCALATE-BLOCKED`. How you trigger that wrapped
+  directive differs by phase, precisely because the mandatory pilot (see the Pilot gate bullet
+  below) is what produces the one number — the observed cycle time — that a recurring trigger
+  needs to be sized safely. There is no safe way to size a recurrence before that number exists,
+  so the two phases use different triggers, not the same one at different speeds:
+  - **Pilot phase (mandatory, always first): a one-time fire, never a recurring one.** Use
+    `/schedule` with a single `fireAt` (the tool's one-time mode — no `cronExpression`) as the
+    pilot trigger — its one-shot behavior is platform-enforced, not operator-enforced. This is
+    deliberate, not a simplification: a one-time trigger cannot double-dispatch, cannot race the
+    roadmap/Decision-Log file, and — critically — cannot silently continue past the piloted card.
+    When the piloted card's `verified-SHIPPED` marker lands and the `/goal` invocation exits,
+    there is no recurring trigger left armed to pick up card #2; the routine stops because the
+    mechanism that would restart it was never configured to repeat. That stop is what makes it
+    safe to observe and report the pilot before anyone decides whether to scale it. `/loop` is
+    **not** an alternative for this phase: it is a recurring, interval-based construct with no
+    one-shot mode, so "stop it after its first fire" is an operator action, not a platform
+    guarantee — if nobody is there to stop it in time, it ticks again and auto-dispatches card
+    #2, silently continuing past the piloted card exactly as the paragraph above says cannot
+    happen. That failure mode is precisely what an unattended pilot cannot risk, so `/loop`
+    belongs only to the batch phase below, never to the pilot.
+  - **Batch phase (only after the pilot is observed and reported): convert to a recurring
+    trigger, sized from what the pilot measured.** Only now, with an actual dispatch → spec →
+    plan → Hunter builds → audit → PR → CI → squash-merge duration in hand from the pilot run,
+    configure `/schedule`'s `cronExpression` (cloud) or a recurring `/loop` interval (local).
+    Size it to that measured cycle — plausibly tens of minutes to hours, not the few-minute
+    cadence that suits a status poll like `/loop 5m` elsewhere in this design — with margin
+    above the observed time, never a convenient round number and never a guess made before the
+    pilot ran. An interval shorter than one cycle risks firing a second unattended invocation
+    while the first is still mid-flight — both independently doing step 1 ("pick the next
+    unblocked card") concurrently, which can double-dispatch a Warchief onto the same card or
+    race on the roadmap/Decision-Log file this routine appends to. Re-confirm the interval
+    against the next few observed runs and widen it if reality runs longer than the pilot did.
+  Those three literal markers are the routine's only legitimate stop
+  states, one for each of the Rule step's three possible return values above (`SHIPPED`,
+  `NEEDS_DIRECTION`, `BLOCKED`) — a run that hits an unresolvable `BLOCKED` has an explicit exit
+  too, not just a silent stall. The Rule step's own routing still runs first and decides which
+  outcomes are legitimate stops: a routine, self-resolved `NEEDS_DIRECTION` or a `BLOCKED` you
+  resolve yourself is never one of the three markers — you decide, log it in the Decision Log,
+  and re-dispatch, so the routine keeps running unattended exactly as it would with the owner
+  present. Only when an item genuinely needs the owner — a register `NEEDS_DIRECTION`, or a
+  `BLOCKED` you can't resolve and must carry up — do you emit the literal `ESCALATE-NEEDS-DIRECTION`
+  / `ESCALATE-BLOCKED` marker into the transcript. Symmetrically, when the one card this
+  `/goal`-wrapped directive was dispatched for clears the Rule step's `SHIPPED` branch —
+  `verify-shipped` returns `PASS` and the outcome matches that card's measurable goal — you emit
+  the literal `verified-SHIPPED` marker into the transcript; this is the required, parallel
+  imperative for the third stop condition, not implied by narrating that the card is shipped.
+  `/goal`'s evaluator judges only the conversation transcript, with no tool or file access to
+  check the escalation register or the roadmap itself, so the literal marker — not the bare word
+  `NEEDS_DIRECTION`, `BLOCKED`, or `shipped`, all of which also appear on every routine,
+  non-halting round (e.g. "mark the card shipped", Warchief returns `SHIPPED`) — is the only
+  signal it can act on to stop the loop. Once the marker is emitted and this `/goal` invocation
+  exits, what happens next depends on which phase you're in: during the pilot, nothing —
+  the one-time trigger already fired and is spent, so the routine stops outright, exactly as
+  required below. In the batch phase (post-pilot only), the recurring `/schedule`/`/loop`
+  trigger is what starts the next unblocked card's `/goal`-wrapped invocation — the marker ends
+  this one card's run, not the whole campaign.
+- **Unattended-safe already, by construction — verify, don't edit.** An automated fire must
+  never stall on a prompt nobody is there to answer. Check this before wiring anything, don't
+  add a gate for it: the Warchief's `tools:` frontmatter (`Read, Write, Edit, Grep, Glob, Bash,
+  Task, TodoWrite, SendMessage`) and the Hunter's (`Read, Write, Edit, Grep, Glob, Bash`) never
+  included `AskUserQuestion` to begin with, on master or on any branch — and Claude Code agent
+  `tools:` is a strict allow-list, so neither can call it, with or without any `/schedule` or
+  `/loop` wrapping. There is nothing to disable here; do not edit those files' frontmatter for
+  this reason. Doing so would be a no-op for the tool gap and, worse, out of this card's
+  documentation-only scope fence if actually carried out — a frontmatter change persists for
+  every future invocation of those agents, not just "the duration of the routine." Everything
+  that would otherwise have gone to the owner already becomes a Decision Log entry awaiting
+  their return, per the escalation register, because the tool was never reachable to begin
+  with. The real place an unattended run can stall is a **tool-use permission prompt** — Bash or
+  Edit awaiting an approve/deny click nobody is there to give — and that risk is exactly what
+  the next bullet's permission-mode choice closes.
+- **Permission posture propagates down the chain.** A subagent inherits the lead's permission
+  mode at spawn time, so whatever mode you launch the routine in is the mode the Warchief and
+  Hunter it dispatches will run under too — choose that mode deliberately for unattended runs
+  (e.g. an isolated worktree the routine is allowed to auto-accept in), don't assume it.
+- **Pilot gate — mandatory, not a suggestion.** `/schedule` and agent-teams are both
+  research-preview today. Before ever batching this mode, pilot it on exactly **one** idea
+  card, wired with the one-time trigger the Wiring bullet requires for this phase — `/schedule`
+  with a single `fireAt`, never a recurring trigger and never `/loop` (a recurring,
+  interval-based construct with no one-shot mode; stopping it after one fire is operator
+  discipline, not a platform guarantee, so it cannot serve this gate). That one-time wiring is
+  what makes the pilot self-terminating: there is no armed trigger left to auto-dispatch a
+  second card once the first ships, so the gate holds by construction, not by operator
+  discipline alone. Observe the run end-to-end (dispatch → rule → `verify-shipped` →
+  report), and record what happened. Only after that single pilot is observed and reported do
+  you take the separate, deliberate step of configuring a *recurring* trigger — sized to the
+  cycle time the pilot just measured, per the Wiring bullet — and scale to a batch; never skip
+  straight to a recurring trigger or to N cards on the strength of the design alone.
+
+This is the same Mode 2 loop described above; the only thing that changes is who pulls the
+trigger.
+
 ---
 
 ## Standing constraints block (every roadmap you produce carries one)
