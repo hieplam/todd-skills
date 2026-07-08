@@ -259,6 +259,17 @@ rounds.
   `workflow_run`-gated workflow that only starts once an earlier one concludes):
   ```
   SHA=$(gh pr view --json headRefOid -q .headRefOid)
+  # Resolve the timeout binary once, up front. `timeout` is GNU coreutils and is not on stock
+  # macOS (only `gtimeout`, and only if `brew install coreutils` was run). If neither exists,
+  # bash would report "command not found" (exit 127) for the watch call below, and the loop's
+  # own `[ "$STATUS" -ne 0 ]` check would misclassify that as a genuine CI failure — dispatching
+  # a Hunter to "fix" a nonexistent problem. Fail loudly here instead of ever hitting that path.
+  TIMEOUT_CMD=$(command -v timeout || command -v gtimeout || true)
+  if [ -z "$TIMEOUT_CMD" ]; then
+    echo "No 'timeout' or 'gtimeout' binary found — install coreutils (brew install coreutils" \
+         "on macOS) before watching CI. Refusing to guess; BLOCKED." >&2
+    exit 1
+  fi
   RUN_IDS=""
   for i in 1 2 3 4 5 6; do
     RUN_IDS=$(gh run list --commit "$SHA" --json databaseId -q '.[].databaseId')
@@ -282,7 +293,7 @@ rounds.
         # NOT a failure: log a heartbeat and re-watch the same run ID. Only a non-124 non-zero
         # exit is an actual CI failure.
         while true; do
-          timeout 20m gh run watch "$RID" --exit-status
+          "$TIMEOUT_CMD" 20m gh run watch "$RID" --exit-status
           STATUS=$?
           if [ "$STATUS" -eq 124 ]; then
             echo "still waiting on run $RID"
@@ -294,10 +305,27 @@ rounds.
         done
         WATCHED="$WATCHED $RID"
       done
+      [ "$FAILED" -eq 1 ] && break
       # Re-poll: a run can attach to this head SHA after the last snapshot (late-registering
       # workflow_run-gated job, bot-added required check, re-run). Keep looping only over IDs
-      # not yet watched; stop once a poll turns up nothing new.
-      ALL_RUN_IDS=$(gh run list --commit "$SHA" --json databaseId -q '.[].databaseId')
+      # not yet watched; stop once a poll turns up nothing new. A transient `gh run list`
+      # failure (rate limit, network blip) returns the same empty output as the legitimate
+      # "no new runs since last poll" case — treating it as such would let PENDING empty out
+      # on a fluke and the loop exit believing CI-watching is complete when a real run was
+      # simply never returned. Retry the poll itself before ever trusting an empty result.
+      POLL_TRIES=0
+      until ALL_RUN_IDS=$(gh run list --commit "$SHA" --json databaseId -q '.[].databaseId'); do
+        POLL_TRIES=$((POLL_TRIES + 1))
+        if [ "$POLL_TRIES" -ge 3 ]; then
+          echo "gh run list failed $POLL_TRIES times while re-polling $SHA — cannot confirm" \
+               "no runs were missed. Treating as BLOCKED, not as 'done'."
+          FAILED=1
+          break
+        fi
+        echo "gh run list failed transiently (retry $POLL_TRIES/3) — not treating as 'no new runs'"
+        sleep 5
+      done
+      [ "$FAILED" -eq 1 ] && break
       PENDING=$(comm -13 <(echo "$WATCHED" | tr ' ' '\n' | sort -u) <(echo "$ALL_RUN_IDS" | tr ' ' '\n' | sort -u))
     done
   fi
@@ -305,13 +333,25 @@ rounds.
   A single `gh run watch` call can run long on target repos you don't control (matrix builds,
   E2E suites, flaky retries) — and while blocked inside it you have no turn to append a
   heartbeat line, which would otherwise read as dead under the 30-minute staleness rule above.
-  Bound each watch under a timeout shorter than that threshold (`timeout 20m ...` shown above;
-  substitute your shell's equivalent, e.g. `gtimeout` on macOS without GNU coreutils). The loop
-  above already re-invokes `gh run watch` on the same run ID when `timeout` fires (exit 124) and
-  logs the heartbeat itself — this keeps the check-in cadence at ~20 minutes instead of every
-  turn, satisfying both "block, don't poll" and the Shaman's liveness contract, while a genuine
-  CI failure (any other non-zero exit) is what actually sets `FAILED=1`. For the common case (CI
-  finishing well under 20 minutes) this is indistinguishable from one unbounded blocking call.
+  Bound each watch under a timeout shorter than that threshold (`$TIMEOUT_CMD 20m ...` shown
+  above). `$TIMEOUT_CMD` is resolved once at the top of the script rather than hardcoded, because
+  a hardcoded `timeout` silently degrades on macOS without GNU coreutils: bash reports "command
+  not found" (exit 127), and the loop's own `[ "$STATUS" -ne 0 ]` check cannot tell that apart
+  from a real CI failure — it would set `FAILED=1` and send a Hunter after nothing. Resolving
+  `$TIMEOUT_CMD` up front (falling back from `timeout` to `gtimeout`, hard-failing if neither
+  exists) removes that ambiguity before the loop ever runs. The loop above already re-invokes
+  `gh run watch` on the same run ID when the timeout fires (exit 124) and logs the heartbeat
+  itself — this keeps the check-in cadence at ~20 minutes instead of every turn, satisfying both
+  "block, don't poll" and the Shaman's liveness contract, while a genuine CI failure (any other
+  non-zero exit) is what actually sets `FAILED=1`. For the common case (CI finishing well under
+  20 minutes) this is indistinguishable from one unbounded blocking call.
+
+  The re-poll (`gh run list` inside the while-loop) is guarded the same way: its exit status is
+  checked, not just its output, because a transient API error (rate limit, network blip) returns
+  the same empty stdout as the legitimate "no new runs since last poll" case. Treating a failed
+  call as "no new runs" would let `PENDING` empty out on a fluke and squash-merge before a real,
+  late-registering run was ever watched. Retry the failed poll a few times; if it keeps failing,
+  stop and report BLOCKED rather than silently proceeding as if CI-watching were complete.
 
   Only once a run has actually failed does "Fix real failures (via a Hunter) rather than forcing
   through" apply; then re-push and repeat the watch loop for the new commit. If addressing
