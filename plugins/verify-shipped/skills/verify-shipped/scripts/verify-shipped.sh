@@ -51,6 +51,14 @@ command -v git >/dev/null 2>&1     || DIE "git not found"
 command -v python3 >/dev/null 2>&1 || DIE "python3 not found — required to emit JSON"
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || DIE "not in a git repo"
+
+# Canonicalize a possibly-relative --worktree path against the caller's
+# original $PWD *before* we cd into REPO_ROOT below. If this isn't done,
+# a relative path (e.g. `../mywt`) silently gets re-resolved against
+# REPO_ROOT instead of the caller's cwd, causing check 4 to test the wrong
+# location and produce a false PASS for a worktree that is still on disk.
+WORKTREE_ARG=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORKTREE_ARG")
+
 cd "$REPO_ROOT"
 
 REPO_FLAGS=()

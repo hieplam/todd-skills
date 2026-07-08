@@ -44,7 +44,9 @@ bash scripts/verify-shipped.sh --pr <number|url> --worktree <path> [--base maste
 ```
 
 - `--pr` — required. PR number or full URL.
-- `--worktree` — required. The worktree path used for the work being verified. All four checks
+- `--worktree` — required. The worktree path used for the work being verified. May be relative
+  or absolute — the script canonicalizes it against the caller's cwd (before changing directory
+  internally) so a relative path is always checked against the right location. All four checks
   run every time; there is no partial/optional mode, because a claimed-done state with an
   unchecked corner is exactly the gap this skill exists to close.
 - `--base` — optional, defaults to `master`.
