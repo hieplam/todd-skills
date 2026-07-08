@@ -318,7 +318,16 @@ default:
 - **Wiring.** Wrap the same directive you'd otherwise get from the owner — "Shaman: run the
   next roadmap idea" — in `/goal ... until verified-SHIPPED, ESCALATE-NEEDS-DIRECTION, or
   ESCALATE-BLOCKED`, then fire it on a recurring trigger: `/schedule` for a cloud routine, or
-  `/loop` for a local one. Those three literal markers are the routine's only legitimate stop
+  `/loop` for a local one. Size that recurrence interval to the cycle, not to a convenient round
+  number: match it to how long one full "run the next roadmap idea" cycle actually takes —
+  dispatch → spec → plan → Hunter builds → audit → PR → CI → squash-merge, plausibly tens of
+  minutes to hours, not the few-minute cadence that suits a status poll like `/loop 5m` elsewhere
+  in this design. An interval shorter than one cycle risks firing a second unattended invocation
+  while the first is still mid-flight — both independently doing step 1 ("pick the next
+  unblocked card") concurrently, which can double-dispatch a Warchief onto the same card or race
+  on the roadmap/Decision-Log file this routine appends to. During the single-card pilot, confirm
+  the chosen interval against the observed cycle time before ever widening to a batch cadence.
+  Those three literal markers are the routine's only legitimate stop
   states, one for each of the Rule step's three possible return values above (`SHIPPED`,
   `NEEDS_DIRECTION`, `BLOCKED`) — a run that hits an unresolvable `BLOCKED` has an explicit exit
   too, not just a silent stall. The Rule step's own routing still runs first and decides which
@@ -327,10 +336,18 @@ default:
   and re-dispatch, so the routine keeps running unattended exactly as it would with the owner
   present. Only when an item genuinely needs the owner — a register `NEEDS_DIRECTION`, or a
   `BLOCKED` you can't resolve and must carry up — do you emit the literal `ESCALATE-NEEDS-DIRECTION`
-  / `ESCALATE-BLOCKED` marker into the transcript. `/goal`'s evaluator judges only the
-  conversation transcript, with no tool or file access to check the escalation register itself,
-  so the literal marker — not the bare word `NEEDS_DIRECTION` or `BLOCKED`, which also appear on
-  every routine, non-halting round — is the only signal it can act on to stop the loop.
+  / `ESCALATE-BLOCKED` marker into the transcript. Symmetrically, when the one card this
+  `/goal`-wrapped directive was dispatched for clears the Rule step's `SHIPPED` branch —
+  `verify-shipped` returns `PASS` and the outcome matches that card's measurable goal — you emit
+  the literal `verified-SHIPPED` marker into the transcript; this is the required, parallel
+  imperative for the third stop condition, not implied by narrating that the card is shipped.
+  `/goal`'s evaluator judges only the conversation transcript, with no tool or file access to
+  check the escalation register or the roadmap itself, so the literal marker — not the bare word
+  `NEEDS_DIRECTION`, `BLOCKED`, or `shipped`, all of which also appear on every routine,
+  non-halting round (e.g. "mark the card shipped", Warchief returns `SHIPPED`) — is the only
+  signal it can act on to stop the loop. Once the marker is emitted and this `/goal` invocation
+  exits, the recurring `/schedule`/`/loop` trigger is what starts the next unblocked card's
+  `/goal`-wrapped invocation — the marker ends this one card's run, not the whole campaign.
 - **Unattended-safe already, by construction — verify, don't edit.** An automated fire must
   never stall on a prompt nobody is there to answer. Check this before wiring anything, don't
   add a gate for it: the Warchief's `tools:` frontmatter (`Read, Write, Edit, Grep, Glob, Bash,
