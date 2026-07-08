@@ -209,15 +209,33 @@ implementer."_
 
 ### 4. Set up isolation
 
-Ensure an isolated worktree exists (worktree-first per repo convention). Install dependencies so
-tests and gates can run. Record the branch base commit.
+Ensure an isolated worktree exists (worktree-first per repo convention, via the
+**using-git-worktrees** skill or a native tool like `EnterWorktree`). Install dependencies so
+tests and gates can run. Record the branch base commit (the SHA your own worktree branched
+from) — every additional worktree in this step branches from that same SHA.
 
 **If `splitting-plans` produced 2+ dependency-independent sub-plans**, its README's dependency
 waves diagram and each sub-plan's `owns_files` already tell you which bundles can run at once (a
 wave containing ≥2 bundles with disjoint `owns_files`). For such a wave, set up **one additional
-isolated worktree per sub-plan in that wave**, all branched from the same recorded base commit
-(see the **using-git-worktrees** skill). This is the only case where more than one Hunter runs at
-once — never let two concurrent Hunters share a worktree.
+worktree per sub-plan in that wave** — but do **not** re-invoke the using-git-worktrees skill or
+`EnterWorktree` for these. You are already inside your own isolated worktree, so Step 0 of that
+skill (and `EnterWorktree`'s own precondition) will detect your existing isolation and refuse to
+create another — "Do NOT create another worktree" is exactly what it will tell you, which would
+silently defeat this whole step. Instead, create each sub-plan's worktree with a **direct git
+command**, run from inside your current worktree (a linked worktree's `git` shares the common
+`.git` with the main checkout, so `git worktree add` from here registers correctly regardless of
+which worktree you run it in):
+
+```bash
+git worktree add <path-per-sub-plan> -b <branch-per-sub-plan> <recorded-base-commit-sha>
+```
+
+Do this once per sub-plan in the wave, all pointed at the same recorded base commit, before
+dispatching any Hunter. Then, **for each new worktree**, still apply the using-git-worktrees
+skill's Step 2 onward (project setup / install dependencies) inside that worktree's own
+directory — only its Step 0/1 (detect-or-create) is bypassed here, because you performed the
+equivalent creation yourself with the direct command above. Never let two concurrent Hunters
+share a worktree.
 
 ### 5. Orchestrate the build via Hunters — do not build it yourself
 
