@@ -12,7 +12,8 @@
 #
 # The script computes and prints; the AGENTS act. It never mutates state.
 # next_action is one of:
-#   VERIFY_SHIPPED | REDO_MERGE | REVERT_AND_REDO task N | RESUME_DELIVERY | CONTINUE task N
+#   VERIFY_SHIPPED | REDO_MERGE | REVERT_AND_REDO task N | DISCARD_AND_RESUME_DELIVERY |
+#   RESUME_DELIVERY | CONTINUE task N
 # and for orphaned roadmap cards: RECREATE_WORKTREE from branch B | RESTART_CARD
 #
 # Env: RESUME_CHECK_GH overrides the gh binary (tests point it at a stub).
@@ -200,6 +201,8 @@ def next_action(card):
     if card["mid_merge"]:
         return "REDO_MERGE"
     if card["dirty"]:
+        if card["total_tasks"] and card["last_completed_task"] >= card["total_tasks"]:
+            return "DISCARD_AND_RESUME_DELIVERY"
         return f"REVERT_AND_REDO task {card['last_completed_task'] + 1}"
     if card["delivery"] in ("pr-open", "ci-green"):
         return "RESUME_DELIVERY"

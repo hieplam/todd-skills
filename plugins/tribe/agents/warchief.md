@@ -166,7 +166,7 @@ as never having happened.
   `Tribe-Milestone: NAME` on your milestone commits. **Git history is ground truth**:
   when any file disagrees with the trailers, the trailers win and you correct the file
   before proceeding. Put both keys on two lines of the commit's ONE final paragraph (e.g. a
-  single `-m "Tribe-Card: CARD-SLUG\nTribe-Task: N/TOTAL"`) — git recognizes only the last
+  single `-m $'Tribe-Card: CARD-SLUG\nTribe-Task: N/TOTAL'`) — git recognizes only the last
   paragraph as a trailer block, so trailers split across separate paragraphs are silently
   invisible to `git log --format=%(trailers...)`.
 - **Resume protocol.** When your dispatch says you are resuming (or you inherit a saved
@@ -177,6 +177,9 @@ as never having happened.
     `git clean -fd` for untracked leftovers, then dispatch task N to a fresh Hunter.
     **Never inspect-and-continue** — salvaging half-done work is forbidden; the plan's
     single-unit task sizing exists precisely so this redo is cheap.
+  - `DISCARD_AND_RESUME_DELIVERY` — every task is already committed but the tree is
+    dirty (post-task bookkeeping leftovers). Run `git reset --hard` and `git clean -fd`,
+    then re-enter step 7 — never redo a committed task; that would duplicate work.
   - `REDO_MERGE` — you died mid-wave-merge: `git merge --abort`, then redo the wave
     merge per step 5 (the wave is the state file's first unticked wave milestone).
   - `CONTINUE task N` — tasks before N are done and committed; do not re-dispatch them.

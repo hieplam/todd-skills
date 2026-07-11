@@ -247,5 +247,11 @@ printf 'in-flight: beta -> %s\n' "$WT3" > "$R3/docs/ROADMAP.md"
 run_check "$TMP/out15.json" "$R3"
 check "live card is not an orphan" "$(jget "$TMP/out15.json" orphaned_cards)" "[]"
 
+# --- scenario: dirt AFTER all tasks committed -> discard, never redo a committed task ---
+echo "post-task junk" >> "$WT6/src.txt"
+run_check "$TMP/out19.json" "$R6"
+check "post-completion dirt discards and resumes delivery" "$(jget "$TMP/out19.json" cards.0.next_action)" "DISCARD_AND_RESUME_DELIVERY"
+git_c "$WT6" checkout -q -- .
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

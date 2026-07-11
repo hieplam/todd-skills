@@ -142,6 +142,8 @@ Given a repo root (default: cwd), it:
    file), `delivery` (none/pr-open/ci-green/merged), and one computed
    `next_action`:
    - `REVERT_AND_REDO <task n>` — dirty worktree: `git reset --hard`, re-dispatch task n.
+   - `DISCARD_AND_RESUME_DELIVERY` — dirty worktree but every task already committed:
+     `git reset --hard` + `git clean -fd`, then re-enter delivery — never redo a task.
    - `CONTINUE <task n+1>` — clean, mid-plan.
    - `REDO_MERGE <wave n>` — `MERGE_HEAD` present: `git merge --abort`, redo the wave merge.
    - `RESUME_DELIVERY` — pushed/PR open: re-enter the CI-watch block.
@@ -176,6 +178,7 @@ from the script.
 | State file says task N done, no `Tribe-Task: N` commit | git wins | task N not done → redo; fix state file |
 | Commit for task N exists, checkbox unticked | git wins (rule was violated) | tick box in a state-only commit; continue at N+1 |
 | Dirty worktree | ruling 1 | `git reset --hard`; redo current task |
+| Dirty worktree, all tasks already committed | ruling 1, but the dirt belongs to no task | reset --hard + clean; resume delivery — never redo a committed task |
 | `MERGE_HEAD` present (died mid-wave-merge) | deterministic | `git merge --abort`; redo the merge |
 | Worktree destroyed, branch exists | existing procedure | recreate worktree (`agents/warchief.md:271-288`), continue |
 | Roadmap marks card in-flight, no branch/worktree/state file anywhere | nothing committed ever happened | restart card from dispatch |
