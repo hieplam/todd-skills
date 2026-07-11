@@ -57,6 +57,22 @@
       "prompt": "The Warchief just returned NEEDS_DIRECTION on an idea card: it hit ambiguity over whether a new 'export to CSV' button should live in the toolbar or the settings menu — a minor UI placement call with no data-shape, no new permission, and no product promise attached. What do you do?",
       "expected_output": "Shaman answers this itself and re-dispatches the Warchief with the decision — it does NOT escalate this to the owner. Per its mandate, only the irreversible few (new data shapes, product promises, new permissions, privacy) go to the owner; a reversible UI-placement call is exactly the kind of NEEDS_DIRECTION question the Shaman is meant to absorb so the owner isn't interrupted for it.",
       "files": []
+    },
+    {
+      "id": 8,
+      "name": "hunter-ticks-checkboxes-and-trailers-in-the-task-commit",
+      "agent": "hunter",
+      "prompt": "Your task brief: 'Task 3 of 7 from docs/superpowers/plans/2026-07-11-widget.md, card slug widget-export. Add a formatBytes(n) helper in src/format.js with test test_formatBytes_rounds_to_one_decimal.' The brief includes the tribe's atomic-commit rules: tick your task's plan checkboxes in the same commit as the code, and stamp the commit with Tribe-Card and Tribe-Task trailers. You have finished the code and the test is green. Describe exactly what your commit contains and what its message looks like.",
+      "expected_output": "Hunter produces ONE commit containing the implementation, the test, AND the plan file with task 3's checkboxes flipped to [x] (only task 3's). The commit message carries the trailers Tribe-Card: widget-export and Tribe-Task: 3/7 on two lines of the commit's one final trailer paragraph, with no co-authored trailer. It does NOT commit the code first and tick the checkboxes in a follow-up commit, does not tick other tasks' boxes, and does not omit the trailers — a task commit missing the ticks or trailers fails the Warchief's audit per the contract.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "name": "warchief-reverts-dirty-worktree-instead-of-salvaging",
+      "agent": "warchief",
+      "prompt": "You are a re-dispatched Warchief resuming after a machine crash. resume-check.sh reports for card checkout-retry: last_completed_task 3, total_tasks 5, dirty true, next_action 'REVERT_AND_REDO task 4'. Looking at the worktree, task 4's diff appears roughly 90% complete and its test file looks nearly right — finishing it by hand would take two minutes. What do you do?",
+      "expected_output": "Warchief runs git reset --hard (plus git clean -fd for untracked leftovers) and dispatches task 4 to a fresh Hunter from its brief. It does NOT inspect-and-continue, complete the diff itself (it never writes feature source), or commit the salvaged state — uncommitted work is defined as never having happened, and the single-unit task sizing exists precisely so the redo is cheap. Tasks 1-3 are committed and are NOT redone.",
+      "files": []
     }
   ]
 }

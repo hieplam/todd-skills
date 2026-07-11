@@ -126,6 +126,72 @@ longer than that, append an intermediate progress line rather than going quiet u
 
 ---
 
+## Crash-safe state & resume (non-negotiable)
+
+The report file above is a heartbeat for *liveness*; committed state is the memory for
+*resume*. The rule that makes resume trivial: **work and its done-record land in the SAME
+git commit**, so a crash can never separate them — and anything uncommitted is *defined*
+as never having happened.
+
+- **Create the state file at intake.** `docs/tribe/state/CARD-SLUG.md` in your worktree,
+  committed before spec work starts, in this exact shape (resume-check.sh parses it —
+  replace the capitalized tokens, keep the field names):
+
+  ```markdown
+  # tribe-state: CARD-SLUG
+  roadmap: ROADMAP-PATH
+  worktree: ABSOLUTE-WORKTREE-PATH
+  branch: BRANCH-NAME
+  report: REPORT-FILE-PATH
+  base-sha: SHA
+  plan: PLAN-PATH-RELATIVE-TO-WORKTREE
+
+  ## Milestones
+  - [ ] spec committed
+  - [ ] plan committed
+  - [ ] wave 1 integrated
+  ```
+
+  Re-record `base-sha` in the same commit as each wave integration (step 5 already
+  re-records it operationally — the state file is where it persists).
+- **Tick milestones atomically.** Each milestone tick lands in the same commit as its
+  artifact: the spec commit also ticks `spec committed`; a wave's merge commit ticks its
+  wave. A milestone with no natural artifact commit gets a tiny state-only commit — more,
+  smaller commits are the accepted cost.
+- **No post-push milestones in the state file.** Once the PR is open, never commit
+  state-file ticks to the branch (it would retrigger CI). GitHub is the durable store for
+  PR/CI/merge state; resume-check.sh derives it live via `gh`.
+- **Trailers on every commit.** Every commit you or your Hunters make carries
+  `Tribe-Card: CARD-SLUG`, plus `Tribe-Task: N/TOTAL` on task commits or
+  `Tribe-Milestone: NAME` on your milestone commits. **Git history is ground truth**:
+  when any file disagrees with the trailers, the trailers win and you correct the file
+  before proceeding. Put both keys on two lines of the commit's ONE final paragraph (e.g. a
+  single `-m $'Tribe-Card: CARD-SLUG\nTribe-Task: N/TOTAL'`) — git recognizes only the last
+  paragraph as a trailer block, so trailers split across separate paragraphs are silently
+  invisible to `git log --format=%(trailers...)`.
+- **Resume protocol.** When your dispatch says you are resuming (or you inherit a saved
+  worktree), run `resume-check.sh REPO-ROOT` — resolve its path exactly as you resolve
+  `heartbeat-check.sh` in Channels above, and stop with `NEEDS_DIRECTION` if neither
+  install path yields it — and obey its `next_action` verbatim:
+  - `REVERT_AND_REDO task N` — the worktree is dirty. Run `git reset --hard` plus
+    `git clean -fd` for untracked leftovers, then dispatch task N to a fresh Hunter.
+    **Never inspect-and-continue** — salvaging half-done work is forbidden; the plan's
+    single-unit task sizing exists precisely so this redo is cheap.
+  - `DISCARD_AND_RESUME_DELIVERY` — every task is already committed but the tree is
+    dirty (post-task bookkeeping leftovers). Run `git reset --hard` and `git clean -fd`,
+    then re-enter step 7 — never redo a committed task; that would duplicate work.
+  - `REDO_MERGE` — you died mid-wave-merge: `git merge --abort`, then redo the wave
+    merge per step 5 (the wave is the state file's first unticked wave milestone).
+  - `CONTINUE task N` — tasks before N are done and committed; do not re-dispatch them.
+  - `RESUME_DELIVERY` — re-enter step 7 (push / PR / CI watch) from wherever `gh` says
+    delivery actually is.
+  - `VERIFY_SHIPPED` — the PR already merged; skip to step 8 and close out.
+  Never re-derive progress from prose, memory, or the report file — the script's
+  reconciliation of trailers, checkboxes, and state file is the single source of resume
+  truth (the report file stays what it is: a liveness heartbeat).
+
+---
+
 ## The Warchief → Hunter dispatch contract (non-negotiable)
 
 Implementation is the Hunter's, exclusively — and you must dispatch it **as the `hunter` agent**,
@@ -200,6 +266,9 @@ never a generic one. This is the single most important operational rule of the t
 - **Start the heartbeat now:** append an ISO-8601-UTC-timestamped `dispatch received` line to the
   report file (see Channels above for the exact format), and keep appending at every milestone
   from here on.
+- **Create and commit the state file now, too** (see Crash-safe state & resume above) —
+  and if your dispatch points you at a saved worktree, run `resume-check.sh` FIRST and
+  obey its `next_action` before doing anything else.
 - Read the repo's governance (`CLAUDE.md`/`AGENTS.md`, `.claude/rules/`, an architecture model
   like `.c3/`) and the actual files the change will touch. **Ground every "current behavior"
   claim in `file:line`** — never assert from memory.
@@ -221,6 +290,10 @@ the Shaman (one question at a time). Save the spec to the repo's spec location a
 Invoke the **writing-plans** skill. Decompose into bite-sized TDD tasks, each with **exact file
 paths, the actual test code, the actual implementation, and the exact commands with expected
 output**. No placeholders. Each task ends in an independently testable, committable deliverable.
+**Every task is a single unit of work** — one red→green→refactor→commit cycle ending in
+exactly ONE commit step. `validate-plan.sh` fails oversized tasks mechanically. Small
+tasks are the crash-safety budget: a task that dies mid-flight is always discarded
+(`git reset --hard`) and redone, so its size caps the maximum redo cost.
 Save and commit the plan. This plan is the brief every Hunter works from. In the plan's **Global
 Constraints**, name the implementer explicitly (per the dispatch contract above):
 _"Implementer: dispatch each implementation/fix task to the `hunter` subagent — never a generic
@@ -294,7 +367,10 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
 - Extract each task to a brief file. Dispatch a **fresh Hunter per task** — always
   `subagent_type: hunter`, never a `general-purpose`/default implementer (see the dispatch
   contract above) — with: where the task fits, the brief (its requirements, verbatim), the
-  interfaces/decisions earlier tasks produced, and the report-file path. When a Hunter returns
+  interfaces/decisions earlier tasks produced, and the report-file path. Every brief also carries
+  the atomic-commit rules verbatim: tick your task's plan checkboxes in the SAME commit as the
+  code, and stamp the commit with the `Tribe-Card` and `Tribe-Task: N/TOTAL` trailers — a task
+  commit missing either fails the audit. When a Hunter returns
   `NEEDS_CONTEXT`, answer by amending the brief and dispatching a fresh Hunter.
 - Hunters follow **TDD** (red → green → commit). **One Hunter in flight per worktree** — never
   two writers in the same tree. For a single plan (or a wave of one sub-plan), that means one
