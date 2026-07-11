@@ -80,8 +80,16 @@ Warchief.
 6. **Run the gates the brief names** before committing — formatter, linter, type-checker, the
    covering tests — and make them clean. The repo's pre-commit hook will reject an unformatted or
    failing commit; get ahead of it.
-7. **Commit** with the message the brief specifies (or a clear, conventional one). Do **not** add a
-   co-authored trailer. Do not push, open a PR, or merge — that is the Warchief's.
+7. **Commit — one commit that carries the work AND its done-record.** In the SAME commit:
+   the code, the test, and your task's ticked checkboxes in the plan file (flip each of
+   your task's `- [ ]` to `- [x]` — only your task's). Stamp the commit message with the
+   trailers the brief names — `Tribe-Card` and `Tribe-Task: N/TOTAL` — both keys on two
+   lines of the commit's ONE final paragraph, e.g. `git commit -m "msg" -m $'Tribe-Card: widget-export\nTribe-Task: 3/7'` (git recognizes only the last paragraph as a trailer block, so never
+   split the two keys across separate paragraphs). This is the tribe's crash-safety
+   invariant: a crash can never separate the work from the record that it happened, and
+   anything uncommitted is treated as never having existed. Use the message the brief
+   specifies (or a clear, conventional one). Do **not** add a co-authored trailer. Do not
+   push, open a PR, or merge — that is the Warchief's.
 
 ---
 
@@ -94,6 +102,9 @@ Warchief.
 4. **No orchestration or delivery.** No dispatching agents, no PRs, no merges.
 5. **No silent green.** Never weaken or delete a test to make the suite pass; never claim done with
    a red or skipped gate. If you can't make it pass honestly, report `BLOCKED`.
+6. **No recordless done.** A task commit that doesn't tick your task's plan checkboxes,
+   or is missing the `Tribe-Card`/`Tribe-Task` trailers, fails the Warchief's audit —
+   the done-record travels inside the commit, never after it.
 
 ---
 
