@@ -186,5 +186,45 @@ git_c "$WT6" commit --allow-empty -qm "local only" -m "Tribe-Card: delta" -m "Tr
 run_check "$TMP/out10.json" "$R6"
 check "unpushed commit flips pushed off" "$(jget "$TMP/out10.json" cards.0.pushed)" "false"
 
+# --- scenario: gh says MERGED -> verify shipped; no PR -> none; gh absent -> unknown ---
+STUB="$TMP/ghstub"; mkdir -p "$STUB"
+cat > "$STUB/gh-merged" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"state": "MERGED", "statusCheckRollup": []}'
+EOF
+cat > "$STUB/gh-nopr" <<'EOF'
+#!/usr/bin/env bash
+echo "no pull requests found for branch" >&2
+exit 1
+EOF
+chmod +x "$STUB/gh-merged" "$STUB/gh-nopr"
+RESUME_CHECK_GH="$STUB/gh-merged" run_check "$TMP/out11.json" "$R6"
+check "merged PR means verify shipped" "$(jget "$TMP/out11.json" cards.0.next_action)" "VERIFY_SHIPPED"
+RESUME_CHECK_GH="$STUB/gh-nopr" run_check "$TMP/out12.json" "$R6"
+check "no PR reads as none" "$(jget "$TMP/out12.json" cards.0.delivery)" "none"
+RESUME_CHECK_GH="$TMP/no-such-gh" run_check "$TMP/out13.json" "$R6"
+check "missing gh degrades to unknown" "$(jget "$TMP/out13.json" cards.0.delivery)" "unknown"
+
+cat > "$STUB/gh-open-green" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"state": "OPEN", "statusCheckRollup": [{"conclusion": "SUCCESS"}, {"state": "SUCCESS"}, {"conclusion": "SKIPPED"}]}'
+EOF
+cat > "$STUB/gh-open-mixed" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"state": "OPEN", "statusCheckRollup": [{"conclusion": "SUCCESS"}, {"conclusion": "FAILURE"}]}'
+EOF
+cat > "$STUB/gh-open-empty" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"state": "OPEN", "statusCheckRollup": []}'
+EOF
+chmod +x "$STUB/gh-open-green" "$STUB/gh-open-mixed" "$STUB/gh-open-empty"
+RESUME_CHECK_GH="$STUB/gh-open-green" run_check "$TMP/out16.json" "$R6"
+check "all-green rollup reads ci-green" "$(jget "$TMP/out16.json" cards.0.delivery)" "ci-green"
+check "ci-green resumes delivery" "$(jget "$TMP/out16.json" cards.0.next_action)" "RESUME_DELIVERY"
+RESUME_CHECK_GH="$STUB/gh-open-mixed" run_check "$TMP/out17.json" "$R6"
+check "mixed rollup reads pr-open" "$(jget "$TMP/out17.json" cards.0.delivery)" "pr-open"
+RESUME_CHECK_GH="$STUB/gh-open-empty" run_check "$TMP/out18.json" "$R6"
+check "empty rollup reads pr-open, not ci-green" "$(jget "$TMP/out18.json" cards.0.delivery)" "pr-open"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

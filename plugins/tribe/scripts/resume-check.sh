@@ -169,8 +169,29 @@ def pushed(wt_path):
     return rc == 0 and out == "0"
 
 def delivery_status(wt_path):
-    # one of: none | pr-open | ci-green | merged | unknown — real implementation
-    # lands in Task 9
+    # GitHub owns post-push state (the spec keeps PR/CI/merge OUT of the state file —
+    # committing ticks after the PR opens would retrigger CI). Probe it live; degrade
+    # loudly to "unknown" when gh is unavailable so local verdicts still work offline.
+    gh_bin = shutil.which(GH) or (GH if os.access(GH, os.X_OK) else None)
+    if not gh_bin:
+        return "unknown"
+    r = subprocess.run([gh_bin, "pr", "view", "--json", "state,statusCheckRollup"],
+                       cwd=wt_path, capture_output=True, text=True)
+    if r.returncode != 0:
+        return "none" if "no pull request" in (r.stderr or "").lower() else "unknown"
+    try:
+        data = json.loads(r.stdout)
+    except ValueError:
+        return "unknown"
+    state = (data.get("state") or "").upper()
+    if state == "MERGED":
+        return "merged"
+    if state == "OPEN":
+        rollup = data.get("statusCheckRollup") or []
+        if rollup and all(((c.get("conclusion") or c.get("state") or "")).upper()
+                          in ("SUCCESS", "NEUTRAL", "SKIPPED") for c in rollup):
+            return "ci-green"
+        return "pr-open"
     return "unknown"
 
 def next_action(card):
