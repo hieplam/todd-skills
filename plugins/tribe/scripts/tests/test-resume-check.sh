@@ -158,5 +158,22 @@ check "dirt is detected" "$(jget "$TMP/out7.json" cards.0.dirty)" "true"
 check "dirty worktree reverts and redoes" "$(jget "$TMP/out7.json" cards.0.next_action)" "REVERT_AND_REDO task 3"
 git_c "$WT3" checkout -q -- . && rm -f "$WT3/new.txt"
 
+# --- scenario: died mid-merge (MERGE_HEAD present) -> redo the merge, not the dirt ---
+R8="$TMP/merge"; new_repo "$R8"
+WT8=$(new_card_worktree "$R8" epsilon)
+BASE8=$(git_c "$WT8" rev-parse HEAD)
+echo "ours" > "$WT8/clash.txt"
+git_c "$WT8" add -A && git_c "$WT8" commit -qm "ours" -m "Tribe-Card: epsilon" -m "Tribe-Task: 1/3"
+git_c "$WT8" branch -q side "$BASE8"
+git_c "$WT8" checkout -q side
+echo "theirs" > "$WT8/clash.txt"
+git_c "$WT8" add -A && git_c "$WT8" commit -qm "theirs"
+git_c "$WT8" checkout -q wt-epsilon
+git_c "$WT8" merge side >/dev/null 2>&1 || true
+check "merge fixture really conflicted" "$(git -C "$WT8" rev-parse -q --verify MERGE_HEAD >/dev/null && echo conflicted || true)" "conflicted"
+run_check "$TMP/out8.json" "$R8"
+check "mid-merge is detected" "$(jget "$TMP/out8.json" cards.0.mid_merge)" "true"
+check "mid-merge outranks dirt" "$(jget "$TMP/out8.json" cards.0.next_action)" "REDO_MERGE"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

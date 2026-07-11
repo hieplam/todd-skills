@@ -157,7 +157,8 @@ def is_dirty(wt_path):
     return rc == 0 and bool(out)
 
 def mid_merge(wt_path):
-    return False  # real implementation lands in Task 7
+    rc, _, _ = sh(["git", "-C", wt_path, "rev-parse", "-q", "--verify", "MERGE_HEAD"])
+    return rc == 0
 
 def pushed(wt_path):
     return False  # real implementation lands in Task 8
