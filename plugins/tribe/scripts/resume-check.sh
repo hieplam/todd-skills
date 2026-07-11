@@ -161,7 +161,12 @@ def mid_merge(wt_path):
     return rc == 0
 
 def pushed(wt_path):
-    return False  # real implementation lands in Task 8
+    rc, _, _ = sh(["git", "-C", wt_path, "rev-parse", "--abbrev-ref",
+                   "--symbolic-full-name", "@{u}"])
+    if rc != 0:
+        return False
+    rc, out, _ = sh(["git", "-C", wt_path, "rev-list", "@{u}..HEAD", "--count"])
+    return rc == 0 and out == "0"
 
 def delivery_status(wt_path):
     # one of: none | pr-open | ci-green | merged | unknown — real implementation

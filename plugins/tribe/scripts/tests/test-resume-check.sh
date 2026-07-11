@@ -175,5 +175,16 @@ run_check "$TMP/out8.json" "$R8"
 check "mid-merge is detected" "$(jget "$TMP/out8.json" cards.0.mid_merge)" "true"
 check "mid-merge outranks dirt" "$(jget "$TMP/out8.json" cards.0.next_action)" "REDO_MERGE"
 
+# --- scenario: branch pushed to a local bare remote -> pushed true, derived not recorded ---
+BARE="$TMP/origin.git"
+git init --template= -q --bare "$BARE"
+git_c "$WT6" remote add origin "$BARE"
+git_c "$WT6" push -qu origin wt-delta
+run_check "$TMP/out9.json" "$R6"
+check "pushed is derived from upstream" "$(jget "$TMP/out9.json" cards.0.pushed)" "true"
+git_c "$WT6" commit --allow-empty -qm "local only" -m "Tribe-Card: delta" -m "Tribe-Milestone: local probe"
+run_check "$TMP/out10.json" "$R6"
+check "unpushed commit flips pushed off" "$(jget "$TMP/out10.json" cards.0.pushed)" "false"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
