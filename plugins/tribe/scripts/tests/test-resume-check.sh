@@ -226,5 +226,26 @@ check "mixed rollup reads pr-open" "$(jget "$TMP/out17.json" cards.0.delivery)" 
 RESUME_CHECK_GH="$STUB/gh-open-empty" run_check "$TMP/out18.json" "$R6"
 check "empty rollup reads pr-open, not ci-green" "$(jget "$TMP/out18.json" cards.0.delivery)" "pr-open"
 
+# --- scenario: roadmap says in-flight but the worktree is gone ---
+R14="$TMP/orphan"; new_repo "$R14"
+WT14=$(new_card_worktree "$R14" phantom)
+git_c "$R14" worktree remove --force "$WT14"
+mkdir -p "$R14/docs"
+cat > "$R14/docs/ROADMAP.md" <<EOF
+# Roadmap
+in-flight: phantom -> $WT14
+in-flight: ghost -> $TMP/never-existed
+EOF
+run_check "$TMP/out14.json" "$R14"
+check "no live cards remain" "$(jget "$TMP/out14.json" cards)" "[]"
+check "branch survivor is recreatable" "$(jget "$TMP/out14.json" orphaned_cards.0.next_action)" "RECREATE_WORKTREE from branch wt-phantom"
+check "unknown card restarts" "$(jget "$TMP/out14.json" orphaned_cards.1.next_action)" "RESTART_CARD"
+
+# --- scenario: live cards are not double-reported as orphans ---
+mkdir -p "$R3/docs"
+printf 'in-flight: beta -> %s\n' "$WT3" > "$R3/docs/ROADMAP.md"
+run_check "$TMP/out15.json" "$R3"
+check "live card is not an orphan" "$(jget "$TMP/out15.json" orphaned_cards)" "[]"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
