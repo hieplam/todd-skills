@@ -27,6 +27,9 @@
 #   - each task section carries at least one fenced code block (actual commands/code, not
 #     prose-only, whether or not the fence is indented under a list item) and mentions an
 #     expected result ("expected")
+#   - each task section carries exactly one "Commit" step (a checkbox step whose title
+#     is "Commit", counted outside fences), enforcing the single-unit-of-work sizing
+#     rule from the atomic-resume spec
 #
 # This does not (and cannot) judge whether the plan is *good* — only whether it is mechanically
 # well-formed enough to hand to a Hunter. Judgment stays with the Warchief/Skinner.
@@ -220,6 +223,27 @@ checks.append({
     "status": "pass" if not tasks_missing_expected else "fail",
     "detail": "all task sections mention an expected result" if not tasks_missing_expected
               else f"missing in: {tasks_missing_expected}",
+})
+
+# 5. each task is a single unit of work: exactly one "Commit" step per task section.
+# The step title must BE "Commit" (writing-plans template: "- [ ] **Step N: Commit**") —
+# a step title merely containing the word commit does not count, and quoted steps
+# inside fenced examples do not count either. Enforces the tribe's crash-resume
+# ruling: one red->green->commit cycle per task, so a discarded half-done task is
+# never expensive to redo.
+COMMIT_STEP_RE = re.compile(r"^\s*-\s*\[[ xX]\]\s*\*\*Step\s+\d+:\s*Commit\s*\*\*", re.IGNORECASE)
+tasks_wrong_commit_count = []
+for s in task_sections:
+    n_commits = sum(1 for j in range(s["line"], s["end"] - 1)
+                    if not in_fence_flags[j] and COMMIT_STEP_RE.match(lines[j]))
+    if n_commits != 1:
+        tasks_wrong_commit_count.append(f"{s['title']} ({n_commits} commit step(s))")
+checks.append({
+    "name": "tasks_single_commit_step",
+    "status": "pass" if not tasks_wrong_commit_count else "fail",
+    "detail": "every task section has exactly one Commit step"
+              if not tasks_wrong_commit_count
+              else f"wrong commit-step count in: {tasks_wrong_commit_count}",
 })
 
 verdict = "pass" if all(c["status"] == "pass" for c in checks) else "fail"

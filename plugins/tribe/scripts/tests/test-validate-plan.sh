@@ -76,5 +76,98 @@ check "quoted headings are not tasks" "$(jget "$TMP/out0.json" task_count)" "1"
 check "fenced angle tokens are not placeholders" "$(find_check "$TMP/out0.json" no_placeholders)" "pass"
 check "fenced fixture verdict is pass" "$(jget "$TMP/out0.json" verdict)" "pass"
 
+# fixture: one task, exactly one commit step -> pass
+F1="$TMP/single.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: One unit
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add -A && git commit -m "feat: one"
+```
+EOF
+} > "$F1"
+bash "$SCRIPT" "$F1" > "$TMP/out1.json"
+check "single commit step passes" "$(find_check "$TMP/out1.json" tasks_single_commit_step)" "pass"
+
+# fixture: one task with two commit steps -> fail
+F2="$TMP/double.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Two units glued together
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: part one"
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -m "feat: part two"
+```
+EOF
+} > "$F2"
+bash "$SCRIPT" "$F2" > "$TMP/out2.json"
+check "two commit steps fail" "$(find_check "$TMP/out2.json" tasks_single_commit_step)" "fail"
+
+# fixture: one task with no commit step -> fail
+F3="$TMP/none.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Never lands
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+EOF
+} > "$F3"
+bash "$SCRIPT" "$F3" > "$TMP/out3.json"
+check "zero commit steps fail" "$(find_check "$TMP/out3.json" tasks_single_commit_step)" "fail"
+
+# fixture: one task whose only commit-like step is "Commit and push" -> fail
+# (the step title must BE "Commit", not merely start with it)
+F4="$TMP/commit-and-push.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Never lands either
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- [ ] **Step 2: Commit and push**
+
+```bash
+git commit -m "feat: never lands" && git push
+```
+EOF
+} > "$F4"
+bash "$SCRIPT" "$F4" > "$TMP/out4.json"
+check "commit-and-push does not count" "$(find_check "$TMP/out4.json" tasks_single_commit_step)" "fail"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
