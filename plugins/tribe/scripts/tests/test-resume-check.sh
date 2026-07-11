@@ -107,5 +107,14 @@ check "card discovered" "$(jget "$TMP/out2.json" cards.0.card)" "alpha"
 check "card branch discovered" "$(jget "$TMP/out2.json" cards.0.branch)" "wt-alpha"
 check "fresh card continues at task 1" "$(jget "$TMP/out2.json" cards.0.next_action)" "CONTINUE task 1"
 
+# --- scenario: two tasks committed with trailers -> continue at task 3 ---
+R3="$TMP/two"; new_repo "$R3"
+WT3=$(new_card_worktree "$R3" beta)
+complete_task "$WT3" beta 1 3
+complete_task "$WT3" beta 2 3
+run_check "$TMP/out3.json" "$R3"
+check "trailers count completed tasks" "$(jget "$TMP/out3.json" cards.0.last_completed_task)" "2"
+check "mid-plan card continues at next task" "$(jget "$TMP/out3.json" cards.0.next_action)" "CONTINUE task 3"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

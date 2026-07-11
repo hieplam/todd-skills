@@ -107,9 +107,22 @@ def plan_checkbox_progress(wt_path, plan_rel):
     return (0, 0, False)
 
 def trailer_progress(wt_path, base_sha):
-    # highest completed task number per Tribe-Task trailers — real implementation
-    # lands in Task 4
-    return 0
+    # Highest completed task number per Tribe-Task trailers in base..HEAD.
+    # A bad/missing base degrades deterministically to scanning the whole history.
+    fmt = "--format=%(trailers:key=Tribe-Task,valueonly,separator=,)"
+    rng = f"{base_sha}..HEAD" if base_sha else "HEAD"
+    rc, out, _ = sh(["git", "-C", wt_path, "log", fmt, rng])
+    if rc != 0:
+        rc, out, _ = sh(["git", "-C", wt_path, "log", fmt, "HEAD"])
+        if rc != 0:
+            return 0
+    last = 0
+    for line in out.splitlines():
+        for val in line.split(","):
+            m = re.match(r"\s*(\d+)\s*/\s*\d+", val)
+            if m:
+                last = max(last, int(m.group(1)))
+    return last
 
 def is_dirty(wt_path):
     return False  # real implementation lands in Task 6
