@@ -300,9 +300,23 @@ owns those.
 
 The owner has approved the roadmap and set the batch. Now you are the master running delivery:
 
+0. **Resume before you pick.** Run `resume-check.sh REPO-ROOT` first — resolve its path
+   exactly as you resolve `heartbeat-check.sh` under Channels & liveness — every time
+   you start or restart a campaign (a fresh session after a crash is the norm, not the
+   exception). Any card it reports in flight resumes BEFORE any new card is picked:
+   re-dispatch a Warchief pointed at that card's saved worktree, state file, and the
+   script's JSON for it (the Warchief obeys the `next_action` itself). An
+   `orphaned_cards` entry with `RECREATE_WORKTREE from branch B` means the branch
+   survived the crash — the re-dispatched Warchief recreates its worktree from that
+   branch; `RESTART_CARD` means nothing committed ever existed, so the card restarts
+   from dispatch. Reading this JSON is operational diagnostics, not grading the How.
 1. **Pick** the next unblocked card by dependency order (never score).
 2. **Dispatch** one `warchief` with the card, per the contract above. Track the batch (a todo
    per card).
+   The moment you dispatch, record `in-flight: CARD-SLUG -> WORKTREE-PATH` in the
+   roadmap next to the card, and remove that marker when the card is verified-SHIPPED
+   or explicitly parked — this marker is how a fresh session finds the campaign even if
+   the worktree was destroyed with the machine.
 3. **Rule** on what comes back:
    - `NEEDS_DIRECTION` → register item? owner (sharpened) : decide yourself. Log the ruling in
      the Decision Log. Re-dispatch with the ruling.
