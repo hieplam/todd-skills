@@ -151,7 +151,10 @@ def trailer_progress(wt_path, base_sha):
     return last
 
 def is_dirty(wt_path):
-    return False  # real implementation lands in Task 6
+    # Anything uncommitted — modified OR untracked — is dirt. Untracked files count
+    # because a Hunter's first move is often a brand-new test file.
+    rc, out, _ = sh(["git", "-C", wt_path, "status", "--porcelain"])
+    return rc == 0 and bool(out)
 
 def mid_merge(wt_path):
     return False  # real implementation lands in Task 7

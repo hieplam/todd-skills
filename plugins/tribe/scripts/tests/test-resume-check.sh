@@ -150,5 +150,13 @@ complete_task "$WT6" delta 3 3
 run_check "$TMP/out6.json" "$R6"
 check "all tasks done moves to delivery" "$(jget "$TMP/out6.json" cards.0.next_action)" "RESUME_DELIVERY"
 
+# --- scenario: uncommitted leftovers -> revert and redo the in-flight task ---
+echo "half-finished work" >> "$WT3/src.txt"
+echo "brand new file" > "$WT3/new.txt"
+run_check "$TMP/out7.json" "$R3"
+check "dirt is detected" "$(jget "$TMP/out7.json" cards.0.dirty)" "true"
+check "dirty worktree reverts and redoes" "$(jget "$TMP/out7.json" cards.0.next_action)" "REVERT_AND_REDO task 3"
+git_c "$WT3" checkout -q -- . && rm -f "$WT3/new.txt"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
