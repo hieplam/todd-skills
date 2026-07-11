@@ -103,8 +103,34 @@ def parse_state_file(path):
     return {"slug": m.group(1), "fields": fields, "milestones": milestones}
 
 def plan_checkbox_progress(wt_path, plan_rel):
-    # (prefix_done, total_tasks, plan_exists) — real implementation lands in Task 5
-    return (0, 0, False)
+    # (prefix_done, total_tasks, plan_exists). prefix_done counts leading contiguous
+    # tasks whose checkboxes are all ticked — tasks execute in order, so a gap means
+    # the later tick is unreliable and the trailer layer decides.
+    if not plan_rel:
+        return (0, 0, False)
+    try:
+        lines = open(os.path.join(wt_path, plan_rel), errors="replace").read().splitlines()
+    except OSError:
+        return (0, 0, False)
+    tasks, cur = [], None
+    for ln in lines:
+        m = re.match(r"^#{1,6}\s*Task\s+(\d+)\b", ln, re.IGNORECASE)
+        if m:
+            cur = {"n": int(m.group(1)), "boxes": []}
+            tasks.append(cur)
+            continue
+        if cur is not None:
+            cb = CHECKBOX_RE.match(ln)
+            if cb:
+                cur["boxes"].append(cb.group(1).lower() == "x")
+    tasks.sort(key=lambda t: t["n"])
+    prefix = 0
+    for t in tasks:
+        if t["boxes"] and all(t["boxes"]):
+            prefix += 1
+        else:
+            break
+    return (prefix, len(tasks), True)
 
 def trailer_progress(wt_path, base_sha):
     # Highest completed task number per Tribe-Task trailers in base..HEAD.

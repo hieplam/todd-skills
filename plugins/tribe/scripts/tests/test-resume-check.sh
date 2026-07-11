@@ -116,5 +116,39 @@ run_check "$TMP/out3.json" "$R3"
 check "trailers count completed tasks" "$(jget "$TMP/out3.json" cards.0.last_completed_task)" "2"
 check "mid-plan card continues at next task" "$(jget "$TMP/out3.json" cards.0.next_action)" "CONTINUE task 3"
 
+# --- scenario: checkboxes agree with trailers -> no inconsistencies, total counted ---
+run_check "$TMP/out4.json" "$R3"
+check "agreement means no inconsistencies" "$(jget "$TMP/out4.json" cards.0.inconsistencies)" "[]"
+check "plan total counted" "$(jget "$TMP/out4.json" cards.0.total_tasks)" "3"
+
+# --- scenario: checkbox ticked without a trailer commit -> git wins, inconsistency reported ---
+R5="$TMP/lie"; new_repo "$R5"
+WT5=$(new_card_worktree "$R5" gamma)
+complete_task "$WT5" gamma 1 3
+python3 - "$WT5/docs/superpowers/plans/gamma.md" <<'EOF'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+# tick task 2's boxes by hand, committing WITHOUT a Tribe-Task trailer (rule violation)
+parts = text.split("### Task 2: Second")
+parts[1] = parts[1].replace("- [ ]", "- [x]", 2)
+open(path, "w").write("### Task 2: Second".join(parts))
+EOF
+git_c "$WT5" add -A
+git_c "$WT5" commit -qm "sneaky untrailed tick"
+run_check "$TMP/out5.json" "$R5"
+check "git wins over checkboxes" "$(jget "$TMP/out5.json" cards.0.last_completed_task)" "1"
+check "inconsistency is reported" "$(jget "$TMP/out5.json" cards.0.inconsistencies.0 | grep -c 'git wins' || true)" "1"
+check "lying card redoes from git truth" "$(jget "$TMP/out5.json" cards.0.next_action)" "CONTINUE task 2"
+
+# --- scenario: every task done -> move to delivery ---
+R6="$TMP/done"; new_repo "$R6"
+WT6=$(new_card_worktree "$R6" delta)
+complete_task "$WT6" delta 1 3
+complete_task "$WT6" delta 2 3
+complete_task "$WT6" delta 3 3
+run_check "$TMP/out6.json" "$R6"
+check "all tasks done moves to delivery" "$(jget "$TMP/out6.json" cards.0.next_action)" "RESUME_DELIVERY"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
