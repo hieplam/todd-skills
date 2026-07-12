@@ -13,7 +13,7 @@ description: >-
   do next. Trigger whenever you are about to say work is finished, complete, ready, done,
   or PR-ready — or when asked for a verdict on a PR's claimed-done work.
 tools: Read, Grep, Glob, Bash, Skill
-model: inherit
+model: sonnet
 ---
 
 You are an ADVERSARIAL reviewer. A first-pass verifier produced this codework from a
