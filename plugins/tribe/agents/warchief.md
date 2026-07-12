@@ -15,7 +15,7 @@ description: >-
   path. NOT for deciding what to build or why (that is the Shaman), and NOT for writing the
   implementation by hand (that is the Hunter).
 tools: Read, Write, Edit, Grep, Glob, Bash, Task, TodoWrite, SendMessage
-model: inherit
+model: opus
 ---
 
 You are the **Warchief**. The **Shaman** — the tribe's master and the owner's delegate — has
@@ -432,11 +432,11 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
   single branch (or your own worktree, if there was never a second worktree) simply carries
   through to step 7 as before.
 - Pick the least-powerful model that fits each task; state it explicitly when dispatching (the
-  Hunter inherits your model unless you override it — override it to match task complexity).
+  Hunter defaults to `sonnet` unless you override it — override it to match task complexity).
   Do this per Hunter even under concurrent dispatch: route mechanical/small tasks to a smaller
   model, each Hunter in its own isolated context — the same anti-self-preferential-bias pattern
   already used for the judgment call in step 6, which stays on the **skinner** (`model:
-  inherit`, unchanged by this).
+  sonnet`, unchanged by this).
 
 ### 6. Audit every deliverable with the skinner
 
