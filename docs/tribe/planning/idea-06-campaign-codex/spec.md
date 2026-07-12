@@ -98,7 +98,7 @@ review: PASS (skinner, round 1)
 | `Category` | One of: `naming`, `testing`, `error-handling`, `structure`, `security`, `commit`, `tripwire`. Greppable facet. |
 | `Decision` | **Exactly one imperative line.** The lookup answer. Not a paragraph, not a discussion. This is the LIFETIMES.tsv discipline: an agent looks up one row, it does not *read* the document (handoff §2.1: greppable table format → cheap in tokens, low ambiguity). |
 | `Source` | **Mandatory provenance:** either `file:line` (a fact grounded in the repo) or `DL-NNN` (a Decision Log ruling). A row with no resolvable source is deleted, never softened. This column is what makes the codex *mechanically auditable* — see §2.3. |
-| `Check` | A shell command that verifies the row, or the literal `manual`. Gives the Tracker its "one concrete, checkable item per rule" (`tracker.md:37`) for free. |
+| `Check` | A shell command that verifies the row, or the literal `manual`. Gives the Tracker its "one concrete, checkable item per rule" (`tracker.md:37`) for free. **Pipes inside the command must be escaped (`\|`)** — the cell holds a shell command and shell commands pipe, so an unescaped `|` would be read as a column separator. `validate-codex.sh` splits on unescaped pipes only and unescapes the cell afterwards, so the stored command is the real one. |
 | `Severity` | `Blocker` or `Should-fix`. **This column is the Tracker/Skinner boundary** — see §2.5. |
 | `State` | `active` or `superseded`. Append-only amendments (§2.4) need this. |
 
@@ -130,12 +130,13 @@ precisely, because a careless reading makes it look like the Skinner is being ha
 authority it must never have.
 
 **It is not.** The Skinner's charter is one question — *"is the work that claims to be done
-actually done?"* — answered against a **requirement contract**, by **running the proof**
-(`skinner.md:20-22`, `:39`). Nothing in that charter is about *code*. What changes here is only
-the **artifact class** under audit (a document, not a diff). The **question** is unchanged.
+actually done?"* — answered against a **requirement contract** (`skinner.md:20-22`), by
+**running the proof, never by reading claims** (`skinner.md:9`; the "Run the proof" step at
+`skinner.md:141-150`). Nothing in that charter is about *code*. What changes here is only the
+**artifact class** under audit (a document, not a diff). The **question** is unchanged.
 
 The contract it audits against is **caller-given** — level 1 of its own contract chain
-(`skinner.md:78-79`: *"an explicit spec/plan path or requirement statement the caller passed
+(`skinner.md:79-80`: *"an explicit spec/plan path or requirement statement the caller passed
 you"*). The Shaman passes the **codex charter**: the column contract of §2.1 plus these five
 acceptance criteria. The Skinner verifies, by executing:
 

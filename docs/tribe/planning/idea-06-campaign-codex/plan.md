@@ -177,7 +177,15 @@ verdict), exit 2 on setup error. Judgment stays with the Skinner (spec §2.6).
   run "$TMP/draft.md"
   check "draft status verdict=pass"        "$(jget "$TMP/out.json" verdict)" "pass"
 
-  # 11. setup errors exit 2 (contract shared with validate-plan.sh)
+  # 11. a Check containing an ESCAPED pipe still parses as 8 cells. Check cells hold shell
+  # commands and shell commands pipe — a naive split("|") would shred exactly the rows this
+  # column exists to carry, so this is a hard regression guard, not an edge case.
+  { header; echo '| CDX-008 | `**/*` | tripwire | A weakened or skipped test in the diff is a Blocker, never a fix. | `DL-001` | `git diff \| grep -q "^-.*test(" && echo violation` | Blocker | active |'; } > "$TMP/pipe.md"
+  run "$TMP/pipe.md"
+  check "escaped pipe in Check verdict=pass" "$(jget "$TMP/out.json" verdict)" "pass"
+  check "escaped pipe row parses to 8 cells" "$(find_check "$TMP/out.json" rows_complete)" "pass"
+
+  # 12. setup errors exit 2 (contract shared with validate-plan.sh)
   set +e
   "$SCRIPT" "$TMP/nope.md" >/dev/null 2>&1; check "missing file exits 2" "$?" "2"
   "$SCRIPT" >/dev/null 2>&1;               check "no argument exits 2"   "$?" "2"
@@ -269,8 +277,19 @@ verdict), exit 2 on setup error. Judgment stays with the Skinner (spec §2.6).
   DL_RE       = re.compile(r"^DL-\d{3}$")
   DECISION_MAX = 200   # one imperative lookup line, not a paragraph
 
+  # A Check cell is a shell command, and shell commands pipe. So the table MUST be split on
+  # UNESCAPED pipes only: a row may carry `git diff \| grep -q foo` and still be 8 cells.
+  # A naive split("|") would shred exactly the rows the Check column exists to hold.
+  SPLIT_RE = re.compile(r"(?<!\\)\|")
+
+  def split_row(s):
+      s = s.strip()
+      if s.startswith("|"): s = s[1:]
+      if s.endswith("|") and not s.endswith(r"\|"): s = s[:-1]
+      return [c.strip() for c in SPLIT_RE.split(s)]
+
   def cell(s):
-      return s.strip().strip("`").strip()
+      return s.strip().strip("`").strip().replace(r"\|", "|")
 
   header = {}
   for line in lines:
@@ -301,9 +320,9 @@ verdict), exit 2 on setup error. Judgment stays with the Skinner (spec §2.6).
       s = line.strip()
       if not s.startswith("|"):
           continue
-      cells = [c.strip() for c in s.strip("|").split("|")]
+      cells = split_row(s)
       if hdr_idx is None:
-          if [c.strip() for c in cells] == COLUMNS:
+          if cells == COLUMNS:
               hdr_idx = i
           continue
       if set(s) <= set("|- :"):      # the separator row
@@ -378,7 +397,7 @@ verdict), exit 2 on setup error. Judgment stays with the Skinner (spec §2.6).
   ```bash
   chmod +x plugins/tribe/scripts/validate-codex.sh
   plugins/tribe/scripts/tests/test-validate-codex.sh; echo "exit=$?"
-  # expected: every line "ok - ...", then "# passed 15, failed 0", exit=0
+  # expected: every line "ok - ...", then "# passed 17, failed 0", exit=0
   ```
 
 - [ ] **Step 3: Verify the neighbours still pass** — the shared harness must stay green.
@@ -474,8 +493,14 @@ of the schema: if the template stops validating, the schema drifted.
   |----|-------|----------|----------|--------|-------|----------|-------|
   | CDX-001 | `plugins/tribe/scripts/*.sh` | testing | Every script ships a fixture test at scripts/tests/test-NAME.sh printing TAP ok/not-ok and exiting non-zero on failure. | `plugins/tribe/scripts/tests/test-validate-plan.sh:1` | `test -f plugins/tribe/scripts/tests/test-$(basename "$F" .sh).sh` | Blocker | active |
   | CDX-002 | `plugins/tribe/scripts/*.sh` | error-handling | Exit 2 means setup error; exit 0 means the script ran, with the verdict in JSON on stdout and logs on stderr. | `plugins/tribe/scripts/validate-plan.sh:38` | `grep -q "Exit codes: 0 = ran successfully" "$F"` | Blocker | active |
-  | CDX-003 | `**/*` | tripwire | A weakened, skipped, or deleted test in the diff is a Blocker, never a fix. | `DL-001` | `git diff | grep -qE "^\-.*(it|test)\(" && echo violation` | Blocker | active |
+  | CDX-003 | `**/*` | tripwire | A weakened, skipped, or deleted test in the diff is a Blocker, never a fix. | `DL-001` | `git diff \| grep -qE "^-.*(it\|test)\(" && echo violation` | Blocker | active |
   ````
+
+  **Note the escaped pipes** (`\|`) in that `Check` cell: it is a shell pipeline living inside a
+  markdown table, so every `|` that belongs to the *command* must be escaped or it would be read
+  as a *column* separator. Task 1's validator splits on unescaped pipes only and unescapes the
+  cell afterwards, so the row round-trips as 8 cells and the stored command is the real one. This
+  is not incidental — the `Check` column exists to hold shell commands, and shell commands pipe.
 
   ```bash
   plugins/tribe/scripts/tests/test-codex-template.sh; echo "exit=$?"
