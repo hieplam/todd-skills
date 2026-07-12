@@ -12,6 +12,6 @@ Method steps 5-8 (dispatch Hunters, PR, merge) are OUT OF SCOPE for this campaig
 authored here is executed by a FUTURE implementation campaign.
 
 ## Milestones
-- [ ] spec committed
+- [x] spec committed
 - [ ] plan committed
 - [ ] plan validated (validate-plan.sh verdict pass)
