@@ -113,7 +113,7 @@ The Warchief merges at the layer above, mechanically, without a reconciliation r
   round and opens a fix round. There is no majority with two reviewers, so unanimity-to-PASS is the
   only coherent rule — and it is the one the cost asymmetry demands (handoff §4.3: a false positive
   costs a cheap fix round; a false negative ships a bug nobody will ever re-read). It also preserves
-  `skinner.md:224` verbatim: "When in doubt, FAIL."
+  `skinner.md:232` verbatim: "When in doubt, **FAIL**. Uncertainty is never PASS."
 - An `UN-AUDITABLE` result from either instance is a FAIL, as today.
 - **The 3-round fix cap is unchanged.** A round is now "both Skinners re-dispatched in parallel".
   If round 3 still fails, the Warchief stops and returns `NEEDS_DIRECTION` with **both** round-3
@@ -127,7 +127,7 @@ The Warchief merges at the layer above, mechanically, without a reconciliation r
 
 | File | Change |
 |---|---|
-| `plugins/tribe/agents/warchief.md` | Step 6 rewritten into the 4 laws above; the five other places that speak of "the skinner" singular (anti-goal #4 at :240-244, step 5's model note at :438, the wave-failure text at :397, the final-report line at :535, and the header at :29) made consistent with a two-Skinner cell |
+| `plugins/tribe/agents/warchief.md` | Step 6 rewritten into the 4 laws above; the **seven** other places that speak of "the skinner" singular made consistent with a two-Skinner cell — the YAML `description:` frontmatter at :9 (the text Claude Code reads to decide how to invoke the agent), the header at :29, anti-goal #4 at :240-244, the Hunter dispatch contract at :215-216, the wave-failure text at :397, step 5's model note at :437-439, and the final-report plus `NEEDS_DIRECTION` lines at :535-538 |
 | `plugins/tribe/agents/skinner.md` | One new Operating-rules invariant: you are one of two independent reviewers; never seek or accept a peer's findings |
 | `plugins/tribe/evals/evals.json` | Three new behavioral evals: concurrent dual dispatch; no-PASS-when-one-FAILs; no cross-Skinner leakage |
 | `plugins/tribe/scripts/tests/test-dual-skinner-cell.sh` | New mechanical contract test (grep-level tripwire) asserting the prompt text carries the four laws |

@@ -47,7 +47,7 @@ tasks create, so there is **one wave, one worktree, one Hunter at a time**. No s
 |---|---|---|
 | 1 | new `test-dual-skinner-cell.sh`, `warchief.md` step 6 | The four laws: concurrent dispatch, isolation, merge, both-must-PASS |
 | 2 | `test-dual-skinner-cell.sh`, `skinner.md` | The reciprocal independence invariant |
-| 3 | `test-dual-skinner-cell.sh`, `warchief.md` (5 singular-Skinner references) | Consistency sweep |
+| 3 | `test-dual-skinner-cell.sh`, `warchief.md` (7 singular-Skinner references) | Consistency sweep |
 | 4 | `evals.json` | Three behavioral evals |
 
 ---
@@ -81,18 +81,23 @@ PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf 'ok - %s\n' "$1"; }
 bad() { FAIL=$((FAIL+1)); printf 'not ok - %s\n' "$1"; }
 
-has() { # has NAME HAYSTACK REGEX — the text must contain the regex
+# Agent prompts are hard-wrapped prose, so a sentence routinely straddles a newline. grep is
+# line-based and would miss it. Flatten every haystack to one whitespace-normalized line first:
+# assertions then match meaning, not line-breaking accidents.
+flat() { tr '\n' ' ' | tr -s ' '; }
+
+has() { # has NAME HAYSTACK REGEX — the (flattened) text must contain the regex
   if grep -qiE "$3" <<<"$2"; then ok "$1"; else bad "$1 (missing: $3)"; fi
 }
-hasnt() { # hasnt NAME HAYSTACK REGEX — the text must NOT contain the regex
+hasnt() { # hasnt NAME HAYSTACK REGEX — the (flattened) text must NOT contain the regex
   if grep -qiE "$3" <<<"$2"; then bad "$1 (found what must be gone: $3)"; else ok "$1"; fi
 }
 
 [[ -f "$WARCHIEF" ]] || { printf 'not ok - warchief.md not found\n'; exit 1; }
 [[ -f "$SKINNER" ]]  || { printf 'not ok - skinner.md not found\n'; exit 1; }
 
-# The step 6 section only: from its heading up to the step 7 heading.
-STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF")"
+# The step 6 section only: from its heading up to the step 7 heading, flattened.
+STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF" | flat)"
 [[ -n "$STEP6" ]] || { printf 'not ok - could not extract step 6 from warchief.md\n'; exit 1; }
 
 # Law 1 — two Skinners, dispatched concurrently in ONE message, on an identical brief.
@@ -113,10 +118,10 @@ has   "law3: agreement tag for single-flagged findings" "$STEP6" '\[one\]'
 has   "law3: both reports preserved verbatim"        "$STEP6" 'both reports verbatim'
 
 # Law 4 — PASS requires BOTH; the 3-round cap survives; escalation carries both reports.
-has   "law4: the round passes only if both pass"     "$STEP6" 'passes only if \*\*both\*\*'
+has   "law4: the round passes only if both pass"     "$STEP6" 'passes only if both skinners return'
 has   "law4: un-auditable from either is a fail"     "$STEP6" 'un-auditable'
 has   "law4: the 3-round fix cap is unchanged"       "$STEP6" 'cap fix-rounds at 3'
-has   "law4: escalation attaches both reports"       "$STEP6" 'both.{0,40}round-3 fail reports'
+has   "law4: escalation attaches both reports"       "$STEP6" 'both round-3 fail reports'
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
@@ -125,10 +130,11 @@ chmod +x plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 ```
 
-Expected (RED): the script runs and reports failures, because today's step 6 says
-"dispatch the **skinner** against the diff" and carries none of the four laws. Exit code 1, output
-ending with a tally such as `0 passed, 15 failed` (the exact split does not matter; what matters is
-that it is non-zero-failing and that the `hasnt` check reports finding the old line).
+Expected (RED): exactly `1 passed, 14 failed`, exit 1. The one passing assertion is
+`law4: the 3-round fix cap is unchanged` — today's step 6 already carries "cap fix-rounds at 3",
+and this card deliberately keeps it. Everything else fails: the four laws are absent, and the
+`hasnt` check correctly reports still finding the old "dispatch the **skinner** against the diff"
+line.
 
 - [ ] **Step 2: Rewrite step 6 to green the test**
 
@@ -184,9 +190,8 @@ into one entry. Tag every merged finding **`[both]`** (both Skinners flagged it)
 in your report file — never summarize them away: they are the evidence trail, and on escalation
 they are what the Shaman reads.
 
-**Law 4 — PASS needs BOTH.** The round **passes only if **both** Skinners return `AUDIT: PASS`**.
-Any FAIL — or an `UN-AUDITABLE` result — from either instance fails the round and opens a fix
-round. With two reviewers there is no majority to take, and one more cheap fix round always beats
+**Law 4 — PASS needs BOTH.** The round **passes only if both Skinners return `AUDIT: PASS`**. Any
+FAIL — or an `UN-AUDITABLE` result — from either instance fails the round and opens a fix round. With two reviewers there is no majority to take, and one more cheap fix round always beats
 one shipped bug that nobody will re-read. Feed the merged findings to a fixer Hunter and re-audit —
 **cap fix-rounds at 3** (a round is both Skinners re-dispatched in parallel). If round 3 still comes
 back FAIL, **stop looping** (do not dispatch a 4th fix attempt): save state and return
@@ -246,12 +251,12 @@ p = pathlib.Path("plugins/tribe/scripts/tests/test-dual-skinner-cell.sh")
 text = p.read_text()
 block = '''
 # Skinner-side reciprocal invariant — it must know it is one of two, and refuse the peer's findings.
-SKIN="$(cat "$SKINNER")"
+SKIN="$(flat <"$SKINNER")"
 has "skinner: knows it is one of two independent reviewers" "$SKIN" 'one of two independent reviewers'
-has "skinner: never seeks or accepts the peer's findings"   "$SKIN" 'never seek'
+has "skinner: never seeks or accepts the peer findings"     "$SKIN" 'never seek'
 has "skinner: reports only what it independently derived"   "$SKIN" 'independently derived'
 '''
-anchor = "\\nprintf '\\\\n%d passed, %d failed\\\\n'"
+anchor = "\nprintf '\\n%d passed, %d failed\\n'"
 assert anchor in text, "tally anchor not found"
 p.write_text(text.replace(anchor, block + anchor, 1))
 print("appended skinner assertions")
@@ -305,14 +310,17 @@ Expected: one commit carrying both trailers, with Task 2's checkboxes ticked in 
 
 ---
 
-### Task 3: Consistency sweep — the five places that still say "the skinner", singular
+### Task 3: Consistency sweep — every passage that still says "the skinner", singular
 
-Step 6 now describes a pair, but five other passages in `warchief.md` still speak of one Skinner. A
-prompt that contradicts itself is a prompt the model resolves arbitrarily.
+Step 6 now describes a pair, but **seven** other passages in `warchief.md` still speak of one
+Skinner — including the YAML `description:` frontmatter, which is the text Claude Code itself reads
+to decide when and how to invoke this agent. A prompt that contradicts itself is a prompt the model
+resolves arbitrarily, so every one of them is assertion-covered here, not eyeballed.
 
 - [ ] **Step 1: Write the failing test**
 
-Append the consistency assertions to the test file, above the tally:
+Append the consistency assertions to the test file, above the tally. The patterns use `.` wildcards
+where the target text contains an apostrophe, so no quoting games are needed:
 
 ```bash
 python3 - <<'PY'
@@ -320,15 +328,20 @@ import pathlib
 p = pathlib.Path("plugins/tribe/scripts/tests/test-dual-skinner-cell.sh")
 text = p.read_text()
 block = '''
-# Consistency — no passage outside step 6 may still describe a single Skinner audit.
-WAR="$(cat "$WARCHIEF")"
-has   "consistency: anti-goal 4 audits with two Skinners"  "$WAR" 'audited by \\*\\*two independent skinners\\*\\*'
-has   "consistency: anti-goal 4 escalates with both reports" "$WAR" "both Skinners' last FAIL reports"
-has   "consistency: wave-failure text carries both reports" "$WAR" "both Skinners' round-3 FAIL"
-has   "consistency: final report cites both Skinners"      "$WAR" 'audited PASS .{0,30}by both skinners'
-hasnt "consistency: no lone-Skinner audit claim survives"  "$WAR" 'audited PASS against the spec by the skinner'
+# Consistency — no passage anywhere in warchief.md may still describe a single-Skinner audit.
+WAR="$(flat <"$WARCHIEF")"
+has   "consistency: frontmatter description audits with two Skinners" "$WAR" 'audits every deliverable with \\*\\*two independent skinners\\*\\*'
+has   "consistency: header line audits with two Skinners"   "$WAR" 'you audit the result with \\*\\*two independent skinners\\*\\*'
+has   "consistency: anti-goal 4 audits with two Skinners"   "$WAR" 'audited by \\*\\*two independent skinners\\*\\*'
+has   "consistency: anti-goal 4 escalates with both reports" "$WAR" 'both skinners.{0,3} last fail reports'
+has   "consistency: dispatch contract names the Skinner pair" "$WAR" 'audit its diff with the \\*\\*skinner\\*\\* pair'
+has   "consistency: wave-failure text carries both reports" "$WAR" 'both skinners.{0,3} round-3 fail'
+has   "consistency: step 5 model note names the Skinner pair" "$WAR" 'stays on the \\*\\*skinner\\*\\* pair'
+has   "consistency: final report cites both Skinners"       "$WAR" 'audited pass against the spec by both skinners'
+hasnt "consistency: no lone-Skinner audit claim survives"   "$WAR" 'spec by the skinner'
+hasnt "consistency: no lone-Skinner escalation survives"    "$WAR" 'attach the skinner'
 '''
-anchor = "\\nprintf '\\\\n%d passed, %d failed\\\\n'"
+anchor = "\nprintf '\\n%d passed, %d failed\\n'"
 assert anchor in text, "tally anchor not found"
 p.write_text(text.replace(anchor, block + anchor, 1))
 print("appended consistency assertions")
@@ -336,16 +349,40 @@ PY
 bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 ```
 
-Expected (RED): the five new `consistency:` assertions fail (4 missing phrases plus the surviving
-lone-Skinner claim at `warchief.md:535`). Tally `18 passed, 5 failed`, exit 1.
+Expected (RED): all ten new `consistency:` assertions fail — the eight `has` patterns are absent,
+and the two `hasnt` patterns are still present in today's text. Tally `18 passed, 10 failed`, exit 1.
 
-- [ ] **Step 2: Update all five passages**
+- [ ] **Step 2: Update all seven passages**
 
-Apply these five exact replacements in `plugins/tribe/agents/warchief.md`:
+Apply these seven exact replacements in `plugins/tribe/agents/warchief.md`. Each `old` string below
+is verbatim from the current file; each `new` string keeps the surrounding line-wrapping intact.
 
-1. Header, line 29 — old: `**Hunter** to implement each task, you audit the result with the **skinner**, and`
-   new: `**Hunter** to implement each task, you audit the result with **two independent skinners**, and`
-2. Anti-goal 4, lines 240-244 — old:
+1. **YAML frontmatter `description:`, line 9** (this is the text Claude Code reads to route work to
+   this agent, so it must not still advertise a single reviewer) — old:
+
+```markdown
+  (implementer subagent) per task, audits every deliverable with the **skinner** by
+```
+
+   new:
+
+```markdown
+  (implementer subagent) per task, audits every deliverable with **two independent skinners** by
+```
+
+2. **Header, line 29** — old:
+
+```markdown
+**Hunter** to implement each task, you audit the result with the **skinner**, and
+```
+
+   new:
+
+```markdown
+**Hunter** to implement each task, you audit the result with **two independent skinners**, and
+```
+
+3. **Anti-goal 4, lines 240-244** — old:
 
 ```markdown
 4. **Never trust "done".** Every Hunter deliverable is audited by the **skinner**,
@@ -366,22 +403,67 @@ Apply these five exact replacements in `plugins/tribe/agents/warchief.md`:
    with both Skinners' last FAIL reports attached verbatim (see Method step 6).
 ```
 
-3. Wave-failure text, lines 397-398 — old: `report file which sub-plans passed and which hit the cap (with the Skinner's round-3 FAIL`
-   `report attached verbatim, per step 6), and save state + return `NEEDS_DIRECTION` to the`
-   new: `report file which sub-plans passed and which hit the cap (with both Skinners' round-3 FAIL`
-   `reports attached verbatim, per step 6), and save state + return `NEEDS_DIRECTION` to the`
-4. Step 5 model note, lines 437-439 — old: `model, each Hunter in its own isolated context — the same anti-self-preferential-bias pattern`
-   `already used for the judgment call in step 6, which stays on the **skinner** (`model:`
-   `sonnet`, unchanged by this).`
-   new: `model, each Hunter in its own isolated context — the same anti-self-preferential-bias pattern`
-   `already used for the judgment call in step 6, which stays on the **skinner** pair (both`
-   `instances `model: sonnet`, unchanged by this).`
-5. Final report line, 535 — old: `- **Audit:** one-line conformance note ("audited PASS against the spec by the skinner")`
-   new: `- **Audit:** one-line conformance note ("audited PASS against the spec by both skinners")`
+4. **Dispatch contract, lines 215-216** — old:
 
-Also update the `NEEDS_DIRECTION` line at 537-538 so it asks for both reports: change
-`attach the Skinner's round-3 FAIL report **verbatim**` to
-`attach both Skinners' round-3 FAIL reports **verbatim**`.
+```markdown
+  builds exactly that under TDD and reports back to YOU; you audit its diff with the
+  `skinner`. The Hunter never contacts the Shaman or the owner — its questions come
+```
+
+   new:
+
+```markdown
+  builds exactly that under TDD and reports back to YOU; you audit its diff with the **skinner**
+  pair. The Hunter never contacts the Shaman or the owner — its questions come
+```
+
+5. **Wave-failure text, lines 397-398** — old:
+
+```markdown
+     report file which sub-plans passed and which hit the cap (with the Skinner's round-3 FAIL
+     report attached verbatim, per step 6), and save state + return `NEEDS_DIRECTION` to the
+```
+
+   new:
+
+```markdown
+     report file which sub-plans passed and which hit the cap (with both Skinners' round-3 FAIL
+     reports attached verbatim, per step 6), and save state + return `NEEDS_DIRECTION` to the
+```
+
+6. **Step 5 model note, lines 437-439** — old:
+
+```markdown
+  model, each Hunter in its own isolated context — the same anti-self-preferential-bias pattern
+  already used for the judgment call in step 6, which stays on the **skinner** (`model:
+  sonnet`, unchanged by this).
+```
+
+   new:
+
+```markdown
+  model, each Hunter in its own isolated context — the same anti-self-preferential-bias pattern
+  already used for the judgment call in step 6, which stays on the **skinner** pair (both
+  instances `model: sonnet`, unchanged by this).
+```
+
+7. **Final report line, 535, plus the `NEEDS_DIRECTION` line at 537-538** — old:
+
+```markdown
+- **Audit:** one-line conformance note ("audited PASS against the spec by the skinner")
+- **The question** (if `NEEDS_DIRECTION`): context, options, your recommendation — ready for the
+  Shaman to rule on. If this `NEEDS_DIRECTION` was triggered by the 3-round audit cap (Method
+  step 6), attach the Skinner's round-3 FAIL report **verbatim** instead of summarizing it.
+```
+
+   new:
+
+```markdown
+- **Audit:** one-line conformance note ("audited PASS against the spec by both skinners")
+- **The question** (if `NEEDS_DIRECTION`): context, options, your recommendation — ready for the
+  Shaman to rule on. If this `NEEDS_DIRECTION` was triggered by the 3-round audit cap (Method
+  step 6), attach both Skinners' round-3 FAIL reports **verbatim** instead of summarizing them.
+```
 
 - [ ] **Step 3: Verify GREEN plus the regression guard**
 
@@ -392,9 +474,11 @@ bash plugins/tribe/scripts/tests/test-resume-check.sh
 grep -n -i 'skinner' plugins/tribe/agents/warchief.md
 ```
 
-Expected: `23 passed, 0 failed`, exit 0; both existing scripts `0 failed`. The `grep` output is read
-by eye as the final check: every remaining mention of the Skinner must describe a pair or a single
-instance *within* the pair — no passage may still imply the audit runs on one reviewer.
+Expected: `28 passed, 0 failed`, exit 0; both existing scripts `0 failed`. The `grep` is a
+belt-and-braces read-through: every remaining mention of the Skinner must describe the pair, or a
+single instance *within* the pair — no passage may still imply the audit runs on one reviewer. The
+two `hasnt` assertions above already fail the build if either of the two known lone-Skinner claims
+survives, so this read-through is a backstop, not the gate.
 
 - [ ] **Step 4: Commit**
 
@@ -505,7 +589,7 @@ Expected: one commit carrying both trailers, Task 4's checkboxes ticked in the s
 ## Definition of done for the implementing campaign
 
 1. All four tasks committed, each with its `Tribe-Card` and `Tribe-Task` trailers.
-2. `bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh` → `23 passed, 0 failed`.
+2. `bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh` → `28 passed, 0 failed`.
 3. The two pre-existing script tests still green.
 4. `python3 scripts/evals/run_evals.py` run once at branch level; evals 10-12 pass, and the 9
    pre-existing evals do not regress.
