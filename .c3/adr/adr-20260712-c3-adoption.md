@@ -1,6 +1,6 @@
 ---
 id: adr-00000000-c3-adoption
-c3-seal: 728bcaf75a8f448e8b4f93dfac3d7b605af15ebb9d1fad0cded3b269590b2ba8
+c3-seal: 10362b3f95db88287d57762f82f65605c1f917070acdf3a4e5cef000f2822177
 title: C3 Architecture Documentation Adoption
 type: adr
 goal: 'Adopt C3 architecture documentation for **todd-skills**: create a validated `.c3/` topology — 3 containers matching the repo''s 3 runtime boundaries (install-time shell distribution, Claude-Code-runtime plugins, dev-time Python eval harness), 10 components, 3 cross-cutting refs, 2 coding rules — with code-map coverage so any file path resolves to its owning component via `c3x lookup`, and inject a CLAUDE.md pointer so future agents route architecture work through `/c3`.'
@@ -132,7 +132,7 @@ Document the repo as **3 containers matching its 3 genuine runtime boundaries** 
 
 | Rule | Why required | Action |
 | --- | --- | --- |
-| rule-bash-strict-mode | All 10 tracked .sh files already comply (grep -L 'set -euo pipefail' returns none); the rule locks the standard in | create + comply |
+| rule-bash-strict-mode | All 14 tracked .sh files already comply (grep -L 'set -euo pipefail' returns none); the rule locks the standard in | create + comply |
 | rule-marketplace-registration | marketplace.json currently lists all 8 plugins/* directories; an unregistered plugin would be silently uninstallable via marketplace flows | create + comply |
 
 ## Work Breakdown

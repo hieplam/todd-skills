@@ -1,14 +1,14 @@
 ---
 id: rule-bash-strict-mode
-c3-seal: c4dac0f2a723e54607a8e239d265acb695d2edb649c5242cc990add5fe30710b
+c3-seal: 3c9e8a316b5c56782c5028b811c720352479b297a8ffa5b59d6cd2332bf8dec9
 title: bash-strict-mode
 type: rule
-goal: 'Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 10 tracked `.sh` files today.'
+goal: 'Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 14 tracked `.sh` files today.'
 ---
 
 ## Goal
 
-Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 10 tracked `.sh` files today.
+Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 14 tracked `.sh` files today.
 
 ## Rule
 
