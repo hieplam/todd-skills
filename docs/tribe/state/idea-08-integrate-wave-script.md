@@ -8,8 +8,8 @@ plan: docs/tribe/planning/idea-08-integrate-wave-script/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated
+- [x] plan committed
+- [x] plan validated
 
 Note: PLANNING-ONLY campaign. No implementation waves, no Hunters, no PR — the plan
 produced here is the brief for a FUTURE implementation campaign.
