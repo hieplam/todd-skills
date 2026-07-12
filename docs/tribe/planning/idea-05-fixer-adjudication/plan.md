@@ -55,7 +55,7 @@ also fixes the sharpest edge: `hunter.md:70-73` tells a Hunter that a test which
 a *broken test* — which is exactly the instruction that turns an honest non-reproduction into a
 fabricated confirmation.
 
-- [ ] **Step 1: Write the failing test (group A)**
+- [x] **Step 1: Write the failing test (group A)**
 
 Create `plugins/tribe/scripts/tests/test-fixer-mandate.sh` with the harness plus the hunter.md
 assertions:
@@ -113,7 +113,7 @@ not ok - hunter: disposition NOT_REPRODUCED
 exit=1
 ```
 
-- [ ] **Step 2: Add the Fixer-mode section to `hunter.md`**
+- [x] **Step 2: Add the Fixer-mode section to `hunter.md`**
 
 In `plugins/tribe/agents/hunter.md`, insert the following block **between** the end of the Method
 section (the line `---` that closes step 7, immediately before `## Anti-goals`) and the
@@ -171,7 +171,7 @@ Then add a seventh anti-goal at the end of the `## Anti-goals` list:
    even when the Skinner marked it Critical. Reproduce it, or report `NOT_REPRODUCED` with evidence.
 ```
 
-- [ ] **Step 3: Green**
+- [x] **Step 3: Green**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -196,7 +196,7 @@ exit=0
 validate-plan suite ok
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/hunter.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md
