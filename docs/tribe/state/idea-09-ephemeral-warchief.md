@@ -8,5 +8,5 @@ plan: docs/tribe/planning/idea-09-ephemeral-warchief/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated
+- [x] plan committed
+- [x] plan validated
