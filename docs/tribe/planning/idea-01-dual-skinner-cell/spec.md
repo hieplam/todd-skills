@@ -225,7 +225,7 @@ independent but touch adjacent text.
 | **02 — ban leaking the Hunter's reasoning into the Skinner** | **Adjacent, same files, different rule.** 02 seals the *implementer→reviewer* channel; 01 seals the *reviewer↔reviewer* channel. | **Real merge-conflict risk:** both edit step 6 of `warchief.md` and the Operating rules of `skinner.md`. They are complementary, not contradictory — 01's brief-contents list ("contract + diff + repo rules + own report path") is *already* the shape 02 wants to make explicit, so 02 lands as a tightening of a list 01 introduced. **Recommended order: land 01 first, then 02 rewrites the brief-contents clause once, in one place, for both reviewers.** The ideas file's suggested order (2 → 1) also works but forces 02 to be re-applied to a second dispatch site when 01 arrives; landing 01 first avoids that. Either way: **sequence them, never run both implementation campaigns concurrently.** |
 | **03 — decorrelate via INPUT asymmetry (contract lens / cold lens)** | **Layers directly on 01.** 03 is meaningless without two reviewers to asymmetrize. | 01 deliberately dispatches two *identical* briefs and says so in its scope fence; 03 replaces "identical brief" with "brief A = contract + diff, brief B = bare diff", and demotes B's output to hypotheses. That means **03 edits the exact clause 01 writes (Law 1) and modifies Law 4** (only the contract-lens reviewer holds the authoritative verdict). Handled by keeping Law 1 and Law 4 as separately-labelled, self-contained clauses rather than one blended paragraph, so 03 can swap them cleanly. 03 must land **after** 01. |
 | **04 — disagreement is a routing signal** | **Layers directly on 01.** 04 consumes exactly the signal 01 emits. | 01's Law 3 tags every merged finding `[both]` or `[one]` but takes no action on the tag. 04 turns that tag into a routing table (`[both]` → Critical by default; `[one]` → fixer adjudicates; head-on conflict → extra round or escalate). **This is a deliberate seam, not a conflict:** 01 was designed to produce the tag precisely so 04 is a small additive edit rather than a rewrite. 04 must land **after** 01. |
-| **05 — the fixer may DROP claims (reproduce-first)** | **Layers on 01; strongly complementary.** | 01 doubles the finding volume (union rule), which raises exactly the false-positive pressure 05 relieves by letting the fixer Hunter drop unreproducible claims. 05 edits `hunter.md` and the fixer-brief clause in step 6 — a *different* clause than 01's Law 3 merge, so the textual conflict is small. 01 does not change the fixer's mandate. **Recommended: 05 lands soon after 01** (the ideas file's build order 2 → 1 → 5 → 4 agrees). |
+| **05 — the fixer may DROP claims (reproduce-first)** | **Prerequisite of 01 — 05 lands FIRST.** Strongly complementary in both directions. | 01 doubles the finding volume (union rule), which raises exactly the false-positive pressure 05 relieves by letting the fixer Hunter drop unreproducible claims. Shipping 01 into a tribe that has no reproduce-first rule means the *first* thing the doubled finding volume hits is a fixer obliged to act on every claim — so **05 must land before 01**, not after, and the locked order is `05 → 01/03 → 04` (below). The ideas file's brainstormed order (`2 → 1 → 5 → 4`) suggested the reverse; it is superseded. **Consequence this card must honour:** 05 also edits step 6 (it adds the fixer-brief template, the disposition ledger and the standoff rule), so by the time this card's Hunter opens step 6, that text is **already there**. This card's Law 3 merge feeds its `[both]`/`[one]` tags *into* 05's existing fixer brief; it must not overwrite or delete 05's clauses. The plan enforces this with a mandatory anchor check before any step-6 edit. |
 | **06 — frozen CODEX.md per campaign** | **Independent; mildly synergistic.** | 06 gives every Skinner one more rule source to read. It changes what goes *into* a Skinner brief, which is 01's Law 1 territory — but as an addition to the shared, identical brief, so both Skinners get it and independence is unaffected. No conflict; if 06 lands first, 01's brief-contents clause simply names the codex too. |
 | **07 — mechanical work queue (`build-queue.sh`)** | **Independent.** | Changes where *tasks* come from, not how audits run. Each queue line still becomes one task and thus one dual-Skinner audit — 01 makes 07's cells 4-role cells. No shared text. |
 | **08 — `integrate-wave.sh` (wave orchestration into code)** | **Independent, adjacent text.** | 08 rewrites step 5 (wave merging) into a script; 01 rewrites step 6. They touch neighbouring sections of `warchief.md` but not the same clauses. One caveat: 01 makes a small consistency edit to step 5's model-tier note (`warchief.md:438`, which currently says the step-6 judgment call "stays on the skinner", singular) and to the wave-failure text at `:397` — if 08 lands concurrently, that is a trivial two-line conflict. Sequence if convenient; not dangerous. |
@@ -233,7 +233,33 @@ independent but touch adjacent text.
 | **10 — meta-loop: repeated failure pattern → new Tracker rule** | **Independent; synergistic.** | 10 triggers on "the same failure pattern appears ≥2 times". With two reviewers, 01's `[both]` agreement tag is a *sharper* input to that trigger — a pattern flagged by two independent reviewers across two cards is stronger evidence for promoting it into a rule. No textual conflict; 10 edits step 6's tail and the Tracker's rule sources. |
 | **Bonus — trial run before fanning out** | **Synergistic.** | The bonus proposes running one representative task through the full cell before dispatching a wide wave. It presumes the cell that this card builds; it can only land after 01. |
 
-**The one hard rule that falls out of this table:** ideas 01, 02, 03 and 04 all rewrite step 6 of
-`warchief.md`. Their implementation campaigns must be **sequenced, not parallelized**, with 01
-first (it is the only one that creates the structure the others edit). 05, 06, 07, 08, 09 and 10
-can proceed independently of that chain.
+**The one hard rule that falls out of this table — the locked implementation order:**
+
+> ### `05 → 01/03 → 04`
+
+Ideas 01, 02, 03, 04 **and 05** all edit step 6 of `warchief.md`. Their `owns_files` overlap, so
+their implementation campaigns must be **sequenced, never parallelized** — the Warchief's own wave
+rules forbid two sub-plans with overlapping `owns_files` in one concurrent wave
+(`warchief.md:332-333, 376-380`).
+
+- **05 lands first.** It is the relief valve for the false-positive pressure this card creates: 01's
+  union rule doubles the finding volume, and 05 is what lets the fixer Hunter drop claims it cannot
+  reproduce. Landing 01 into a tribe with no reproduce-first rule ships the pressure without the
+  valve.
+- **01 (this card) lands second**, into a step 6 that **already contains 05's** fixer-brief template,
+  disposition ledger and standoff rule. This card's Hunter must therefore **compose with that text,
+  never overwrite it** — Law 3's `[both]`/`[one]` tags flow into the fixer brief 05 introduced. The
+  plan's Global Constraints make the anchor check mandatory before any step-6 edit, precisely so a
+  cold Hunter cannot silently delete 05's work by pasting a stale verbatim block.
+- **03 lands alongside/after 01** (it rewrites Law 1 and Law 4, which this card deliberately keeps as
+  separate, self-contained clauses so 03 can swap them cleanly).
+- **04 lands last.** It consumes the `[both]`/`[one]` tag this card emits, so it is inert until 01
+  has shipped.
+- **02** also edits step 6 and must be sequenced into this chain (land it after 01, so it tightens
+  the brief-contents clause once, in one place, for both reviewers).
+- **06, 07, 08, 09 and 10** are independent of the chain and can proceed in any order.
+
+This order is the settled cross-campaign decision, reconciled against the sibling specs for ideas
+03, 04 and 05, which state it identically. Where it conflicts with the brainstormed "suggested build
+order" in `bun-rust-migrate-ideas.md:275-277` (`2 → 1 → 5 → 4`), **this order governs** — that line
+is a first-pass suggestion, not a ruling.

@@ -13,6 +13,25 @@ each other, their findings merged by the Warchief, PASS only when both PASS.
 
 - **Implementer: dispatch each implementation/fix task to the `hunter` subagent — never a generic
   implementer.** The audit of each task stays with the `skinner` subagent.
+- **Sequencing — this card lands SECOND, after idea 05.** The locked implementation order is
+  `05 → 01/03 → 04` (spec, "Interactions with other ideas"). **Do not run this campaign until idea
+  05 has merged.** Ideas 05, 01, 03, 04 and 02 all edit `warchief.md` step 6; their `owns_files`
+  overlap, so they are sequenced, never parallelised.
+- **Anchor check — the mandatory first action of every task that edits `warchief.md`.** The `old:`
+  blocks quoted in this plan were captured verbatim from `warchief.md` at base commit `6a46391`,
+  **before idea 05 landed**. Idea 05 edits step 6 too: it adds a fixer-brief template, a disposition
+  ledger and a standoff rule. So before editing, **re-read step 6 as it actually exists** and take
+  one of these branches:
+  - **It matches the quoted `old:` block byte-for-byte** (05 has not landed, or did not touch this
+    passage) → apply the replacement exactly as written below.
+  - **It does not match, because idea 05's clauses are present** → **do NOT delete them.** The
+    replacement below rewrites step 6's *dispatch / isolation / merge / verdict* prose only. Idea
+    05's fixer-brief template, disposition ledger and standoff rule must survive **verbatim** inside
+    the new step 6, with Law 3's `[both]`/`[one]` agreement tags feeding into the fixer brief that 05
+    introduced. Compose the two; never overwrite.
+  - **It does not match for any other reason** (an anchor you cannot account for) → **stop and report
+    `NEEDS_CONTEXT` to the Warchief** with the actual text. Do not guess at a reconciliation, and do
+    not paste a stale block over live text.
 - Work in an isolated worktree branched from `origin/master`. Never commit on `master`.
 - Every commit carries the trailer `Tribe-Card: idea-01-dual-skinner-cell` plus
   `Tribe-Task: N/4`, both in the commit message's single final paragraph. No `Co-authored-by`
@@ -136,10 +155,24 @@ and this card deliberately keeps it. Everything else fails: the four laws are ab
 `hasnt` check correctly reports still finding the old "dispatch the **skinner** against the diff"
 line.
 
+This tally is computed against step 6 at base `6a46391`. **Idea 05 lands before this card** (see the
+anchor check in Global Constraints) and preserves "cap fix-rounds at 3" while adding no
+dual-reviewer language, so the same `1 passed, 14 failed` is expected after 05 has merged. If **any
+other** assertion is already passing before you edit anything, something has already modified this
+card's territory: **stop and report `NEEDS_CONTEXT` to the Warchief** rather than editing on top of
+it.
+
 - [ ] **Step 2: Rewrite step 6 to green the test**
 
+**Run the anchor check first** (Global Constraints): re-read step 6 as it actually exists. If idea
+05's fixer-brief template, disposition ledger and standoff rule are present, **preserve them
+verbatim** inside the new step 6 and let Law 3's `[both]`/`[one]` tags feed the fixer brief 05
+introduced — the replacement below rewrites the dispatch / isolation / merge / verdict prose, not
+05's fixer clauses. Only when step 6 still matches the block below byte-for-byte do you replace it
+wholesale.
+
 In `plugins/tribe/agents/warchief.md`, replace the whole of step 6 — the heading at line 441 and the
-paragraph beneath it, i.e. this exact current text:
+paragraph beneath it, i.e. this exact current text (as it stands at base `6a46391`):
 
 ```markdown
 ### 6. Audit every deliverable with the skinner
@@ -212,13 +245,14 @@ plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting 
 bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 bash plugins/tribe/scripts/tests/test-validate-plan.sh
 bash plugins/tribe/scripts/tests/test-resume-check.sh
-git diff --stat
+git status --short
 ```
 
 Expected: `test-dual-skinner-cell.sh` prints `15 passed, 0 failed` and exits 0; the two existing
-test scripts still end in `0 failed`; `git diff --stat` shows exactly two paths changed —
-`plugins/tribe/agents/warchief.md` and the new
-`plugins/tribe/scripts/tests/test-dual-skinner-cell.sh`. No other file is touched.
+test scripts still end in `0 failed`; `git status --short` shows exactly two paths —
+` M plugins/tribe/agents/warchief.md` and `?? plugins/tribe/scripts/tests/test-dual-skinner-cell.sh`.
+No other file is touched. (Use `git status --short`, **not** `git diff --stat`: the test script is a
+brand-new untracked file and does not appear in `git diff` output until it is staged.)
 
 - [ ] **Step 4: Commit**
 
@@ -447,7 +481,8 @@ is verbatim from the current file; each `new` string keeps the surrounding line-
   instances `model: sonnet`, unchanged by this).
 ```
 
-7. **Final report line, 535, plus the `NEEDS_DIRECTION` line at 537-538** — old:
+7. **The "Delivering the report" bullets, lines 535-538** — the `**Audit:**` line at 535 and the
+   `**The question**` bullet that spans 536-538 — old:
 
 ```markdown
 - **Audit:** one-line conformance note ("audited PASS against the spec by the skinner")

@@ -15,3 +15,7 @@ authored here is executed by a FUTURE implementation campaign.
 - [x] spec committed
 - [x] plan committed
 - [x] plan validated (validate-plan.sh verdict pass)
+- [x] audit round 1 (2 Skinners) — both FAIL, fixed in 86513e8
+- [x] audit round 2 (2 fresh Skinners) — A PASS / B FAIL; B's Critical (implementation order
+      contradicted the locked `05 → 01/03 → 04`) adjudicated as UPHELD; spec + plan fixed
+- [ ] audit round 3 (2 fresh Skinners) — both must PASS
