@@ -8,7 +8,7 @@ plan: docs/tribe/planning/idea-07-mechanical-queue/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
+- [x] plan committed
 - [ ] plan validated (validate-plan.sh PASS)
 
 ## Campaign kind
