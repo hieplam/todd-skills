@@ -7,6 +7,6 @@ base-sha: 6a4639190ff1ce3eaffab913708b3a64e33976b3
 plan: docs/tribe/planning/idea-09-ephemeral-warchief/plan.md
 
 ## Milestones
-- [ ] spec committed
+- [x] spec committed
 - [ ] plan committed
 - [ ] plan validated
