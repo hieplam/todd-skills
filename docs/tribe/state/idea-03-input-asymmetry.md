@@ -8,8 +8,8 @@ plan: docs/tribe/planning/idea-03-input-asymmetry/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated
+- [x] plan committed
+- [x] plan validated (validate-plan.sh: pass, 7/7 checks)
 
 ## Notes
 PLANNING-ONLY campaign: deliverable is spec + plan only. Method steps 5-8 (Hunter dispatch,
