@@ -415,7 +415,7 @@ unqualified they say the opposite of Task 1's charter. Two prompt documents disa
 a finding is arguable is a coin flip at runtime. This task closes the contradiction and installs a
 permanent regression guard against it re-opening.
 
-- [ ] **Step 1: Write the failing test (group D, including the negative assertion)**
+- [x] **Step 1: Write the failing test (group D, including the negative assertion)**
 
 Append to `plugins/tribe/scripts/tests/test-fixer-mandate.sh`, before the final `printf`/`exit`:
 
@@ -455,7 +455,7 @@ ok - no-finding-authority: review-agents.md
 exit=1
 ```
 
-- [ ] **Step 2: Add the clarifying clause to both docs**
+- [x] **Step 2: Add the clarifying clause to both docs**
 
 In `plugins/tribe/README.md`, at the end of line 90 (the Skinner's "What it actually does" paragraph),
 append this sentence — keep the existing sentence exactly as it is:
@@ -471,7 +471,7 @@ matching sentence:
 That authority is **at the **verdict** level**: an individual finding is a *falsifiable hypothesis* — a fixer must reproduce it before fixing, and records `NOT_REPRODUCED` with evidence if it cannot.
 ```
 
-- [ ] **Step 3: Green — the whole suite, plus the repo's other suites**
+- [x] **Step 3: Green — the whole suite, plus the repo's other suites**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -488,7 +488,7 @@ validate-plan ok
 resume-check ok
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/README.md plugins/tribe/claude-md/review-agents.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md

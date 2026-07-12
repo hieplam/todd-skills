@@ -42,5 +42,17 @@ has "$WARCHIEF" "with new evidence" "warchief: a refuted falsification sends the
 has "$WARCHIEF" "only ever SHORTENS the loop" "warchief: standoff never extends the 3-round cap"
 has "$WARCHIEF" "even with rounds left on the cap" "warchief: standoff escalates immediately"
 
+# --- group D: doctrine distinguishes the verdict from a finding -----------------------
+has "$README" "falsifiable hypothesis" "readme: a finding is a falsifiable hypothesis"
+has "$README" "at the **verdict** level" "readme: scopes the authority to the verdict"
+has "$REVIEW_DOC" "falsifiable hypothesis" "review-agents: a finding is a falsifiable hypothesis"
+has "$REVIEW_DOC" "at the **verdict** level" "review-agents: scopes the authority to the verdict"
+
+# negative assertion — the regression guard. No prompt or doc may call an individual FINDING
+# authoritative/unarguable; that phrasing is reserved for the VERDICT.
+for f in "$HUNTER" "$WARCHIEF" "$README" "$REVIEW_DOC"; do
+  lacks "$f" "finding (is|remains) (authoritative|unarguable)" "no-finding-authority: $(basename "$f")"
+done
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
