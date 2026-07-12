@@ -8,8 +8,8 @@ plan: docs/tribe/planning/idea-04-disagreement-routing/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated (validate-plan.sh PASS)
+- [x] plan committed
+- [x] plan validated (validate-plan.sh PASS — 7/7 checks, 5 tasks)
 
 ## Note
 PLANNING-ONLY campaign. Steps 5-8 of the Warchief method (dispatch Hunters, PR, merge)
