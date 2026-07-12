@@ -87,7 +87,7 @@ Shaman  ──(vision: what/why)──▶  Warchief
 
 **Answers:** *Is the work that claims to be done actually done?*
 
-**What it actually does:** The **heavy, run-once-at-the-end** gate — before declaring "done" or before merging. The Skinner reconstructs the **requirement contract** (from spec/plan → Jira ticket via `ask-copilot` → PR description), then **RUNS real proof** to verify the implementation against that contract, and **self-refutes its own findings** before ruling. Its `PASS`/`FAIL` verdict is **authoritative — a `FAIL` must be fixed, never argued away.**
+**What it actually does:** The **heavy, run-once-at-the-end** gate — before declaring "done" or before merging. The Skinner reconstructs the **requirement contract** (from spec/plan → Jira ticket via `ask-copilot` → PR description), then **RUNS real proof** to verify the implementation against that contract, and **self-refutes its own findings** before ruling. Its `PASS`/`FAIL` verdict is **authoritative — a `FAIL` must be fixed, never argued away.** That authority is **at the **verdict** level**: an individual **finding** underneath it is a *falsifiable hypothesis*, not a ruling — the fixer Hunter must **reproduce a finding before it may fix it**, and reports `NOT_REPRODUCED` with evidence when it cannot (see the Hunter's "Fixer mode"). The verdict is the referee; a finding is the claim it referees.
 
 **Ownership:** The Skinner is the **single source of truth** for *done-ness*, and enforces only the done-gating governance. It inspects the **product / the kill** — whether the work is *actually* finished and correct.
 

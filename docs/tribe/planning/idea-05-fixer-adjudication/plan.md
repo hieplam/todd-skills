@@ -55,7 +55,7 @@ also fixes the sharpest edge: `hunter.md:70-73` tells a Hunter that a test which
 a *broken test* — which is exactly the instruction that turns an honest non-reproduction into a
 fabricated confirmation.
 
-- [ ] **Step 1: Write the failing test (group A)**
+- [x] **Step 1: Write the failing test (group A)**
 
 Create `plugins/tribe/scripts/tests/test-fixer-mandate.sh` with the harness plus the hunter.md
 assertions:
@@ -113,7 +113,7 @@ not ok - hunter: disposition NOT_REPRODUCED
 exit=1
 ```
 
-- [ ] **Step 2: Add the Fixer-mode section to `hunter.md`**
+- [x] **Step 2: Add the Fixer-mode section to `hunter.md`**
 
 In `plugins/tribe/agents/hunter.md`, insert the following block **between** the end of the Method
 section (the line `---` that closes step 7, immediately before `## Anti-goals`) and the
@@ -171,7 +171,7 @@ Then add a seventh anti-goal at the end of the `## Anti-goals` list:
    even when the Skinner marked it Critical. Reproduce it, or report `NOT_REPRODUCED` with evidence.
 ```
 
-- [ ] **Step 3: Green**
+- [x] **Step 3: Green**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -196,7 +196,7 @@ exit=0
 validate-plan suite ok
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/hunter.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md
@@ -217,7 +217,7 @@ bare orders with no identity. Without a **stable finding ID**, the Warchief cann
 finding re-raised in a later round, and Task 3's loop termination would be a judgment call instead of
 a mechanical rule.
 
-- [ ] **Step 1: Write the failing test (group B)**
+- [x] **Step 1: Write the failing test (group B)**
 
 Append to `plugins/tribe/scripts/tests/test-fixer-mandate.sh`, immediately **before** the final
 `printf`/`exit` lines:
@@ -253,7 +253,7 @@ not ok - warchief: seals the reviewer's context
 exit=1
 ```
 
-- [ ] **Step 2: Add the brief template to `warchief.md` step 6**
+- [x] **Step 2: Add the brief template to `warchief.md` step 6**
 
 In `plugins/tribe/agents/warchief.md`, inside `### 6. Audit every deliverable with the skinner`,
 insert the following **after** the existing paragraph that ends "…without waiting for 3 rounds."
@@ -290,7 +290,7 @@ therefore never reads the implementer's reasoning, and the disagreement is settl
 rather than by an argument between two agents.
 ```
 
-- [ ] **Step 3: Green**
+- [x] **Step 3: Green**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -303,7 +303,7 @@ Expected output:
 exit=0
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md
@@ -321,7 +321,7 @@ loop burns all three rounds (`warchief.md:446`) to reach an escalation it could 
 This task makes the exchange bounded: a phantom finding costs **one fix round plus one re-audit**, and
 a genuine deadlock escalates on the spot.
 
-- [ ] **Step 1: Write the failing test (group C)**
+- [x] **Step 1: Write the failing test (group C)**
 
 Append to `plugins/tribe/scripts/tests/test-fixer-mandate.sh`, before the final `printf`/`exit`:
 
@@ -353,7 +353,7 @@ not ok - warchief: standoff escalates immediately
 exit=1
 ```
 
-- [ ] **Step 2: Add the adjudication rules to `warchief.md` step 6**
+- [x] **Step 2: Add the adjudication rules to `warchief.md` step 6**
 
 Insert verbatim, directly **after** the block Task 2 added (still inside step 6, still before
 `### 7. Deliver`):
@@ -383,7 +383,7 @@ with the branch's code unchanged and new regression tests added**. That is a cle
 suspicious one — do not go hunting for something to change in order to feel like the round did work.
 ```
 
-- [ ] **Step 3: Green**
+- [x] **Step 3: Green**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -396,7 +396,7 @@ Expected output:
 exit=0
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md
@@ -415,7 +415,7 @@ unqualified they say the opposite of Task 1's charter. Two prompt documents disa
 a finding is arguable is a coin flip at runtime. This task closes the contradiction and installs a
 permanent regression guard against it re-opening.
 
-- [ ] **Step 1: Write the failing test (group D, including the negative assertion)**
+- [x] **Step 1: Write the failing test (group D, including the negative assertion)**
 
 Append to `plugins/tribe/scripts/tests/test-fixer-mandate.sh`, before the final `printf`/`exit`:
 
@@ -455,7 +455,7 @@ ok - no-finding-authority: review-agents.md
 exit=1
 ```
 
-- [ ] **Step 2: Add the clarifying clause to both docs**
+- [x] **Step 2: Add the clarifying clause to both docs**
 
 In `plugins/tribe/README.md`, at the end of line 90 (the Skinner's "What it actually does" paragraph),
 append this sentence — keep the existing sentence exactly as it is:
@@ -471,7 +471,7 @@ matching sentence:
 That authority is **at the **verdict** level**: an individual finding is a *falsifiable hypothesis* — a fixer must reproduce it before fixing, and records `NOT_REPRODUCED` with evidence if it cannot.
 ```
 
-- [ ] **Step 3: Green — the whole suite, plus the repo's other suites**
+- [x] **Step 3: Green — the whole suite, plus the repo's other suites**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -488,7 +488,7 @@ validate-plan ok
 resume-check ok
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/README.md plugins/tribe/claude-md/review-agents.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md

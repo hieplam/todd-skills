@@ -453,6 +453,56 @@ authoring context, so you adjudicate any finding that conflicts with what the pl
 genuine plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting for 3
 rounds.
 
+**The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
+authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
+bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that
+obeys it launders a false positive into the branch (with a green suite vouching for it). Build the
+brief like this:
+
+- **Assign each routed Critical/Important finding a stable ID** (`F1`, `F2`, and so on — never reused
+  within the campaign) and record its **finding key** — `severity | location (file:line or rule) |
+  one-line claim` — in your report file. The Skinner emits findings without identity and its bullet
+  order is not stable between rounds; the key is how you recognise the SAME finding re-raised later,
+  which is what makes the loop termination below mechanical instead of a judgment call.
+- **Each finding in the brief carries:** its ID, its severity, its confidence class (`single` when one
+  Skinner ran — the field is filled by reviewer-disagreement routing if 2+ reviewers exist), the
+  Skinner's claim + location + evidence **verbatim**, and the requirement/rule it maps to.
+- **Include this mandate line verbatim:** _"Every finding is a hypothesis, not an order. Reproduce it before you fix it; if you cannot make it manifest, report `NOT_REPRODUCED` with evidence — never fix
+  blind."_ The procedure itself lives in the Hunter's own charter (hunter.md, "Fixer mode"), so the
+  fixer's authority to decline a false claim does not depend on your brief remembering to grant it.
+- **Require a disposition ledger back** — exactly one of `FIXED` / `NOT_REPRODUCED` / `ESCALATED` per
+  finding ID. A `NOT_REPRODUCED` with no committed artifact and no transcribed command is not a
+  disposition: reject the report and dispatch a fresh fixer Hunter (that counts as a fix-round).
+
+**Never send the fixer's report to the Skinner.** The fixer's counter-evidence reaches the reviewer
+the only way evidence is allowed to travel — **as an artifact in the diff**: the falsification test is
+committed, and the next Skinner, running cold, executes it as part of running the proof. The reviewer
+therefore never reads the implementer's reasoning, and the disagreement is settled by the oracle
+rather than by an argument between two agents.
+
+**Adjudicate the ledger after each re-audit — a phantom finding must never grind the round cap.** For
+each finding the fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
+
+1. **The Skinner does not re-raise it** → the finding **falls**. Record `DROPPED (falsified, round N)`
+   against its ID and move on. The whole cost of that false positive was one test and one round —
+   which is the point: you are not making the reviewer right, you are making its wrongness cheap.
+2. **The Skinner re-raises it *with new evidence*** that defeats the falsification — it names the
+   input, path, or condition the falsification test failed to cover → the finding **stands** and the
+   reviewer won the exchange. Send it back to the fixer with that refutation attached; it must now be
+   reproduced under the Skinner's stated condition. This is an ordinary fix-round.
+3. **The Skinner re-raises it *unchanged*, with no new evidence, leaving the falsification artifact
+   unaddressed** → **standoff**. Do NOT spend another round. Return `NEEDS_DIRECTION` to the Shaman
+   **immediately — even with rounds left on the cap** — carrying the Skinner's report **verbatim** AND
+   the fixer's falsification artifact plus its command output. A reviewer and a fixer deadlocked over
+   whether a defect even exists is not a code bug you can grind out; it is usually a contract
+   ambiguity wearing a bug costume, and that belongs with the Shaman.
+
+The 3-round cap above is unchanged as the outer bound — the standoff rule **only ever SHORTENS the loop**,
+never extends it. And note the correct-but-unfamiliar outcome this creates: a round in which
+every routed finding came back `NOT_REPRODUCED` and the next Skinner re-raises none ends in **PASS,
+with the branch's code unchanged and new regression tests added**. That is a clean result, not a
+suspicious one — do not go hunting for something to change in order to feel like the round did work.
+
 ### 7. Deliver: evidence, PR, green, merge
 
 - **Capture before/after evidence** through the repo's real harness (e.g. its e2e/browser

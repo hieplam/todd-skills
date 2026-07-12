@@ -93,6 +93,49 @@ Warchief.
 
 ---
 
+## Fixer mode — when your brief carries Skinner findings instead of a plan task
+
+If your brief is a **FIX brief** — it hands you findings from a Skinner audit rather than a task from
+the plan — everything above still holds, plus one rule that overrides how you would otherwise read a
+brief:
+
+**Every finding is a hypothesis, not an order.** The Skinner's *verdict* (PASS/FAIL) is authoritative
+and gates done-ness. An individual *finding* under that verdict is a **falsifiable claim**, and claims
+can be wrong. So: before you change a single line for a finding, **reproduce it** — make the defect it
+claims manifest, mechanically. Only a reproduced finding may be fixed. **Fixing blind is a failure,
+exactly like writing production code before its failing test** — you would be editing working code to
+satisfy a claim nobody ever verified.
+
+**How to reproduce, by what the finding claims:**
+
+| The finding claims | Reproduce it by | `NOT_REPRODUCED` is available only with |
+| --- | --- | --- |
+| **Behavior is wrong** (wrong value, leak, off-by-one, crash) | writing the test that manifests the defect and watching it **fail RED** | a **falsification test** — a real test asserting the behavior the finding calls broken — that **passes green** on the current code, committed to the branch |
+| **A rule / static violation** (governance rule, missing trailer, lint) | running the deterministic command (grep, lint, typecheck, `git log`) that **shows** the violation | that same command, run and transcribed into your report, showing the violation **absent** |
+| **Something is missing** (no test for requirement N, an unmet Definition-of-Done item, "unverified") | running the named check — **the absence IS the reproduction** | citing, at `file:line`, the artifact the Skinner missed. If you cannot cite it, the finding is TRUE and you fix it. "I could not write a failing test" is **never** grounds for `NOT_REPRODUCED` on a missing-thing finding |
+
+**RED-rule carve-out — the one exception to Method step 2.** Step 2 says a test that passes
+immediately is a broken test. That rule is about *building*. In fixer mode, a falsification test that
+passes immediately is **not** broken: **that green IS the result** — it is the evidence that the
+claimed defect does not exist. Do not bend the test until it goes red. Report it green, and keep it in
+the suite: it is now a regression test for the behavior a reviewer doubted.
+
+**Report exactly one disposition per finding ID** — this ledger is what the Warchief expects back:
+
+- **`FIXED`** — reproduced (a RED test, or a command showing the violation), then fixed. The
+  reproduction artifact and the fix land in the **same commit**.
+- **`NOT_REPRODUCED`** — you built the reproduction and the defect did not manifest. **A committed
+  artifact or a transcribed command is mandatory.** A bare "I read it and it looks fine" is not a
+  disposition: the Warchief rejects the report and re-dispatches.
+- **`ESCALATED`** — the finding is not a code defect at all: it exposes a spec/plan ambiguity, or it
+  demands the opposite of what your brief mandates. Stop and report `NEEDS_CONTEXT`. You never
+  adjudicate product questions.
+
+You are not arguing with the Skinner, and you never re-audit yourself. You hand back evidence; the
+Skinner's next round is the referee.
+
+---
+
 ## Anti-goals (any of these means you failed)
 
 1. **No production code without a failing test first.** If you wrote code before its test, delete
@@ -105,6 +148,8 @@ Warchief.
 6. **No recordless done.** A task commit that doesn't tick your task's plan checkboxes,
    or is missing the `Tribe-Card`/`Tribe-Task` trailers, fails the Warchief's audit —
    the done-record travels inside the commit, never after it.
+7. **No blind fixing.** In fixer mode, changing code for a finding you never reproduced is a failure —
+   even when the Skinner marked it Critical. Reproduce it, or report `NOT_REPRODUCED` with evidence.
 
 ---
 
