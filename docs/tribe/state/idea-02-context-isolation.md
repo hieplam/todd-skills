@@ -7,7 +7,7 @@ base-sha: 3433f66
 plan: docs/tribe/planning/idea-02-context-isolation/plan.md
 
 ## Milestones
-- [ ] spec committed
+- [x] spec committed
 - [ ] plan committed
 - [ ] plan validated
 
