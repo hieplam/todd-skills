@@ -35,5 +35,12 @@ has "$WARCHIEF" "Reproduce it before you fix it" "warchief: brief carries the ma
 has "$WARCHIEF" "disposition ledger" "warchief: requires a disposition ledger back"
 has "$WARCHIEF" "Never send the fixer's report to the Skinner" "warchief: seals the reviewer's context"
 
+# --- group C: warchief.md terminates the reviewer/fixer exchange ----------------------
+has "$WARCHIEF" "standoff" "warchief: names the standoff case"
+has "$WARCHIEF" "DROPPED (falsified" "warchief: a non-re-raised finding falls"
+has "$WARCHIEF" "with new evidence" "warchief: a refuted falsification sends the finding back"
+has "$WARCHIEF" "only ever SHORTENS the loop" "warchief: standoff never extends the 3-round cap"
+has "$WARCHIEF" "even with rounds left on the cap" "warchief: standoff escalates immediately"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

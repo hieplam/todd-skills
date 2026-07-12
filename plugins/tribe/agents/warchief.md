@@ -480,6 +480,29 @@ committed, and the next Skinner, running cold, executes it as part of running th
 therefore never reads the implementer's reasoning, and the disagreement is settled by the oracle
 rather than by an argument between two agents.
 
+**Adjudicate the ledger after each re-audit — a phantom finding must never grind the round cap.** For
+each finding the fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
+
+1. **The Skinner does not re-raise it** → the finding **falls**. Record `DROPPED (falsified, round N)`
+   against its ID and move on. The whole cost of that false positive was one test and one round —
+   which is the point: you are not making the reviewer right, you are making its wrongness cheap.
+2. **The Skinner re-raises it *with new evidence*** that defeats the falsification — it names the
+   input, path, or condition the falsification test failed to cover → the finding **stands** and the
+   reviewer won the exchange. Send it back to the fixer with that refutation attached; it must now be
+   reproduced under the Skinner's stated condition. This is an ordinary fix-round.
+3. **The Skinner re-raises it *unchanged*, with no new evidence, leaving the falsification artifact
+   unaddressed** → **standoff**. Do NOT spend another round. Return `NEEDS_DIRECTION` to the Shaman
+   **immediately — even with rounds left on the cap** — carrying the Skinner's report **verbatim** AND
+   the fixer's falsification artifact plus its command output. A reviewer and a fixer deadlocked over
+   whether a defect even exists is not a code bug you can grind out; it is usually a contract
+   ambiguity wearing a bug costume, and that belongs with the Shaman.
+
+The 3-round cap above is unchanged as the outer bound — the standoff rule **only ever SHORTENS the loop**,
+never extends it. And note the correct-but-unfamiliar outcome this creates: a round in which
+every routed finding came back `NOT_REPRODUCED` and the next Skinner re-raises none ends in **PASS,
+with the branch's code unchanged and new regression tests added**. That is a clean result, not a
+suspicious one — do not go hunting for something to change in order to feel like the round did work.
+
 ### 7. Deliver: evidence, PR, green, merge
 
 - **Capture before/after evidence** through the repo's real harness (e.g. its e2e/browser

@@ -321,7 +321,7 @@ loop burns all three rounds (`warchief.md:446`) to reach an escalation it could 
 This task makes the exchange bounded: a phantom finding costs **one fix round plus one re-audit**, and
 a genuine deadlock escalates on the spot.
 
-- [ ] **Step 1: Write the failing test (group C)**
+- [x] **Step 1: Write the failing test (group C)**
 
 Append to `plugins/tribe/scripts/tests/test-fixer-mandate.sh`, before the final `printf`/`exit`:
 
@@ -353,7 +353,7 @@ not ok - warchief: standoff escalates immediately
 exit=1
 ```
 
-- [ ] **Step 2: Add the adjudication rules to `warchief.md` step 6**
+- [x] **Step 2: Add the adjudication rules to `warchief.md` step 6**
 
 Insert verbatim, directly **after** the block Task 2 added (still inside step 6, still before
 `### 7. Deliver`):
@@ -383,7 +383,7 @@ with the branch's code unchanged and new regression tests added**. That is a cle
 suspicious one — do not go hunting for something to change in order to feel like the round did work.
 ```
 
-- [ ] **Step 3: Green**
+- [x] **Step 3: Green**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -396,7 +396,7 @@ Expected output:
 exit=0
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md
