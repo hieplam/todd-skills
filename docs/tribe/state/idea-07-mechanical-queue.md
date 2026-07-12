@@ -9,7 +9,7 @@ plan: docs/tribe/planning/idea-07-mechanical-queue/plan.md
 ## Milestones
 - [x] spec committed
 - [x] plan committed
-- [ ] plan validated (validate-plan.sh PASS)
+- [x] plan validated (validate-plan.sh PASS — 7/7 checks, 6 tasks)
 
 ## Campaign kind
 PLANNING-ONLY. Deliverable is the committed spec + plan (for a FUTURE implementation
