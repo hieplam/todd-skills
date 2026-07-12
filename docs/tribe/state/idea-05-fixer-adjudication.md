@@ -8,8 +8,8 @@ plan: docs/tribe/planning/idea-05-fixer-adjudication/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated (validate-plan.sh PASS)
+- [x] plan committed
+- [x] plan validated (validate-plan.sh PASS — 7/7 checks, 4 tasks)
 
 ## Campaign type
 PLANNING-ONLY. Deliverable is spec + plan only. No Hunter dispatch, no implementation,
