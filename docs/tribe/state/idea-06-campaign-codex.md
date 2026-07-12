@@ -8,8 +8,8 @@ plan: docs/tribe/planning/idea-06-campaign-codex/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated
+- [x] plan committed
+- [x] plan validated (validate-plan.sh verdict=pass, 7/7 checks)
 
 ## Note
 PLANNING-ONLY campaign: deliverable is spec + plan. No Hunter dispatch, no PR, no merge.
