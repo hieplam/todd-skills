@@ -18,4 +18,7 @@ authored here is executed by a FUTURE implementation campaign.
 - [x] audit round 1 (2 Skinners) — both FAIL, fixed in 86513e8
 - [x] audit round 2 (2 fresh Skinners) — A PASS / B FAIL; B's Critical (implementation order
       contradicted the locked `05 → 01/03 → 04`) adjudicated as UPHELD; spec + plan fixed
-- [ ] audit round 3 (2 fresh Skinners) — both must PASS
+- [x] audit round 3 (2 fresh Skinners, concurrent, isolated) — BOTH PASS. Law 4 (unanimity) satisfied.
+      Both independently simulated all 4 tasks end-to-end in isolated clones and reproduced every
+      predicted tally (1/14→15/0, 15/3→18/0, 18/10→28/0, evals 9→12); fence empty; trailers clean.
+- [x] PLANNED — deliverable complete (spec + plan committed, validate-plan.sh verdict pass)
