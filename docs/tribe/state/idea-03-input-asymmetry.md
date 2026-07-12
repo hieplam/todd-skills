@@ -7,7 +7,7 @@ base-sha: 3433f666c91d5ce61c26b18f370102a4e11c49e8
 plan: docs/tribe/planning/idea-03-input-asymmetry/plan.md
 
 ## Milestones
-- [ ] spec committed
+- [x] spec committed
 - [ ] plan committed
 - [ ] plan validated
 
