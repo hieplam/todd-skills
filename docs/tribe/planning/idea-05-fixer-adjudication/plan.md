@@ -217,7 +217,7 @@ bare orders with no identity. Without a **stable finding ID**, the Warchief cann
 finding re-raised in a later round, and Task 3's loop termination would be a judgment call instead of
 a mechanical rule.
 
-- [ ] **Step 1: Write the failing test (group B)**
+- [x] **Step 1: Write the failing test (group B)**
 
 Append to `plugins/tribe/scripts/tests/test-fixer-mandate.sh`, immediately **before** the final
 `printf`/`exit` lines:
@@ -253,7 +253,7 @@ not ok - warchief: seals the reviewer's context
 exit=1
 ```
 
-- [ ] **Step 2: Add the brief template to `warchief.md` step 6**
+- [x] **Step 2: Add the brief template to `warchief.md` step 6**
 
 In `plugins/tribe/agents/warchief.md`, inside `### 6. Audit every deliverable with the skinner`,
 insert the following **after** the existing paragraph that ends "…without waiting for 3 rounds."
@@ -290,7 +290,7 @@ therefore never reads the implementer's reasoning, and the disagreement is settl
 rather than by an argument between two agents.
 ```
 
-- [ ] **Step 3: Green**
+- [x] **Step 3: Green**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-fixer-mandate.sh; echo "exit=$?"
@@ -303,7 +303,7 @@ Expected output:
 exit=0
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-fixer-mandate.sh docs/tribe/planning/idea-05-fixer-adjudication/plan.md

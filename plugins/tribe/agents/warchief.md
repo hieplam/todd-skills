@@ -453,6 +453,33 @@ authoring context, so you adjudicate any finding that conflicts with what the pl
 genuine plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting for 3
 rounds.
 
+**The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
+authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
+bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that
+obeys it launders a false positive into the branch (with a green suite vouching for it). Build the
+brief like this:
+
+- **Assign each routed Critical/Important finding a stable ID** (`F1`, `F2`, and so on — never reused
+  within the campaign) and record its **finding key** — `severity | location (file:line or rule) |
+  one-line claim` — in your report file. The Skinner emits findings without identity and its bullet
+  order is not stable between rounds; the key is how you recognise the SAME finding re-raised later,
+  which is what makes the loop termination below mechanical instead of a judgment call.
+- **Each finding in the brief carries:** its ID, its severity, its confidence class (`single` when one
+  Skinner ran — the field is filled by reviewer-disagreement routing if 2+ reviewers exist), the
+  Skinner's claim + location + evidence **verbatim**, and the requirement/rule it maps to.
+- **Include this mandate line verbatim:** _"Every finding is a hypothesis, not an order. Reproduce it before you fix it; if you cannot make it manifest, report `NOT_REPRODUCED` with evidence — never fix
+  blind."_ The procedure itself lives in the Hunter's own charter (hunter.md, "Fixer mode"), so the
+  fixer's authority to decline a false claim does not depend on your brief remembering to grant it.
+- **Require a disposition ledger back** — exactly one of `FIXED` / `NOT_REPRODUCED` / `ESCALATED` per
+  finding ID. A `NOT_REPRODUCED` with no committed artifact and no transcribed command is not a
+  disposition: reject the report and dispatch a fresh fixer Hunter (that counts as a fix-round).
+
+**Never send the fixer's report to the Skinner.** The fixer's counter-evidence reaches the reviewer
+the only way evidence is allowed to travel — **as an artifact in the diff**: the falsification test is
+committed, and the next Skinner, running cold, executes it as part of running the proof. The reviewer
+therefore never reads the implementer's reasoning, and the disagreement is settled by the oracle
+rather than by an argument between two agents.
+
 ### 7. Deliver: evidence, PR, green, merge
 
 - **Capture before/after evidence** through the repo's real harness (e.g. its e2e/browser

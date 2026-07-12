@@ -27,5 +27,13 @@ has "$HUNTER" "RED-rule carve-out" "hunter: carve-out to the immediate-pass RED 
 has "$HUNTER" "that green IS the result" "hunter: a green falsification test is a result, not a bug"
 has "$HUNTER" "No blind fixing" "hunter: blind fixing is an anti-goal"
 
+# --- group B: warchief.md step 6 carries the fixer-brief template ---------------------
+has "$WARCHIEF" "The fixer brief" "warchief: has a fixer-brief template"
+has "$WARCHIEF" "stable ID" "warchief: assigns each finding a stable ID"
+has "$WARCHIEF" "finding key" "warchief: records a finding key for cross-round identity"
+has "$WARCHIEF" "Reproduce it before you fix it" "warchief: brief carries the mandate verbatim"
+has "$WARCHIEF" "disposition ledger" "warchief: requires a disposition ledger back"
+has "$WARCHIEF" "Never send the fixer's report to the Skinner" "warchief: seals the reviewer's context"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
