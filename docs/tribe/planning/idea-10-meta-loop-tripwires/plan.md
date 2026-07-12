@@ -25,11 +25,16 @@ that deliberately applied none of it.
   JSON assertions. No new test dependency.
 - **Never invent a rule the spec did not sanction.** Rule text is given verbatim in Tasks 5 and 6;
   copy it, do not improvise detectors.
-- **Ratification hook — one open ruling.** The spec escalates ONE What/Why question to the Shaman:
-  *who may set `ratified: true` + `severity: blocker`*. The plan's default is **Option A (the Shaman
-  ratifies)**, and it is confined to exactly two places: the `RATIFY_AUTHORITY` constant in Task 3
-  and the shaman.md clause in Task 8. If the Shaman rules differently, change only those two — no
-  other task moves.
+- **Ratification authority — SETTLED (Decision Log D4, owner-ratified).** *Who may set
+  `ratified: true` + `severity: blocker` on a tribe-minted rule* was escalated and ruled:
+  **Option A — the Shaman ratifies, and the Warchief never does.** The Shaman may ratify ONLY when
+  all four conditions hold: (1) the pattern `recurred` in ≥2 distinct cards, (2) the blast-radius
+  backtest fires on ≤25% of the last 20 merged commits, (3) a Decision Log entry is written,
+  (4) the blocker budget (cap 12) has room. A repo-wide rule that exceeds the backtest threshold
+  **auto-escalates to the owner BEFORE ratification**. The owner sees every ratification in the
+  campaign report and may veto. This ruling is encoded in exactly two places — the
+  `RATIFY_AUTHORITY` constant (Task 3) and the shaman.md clause (Task 8) — and is settled law: do
+  not re-open it.
 - **Waves.** Tasks 1-4 all own `tripwire-check.sh` and must run in sequence. Tasks 5-8 own disjoint
   files (`.claude/rules/tripwires/`, `tracker.md`, `warchief.md`, `shaman.md`+`hunter.md`) and may
   be dispatched as one concurrent wave after Task 4 integrates.
@@ -343,11 +348,16 @@ plugins/tribe/scripts/tests/test-tripwire-check.sh; echo "exit=$?"
       Declare the ratification authority as one named constant near the top of the python half:
 
 ```python
-# The authority permitted to set `ratified: true` + `severity: blocker` on a tribe-minted rule.
-# Spec's escalated question, ruled Option A (the Shaman ratifies). If the Shaman rules otherwise,
-# this constant and the shaman.md clause (Task 8) are the ONLY two places that change.
+# Who may set `ratified: true` + `severity: blocker` on a tribe-minted rule.
+# SETTLED — Decision Log D4 (owner-ratified), Option A: the Shaman ratifies; the Warchief never
+# does. Ratification requires ALL FOUR of: recurred in >= 2 distinct cards; backtest fire rate
+# <= BACKTEST_MAX_FIRE_RATE over the last BACKTEST_COMMITS merged commits; a Decision Log entry;
+# and budget room under BLOCKER_BUDGET. A repo-wide rule over the threshold auto-escalates to the
+# owner before ratification (see the shaman.md clause, Task 8 — the only other encode point).
 RATIFY_AUTHORITY = "shaman"
 BLOCKER_BUDGET = 12
+BACKTEST_COMMITS = 20
+BACKTEST_MAX_FIRE_RATE = 0.25
 RETIREMENT_WINDOW_CARDS = 5
 ```
 
@@ -857,11 +867,18 @@ Implements spec §2.5, rows 3 and 4 — the cross-card half of the loop, plus th
 - [ ] **Step 1: Extend the contract test (RED).** Append to `test-agent-contracts.sh`:
 
 ```bash
-has shaman.md 'tripwire-check.sh'  "shaman runs the tripwire gate at verify-SHIPPED"
+has shaman.md 'tripwire-check.sh'   "shaman runs the tripwire gate at verify-SHIPPED"
 has shaman.md 'ratif'              "shaman holds the ratification act"
 has shaman.md '--backtest'         "shaman requires a blast-radius backtest before ratifying"
+has shaman.md 'the Warchief never ratifies' "ruling D4: only the shaman ratifies"
+has shaman.md 'Decision Log'       "ruling D4: every ratification is logged"
+has shaman.md 'Auto-escalation to the owner' "ruling D4: repo-wide over-threshold rules go to the owner"
 has hunter.md 'tripwire-weakened-test' "hunter anti-goal 5 points at its checkable rule"
 ```
+
+      These six assertions are the mechanical guard on **Decision Log ruling D4**: the four
+      ratification conditions and the owner auto-escalation must survive in the prompt verbatim, or
+      this test goes red.
 
 - [ ] **Step 2: Watch it fail (RED).**
 
@@ -869,7 +886,7 @@ has hunter.md 'tripwire-weakened-test' "hunter anti-goal 5 points at its checkab
 plugins/tribe/scripts/tests/test-agent-contracts.sh; echo "exit=$?"
 ```
 
-      Expected: the four new assertions fail; the Task-6 and Task-7 assertions still pass.
+      Expected: the seven new assertions fail; the Task-6 and Task-7 assertions still pass.
 
 - [ ] **Step 3a: Edit `plugins/tribe/agents/shaman.md` (GREEN).** In the campaign loop's **Rule**
       step, inside the `SHIPPED` branch, after the `verify-shipped` PASS and the outcome check, add:
@@ -885,16 +902,26 @@ plugins/tribe/scripts/tests/test-agent-contracts.sh; echo "exit=$?"
        decide *that* a rule is owed and at what severity; a Warchief writes the detector — you never
        read the diff it is grounded in, and that boundary does not bend for this.
      - `promotion` (a class recurred in 2 or more distinct cards DESPITE its rule) → the advisory
-       severity is not deterring. **You hold the ratification act**: you may set `ratified: true` +
-       `severity: blocker` on that rule, which is what lets the Skinner FAIL work over it. Two
-       conditions, both mechanical, both mandatory: a passing blast-radius backtest
-       (`tripwire-check.sh REPO-ROOT --backtest RULE-FILE` must return `pass` — a rule that would
-       have fired on more than a quarter of recent commits is a wolf, not a guardrail, and it gets
-       narrowed instead of ratified), and budget room (12 ratified blockers, cap; minting a
-       thirteenth means retiring one — rules that accrete forever stop being read). Escalate to the
-       owner instead of ratifying when the rule's `paths` glob is repo-wide AND its backtest fire
-       rate exceeds the threshold: that combination is a standing veto over everything, and a
-       standing veto is a new permission, which is the owner's to grant.
+       severity is not deterring. **You hold the ratification act, and only you: the Warchief never
+       ratifies.** Setting `ratified: true` + `severity: blocker` is what lets the Skinner FAIL work
+       over a rule the tribe wrote for itself, so it is permitted only when **all four** of these
+       hold — every one of them mechanical, none of them a matter of taste:
+       1. the pattern is recorded as `recurred` in **2 or more distinct cards** (the duty above is
+          precisely this condition, computed for you);
+       2. the blast-radius backtest passes — `tripwire-check.sh REPO-ROOT --backtest RULE-FILE`
+          returns `pass`, i.e. the detector fires on **no more than 25% of the last 20 merged
+          commits**. A rule that would have fired on more than a quarter of recent work is a wolf,
+          not a guardrail: narrow it instead of ratifying it;
+       3. you write the ratification into the **Decision Log** — rule id, the two cards that earned
+          it, and the measured fire rate;
+       4. the **blocker budget has room** (cap: 12 ratified blockers). Minting a thirteenth means
+          retiring one first — rules that accrete forever stop being read.
+       **Auto-escalation to the owner:** if the rule's `paths` glob is repo-wide AND its backtest
+       fire rate exceeds the threshold, you do **not** ratify it — carry it to the owner *before*
+       any ratification. That combination is a standing veto over everything the tribe will ever
+       build, and a standing veto is a new permission, which is the owner's alone to grant. Every
+       ratification you do make appears in the end-of-campaign report, where the owner may veto or
+       retire it.
      - `narrowing` (a rule waived in 3 or more distinct cards) → it is a false-positive generator.
        Dispatch a card to narrow its detector, or retire it.
      - `retirement` (a rule cited zero times across the last 5 shipped cards) → retire it at

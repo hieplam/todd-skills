@@ -2,9 +2,12 @@
 
 **Card:** `idea-10-meta-loop-tripwires`
 **Branch:** `planning/idea-10-meta-loop-tripwires`
-**Status:** spec complete; ONE What/Why question escalated to the Shaman (see
-[Open question](#open-question-escalated-to-the-shaman)). The mechanism below is identical under
-every option of that question — only *who performs the ratification act* changes.
+**Status:** spec complete. The one escalated What/Why question — *who may ratify a tribe-minted rule
+to Blocker severity* — was **ruled by the Shaman as Decision Log D4 (owner-ratified): Option A, the
+Shaman ratifies under four mechanical conditions, with owner auto-escalation for repo-wide
+over-threshold rules; the Warchief never ratifies.** See
+[Ratification authority](#ratification-authority--ruled-decision-log-d4-owner-ratified). Nothing
+else in this spec depends on that ruling.
 
 ---
 
@@ -391,7 +394,19 @@ nothing reads. No data shape, no user-facing promise, no CI dependency is touche
 
 ---
 
-## Open question — escalated to the Shaman
+## Ratification authority — RULED (Decision Log D4, owner-ratified)
+
+> **Ruling (settled law — do not re-open).** **Option A.** The Shaman may set `ratified: true` +
+> `severity: blocker` ONLY when all four hold: (1) the pattern `recurred` in ≥2 distinct cards,
+> (2) the backtest fires on ≤25% of the last 20 merged commits, (3) a Decision Log entry is
+> written, (4) the blocker budget (cap 12) has room. A repo-wide rule that exceeds the backtest
+> threshold **auto-escalates to the owner before ratification**. The owner sees every ratification
+> in the campaign report and may veto. **The Warchief never ratifies.**
+>
+> Encoded in exactly two places: `RATIFY_AUTHORITY` (plan Task 3) and the shaman.md clause (plan
+> Task 8), and guarded by six assertions in `test-agent-contracts.sh`.
+
+The question as escalated, and the options weighed, are preserved below for context.
 
 **Question: who may set `ratified: true` + `severity: blocker` on a tribe-minted tripwire rule —
 the flag that lets a rule the tribe wrote for itself FAIL future work?**
