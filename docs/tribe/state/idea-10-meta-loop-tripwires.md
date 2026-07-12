@@ -13,5 +13,5 @@ for a FUTURE implementation campaign.
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated (validate-plan.sh PASS)
+- [x] plan committed
+- [x] plan validated (validate-plan.sh PASS — 8 tasks, 7/7 checks)
