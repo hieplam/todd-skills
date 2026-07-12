@@ -13,5 +13,5 @@ authored here is executed by a FUTURE implementation campaign.
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated (validate-plan.sh verdict pass)
+- [x] plan committed
+- [x] plan validated (validate-plan.sh verdict pass)
