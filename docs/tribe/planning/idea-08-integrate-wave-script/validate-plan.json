@@ -1,0 +1,53 @@
+{
+  "plan_file": "docs/tribe/planning/idea-08-integrate-wave-script/plan.md",
+  "task_count": 8,
+  "task_titles": [
+    "Task 1: Skeleton, preflight validation, and the exit-2 contract",
+    "Task 2: Merge the wave in declared order, with trailers",
+    "Task 3: Clean up each merged worktree and branch, immediately, safely",
+    "Task 4: Conflict path \u2014 capture, abort, exit 3",
+    "Task 5: Resume-safety I \u2014 die mid-merge, re-run, converge (`REDO_MERGE`)",
+    "Task 6: Resume-safety II \u2014 already-integrated branches are skipped, not re-merged",
+    "Task 7: Optional state-file re-record (`--state-file` + `--wave`)",
+    "Task 8: Shrink `warchief.md` step 5 to an invocation plus judgment"
+  ],
+  "checks": [
+    {
+      "name": "has_task_sections",
+      "status": "pass",
+      "detail": "8 task section(s) found"
+    },
+    {
+      "name": "global_constraints_present",
+      "status": "pass",
+      "detail": "found at line 17"
+    },
+    {
+      "name": "hunter_named_as_implementer",
+      "status": "pass",
+      "detail": "Global Constraints names the hunter subagent as implementer"
+    },
+    {
+      "name": "no_placeholders",
+      "status": "pass",
+      "detail": "none found"
+    },
+    {
+      "name": "tasks_have_code_blocks",
+      "status": "pass",
+      "detail": "all task sections carry a fenced code block"
+    },
+    {
+      "name": "tasks_have_expected_output",
+      "status": "pass",
+      "detail": "all task sections mention an expected result"
+    },
+    {
+      "name": "tasks_single_commit_step",
+      "status": "pass",
+      "detail": "every task section has exactly one Commit step"
+    }
+  ],
+  "placeholder_hits": [],
+  "verdict": "pass"
+}
