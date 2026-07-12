@@ -8,7 +8,7 @@ plan: docs/tribe/planning/idea-02-context-isolation/plan.md
 
 ## Milestones
 - [x] spec committed
-- [ ] plan committed
-- [ ] plan validated
+- [x] plan committed
+- [x] plan validated (validate-plan.sh: pass, 7/7 checks, 3 tasks)
 
 Note: PLANNING-ONLY campaign. Method steps 5-8 (hunters, PR, merge) are out of scope by dispatch.
