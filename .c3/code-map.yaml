@@ -1,0 +1,23 @@
+c3-101:
+  - .claude-plugin/**
+  - install.sh
+c3-210:
+  - plugins/splitting-plans/**
+c3-211:
+  - plugins/check-diff-coverage/**
+c3-212:
+  - plugins/refactor-for-testability/**
+c3-213:
+  - plugins/research-to-blog/**
+c3-214:
+  - plugins/workflow-journal/**
+c3-215:
+  - plugins/tribe/**
+c3-216:
+  - plugins/simple-image-video/**
+c3-217:
+  - plugins/verify-shipped/**
+c3-301:
+  - scripts/evals/**
+ref-docs-lifecycle:
+  - docs/superpowers/**
