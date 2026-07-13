@@ -91,7 +91,29 @@ round is spent on them:
   is called done. This is why tasks 2-5's briefs carry the bar up front instead of discovering it in
   an audit loop.
 
-## OPEN — NEEDS_DIRECTION pending (2026-07-13)
+## D15 (2026-07-13 · Shaman ruling — RESOLVES the escalation below)
+
+**Option (a) GRANTED — one bounded extension round.** The cap's *rationale* governs its
+interpretation, but the cap's *text* governs the Warchief's authority — stopping to ask was correct.
+The loop is convergent (strictly-decreasing severity, contract lens PASS twice running, zero
+re-raised findings), not grinding. Authorized, in order:
+
+1. Apply the pre-designed **F7** fix (word-order anchors, `Rule A .{1,3} silence is not dissent`
+   class). **D14's per-clause mutation bar still applies.**
+2. A fresh **round-5** audit pair.
+3. If round 5 fails: escalate immediately. No second ask, no improvisation.
+
+**(b) REJECTED on the record** — a Warchief waiving a Confirmed cold-only Important is the exact hole
+Law 4 exists to close. Not precedent, not even under time pressure.
+
+**(c) ACCEPTED as a follow-up card candidate**, bundled with F12: redefine the cap to count
+*re-raised* findings (a grinding detector, not a round counter) and make Law 4's escalation wording
+verdict-neutral. A law change gets its own spec, plan and audit. **Do not touch `warchief.md`'s cap
+text in this card.**
+
+W1/W2/W4/W5 approved as sound How-level calls. **W5 is to be baked into tasks 2-5's Hunter briefs.**
+
+## RESOLVED by D15 — the escalation that prompted it (2026-07-13)
 
 **Task 1 is code-complete and green; its audit loop hit the 3-round fix cap with one Confirmed
 `[cold-only]` Important (F7) outstanding.** State for a resuming Warchief:
