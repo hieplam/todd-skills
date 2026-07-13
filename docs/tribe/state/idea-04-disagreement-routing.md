@@ -91,6 +91,24 @@ round is spent on them:
   is called done. This is why tasks 2-5's briefs carry the bar up front instead of discovering it in
   an audit loop.
 
+## OPEN — NEEDS_DIRECTION pending (2026-07-13)
+
+**Task 1 is code-complete and green; its audit loop hit the 3-round fix cap with one Confirmed
+`[cold-only]` Important (F7) outstanding.** State for a resuming Warchief:
+
+- Branch `feat/idea-04-disagreement-routing` @ `e1b55e6`, tree clean. Suite 8/8 green; all 6 neighbour
+  suites green (175 assertions). `skinner.md` / `hunter.md` untouched.
+- Fix rounds spent: **3 of 3**. F1-F6 all routed, all FIXED, none ever re-raised (the loop converged:
+  Critical → Critical → Important → Important; the contract lens has PASSed in rounds 3 and 4).
+- **F7** (cold-only, Important, Confirmed): the Rule A / Rule B assertions anchor on the whole sentence
+  being wrapped in ONE bold span, so a meaning-preserving re-bolding (`**Rule A** — silence is not
+  dissent.`) would redden them. Pre-designed fix, one line each: drop the `\*\*…\*\*` requirement and
+  anchor on word order (`Rule A .{1,3} silence is not dissent`), which stays unique to the clause — W2's
+  restatement puts "(Rule A)" *after* the phrase — so D14 per-clause anchoring survives while bold
+  relocation no longer breaks it.
+- Tasks 2-5 are NOT started. Their briefs must carry **W5** up front so assertions are born at the bar
+  rather than discovered at it.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
