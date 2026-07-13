@@ -612,11 +612,15 @@ has 'routed value TIEBREAK is row-anchored in the enum, like its siblings' "$STE
 # ledger row, it is a committed state-file line (see the "Task 4, 4th fix round (D18/F22)" block
 # below for why: the report file is never git-committed mid-round, so it cannot be what a crash
 # survives). This assertion is updated in place because its invariant changed, per the brief's own
-# rule ("update any assertion whose invariant D18 has now changed"). Single long literal, no
-# internal bridge needed (D17 convention: a true zero-gap phrase stays a bare literal).
+# rule ("update any assertion whose invariant D18 has now changed").
+# F35/W18 fix: this used to be ONE bare literal spanning TWO clauses ("Before dispatching C" / "WRITE
+# AND COMMIT the finding key ...") with no bridge at the comma joint — the exact defect W18 names as
+# its clearest example. A legal clarifying insertion right after the comma (e.g. "Before dispatching
+# C, and only then,") reddened it (reproduced). Bridged at that joint (actual gap 2 chars; `.{0,40}`
+# keeps 38 chars of D17 headroom).
 has 'before dispatching C, the Warchief WRITEs AND COMMITS the finding key to the state files Tie-breaks spent heading' \
     "$STEP6" \
-    "Before dispatching C, WRITE AND COMMIT the finding key under a \`## Tie-breaks spent\` heading in the card.s state file"
+    "Before dispatching C.{0,40}WRITE AND COMMIT the finding key under a \`## Tie-breaks spent\` heading in the card.s state file"
 
 # F21a, part 2: WHY that write happens before dispatch -- it is what SPENDS the key's one
 # tie-break, and the timing (before, not after) is what survives a crash. Three conjuncts
@@ -634,8 +638,13 @@ has 'the write lands before C is dispatched so a crash mid-tie-break cannot lose
 # "TIEBREAK resolves onward to..." assertion above, restated here at the write/append-rule's own
 # location so a later editor cannot silently drop this rule while leaving the outcome definition).
 # Actual gaps: 58, 2, 3, 2, 5 chars; bridges widened to keep >=30 chars of D17 headroom each.
+# F35/W18 fix: this was itself a second instance of the same defect as F35's headline example -- a
+# bare literal spanning TWO clauses ("When C returns" / "APPEND the outcome as a new row") with no
+# bridge at the comma joint. A legal clarifying insertion right after the comma (e.g. "When C
+# returns, at last,") reddened it (reproduced). Bridged at that joint (actual gap 2 chars; `.{0,40}`
+# keeps 38 chars of D17 headroom).
 has 'when C returns, the outcome is APPENDED as a new row' "$STEP6" \
-    'When C returns, APPEND the outcome as a new row'
+    'When C returns.{0,40}APPEND the outcome as a new row'
 
 has 'the appended outcome names all three onward values: TO_FIXER, DROPPED tie-break round N, or a rung-3 escalation' \
     "$STEP6" \
@@ -964,9 +973,12 @@ has 'the final-audit backstop is now scoped explicitly to the ordinary, no-crash
     'In the ordinary, no-crash case.{0,35}and only there.{0,35}what keeps the record safe despite that gap'
 
 # F25, part 2: the hazard, stated plainly -- after a crash, the backstop above is simply not there.
-# Literal, zero-gap phrase (D17 convention).
+# F35/W18 fix: this was a bare literal spanning TWO clauses ("After a crash" / "that backstop is not
+# there") with no bridge at the comma joint -- a legal clarifying insertion right after the comma
+# (e.g. "After a crash, even a benign one,") reddened it (reproduced). Bridged at that joint (actual
+# gap 2 chars; `.{0,40}` keeps 38 chars of D17 headroom).
 has 'after a crash, that backstop is not there' "$STEP6" \
-    'After a crash, that backstop is not there'
+    'After a crash.{0,40}that backstop is not there'
 
 # F25, part 3: the reproduction, stated as law -- resume-check.sh's next_action() returns
 # RESUME_DELIVERY or DISCARD_AND_RESUME_DELIVERY once every task is committed. Actual gaps 2, 1, 26
@@ -1019,9 +1031,13 @@ has 'the never a wrong merge safety claim is explicitly RETIRED' "$STEP6" \
     'The "never a wrong merge" safety claim is RETIRED'
 
 # F25, part 9: what survives, stated no more strongly than true -- absent a crash, this routing law
-# is sound. Literal, zero-gap phrase (D17 convention).
+# is sound.
+# F35/W18 fix: this was a bare literal spanning TWO clauses ("absent a crash" / "this routing law is
+# sound") with no bridge at the comma joint -- a legal clarifying insertion right after the comma
+# (e.g. "absent a crash, which is the ordinary case,") reddened it (reproduced). Bridged at that
+# joint (actual gap 2 chars; `.{0,40}` keeps 38 chars of D17 headroom).
 has 'what survives: absent a crash, this routing law is sound' "$STEP6" \
-    'absent a crash, this routing law is sound'
+    'absent a crash.{0,40}this routing law is sound'
 
 # F25, part 10: and under a crash, it is the tribe's resume machinery -- never this routing law --
 # that fails. Actual gaps 3 and 3 chars; `.{0,35}` keeps 32 chars of D17 headroom on each.
