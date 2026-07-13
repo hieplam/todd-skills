@@ -9,7 +9,7 @@ plan: docs/tribe/planning/idea-04-disagreement-routing/plan.md
 ## Milestones
 - [x] spec committed (on master, planning campaign)
 - [x] plan committed (on master, planning campaign — validate-plan.sh PASS, 5 tasks)
-- [ ] wave 1 integrated (tasks 1-5; single wave, single worktree)
+- [x] wave 1 integrated (tasks 1-5; single wave, single worktree — final branch audit PASSED: contract lens's sole Critical F38 resolved by D22 ratification, cold lens 0 hypotheses)
 
 ## Campaign type
 
@@ -855,6 +855,28 @@ file), no mechanical oracle exists for "may this fence widen." Escalating.**
 
 **Round accounting:** this is fix-round **1 of 3** for the final branch audit — but the cap is NOT what stops me.
 A fence question is a What/Why question, and my charter routes it up **immediately, without waiting for the cap**.
+
+## D22 (2026-07-14 · Shaman ruling — RESOLVES F38. W17 IS RATIFIED.)
+
+**Option (a) GRANTED.** The `len(evals) == 16` → `== 20` bump in idea-03's `test-input-asymmetry.sh` is an
+**authorized one-line cross-card fence extension**. Rationale on record: the bind is real and jointly
+unsatisfiable in-fence; the change is **arithmetic** (no assertion's meaning changes, no invariant weakens,
+idea-03's exact-count design is preserved); and it ships the truth. **Disclose it in the PR body as a
+D22-authorized cross-card edit, exactly like the D16 pointer.**
+
+*(Numbered D22, not D21 — D21 is the owner's batch directive.)*
+
+**On the record, from the Shaman:** *"you verified the bind yourself, accepted W17's merits, and still refused to
+self-ratify the fence move — that division of authority is precisely right, and it is why W17 gets ratified
+instead of relitigated."*
+
+**(b) and (c) rejected.** **(d) ACCEPTED as a follow-up card:** exact-count eval assertions fire on every future
+card that adds an eval — replace with `>=` / id-presence, in a card of its own, bundled with the
+resume/round-accounting family (D15(c), F12, D17's unmeetable-bar detector, D19's `resume-check.sh` mid-audit
+card). **F39/F40 filed as Minors.**
+
+**Final audit disposition:** F38 → **RESOLVED by ratification** (no code change required; the branch was already
+correct — only its authorization was missing). The round's sole Critical is cleared. **PROCEED to delivery.**
 
 ## Scope fence (from the plan's Global Constraints)
 
