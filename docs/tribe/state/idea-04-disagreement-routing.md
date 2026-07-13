@@ -614,6 +614,35 @@ ACTUAL cause; never substitute a near-miss."* The document breaks its own rule t
 In-fence: step-6 prose + the state-file format (which is this card's own). No spec override needed — this is
 D20 implemented correctly.
 
+## W16 — the finding-key match is a JUDGMENT, not a grep. Say so, and make the safe error the default. (task 4, final)
+
+F30 (Critical, cold-only) — the last overstatement, and it is D19's principle again:
+
+- The new text calls the `## Tie-breaks spent` lookup **"concrete, greppable"**, and the pre-existing finding-key
+  definition claims the key is what makes termination *"mechanical instead of a judgment call"*.
+- **But the finding key is free-text, LLM-authored prose** (`severity | location | one-line claim`), with no
+  normalization, no hash, no canonical form, and **no script anywhere implements the lookup**. Two independent
+  Skinner runs will not reproduce a one-line claim byte-for-byte across a commit boundary or a crash.
+- So the cap's enforcement is a **Warchief judgment**, and the text promises a mechanism it does not have.
+  Consequences: a paraphrase-drifted key → the cap silently fails and a **second tie-break is dispatched**
+  (the "can never grind" claim broken); a coincidental match → a genuinely new finding is **wrongly forced to
+  rung 3** without ever getting its own tie-break.
+
+**Note what this is NOT:** the finding key and the per-key cap are **pre-existing** (idea 05 / spec §2.3), and
+the key was never byte-stable. This card added the *persistence*, and with it the false claim of mechanism.
+
+**Ruling — tell the truth and make the safe error the default:**
+
+1. **Drop "greppable"/"mechanical" for this lookup.** State plainly: **matching a finding key across rounds is
+   the Warchief's judgment** — the same recognition Law 3's merge already relies on — **not a string compare.**
+2. **On doubt, treat the key as NOT spent.** The two errors are not symmetric: wrongly re-dispatching costs
+   **one review round**; wrongly forcing rung 3 **burns a human ruling and denies the finding the mechanical
+   oracle the ladder exists to give it.** The cheaper error is the default. Say so, with the reason.
+3. Keep the cap as written for a key the Warchief **does** recognize — the bound still holds in the ordinary
+   case, which is what it was for.
+4. **Guard the honesty mechanically** (no "greppable"/"mechanical" claim for this lookup; the judgment
+   statement; the on-doubt-not-spent default) so no future editor re-inflates the guarantee.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
