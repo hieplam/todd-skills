@@ -784,6 +784,45 @@ it contains every ruling in the campaign, i.e. the entire contract. A cold lens 
 (or its `git log`, 55 commits of ruling messages) would be reading the contract through the back door. Scoping
 *which bytes* is mechanical address information and is required; it leaks no judgment.
 
+## W22 — the final audit pair died to an API session limit. That is an ENVIRONMENT failure, and it consumes NO round. (2026-07-14)
+
+The fresh final-whole-branch pair was dispatched per W21 (contract lens + cold lens, concurrent, asymmetric
+briefs). **Both were terminated mid-run by an API session limit** (`You've hit your session limit · resets
+6:30am Asia/Saigon`). Neither wrote its report file; neither rendered a verdict; no finding was produced.
+
+**Round accounting — get this right, resumer:**
+
+- **This round DID NOT HAPPEN.** No `AUDIT:` line, no `COLD-LENS:` line, no findings. There is nothing to
+  disposition and nothing to fix.
+- **It consumes NO fix round.** The branch has had **zero** completed final-branch audit rounds since the F36/F37
+  fix landed at `4690caa`. This is the same principle the shipped law already states for a `CONTAMINATED` refusal:
+  *"a briefing bug of yours must not burn the code's fix budget."* An environment death is the same class — the
+  code was never judged.
+- **W19's standing order is therefore NOT yet triggered.** ("If the next pair returns a Critical, escalate.") No
+  pair has returned anything.
+
+**State of the branch at this pause — all committed, tree clean, HEAD `1d688fb`:**
+
+- Tasks 1-5: committed, plan checkboxes all `[x]`.
+- F36 (Critical) and F37 (Important): **FIXED** at `4690caa`, with 13 per-clause mutation proofs, all 17 bridge
+  points proven to survive a 30-char insertion (worst headroom 31 chars, measured), bold relocation and reflow.
+- Proofs RUN and green: **7/7 grep suites, 358 assertions** (disagreement-routing 183, context-isolation 35,
+  dual-skinner-cell 27, fixer-mandate 28, input-asymmetry 46, resume-check 32, validate-plan 7).
+  `evals.json` parses, **20 entries** (the card's four are ids 17-20). *The eval BENCHMARK runner
+  (`run_evals.py`) also died to the same session limit (`0 tokens`, FAIL) — that is the environment, not the
+  artifact; the structural invariant the plan requires is intact and verified.*
+- **NOT merged. NOT pushed. No PR opened.** Correctly so — W20 forbids delivering a branch whose final audit has
+  not passed, and it has not run.
+
+**NEXT ACTION for whoever resumes (do exactly this, nothing else):**
+
+1. Dispatch a **fresh pair** — contract lens + cold lens, concurrent, per **W21**'s brief split (D17 verbatim to
+   the contract lens ONLY; the cold lens gets the bare diff of the three product files, scoped as
+   `git diff d21724c...HEAD -- plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-disagreement-routing.sh plugins/tribe/evals/evals.json`, and **never** this state file, the plan, the spec, or `git log`).
+2. On PASS → PR (mirror #30's shape) → **no CI exists in this repo** (`.github/workflows/` absent; step 7 exit-2
+   path — record it via `gh pr checks`) → squash-merge → delete branch → remove worktree.
+3. On a Critical → **escalate to the Shaman** per W19. Do not grind.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
