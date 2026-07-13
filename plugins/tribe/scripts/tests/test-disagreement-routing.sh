@@ -651,9 +651,24 @@ has 'the appended outcome names all three onward values: TO_FIXER, DROPPED tie-b
 # point it reaches this rung, consults the heading first. Updated in place (invariant changed, per
 # the brief's own rule). Two conjuncts (W5 bar #3), each anchored on phrasing unique to this
 # clause; actual gaps 27 and 12 chars, so `.{0,60}`/`.{0,45}` keep >=30 chars of D17 headroom.
+# W15/F29 UPDATES this clause in place (invariant changed): the pre-fix text treated bare KEY
+# PRESENCE alone as sufficient to label a resumed conflict `ESCALATED (tie-break spent)`,
+# unconditionally, "never a crash" -- which made `ESCALATED (oracle unavailable)` unreachable by any
+# rule the document defined (F29, Critical, cold-only). The fix inserts "under EITHER status" at the
+# presence-check clause (new actual gap there is 22 chars, so the bridge widens from a bare literal to
+# `.{0,55}`, keeping 33 chars of D17 headroom) -- the assertion now guards the CORRECTED claim: key
+# presence alone still means SPENT (rung 3, no second C), but which trigger fires is a SEPARATE
+# decision the two new branch assertions below cover. Guarding the old unconditional bare-literal tail
+# here would be guarding the false statement F29 found, so it is retired in favor of this rewrite,
+# per the brief's own instruction.
 has 'any Warchief entering an audit round consults the state files Tie-breaks spent heading first, fresh or resumed' \
     "$STEP6" \
-    'Any Warchief.{0,60}ENTERS an audit round consults the state file.s `## Tie-breaks spent` heading FIRST.{0,45}finds a finding key listed there, treats that key.s tie-break as SPENT'
+    'Any Warchief.{0,60}ENTERS an audit round consults the state file.s `## Tie-breaks spent` heading FIRST.{0,45}finds a finding key listed there.{0,55}treats that key.s tie-break as SPENT'
+
+# Regression guard: the retired bare-key-presence-decides wording (no status check at all) must never
+# come back verbatim -- this is the exact phrasing F29 proved makes `oracle unavailable` unreachable.
+hasnt 'the Bounds rule no longer decides the trigger from bare key presence alone, without a status check' \
+    "$STEP6" 'listed there, treats that key.s tie-break as SPENT'
 
 # This half of the old sentence is untouched by D19/F23 (the consequence of finding the key spent
 # is unchanged), so its assertion keeps its NAME and regex stable (brief's own instruction).
@@ -1158,6 +1173,87 @@ has 'the resurfacing forced rung-3 trip in the Bounds paragraph is recorded as E
 has 'the Bounds-paragraph trigger is the spent key, never a crash, never an ambiguous contract' \
     "$STEP6" \
     'is already spent.{0,40}never a crash.{0,40}`oracle unavailable`.s trigger, defined below.{0,40}never a contract that is actually ambiguous.{0,40}`spec ambiguity`.s'
+
+# --- Task 4, W15 fix round (F29): the state file records STATUS, not just the key -----------------
+# F29 (Critical, cold-only, Confirmed): the Bounds rule (just above) unconditionally labeled ANY
+# resumed conflict on a listed key `ESCALATED (tie-break spent)`, "never a crash" -- while the crash
+# paragraph (a few lines below it) said a Warchief that died between the spend-commit and C's outcome
+# landing must record `ESCALATED (oracle unavailable)`. Both fire on the exact same observable event
+# (the finding key is present under `## Tie-breaks spent`) because the pre-fix heading recorded "one
+# finding key per line" -- no outcome, no status -- so nothing in the committed record could ever
+# distinguish "the oracle ran and resolved" from "the oracle was spent and then lost to a crash". The
+# Bounds rule's hard-wired first label therefore made the second trigger unreachable by any rule the
+# document defined, directly violating D20's own "the recorded trigger must be the ACTUAL cause; never
+# a near-miss" two paragraphs after it was stated. Reinforcing evidence: `tie-break spent`'s own
+# definition already excluded `oracle unavailable` ("never ... because no crash occurred here at
+# all"), but `oracle unavailable`'s definition never reciprocated.
+#
+# W15 (Shaman ruling) fixes this at the root: the `## Tie-breaks spent` heading now records KEY PLUS
+# STATUS (`dispatched` written+committed before C is dispatched; `resolved` appended+committed, never
+# overwriting, when C's outcome lands), so the two triggers become DECIDABLE from committed state
+# alone -- latest status `resolved` -> `ESCALATED (tie-break spent)`; latest status `dispatched` with
+# no `resolved` ever landing -> `ESCALATED (oracle unavailable)` -- and the mutual exclusion is stated
+# from BOTH sides. Every bridge below is measured against this new text's OWN actual consumption
+# (measured by direct extraction of the shipped, flattened clause) and widened to keep >=30 chars of
+# D17 headroom on every one; a true near-zero gap is left as a bare (or near-bare) literal per this
+# file's own established convention.
+
+# The concrete, greppable line format itself: key plus status, never a bare key. Two short assertions
+# (W5 bar #2), each on its own unique clause. First: the format change is named. Actual gap 2 chars
+# (near-zero, left bare per convention).
+has 'the Tie-breaks spent heading now records key PLUS STATUS, never a bare key' "$STEP6" \
+    'heading records key PLUS STATUS.{0,40}never a bare key'
+
+# Second: the concrete format itself is stated -- `<finding-key>: dispatched`. Actual gap 1 char
+# (near-zero, left bare per convention).
+has 'the concrete greppable line format is stated: <finding-key>: dispatched' "$STEP6" \
+    'concrete, greppable line format is.{0,40}`<finding-key>: dispatched`'
+
+# When C's outcome lands, `resolved` is APPENDED (never overwriting `dispatched`) to the SAME state
+# file heading -- this is the other half of the format, without which `resolved` could never be
+# produced. Actual gap 21 chars; `.{0,55}` keeps 34 chars of D17 headroom.
+has 'when Cs outcome lands, resolved is appended to the state files Tie-breaks spent heading too' \
+    "$STEP6" \
+    'ALSO APPEND `<finding-key>: resolved`.{0,55}`## Tie-breaks spent` heading \(W15\)'
+
+# ...and it never overwrites the `dispatched` line laid down before dispatch -- append-only, same
+# discipline as the report-file ledger. Near-zero actual gap (3 chars), left as a near-bare literal
+# per convention; `.{0,40}` keeps 37 chars of headroom for safety.
+has 'the resolved line never overwrites the dispatched line laid down before dispatch' "$STEP6" \
+    '`## Tie-breaks spent` heading \(W15\).{0,40}never overwriting the `dispatched` line laid down before dispatch'
+
+# The two-branch decision rule itself -- this is the mechanism that makes both triggers reachable.
+# Branch 1: latest status `resolved` -> `ESCALATED (tie-break spent)`. Actual gap 43 chars; `.{0,75}`
+# keeps 32 chars of D17 headroom.
+has 'decision rule branch 1: latest status resolved fires ESCALATED (tie-break spent)' "$STEP6" \
+    'Latest line is `<finding-key>: resolved`.{0,75}This forced rung-3 trip is recorded as `ESCALATED \(tie-break spent\)`'
+
+# Branch 2: latest status `dispatched`, no `resolved` ever landing -> `ESCALATED (oracle
+# unavailable)`. Actual gap 70 chars; `.{0,105}` keeps 35 chars of D17 headroom.
+has 'decision rule branch 2: latest status dispatched with no resolved ever landing fires ESCALATED (oracle unavailable)' \
+    "$STEP6" \
+    'Latest line is `<finding-key>: dispatched`, with no `resolved` line ever landing.{0,105}This forced rung-3 trip is recorded as `ESCALATED \(oracle unavailable\)` instead'
+
+# The mutual exclusion, stated from BOTH sides (W15 ruling 3). First: the two statuses are exhaustive
+# and exclusive by construction -- a key's latest line is always exactly one of the two, never both.
+# Actual gap 29 chars; `.{0,60}` keeps 31 chars of D17 headroom.
+has 'the two statuses are mutually exclusive by construction: always exactly one, never both' "$STEP6" \
+    'a key.s latest status line is always exactly one of.{0,60}never both at once'
+
+# Second: `oracle unavailable`'s OWN definition now reciprocally excludes `tie-break spent` -- this is
+# the reinforcing-evidence gap F29 named explicitly (the exclusion existed only from the tie-break-spent
+# side before this fix). Near-zero actual gap (2 chars), left as a near-bare literal per convention.
+has 'oracle unavailable reciprocally excludes tie-break spent: fires only when latest status is resolved' \
+    "$STEP6" \
+    'never `ESCALATED \(tie-break spent\)`, because that trigger fires only when the key.s LATEST state-file line is `resolved`'
+
+# The crash-cost paragraph (rung 2's honest-cost sentence) now names its OWN produced trigger
+# explicitly, tying the general decision rule above to the concrete crash-window scenario it describes.
+# Two conjuncts (W5 bar #3): the label fires -- AND -- the other label explicitly does not. Actual gaps
+# 16 and 3 chars; `.{0,50}`/`.{0,40}` keep >=30 chars of D17 headroom on each.
+has 'the crash-cost paragraph names its own outcome as ESCALATED (oracle unavailable), never tie-break spent' \
+    "$STEP6" \
+    'Per the status-based rule above.{0,50}recorded as `ESCALATED \(oracle unavailable\)`.{0,40}never as `ESCALATED \(tie-break spent\)`'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

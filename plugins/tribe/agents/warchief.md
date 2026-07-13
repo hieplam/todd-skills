@@ -699,7 +699,9 @@ evaluation order fire early?), the dispute has a mechanical oracle. Dispatch **o
 and take the **majority direction** across the three independent samples.
 
 **Before dispatching C, WRITE AND COMMIT the finding key under a `## Tie-breaks spent` heading in
-the card's state file** (`docs/tribe/state/CARD-SLUG.md`), one finding key per line — the same
+the card's state file** (`docs/tribe/state/CARD-SLUG.md`) — **the heading records key PLUS STATUS,
+never a bare key** (W15): the concrete, greppable line format is **`<finding-key>: dispatched`**,
+one status line per event, appended, never overwritten — the same
 commit-before-act discipline as D12a: a record is an artifact, not a claim. That write is what
 SPENDS the key's one tie-break, and it lands before C is dispatched exactly so a crash mid-tie-break
 cannot lose the fact — the per-key cap survives a crash precisely because the record is
@@ -726,7 +728,11 @@ spending a tie-break is the Warchief's own housekeeping act, not a Hunter's task
 
 **When C returns, APPEND the outcome as a new row** (the ledger is append-only — see "Recording it"
 below): `TO_FIXER` if C sided with the finding, `DROPPED (tie-break, round N)` if C sided against it,
-or a rung-3 escalation if there is no majority.
+or a rung-3 escalation if there is no majority. **The same moment, ALSO APPEND `<finding-key>:
+resolved` to the state file's `## Tie-breaks spent` heading** (W15) — never overwriting the
+`dispatched` line laid down before dispatch; the heading stays append-only and the key's LATEST
+line is what a later reader consults. This second line is the committed proof that C's outcome
+actually landed — its absence is what a crash mid-oracle leaves behind.
 
 - C flags the location in **A's direction only** → majority (2 of 3): A's finding proceeds to the
   fixer as `agreed`; B's is dropped, ledger `DROPPED (tie-break, round N)`.
@@ -739,13 +745,29 @@ or a rung-3 escalation if there is no majority.
 campaign** (the key is the finding's identity, not the round): a conflict resurfacing on the same key
 has already spent its tie-break and goes **straight to rung 3**. **Any Warchief — fresh or resumed —
 that ENTERS an audit round consults the state file's `## Tie-breaks spent` heading FIRST**, and if it
-finds a finding key listed there, treats that key's tie-break as SPENT — it goes straight to rung 3
-and never dispatches a second tie-break Skinner on that key. This forced rung-3 trip is recorded as
-`ESCALATED (tie-break spent)` — the trigger is that the key's one tie-break is already spent, never a
-crash (`oracle unavailable`'s trigger, defined below) and never a contract that is actually ambiguous
-(`spec ambiguity`'s). **The report-file ledger's `TIEBREAK` row
+finds a finding key listed there under EITHER status, treats that key's tie-break as SPENT — it goes
+straight to rung 3 and never dispatches a second tie-break Skinner on that key, regardless of which of
+the two triggers below the status decides.
+
+**Which of the two it records is decided by the key's LATEST status line (W15) — never by the key's
+bare presence:**
+
+- Latest line is **`<finding-key>: resolved`** → the oracle genuinely ran to completion. This forced
+  rung-3 trip is recorded as `ESCALATED (tie-break spent)` — the trigger is that the key's one
+  tie-break is already spent, never a crash (`oracle unavailable`'s trigger, defined below) and never
+  a contract that is actually ambiguous (`spec ambiguity`'s).
+- Latest line is **`<finding-key>: dispatched`, with no `resolved` line ever landing** → the
+  Warchief died mid-oracle before its outcome could be appended. This forced rung-3 trip is recorded
+  as `ESCALATED (oracle unavailable)` instead — the trigger is that the oracle never ran, never that
+  the key's tie-break was cleanly spent by resolution.
+
+**The two are mutually exclusive by construction**: a key's latest status line is always exactly one
+of `resolved` or `dispatched`, never both at once, so exactly one of the two triggers is ever the
+actual cause — the recorded trigger can never be a near-miss substituted for the real one (D20).
+**The report-file ledger's `TIEBREAK` row
 is consulted for none of this** — it is the audit trail, not the authoritative record, and only the
-state file's `## Tie-breaks spent` heading decides whether a key's tie-break is spent. And a
+state file's `## Tie-breaks spent` heading decides whether a key's tie-break is spent — read for its
+key's LATEST status line, which is what decides which of the two triggers above applies. And a
 **tie-break is a REVIEW round: it does not consume a fix round** — no code changes, no fixer is
 dispatched, and the 3-round fix cap counts *fix* rounds only. Otherwise one conflict would eat a third
 of the branch's entire fix budget without a single line being fixed.
@@ -779,7 +801,10 @@ honest cost of a crash mid-tie-break, absent a further crash during the final au
 — it is a forced escalation: a crash landing after the spend-commit but before C's outcome lands
 means the key is spent and the mechanical oracle never ran, so that finding is forced to **rung 3 —
 a human ruling** — on the next audit round that touches it, and no second tie-break Skinner is ever
-dispatched on that key — consistent with the absolute rule above, not in tension with it.
+dispatched on that key — consistent with the absolute rule above, not in tension with it. **Per the
+status-based rule above (W15), this is recorded as `ESCALATED (oracle unavailable)` — never as
+`ESCALATED (tie-break spent)`**, because the key's latest state-file line stays `dispatched`; the
+`resolved` line that would have flipped the label never landed.
 
 **Rung 3 — the conflict IS the finding → `NEEDS_DIRECTION`, immediately.**
 No citation settles it and no majority exists: the two reviewers read the contract differently and
@@ -831,8 +856,11 @@ question here — only the artifact is inconclusive, not the text the two review
 the finding key's one tie-break, but a crash after that write and before C's outcome landed means the
 mechanical oracle never ran and its result never landed either — never `ESCALATED (spec ambiguity)`,
 because no contract is ambiguous here, only unrun; never `ESCALATED (standoff)`, because no Skinner
-was ever re-dispatched to re-raise anything; and never `ESCALATED (inconclusive artifact)`, because
-no adjudication of a falsification artifact ever ran on this finding at all.
+was ever re-dispatched to re-raise anything; never `ESCALATED (inconclusive artifact)`, because
+no adjudication of a falsification artifact ever ran on this finding at all; and (W15) never
+`ESCALATED (tie-break spent)`, because that trigger fires only when the key's LATEST state-file line
+is `resolved` — here it stays `dispatched` forever, since the outcome that would have appended
+`resolved` never landed.
 `ESCALATED (tie-break spent)` is the non-crash rung-2 bound above: a conflict resurfaces on a finding
 key whose one tie-break this campaign has already spent, so rung 2 is skipped outright and the
 finding goes straight to rung 3 without C ever being dispatched a second time — never
