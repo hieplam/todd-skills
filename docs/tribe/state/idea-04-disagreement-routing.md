@@ -215,6 +215,40 @@ is already 200/250 consumed — a legal, meaning-preserving rewording of the pro
 it (proven by mutation). That is a W5 bar-1 violation (a test that fails when it should not). Fix: split
 into short assertions anchored on phrases unique to the clause, with no long bridging spans.
 
+## OPEN — 2nd NEEDS_DIRECTION (task 2, 2026-07-13). Branch green @ f2d8271; tasks 3-5 not started.
+
+Task 2's audit spent its 3 fix rounds (F8 → F9 → F11+F12b) and round 4 does not pass. **The two lenses
+conflicted head-on** — the `conflicting` case this very card exists to route:
+
+- **Contract lens A: FAIL.** Three assertions are *fragile*: a legal, meaning-preserving reword overflows
+  their `.{0,N}` bridges and reddens them (proven by mutation — e.g. inserting ", with no exceptions,"
+  overflows a 20-char bridge).
+- **Cold lens B:** explicitly **refuted** that same hypothesis ("measured actual gap consumption vs budget
+  … all have comfortable headroom … Refuted") — and raised a different Critical instead.
+
+**Rung 1 of this card's own ladder resolves the conflict by CITATION, not taste.** W5 bar 1 (this state
+file) says an assertion must not break on a legal rewording. A demonstrated a legal rewording that breaks
+one. B measured only *current* consumption (2/20 chars), which is not the same question. **A's finding
+stands; B's refutation is off-target.** No tie-break Skinner needed — the contract settled it. Recorded as
+a live demonstration of rung 1 working exactly as specced.
+
+### The genuine spec ambiguity (F13) — this is what the cap caught, and it is NOT mine to settle
+
+Cold lens B, Critical: the `agreed`/`NOT_REPRODUCED` clause says the finding *"escalates to you immediately
+for adjudication"* — and **nothing anywhere defines what that adjudication DOES.** Every sibling escalation
+in step 6 names a concrete action (standoff → `NEEDS_DIRECTION` carrying the report verbatim + the
+falsification artifact; plan-vs-card conflict → `NEEDS_DIRECTION` immediately; CONTAMINATED → fix the
+dispatch, re-dispatch, does not consume a fix round). This one names none: no output, no evidence bar, no
+stated effect on the fix-round cap. B found at least three readings that survive, and could not refute any.
+
+**Neither idea-04's spec nor idea-05's defines it.** The contract is underdetermined at exactly the spot
+this card's own rung 3 describes: *"a question no experiment can settle is not a code question."*
+
+Secondary, and fixable as ordinary work: idea-05's ledger-adjudication rule's own body still says *"For each
+finding the fixer returned as `NOT_REPRODUCED`, exactly one of these three applies"* with **no exclusion for
+`agreed`** — the carve-out lives only in a paragraph 30 lines earlier that the rule never acknowledges. A
+reader arriving at the rule has no signal it does not apply to them.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
