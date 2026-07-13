@@ -717,6 +717,45 @@ same breath. The on-doubt default already leans away from the expensive error �
 
 **This is the campaign's final fix.** If the next pair returns a Critical, escalate — do not grind.
 
+## W20 — the resume script says DELIVER; the committed record says a ruled Critical is open. The record wins. (resume, 2026-07-14)
+
+The prior Warchief died with the W19 fix **staged but never committed**. A fresh Warchief resumed and ran
+`resume-check.sh`, which returned **`DISCARD_AND_RESUME_DELIVERY`** (`last_completed_task: 5/5`, `dirty: true`)
+— i.e. *"discard the tree and go open the PR."* **Followed on its discard half; REFUSED on its delivery half.**
+
+**Why the script is wrong here, and why that was PREDICTED IN THIS FILE:**
+
+- `resume-check.sh` models **task** progress, not **audit** progress. All 5 tasks *are* committed, so it infers
+  delivery. That inference is false: the branch is mid-**final-whole-branch-audit**, and the script has no state
+  for that.
+- **This is not a discovery — it is W13/F25, already ruled and already on the record**: *"after all Hunter tasks
+  are committed, `next_action()` returns `RESUME_DELIVERY` … **There is no branch that re-enters step 6.** So a
+  Warchief that dies during the final whole-branch audit resumes straight into delivery and **opens and merges
+  the PR without ever finishing that audit** … today, a crash mid-audit can produce an UNAUDITED MERGE."*
+  D19 ratified that hazard as real, out-of-fence, and filed as a follow-up card. **This campaign just became its
+  own first live victim** — and obeying the script would have shipped the exact defect the card documents.
+- **Verified at HEAD (`2748d8b`), not assumed:** `Supersession (W16)` appears **0 times** in `warchief.md`, while
+  idea-05's *"mechanical instead of a judgment call"* still stands unqualified at line 931 beside W16's
+  contradicting *"judgment, never a grep"* text. **F36 (Critical, contract lens) is OPEN on the branch.** W19 is a
+  `chore(tribe): rule` commit with **no fix commit after it** — git history, the ground truth, says the fix never
+  landed.
+
+**Ruling — the two doctrines are complementary, not in conflict; apply each to what it actually governs:**
+
+1. **"Uncommitted = never happened" is absolute** (resume doctrine). The staged W19 diff **never happened**. It is
+   `git reset --hard` + `git clean -fd`'d — **not inspected, not salvaged, not committed.** Reading a dead agent's
+   half-finished diff and continuing from it is precisely the inspect-and-continue the doctrine forbids.
+2. **The committed state file is the authoritative resume artifact** (D18, ratified). It records W19 as a ruling
+   authorizing a fix for an **open Critical**. A ruling with no fix commit after it = **fix outstanding**.
+3. Therefore: **discard, then RE-ENTER THE AUDIT LOOP at W19's fix round** — a fresh fixer Hunter briefed from
+   **the ruling**, never from the discarded diff — then a **fresh final-branch pair**. Delivery is entered only
+   after that pair passes.
+
+**This needs no Shaman ruling: it relitigates nothing and makes no new law.** It applies law the Shaman already
+ratified (D18: the state file is the resume truth; D19/W13: the script cannot resume an audit) to the situation
+those rulings predicted. Recorded here so the next resumer does not re-derive it — and so the campaign's PR can
+cite it as the follow-up card's motivating incident.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
