@@ -13,11 +13,20 @@ bad() { FAIL=$((FAIL+1)); printf 'not ok - %s\n' "$1"; }
 
 # Agent prompts are hard-wrapped prose, so a sentence routinely straddles a newline. grep is
 # line-based and would miss it. Flatten every haystack to one whitespace-normalized line first:
-# assertions then match meaning, not line-breaking accidents (W5 bar #1; see
+# assertions then match meaning, not line-breaking accidents (D17, mutation class (i); see
 # test-dual-skinner-cell.sh for the established convention this follows). Also strip literal
 # `**` bold markers: which words a legal reword chooses to bold is decoration, not invariant
-# (F7 — a re-bolding that keeps only the label, e.g. `**Rule A** — silence is not dissent.`,
-# must not redden an assertion that never asked to own the bold span in the first place).
+# (D17, mutation class (ii) — a re-bolding that keeps only the label, e.g. `**Rule A** —
+# silence is not dissent.`, must not redden an assertion that never asked to own the bold span
+# in the first place).
+#
+# D17 (bounded W5 bar #1): every `.{0,N}` bridge below is sized so `N` leaves >=30 characters
+# of headroom over that bridge's ACTUAL current consumption — i.e. it survives inserting up to
+# 30 characters of clarifying text at that bridge point (mutation class (iii)) without going
+# hollow. No guarded invariant is matched as one contiguous literal spanning more than a single
+# clause; a literal covering an entire clause (e.g. "artifact ... defeats the finding") is itself
+# split by an internal bridge rather than left as a zero-tolerance run of words. Unbounded
+# paraphrase remains explicitly out of scope.
 flat() { tr '\n' ' ' | tr -s ' ' | sed -E 's/\*\*//g'; }
 
 # Step 6 spans from its own heading up to (but not including) the step 7 heading.
@@ -49,23 +58,28 @@ has 'classes are computed at merge, before the fixer is dispatched' "$STEP6" \
 
 # Word-order anchor, not a bold-span anchor: a legal, meaning-preserving re-bolding of the
 # clause (e.g. bolding only the "Rule A" label instead of the whole sentence) must not redden
-# this assertion (W5 bar #1/F7). This stays unique to the guarded clause because the W2 mapping
-# paragraph's restatement puts "(Rule A)" AFTER the phrase ("...silence is not dissent (Rule A)"),
-# which cannot satisfy a "Rule A ... silence is not dissent" word-order match (D14 survives).
+# this assertion (D17 mutation class (ii), was W5 bar #1/F7). The bridge is widened to `.{1,40}`
+# (D17: >=30 headroom over the ~1-char actual gap) so up to 30 characters of clarifying text
+# between "Rule A" and "silence" survives too (D17 mutation class (iii)). This stays unique to
+# the guarded clause because the W2 mapping paragraph's restatement puts "(Rule A)" AFTER the
+# phrase ("...silence is not dissent (Rule A)"), which cannot satisfy a "Rule A ... silence is
+# not dissent" word-order match within 40 characters (D14 survives).
 has 'Rule A: silence is not dissent' "$STEP6" \
-    'Rule A .{1,3} silence is not dissent'
+    'Rule A .{1,40} silence is not dissent'
 
 # Compound claim: one-flags-one-silent is classed `single` — AND — the same sentence
 # says it is never `conflicting`. Both conjuncts, anchored to the sentence that makes
 # them (W5 bar #3); a rewrite that keeps only the "never conflicting" half is not this
-# assertion's clause and must not hold it green.
+# assertion's clause and must not hold it green. Both bridges are widened to `.{0,40}`
+# (D17: >=30 headroom over their ~2-char actual gaps).
 has 'Rule A: one-flags-one-silent is single, never conflicting' "$STEP6" \
-    'one-flags-one-silent is therefore `single`.{0,20}never.{0,15}`?conflicting`?'
+    'one-flags-one-silent is therefore `single`.{0,40}never.{0,40}`?conflicting`?'
 
 # Same word-order anchor as Rule A above (F7): stays unique to the guarded clause because the
 # W2 mapping paragraph never restates "Rule B" before "co-location"/"conflict" in this order.
+# Widened to `.{1,40}` for the same D17 reason as Rule A above.
 has 'Rule B: co-location alone is not a conflict' "$STEP6" \
-    'Rule B .{1,3} co-location is not conflict'
+    'Rule B .{1,40} co-location is not conflict'
 
 has 'Rule B: the one yes/no compatibility test' "$STEP6" \
     'can one edit satisfy both remedies'
@@ -145,9 +159,9 @@ has 'a NOT_REPRODUCED, agreed finding escalates to the Warchief immediately, not
 # explicitly, AND the reconciliation must be scoped to the `[cold-only]` half only — a
 # `[contract-only]` finding is carried by the contract lens's own verdict (Law 4) and is never a
 # hypothesis for the Warchief to pre-filter (W8/F11). Each assertion below is short and anchored on
-# a phrase unique to its own conjunct, with no long bridging span (W5 bar #1, F12b): a legal,
-# meaning-preserving rewording of the prose between two phrases must not push a bridge span past
-# its budget and redden an assertion that never asked to guard that prose. Every phrase named is
+# a phrase unique to its own conjunct, with every `.{0,N}` bridge sized to D17's >=30-char-headroom
+# floor (F12b flagged the previous `.{0,40}` on the hypothesis/dispositions bridge as only 27 chars
+# of headroom over its 13-char actual gap; widened to `.{0,50}` here). Every phrase named is
 # coined by this clause and appears nowhere else in step 6 (confirmed against the pre-fix file), so
 # deleting only this clause reddens only these five assertions.
 
@@ -155,7 +169,7 @@ has 'pre-filter is scoped to cold-only, never to contract-only' "$STEP6" \
     'ONLY permitted pre-filter on a `single` finding.s `\[cold-only\]` half.{0,40}never on its `\[contract-only\]` half'
 
 has 'cold-only finding is a hypothesis and gets an evidence-bearing disposition' "$STEP6" \
-    '`\[cold-only\]` finding is a hypothesis.{0,40}exactly one of Law 3.s three evidence-bearing dispositions'
+    '`\[cold-only\]` finding is a hypothesis.{0,50}exactly one of Law 3.s three evidence-bearing dispositions'
 
 has 'contract-only finding is not a hypothesis; carried by the contract lens own verdict' "$STEP6" \
     '`\[contract-only\]` finding is not a hypothesis.{0,40}carried by the contract lens.s own verdict'
@@ -182,10 +196,11 @@ has 'agreed does not wait on the ledger rule below; single is governed by it unc
     'does not wait on the ledger-adjudication rule below'
 
 # Second conjunct: the `single` clause explicitly says that same ledger rule governs it
-# unchanged. A short bounded bridge (15 chars, vs. the old zero-gap literal) survives an
-# insertion like "still" between "below" and "governs" without needing a huge span.
+# unchanged. D17: the bridge is `.{0,40}` (>=30 headroom over the ~1-char actual gap between
+# "below" and "governs"), replacing the earlier `.{0,15}` that was under the 30-char floor and
+# could still be overflowed by an insertion like "still, only".
 has 'single finding: the ledger-adjudication rule below governs it unchanged' "$STEP6" \
-    'ledger-adjudication rule below.{0,15}governs unchanged'
+    'ledger-adjudication rule below.{0,40}governs unchanged'
 
 # --- Item 1 (F13/D16): what the agreed/NOT_REPRODUCED adjudication DOES -----------------------
 # The plan's mandated text says a `NOT_REPRODUCED` on an `agreed` finding "escalates to you
@@ -194,16 +209,21 @@ has 'single finding: the ledger-adjudication rule below governs it unchanged' "$
 # the Warchief weighs the fixer's falsification artifact against both reviewers' reports and
 # records exactly one of UPHELD / REJECTED / ESCALATED, and the act consumes no fix round. Each
 # outcome is its own short assertion, anchored on its own unique all-caps token plus its
-# consequence phrase, with no bridge that has to span across to a sibling outcome.
+# consequence phrase, with no bridge that has to span across to a sibling outcome. D17: each
+# clause verb phrase that used to be one zero-gap literal ("artifact defeats the finding", "does
+# not cover the condition", "does not let you tell") is itself split by an internal `.{0,40}`
+# bridge, so a plausible clarifying word inserted mid-clause (e.g. "still") no longer breaks it —
+# and the ESCALATED tail bridge is widened from `.{0,15}` to `.{0,40}` for the same >=30-headroom
+# reason as the assertions above.
 
 has 'agreed adjudication UPHELD drops the finding as falsified, no fixer round spent' "$STEP6" \
-    'UPHELD.{0,40}artifact defeats the finding.{0,60}DROPPED \(falsified\).{0,50}no fixer round is spent'
+    'UPHELD.{0,40}artifact.{0,40}defeats the finding.{0,60}DROPPED \(falsified\).{0,50}no fixer round is spent'
 
 has 'agreed adjudication REJECTED sends it back to the fixer with the condition named' "$STEP6" \
-    'REJECTED.{0,50}does not cover the condition.{0,150}back to the fixer with that condition named'
+    'REJECTED.{0,50}does not.{0,40}cover the condition.{0,150}back to the fixer with that condition named'
 
 has 'agreed adjudication ESCALATED goes to the Shaman as NEEDS_DIRECTION' "$STEP6" \
-    'ESCALATED.{0,50}does not let you tell.{0,40}NEEDS_DIRECTION.{0,15}to the Shaman'
+    'ESCALATED.{0,50}does not.{0,40}let you tell.{0,40}NEEDS_DIRECTION.{0,40}to the Shaman'
 
 has 'agreed adjudication is a review act: it consumes no fix round' "$STEP6" \
     'is a REVIEW act.{0,100}consumes NO fix round'
@@ -212,10 +232,14 @@ has 'agreed adjudication is a review act: it consumes no fix round' "$STEP6" \
 # Idea-05's shipped ledger-adjudication rule opened with no signal that an `agreed` finding's
 # `NOT_REPRODUCED` does not wait for it (the carve-out lived only in a paragraph 30 lines earlier
 # that the rule never acknowledged). D16 authorizes exactly one pointer clause, added to the
-# rule's own text, changing no duties and none of its three outcomes.
+# rule's own text, changing no duties and none of its three outcomes. D17: each
+# "finding's `NOT_REPRODUCED`" occurrence is itself split by an internal `.{0,40}` bridge (rather
+# than left as one zero-gap literal run), so a clarifying insertion right after "finding's" (e.g.
+# "finding's own") cannot break this — the most sensitive edit in the campaign gets the same
+# >=30-headroom treatment as everything else.
 
 has 'ledger-adjudication rule points to the agreed carve-out: it governs single, not agreed' "$STEP6" \
-    'governs a `single` finding.s `NOT_REPRODUCED`.{0,60}`agreed` finding.s `NOT_REPRODUCED`.{0,40}adjudicated immediately.{0,40}per the routing table above'
+    'governs a `single` finding.s.{0,40}`NOT_REPRODUCED`.{0,60}`agreed` finding.s.{0,40}`NOT_REPRODUCED`.{0,40}adjudicated immediately.{0,40}per the routing table above'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
