@@ -61,5 +61,18 @@ has "skinner: knows it is one of two independent reviewers" "$SKIN" 'one of two 
 has "skinner: never seeks or accepts the peer findings"     "$SKIN" 'never seek'
 has "skinner: reports only what it independently derived"   "$SKIN" 'independently derived'
 
+# Consistency — no passage anywhere in warchief.md may still describe a single-Skinner audit.
+WAR="$(flat <"$WARCHIEF")"
+has   "consistency: frontmatter description audits with two Skinners" "$WAR" 'audits every deliverable with \*\*two independent skinners\*\*'
+has   "consistency: header line audits with two Skinners"   "$WAR" 'you audit the result with \*\*two independent skinners\*\*'
+has   "consistency: anti-goal 4 audits with two Skinners"   "$WAR" 'audited by \*\*two independent skinners\*\*'
+has   "consistency: anti-goal 4 escalates with both reports" "$WAR" 'both skinners.{0,3} last fail reports'
+has   "consistency: dispatch contract names the Skinner pair" "$WAR" 'audit its diff with the \*\*skinner\*\* pair'
+has   "consistency: wave-failure text carries both reports" "$WAR" 'both skinners.{0,3} round-3 fail'
+has   "consistency: step 5 model note names the Skinner pair" "$WAR" 'stays on the \*\*skinner\*\* pair'
+has   "consistency: final report cites both Skinners"       "$WAR" 'audited pass against the spec by both skinners'
+hasnt "consistency: no lone-Skinner audit claim survives"   "$WAR" 'spec by the skinner'
+hasnt "consistency: no lone-Skinner escalation survives"    "$WAR" 'attach the skinner'
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

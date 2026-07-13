@@ -351,7 +351,7 @@ Skinner — including the YAML `description:` frontmatter, which is the text Cla
 to decide when and how to invoke this agent. A prompt that contradicts itself is a prompt the model
 resolves arbitrarily, so every one of them is assertion-covered here, not eyeballed.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append the consistency assertions to the test file, above the tally. The patterns use `.` wildcards
 where the target text contains an apostrophe, so no quoting games are needed:
@@ -386,7 +386,7 @@ bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 Expected (RED): all ten new `consistency:` assertions fail — the eight `has` patterns are absent,
 and the two `hasnt` patterns are still present in today's text. Tally `18 passed, 10 failed`, exit 1.
 
-- [ ] **Step 2: Update all seven passages**
+- [x] **Step 2: Update all seven passages**
 
 Apply these seven exact replacements in `plugins/tribe/agents/warchief.md`. Each `old` string below
 is verbatim from the current file; each `new` string keeps the surrounding line-wrapping intact.
@@ -500,7 +500,7 @@ is verbatim from the current file; each `new` string keeps the surrounding line-
   step 6), attach both Skinners' round-3 FAIL reports **verbatim** instead of summarizing them.
 ```
 
-- [ ] **Step 3: Verify GREEN plus the regression guard**
+- [x] **Step 3: Verify GREEN plus the regression guard**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
@@ -515,7 +515,7 @@ single instance *within* the pair — no passage may still imply the audit runs 
 two `hasnt` assertions above already fail the build if either of the two known lone-Skinner claims
 survives, so this read-through is a backstop, not the gate.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-dual-skinner-cell.sh \
