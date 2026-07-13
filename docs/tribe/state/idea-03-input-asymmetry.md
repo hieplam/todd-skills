@@ -10,8 +10,51 @@ plan: docs/tribe/planning/idea-03-input-asymmetry/plan.md
 - [x] spec committed (settled law on master, PR #25)
 - [x] plan committed (settled law on master, PR #25; validate-plan.sh passes)
 - [x] wave 1 integrated (tasks 1-4 committed: 648e42d, 49b8b64, a03bbe5, a3c70b6; fixes f8822c3, f718262)
-- [ ] branch audit PASS (round 3 of 3 FAILED — escalated NEEDS_DIRECTION)
+- [x] branch audit PASS (final: contract lens AUDIT: PASS, cold lens 0 Critical; D13 hard stop)
 - [ ] PR squash-merged
+
+## FINAL AUDIT (range b1f508a..8e750b2) — **ROUND PASSES** 2026-07-13T10:12Z
+Skinner A (lens: contract): **AUDIT: PASS** — 14/14 rows; 6/6 suites green (46+27+35+28+32+7 = 175
+passing assertions, 0 failing); eval 16 run LIVE -> PASS. ZERO Critical, ZERO Important.
+Skinner B (lens: cold, path-scoped to plugins/**, uncontaminated): **COLD-LENS: 1 hypothesis** —
+ZERO Critical, 1 Important. B independently per-clause mutation-tested a sample of the new tripwires
+(the must-not-read rule, the Hunter-report row, the commit/branch/PR row, the F10 precedence sentence,
+the H1 contamination sentence) — every one correctly flipped red. No hollow greps found.
+
+Per ruling D13's HARD STOP: an Important no longer blocks; only a NEW Critical returns to the Shaman.
+There is no Critical. **THE ROUND PASSES — SHIP.**
+
+### Dispositions
+- F12 [cold-only] Important — **CONFIRMED, ships as a documented follow-up (D13)**. warchief.md:544
+  (this card's OWN rewritten Law 4) still says escalation attaches "**both round-3 FAIL reports**".
+  But the card's new Law 4 makes a round fail when the contract lens returned `AUDIT: PASS` and a
+  cold hypothesis is Confirmed — and the cold lens NEVER emits an `AUDIT: FAIL` line at all (its
+  terminator is `COLD-LENS: N hypotheses`). So "both FAIL reports" names a state that the very rule
+  above it says can be false. The stale phrase also survives untouched at :248, :401, :744
+  (pre-existing, outside this card's fence).
+  LIVE EVIDENCE FROM THIS CAMPAIGN: audit R6b hit exactly this state — contract lens PASS, a Confirmed
+  cold Important, round failed — and the Warchief escalated holding one `AUDIT: PASS` report and one
+  `COLD-LENS:` report, not two FAIL reports. The charitable reading held, but the letter of the law
+  did not describe reality. Follow-up: reword to verdict-neutral ("both Skinners' last reports — the
+  contract lens's verdict and the cold lens's hypotheses + dispositions") at all four sites, and add a
+  round-3-escalation eval covering the PASS-contract-lens + Confirmed-cold-hypothesis path.
+- F11 [cold-only] Minor — test-input-asymmetry.sh:98's anchor is satisfied by both the prose lead-in
+  and the table row; deleting only the row leaves it green. Content genuinely present twice. Ships.
+- Minor (A) — the plan's DoD literal count says "34 passed"; actual is 46 (later rounds added the H1,
+  F10 and eval-content guards). Stale number, not drift. Ships.
+- Minor (A/B) — evals.json's diff carries em-dash re-serialization noise (json.dumps ensure_ascii).
+  Cosmetic. Ships.
+
+### Follow-up candidates for the Shaman (filed in the PR body)
+1. **Path-scope the cold lens's diff.** warchief.md step 6 forbids the contract in the cold BRIEF but
+   says nothing about the diff RANGE containing it. The tribe's own spec/plan/state files live in the
+   repo, so they land in every tribe card's diff — and a cold Skinner DID read them this campaign
+   (audit R6). The law needs: "path-scope the cold lens's diff to the operative code, excluding
+   contract documents." This card cannot fix its own law inside its own fence.
+2. **F12** — the verdict-neutral escalation rewording above (4 sites) + the missing round-3 eval.
+3. **Per-clause mutation as the standing acceptance bar** — a whole-file revert cannot distinguish
+   "this assertion guards its clause" from "it guards some other clause the revert also deleted".
+   That is precisely how the Critical F5 survived a round. Worth writing into the Warchief's law.
 
 ## RULING D13 — RECEIVED 2026-07-13T10:00Z (authorizes the FINAL round; hard stop after it)
 GRANTED: (a) — ONE final bounded round. Rationale on record: F10 is the unfinished half of H1, which
