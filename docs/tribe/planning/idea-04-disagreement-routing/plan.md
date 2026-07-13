@@ -49,7 +49,7 @@ implementer.**
 Creates the mechanical conformance test, then teaches step 6 what `agreed`, `single`, and
 `conflicting` mean — including the two rules that stop the taxonomy from degenerating.
 
-- [ ] **Step 1: Write the test harness with the class assertions (RED)**
+- [x] **Step 1: Write the test harness with the class assertions (RED)**
 
 Create `plugins/tribe/scripts/tests/test-disagreement-routing.sh`. It greps step 6 of `warchief.md`
 for the invariants a careless future edit would silently delete. Harness style follows
@@ -122,7 +122,7 @@ not ok - Rule B: the one yes/no compatibility test (missing: can one edit satisf
 exit=1
 ```
 
-- [ ] **Step 2: Add the class definitions to step 6 (GREEN)**
+- [x] **Step 2: Add the class definitions to step 6 (GREEN)**
 
 In `plugins/tribe/agents/warchief.md`, inside step 6, insert this block **immediately after idea
 01's merge law** (the paragraph that tags each merged finding `[both]` or `[one]`) and **before**
@@ -176,7 +176,7 @@ ok - Rule B: the one yes/no compatibility test
 exit=0
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 chmod +x plugins/tribe/scripts/tests/test-disagreement-routing.sh

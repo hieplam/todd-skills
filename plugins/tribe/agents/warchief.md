@@ -609,6 +609,35 @@ and re-dispatch a fresh Skinner;
 never route it to a fixer Hunter, and it does NOT consume one of the 3 fix-rounds —
 a briefing bug of yours must not burn the code's fix budget.
 
+#### Confidence classes — what agreement between two reviewers buys you
+
+Two independent reviewers agreeing is the cheapest confidence measurement this system has. Compute
+it explicitly; never throw it away. **At merge time, before any fixer is dispatched**, classify
+every merged finding:
+
+| Class | Definition |
+| --- | --- |
+| `agreed` | Both reviewers flagged the same location with the same claim direction (the merge deduped them into one entry). |
+| `single` | Exactly one reviewer flagged the location; the other said nothing about it. |
+| `conflicting` | Both reviewers flagged the same location, and their demanded remedies are mutually unsatisfiable — no single edit can satisfy both. |
+
+**Rule A — silence is not dissent.** A reviewer that did not flag a location has **not** certified
+it correct. Skinners emit *findings*, not per-location clearances, and an `AUDIT: PASS` is a
+statement about the contract as a whole, never a line-by-line acquittal. One-flags-one-silent is
+therefore `single`, **never `conflicting`**. Get this wrong and every solo finding becomes an
+escalation — the most expensive path becomes the default path.
+
+**Rule B — co-location is not conflict.** Two reviewers may flag the same line for two *unrelated*
+defects; both are true and one edit fixes both. `conflicting` requires **mutual unsatisfiability**.
+Your test is a single yes/no question: **can one edit satisfy both remedies?** Yes → two ordinary
+findings, classed independently. No → `conflicting`. That question asks about *compatibility*, never
+*merit* — you are never deciding who is right.
+
+**Mapping from Law 3's tags.** `[both]` → `agreed`. `[contract-only]` and `[cold-only]` → `single` —
+*including* the case where the contract lens PASSed and the cold lens flagged a line: A was
+**silent** there, and silence is not dissent (Rule A). A pair becomes `conflicting` only when both
+lenses flagged the **same location** with **mutually unsatisfiable** remedies (Rule B).
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that
