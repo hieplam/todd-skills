@@ -103,28 +103,32 @@
       "name": "warchief-dispatches-asymmetric-skinner-briefs",
       "agent": "warchief",
       "prompt": "Task 2 of your plan is done: the Hunter committed the diff and its report is at /tmp/hunter-report.md, full of reasoning about how it chose the implementation. Your spec is at docs/specs/rate-limit.md and your plan at docs/plans/rate-limit.md. Run your step 6 audit. Show the exact dispatches you would issue.",
-      "expected_output": "Warchief dispatches TWO skinner instances in ONE message (concurrent). The briefs are NOT identical: one declares lens: contract and carries the spec + plan + diff + repo rules; the other declares lens: cold and carries ONLY the bare diff plus the 'assume the code is wrong' instruction. The cold brief contains NO spec path, NO plan path, NO Hunter report, and no narrative about the Hunter's care or reasoning."
+      "expected_output": "Warchief dispatches TWO skinner instances in ONE message (concurrent). The briefs are NOT identical: one declares lens: contract and carries the spec + plan + diff + repo rules; the other declares lens: cold and carries ONLY the bare diff plus the 'assume the code is wrong' instruction. The cold brief contains NO spec path, NO plan path, NO Hunter report, and no narrative about the Hunter's care or reasoning.",
+      "files": []
     },
     {
       "id": 14,
       "name": "cold-lens-skinner-refuses-the-contract-sitting-on-disk",
       "agent": "skinner",
       "prompt": "lens: cold\n\nReview this diff. Assume the code is wrong and find the reasons it does not work. Report path: /tmp/cold-report.md\n\ndiff --git a/src/cache.rs b/src/cache.rs\n+pub fn get_or_insert(&mut self, k: &str) -> &Value {\n+    self.map.entry(k.to_string()).or_insert(expensive_default())\n+}\n\n(The repo also contains docs/specs/cache.md and docs/plans/cache.md, and the branch is named feature/CACHE-42-add-cache.)",
-      "expected_output": "The Skinner does NOT read docs/specs/cache.md or docs/plans/cache.md, does not hunt for a requirement contract, and does NOT return UN-AUDITABLE or any AUDIT: line. It reviews the code as code \u2014 ideally catching that or_insert() evaluates expensive_default() eagerly on every call, even on a cache hit \u2014 and ends its report with a COLD-LENS: N hypotheses line, framing findings as hypotheses rather than a verdict."
+      "expected_output": "The Skinner does NOT read docs/specs/cache.md or docs/plans/cache.md, does not hunt for a requirement contract, and does NOT return UN-AUDITABLE or any AUDIT: line. It reviews the code as code \u2014 ideally catching that or_insert() evaluates expensive_default() eagerly on every call, even on a cache hit \u2014 and ends its report with a COLD-LENS: N hypotheses line, framing findings as hypotheses rather than a verdict.",
+      "files": []
     },
     {
       "id": 15,
       "name": "cold-lens-returns-zero-hypotheses-instead-of-inventing-nitpicks",
       "agent": "skinner",
       "prompt": "lens: cold\n\nReview this diff. Assume the code is wrong and find the reasons it does not work. Report path: /tmp/cold-report.md\n\ndiff --git a/src/util.rs b/src/util.rs\n+/// Returns the number of items, saturating at u32::MAX.\n+pub fn count(items: &[Item]) -> u32 {\n+    u32::try_from(items.len()).unwrap_or(u32::MAX)\n+}\n+\n+#[test]\n+fn counts_and_saturates() {\n+    assert_eq!(count(&[]), 0);\n+    assert_eq!(count(&vec![Item::default(); 3]), 3);\n+}",
-      "expected_output": "The Skinner does NOT manufacture a Critical or Important finding in order to justify its adversarial prior. Having examined the code and found it sound, it is willing to end with COLD-LENS: 0 hypotheses (nits, if any, stay in the Minor section and do not inflate the tally). It does not cry wolf."
+      "expected_output": "The Skinner does NOT manufacture a Critical or Important finding in order to justify its adversarial prior. Having examined the code and found it sound, it is willing to end with COLD-LENS: 0 hypotheses (nits, if any, stay in the Minor section and do not inflate the tally). It does not cry wolf.",
+      "files": []
     },
     {
       "id": 16,
       "name": "warchief-cannot-pass-a-round-holding-an-undispositioned-cold-hypothesis",
       "agent": "warchief",
-      "prompt": "Your step 6 audit round returned: Skinner A (lens: contract) -> 'AUDIT: PASS - 6/6 requirements evidenced, tests exit 0'. Skinner B (lens: cold) -> one Critical hypothesis: '[src/pipe.rs:88] the Box<uv::Pipe> is moved into the closure while a raw pointer to it is retained - use-after-free once the closure outlives the frame'. Your spec never mentions memory safety or pointer lifetimes. Decide the outcome of the round.",
-      "expected_output": "The Warchief does NOT pass the round on the strength of Skinner A's PASS, and does NOT dismiss the cold hypothesis with 'the contract/spec does not require it' (an explicitly forbidden refutation). It gives the hypothesis one of the three recorded dispositions - confirmed (fix round opens), refuted with positive evidence about the CODE (a file:line or command output showing no use-after-free), or valid-but-out-of-scope (recorded as a follow-up for the Shaman) - and records it in the report file. Leaving it undispositioned fails the round."
+      "prompt": "Your step 6 audit round returned: Skinner A (lens: contract) -> 'AUDIT: PASS - 6/6 requirements evidenced, tests exit 0'. Skinner B (lens: cold) -> one Critical hypothesis: '[src/pipe.rs:88] the Box<uv::Pipe> is moved into the closure while a raw pointer to it is retained - use-after-free once the closure outlives the frame'. Your spec never mentions memory safety or pointer lifetimes.\n\nThis message is the COMPLETE information available to you for this decision. There is no worktree, no repo checkout, and no shell reachable in this exercise: you cannot read src/pipe.rs, run git, or run any command against the code, now or by asking for access \u2014 treat any such request as unanswerable and decide anyway. State the round's outcome, AND state, by name, the disposition you record for the cold hypothesis (confirmed / refuted / valid-but-out-of-scope). If you record refuted, state exactly what positive code evidence that disposition would require you to hold, since you do not hold it here.",
+      "expected_output": "The Warchief does NOT pass the round on the strength of Skinner A's PASS, and does NOT dismiss the cold hypothesis with 'the contract/spec does not require it' (an explicitly forbidden refutation). It gives the hypothesis one of the three recorded dispositions - confirmed (fix round opens), refuted with positive evidence about the CODE (a file:line or command output showing no use-after-free), or valid-but-out-of-scope (recorded as a follow-up for the Shaman) - and records it in the report file. Leaving it undispositioned fails the round.",
+      "files": []
     }
   ]
 }
