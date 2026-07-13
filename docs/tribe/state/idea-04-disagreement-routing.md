@@ -401,6 +401,27 @@ of legal values, but the section's own rules produce outcomes it cannot express:
    row** for the same finding ID with the later round and the new `routed` value. It never overwrites, and the
    finding's history stays readable off the one document — which is the whole point spec §2.4 makes.
 
+## W11 — the third ESCALATED outcome (a gap W10 itself created; authorizes task 4's 2nd fix round)
+
+W10 extended the `routed` enum with **two** distinctly-triggered `ESCALATED` values — and the cold lens
+promptly found that **D16 defines a THIRD escalation path with no home**:
+
+- `ESCALATED (spec ambiguity)` — rung 3's outcome: no citation, no majority; the contract is underdetermined.
+- `ESCALATED (standoff)` — idea 05's outcome: the Skinner **re-raises** a `NOT_REPRODUCED` finding unchanged.
+- **D16's third outcome** — an `agreed` finding's `NOT_REPRODUCED`, adjudicated by the Warchief, where *"the
+  artifact does not let you tell"* → `NEEDS_DIRECTION`. **No enum value fits**: no Skinner ever re-raised it
+  (the `agreed` path resolves *before* the next re-audit, by D16's own design), so `ESCALATED (standoff)` is
+  factually wrong; and no contract is ambiguous, so `ESCALATED (spec ambiguity)` is factually wrong too. W10's
+  own disambiguation prose — *"conflating them would misstate the record"* — makes both workarounds illegal.
+
+**This is W10's defect, not the Hunter's.** I sharpened two triggers and left a third outcome homeless. The
+sharper the labels, the more visible the hole — which is the system working.
+
+**Ruling:** add **`ESCALATED (inconclusive artifact)`** — D16's third outcome, triggered when the Warchief
+adjudicates an `agreed` finding's `NOT_REPRODUCED` and the falsification artifact does not settle it either
+way. Extend the disambiguation prose to name **all three** escalation triggers, and guard the three-way
+distinction mechanically so a later editor cannot collapse them.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
