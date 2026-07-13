@@ -48,6 +48,25 @@ hasnt() { # hasnt NAME HAYSTACK REGEX — the (flattened) text must NOT contain 
   if grep -Eqi -- "$3" <<<"$2"; then bad "$1 (found forbidden: $3)"; else ok "$1"; fi
 }
 
+# every_claim_superseded NAME HAYSTACK SHAPE BOUND — EVERY occurrence of the claim SHAPE must also
+# be an occurrence of BOUND (the same claim, followed by its supersession). A `hasnt` cannot express
+# this invariant: the claim itself is idea-05's pre-existing, deliberately-preserved text (W19 forbids
+# deleting or rewording it), so forbidding the claim outright would forbid the shipped law. What is
+# forbidden is the claim standing UNSUPERSEDED — anywhere, in any wording of the class. Counting
+# SHAPE against BOUND is what makes that mechanical: a re-inflation worded "greppable", "automatic",
+# "a string compare" or "byte-for-byte" is still a SHAPE, and a SHAPE with no supersession behind it
+# fails the count. 0 == 0 passes (no claim, nothing to supersede); 2 == 1 fails (one bare claim).
+every_claim_superseded() {
+  local n_shape n_bound
+  n_shape=$(grep -Eoi -- "$3" <<<"$2" | wc -l | tr -d ' ' || true)
+  n_bound=$(grep -Eoi -- "$4" <<<"$2" | wc -l | tr -d ' ' || true)
+  if [[ "$n_shape" -eq "$n_bound" ]]; then
+    ok "$1"
+  else
+    bad "$1 (mechanism-vs-judgment claims: $n_shape; superseded: $n_bound)"
+  fi
+}
+
 # --- Task 1: the three confidence classes -----------------------------------
 # Each regex binds the class-table row's own token to the pipe cell that immediately
 # follows it, then to a phrase unique to that row's own definition ([^|]* never crosses
@@ -1336,11 +1355,18 @@ has 'the crash-cost paragraph names its own outcome as ESCALATED (oracle unavail
 # of D17 headroom over its actual current consumption; near-zero gaps are left near-bare per this
 # file's convention.
 
-# The lookup is stated as a JUDGMENT, never a grep/string-compare. Actual gap 2 chars; `.{0,40}` keeps
-# 38 chars of headroom.
+# The lookup is stated as a JUDGMENT, never a grep/string-compare. Actual gaps 2 and 2 chars;
+# `.{0,40}` keeps 38 chars of headroom on each.
+# F36 TIGHTENING (per-clause anchoring, W5 bar #2): this assertion used to open on the bare predicate
+# `the Warchief.s JUDGMENT`. F36's fix adds a supersession clause ~170 lines below that legitimately
+# restates that same predicate ("the Warchief's judgment, never a grep or string-compare") — so the
+# old regex would have been held GREEN by the supersession even if THIS paragraph were deleted. It is
+# now anchored on the subject phrase unique to this clause ("the current conflict's finding key"; the
+# supersession's subject is "the same finding re-raised in a later round"), so deleting only this
+# paragraph reddens only this assertion. A tightening: no conjunct is dropped.
 has 'recognizing a listed key as the current finding is the Warchiefs JUDGMENT, never a grep or string-compare' \
     "$STEP6" \
-    'the Warchief.s JUDGMENT.{0,40}never a grep or string-compare'
+    'a listed key IS the current conflict.s finding key.{0,40}the Warchief.s JUDGMENT.{0,40}never a grep or string-compare'
 
 # That judgment is explicitly the SAME recognition Law 3's merge already relies on -- not a new
 # capability the state file invents (guards against re-treating this as a novel mechanical faculty).
@@ -1412,12 +1438,67 @@ has 'the cap bounds the procedure, not a promise about the world, because recogn
     "$STEP6" \
     'bounds the procedure, not a promise about the world.{0,45}key recognition is a judgment call'
 
-# The recognition error's cost is ITSELF bounded -- at most one extra review round, the exact cost
-# W16's on-doubt default already prices in -- never an unbounded run of tie-breaks on one finding.
-# Actual gaps 32 and 23 chars; `.{0,65}`/`.{0,55}` keep >=32 chars of D17 headroom on each.
-has 'a recognition error costs at most one extra review round, the same cost the on-doubt default already prices in' \
+# --- F37 (W19): the recognition-error cost bound is scoped to the ONE direction it covers ----------
+#
+# F37 (Important, cold lens). REPRODUCED by direct extraction of the shipped, flattened clause: the
+# Bounds paragraph said "a recognition error is possible, and ITS COST IS BOUNDED TOO -- at most one
+# extra review round", a BLANKET claim over both error directions. It is true of exactly one of them.
+# The other direction -- wrongly treating an UNSPENT key as SPENT -- burns a human ruling at rung 3
+# and denies a genuinely new finding the mechanical oracle, which step 6 itself states thirteen lines
+# later in the on-doubt paragraph. The blanket claim understated the cost by omission, and the OLD
+# assertion here (`recognition error is possible.{0,65}at most one extra review round...`) vouched for
+# it -- so it is RETIRED and replaced, exactly as F30's "greppable" assertion was, rather than left
+# certifying a claim the prose no longer makes. W19's ruling: scope the bound to the direction it
+# actually covers, and name the other direction's cost IN THE SAME BREATH.
+#
+# Every bridge below is measured against the shipped, flattened clause and keeps >=30 chars of D17
+# headroom over its actual current consumption.
+
+# Regression guard: the retired BLANKET cost claim must never come back. Verbatim, unique substring of
+# the pre-fix text (confirmed by direct grep against the pre-fix shipped text); matches nothing in the
+# corrected text below.
+hasnt 'the retired blanket recognition-error cost claim (bounded in BOTH directions) does not survive' \
     "$STEP6" \
-    'recognition error is possible.{0,65}at most one extra review round.{0,55}on-doubt default below already prices in'
+    'its cost is bounded too'
+
+# Conjunct 1 -- the bound is SCOPED: it covers only one of the two recognition-error directions.
+# Actual gap 6 chars; `.{0,45}` keeps 39 chars of D17 headroom.
+has 'the recognition-error cost bound is scoped to ONE of its two directions, not both' "$STEP6" \
+    'recognition error is possible.{0,45}the bound covers only ONE of its two directions'
+
+# Conjunct 2 -- the BOUNDED direction is named, with its cost and the on-doubt default that prices it
+# in. Anchored on "Reading a SPENT key as unspent", which is unique to THIS clause (the on-doubt
+# paragraph below says "wrongly treating a spent key as unspent"), so the on-doubt clause can never
+# hold this assertion green and vice versa (W5 bar #2). Actual gaps 6 and 23 chars; `.{0,40}`/`.{0,55}`
+# keep >=32 chars of D17 headroom on each.
+has 'the BOUNDED direction is named: reading a SPENT key as unspent costs at most one extra review round' \
+    "$STEP6" \
+    'Reading a SPENT key as unspent.{0,40}at most one extra review round.{0,55}on-doubt default below already prices in'
+
+# Conjunct 3 (W5 bar #3 -- conjunct completeness: the claim's name is compound, so BOTH halves are
+# checked) -- the OTHER direction is explicitly NOT covered by the bound, and its cost is named in the
+# same breath: a burned human ruling at rung 3 AND a denied mechanical oracle. Four anchors, each
+# bridged at its own clause joint rather than glued into one multi-clause literal (D17). Actual gaps
+# 2, 1 and 5 chars; `.{0,40}` keeps >=35 chars of D17 headroom on each.
+has 'the OTHER direction is NOT bounded, and its cost -- a burned human ruling, a denied oracle -- is named in the same breath' \
+    "$STEP6" \
+    'The other direction is not bounded by it.{0,40}reading an UNSPENT key as spent.{0,40}burns a human ruling at rung 3.{0,40}denies a genuinely new finding the mechanical oracle'
+
+# Conjunct 4 -- W19's second half: the on-doubt default states WHY it leans away from the expensive
+# error, not merely THAT it does. The default is justified by the error it makes when it is WRONG:
+# it errs into the bounded cost, never into the unbounded one. Actual gaps 6 and 2 chars; `.{0,40}`
+# keeps >=34 chars of D17 headroom on each.
+has 'the on-doubt default says WHY it leans that way: it errs into the bounded cost, never the unbounded one' \
+    "$STEP6" \
+    'The cheaper error is the default.{0,40}errs into the bounded cost.{0,40}never into the unbounded one'
+
+# Conjunct 5 -- and WHY that asymmetry is decisive: one wrong direction is recoverable by the next
+# round, the other is recoverable by nothing. Both halves checked (W5 bar #3); each anchored inside
+# its own clause and bridged at the clause joints (D17). Actual gaps 1, 8 and 1 chars; `.{0,35}`/
+# `.{0,45}` keep >=34 chars of D17 headroom on each.
+has 'the WHY is the recoverability asymmetry: a review round the next round recovers vs a human ruling nothing recovers' \
+    "$STEP6" \
+    'being wrong that way costs a review round.{0,35}the next round recovers.{0,45}being wrong the other way costs a human ruling.{0,35}nothing recovers'
 
 # --- F34 (D19): the ledger's idempotence parenthetical is qualified to what is actually true --------
 #
@@ -1515,6 +1596,72 @@ hasnt 'rung-2 leak: no text hands, attaches, or tells the tie-break Skinner eith
 hasnt 'delegating an unresolvable conflict downward: no text routes a conflicting finding to the fixer as-is' \
       "$STEP6" \
       'route (the )?`?conflicting`? .{0,50}to the fixer'
+
+# --- F36 (W19): idea-05's "mechanical instead of a judgment call" is SUPERSEDED, in place ----------
+#
+# F36 (Critical, contract lens). REPRODUCED by direct extraction of the shipped, flattened text: step 6
+# said BOTH of these, ~170 lines apart, and neither acknowledged the other --
+#   idea-05 (pre-existing): "the key is how you recognise the SAME finding re-raised later, which is
+#     what makes the loop termination below MECHANICAL INSTEAD OF A JUDGMENT CALL."
+#   W16 (this card):        "Recognizing that a listed key IS the current conflict's finding key is the
+#     Warchief's JUDGMENT, NEVER A GREP OR STRING-COMPARE."
+# W16 retired exactly that mechanism claim for exactly that recognition act. The shipped honesty guard
+# (`hasnt 'greppable'`, above) is a LITERAL-STRING check: it was GREEN on this text (0 occurrences of
+# the word) while the identical overclaim, worded "mechanical", stood unqualified. A guard that catches
+# one spelling of a claim does not guard the claim.
+#
+# W19's ruling, and the shape of this fix: idea-05's sentence is PRE-EXISTING law and is neither
+# deleted nor reworded -- not one character of it. What lands is a SUPERSESSION CLAUSE immediately
+# after it, drawing the distinction the two texts were talking past: what the key makes mechanical is
+# the RECORDING (writing the ID and key down once, stably); the RECOGNITION that a listed key IS the
+# same finding re-raised in a later round is the Warchief's judgment, never a grep or string-compare.
+# Then the guard is broadened from the literal word to the CLAIM CLASS (`every_claim_superseded`).
+#
+# Every bridge below is measured against the shipped, flattened clause and keeps >=30 chars of D17
+# headroom over its actual current consumption.
+
+# The claim is BOUND to its supersession: idea-05's sentence is immediately followed by the clause
+# that scopes it to the RECORDING. Deleting only the supersession reddens only this (and the class
+# guard below). Actual gap 23 chars; `.{0,55}` keeps 32 chars of D17 headroom.
+has 'idea-05s mechanical-instead-of-a-judgment-call claim is immediately superseded: what the key makes mechanical is the RECORDING' \
+    "$STEP6" \
+    'mechanical instead of a judgment call.{0,55}what the key makes mechanical is the RECORDING'
+
+# The supersession's substance -- the RECOGNITION of a re-raised finding is the Warchief's judgment,
+# never a grep or string-compare (W5 bar #3: both conjuncts of the compound claim are checked). The
+# opening anchor is unique to THIS clause ("the same finding re-raised in a later round"); W16's own
+# paragraph, ~170 lines above, says "the current conflict's finding key" -- so neither clause can hold
+# the other's assertion green (W5 bar #2). Actual gaps 20 and 2 chars; `.{0,55}`/`.{0,40}` keep >=35
+# chars of D17 headroom on each.
+has 'the supersession says the RECOGNITION of a re-raised finding is the Warchiefs judgment, never a grep or string-compare' \
+    "$STEP6" \
+    'RECOGNITION that a listed key IS the same finding re-raised.{0,55}the Warchief.s judgment.{0,40}never a grep or string-compare'
+
+# The supersession points at the tie-break Bounds, which is where the fallibility of that judgment is
+# already priced in -- so the two texts are one law, not two. Actual gap 2 chars; `.{0,40}` keeps 38
+# chars of D17 headroom.
+has 'the supersession points back at the tie-break Bounds, which already prices that fallibility in' \
+    "$STEP6" \
+    'see the tie-break Bounds above.{0,40}which prices that fallibility in'
+
+# THE CLASS GUARD (W19: "broaden the guard so it catches this claim class by MEANING, not by the
+# single literal word 'greppable'"). SHAPE is the claim class -- a MECHANISM word asserted in
+# OPPOSITION to judgment ("<mechanism> instead of / rather than / not a judgment call") -- with the
+# mechanism spelled ANY of the ways this campaign has actually seen it spelled: greppable (F30),
+# mechanical (F36), and the near neighbours a future editor would reach for (automatic, a string
+# compare, a grep, byte-for-byte). `[^.]` bridges cannot cross a sentence boundary, so the shape
+# cannot be assembled out of two unrelated sentences. BOUND is the same shape WITH its supersession
+# behind it. The invariant: every claim of the class is superseded -- count(SHAPE) == count(BOUND).
+#
+# This is what a literal `hasnt` cannot express. idea-05's claim is preserved by W19's own ruling, so
+# forbidding the claim outright would forbid the shipped law; what is forbidden is the claim standing
+# BARE. Proven to bite in both directions (see the fix report): on the pre-fix text SHAPE=1, BOUND=0
+# -> red; re-inflating the claim elsewhere in any wording of the class -> SHAPE=2, BOUND=1 -> red.
+CLAIM_SHAPE='(greppable|mechanical|automatic|a string.compare|a grep|byte.for.byte)[^.]{0,60}(instead of|rather than|not) a judgment call'
+every_claim_superseded 'no mechanism-vs-judgment claim about the finding key survives UNSUPERSEDED, in any wording of the class' \
+    "$STEP6" \
+    "$CLAIM_SHAPE" \
+    "$CLAIM_SHAPE"'.{0,55}what the key makes mechanical is the RECORDING'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

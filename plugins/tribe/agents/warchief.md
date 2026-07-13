@@ -746,9 +746,13 @@ round per finding key, per campaign** (the key is the finding's identity, not th
 next paragraph states — recognising "the same key" is the Warchief's judgment, never a string
 compare): a conflict resurfacing on a key the Warchief recognises as the same has already spent its
 tie-break and goes **straight to rung 3**. **This bounds the procedure, not a promise about the
-world**: because key recognition is a judgment call, a recognition error is possible, and its cost is
-bounded too — **at most one extra review round**, exactly the cost the on-doubt default below already
-prices in, never an unbounded run of tie-breaks on the same finding. **Any Warchief — fresh or
+world**: because key recognition is a judgment call, a recognition error is possible, and **the bound
+covers only ONE of its two directions**. Reading a SPENT key as unspent costs **at most one extra
+review round** — exactly the cost the on-doubt default below already prices in, never an unbounded run
+of tie-breaks on the same finding. **The other direction is not bounded by it**: reading an UNSPENT
+key as spent burns a human ruling at rung 3 and denies a genuinely new finding the mechanical oracle
+this rung exists to give it — which is precisely why the on-doubt default below leans away from it.
+**Any Warchief — fresh or
 resumed — that ENTERS an audit round consults the state file's `## Tie-breaks spent` heading FIRST**,
 and if it finds a finding key listed there under EITHER status, treats that key's tie-break as SPENT —
 it goes straight to rung 3 and never dispatches a second tie-break Skinner on that key, regardless of
@@ -764,8 +768,10 @@ the same, not a new capability the state file invents. **On doubt, treat the key
 the two errors this default trades off are not symmetric: wrongly treating a spent key as unspent
 costs one extra review round, a second tie-break Skinner dispatched on what turns out to be the same
 finding; wrongly treating an unspent key as spent burns a human ruling at rung 3 and denies a
-genuinely new finding the mechanical oracle this rung exists to give it. The cheaper error is the
-default.
+genuinely new finding the mechanical oracle this rung exists to give it. **The cheaper error is the
+default** — it errs into the bounded cost, never into the unbounded one: being wrong that way costs a
+review round the next round recovers, while being wrong the other way costs a human ruling nothing
+recovers.
 
 **Which of the two it records is decided by the key's LATEST status line (W15) — never by the key's
 bare presence:**
@@ -929,6 +935,13 @@ brief like this:
   one-line claim` — in your report file. The Skinner emits findings without identity and its bullet
   order is not stable between rounds; the key is how you recognise the SAME finding re-raised later,
   which is what makes the loop termination below mechanical instead of a judgment call.
+
+  **Supersession (W16).** What the key makes mechanical is the **RECORDING** — writing the finding's
+  ID and key down once, stably, so a later round has something to point at. The **RECOGNITION** that a
+  listed key IS the same finding re-raised in a later round is the Warchief's judgment, never a grep
+  or string-compare (see the tie-break Bounds above, which prices that fallibility in). Nothing in the
+  sentence above is deleted or reworded: it is true of the recording, and it was never true of the
+  recognition.
 - **Each finding in the brief carries:** its ID, its severity, its confidence class (`single` when one
   Skinner ran — the field is filled by reviewer-disagreement routing if 2+ reviewers exist), the
   Skinner's claim + location + evidence **verbatim**, and the requirement/rule it maps to.
