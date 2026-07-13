@@ -92,5 +92,22 @@ has   "law1: cold brief must not carry the Hunter report"     "$STEP6" "hunter's
 has   "law1: cold brief must not carry commit/branch/PR text" "$STEP6" 'commit message|branch name|PR body'
 has   "law1: the cold lens may still read the codebase"       "$STEP6" 'not blind to the codebase|may read'
 
+# --- Task 3 — Delta-Law 3 (tags + disposition) and Delta-Law 4 (round-PASS rule) -----------
+# Repetition bounds capped at {0,200} (not {0,300}/{0,400}) to match this file's own convention
+# (see the {0,200} bounds already used by the law1 assertions above): BSD grep (the /usr/bin/grep
+# this repo's contributors actually run) rejects any {m,n} with n > 255 ("maximum repetition
+# exceeds 255"), so a wider bound would make the assertion never executable, on any content.
+has   "law3: three-tag vocabulary"                             "$STEP6" '\[both\].{0,200}\[contract-only\].{0,200}\[cold-only\]'
+has   "law3: cold findings are hypotheses"                     "$STEP6" 'hypothes'
+has   "law3: every cold hypothesis gets a recorded disposition" "$STEP6" 'disposition'
+has   "law3: the three dispositions are named"                 "$STEP6" 'confirmed.{0,200}refuted.{0,200}(out of scope|follow-up)'
+has   "law3: refuting needs evidence about the CODE"           "$STEP6" 'evidence that the code is correct|evidence about the code'
+has   "law3: the contract-does-not-require-it refutation is forbidden" "$STEP6" 'contract does not require'
+has   "law3: an undispositioned hypothesis fails the round"    "$STEP6" 'undispositioned|silence is not a disposition'
+has   "law4: only the contract lens holds the verdict"         "$STEP6" 'only the contract lens'
+has   "law4: the round-PASS rule is stated"                    "$STEP6" 'round passes if and only if'
+hasnt "law4: the both-must-PASS rule is gone"                  "$STEP6" 'pass requires both|requires both skinners'
+has   "law4: the 3-round cap is untouched"                     "$STEP6" '3-round fix cap|3 fix-rounds'
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

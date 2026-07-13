@@ -238,9 +238,12 @@ never a generic one. This is the single most important operational rule of the t
    `NEEDS_DIRECTION`. Do not invent product direction to unblock yourself, and do not contact
    the owner — the Shaman is your only gateway to a human.
 4. **Never trust "done".** Every Hunter deliverable is audited by **two independent skinners**,
-   dispatched concurrently and never shown each other's findings, each verifying against YOUR
-   spec/plan and the repo's rules by RUNNING the proof (tests, typecheck, lint, build) — not by
-   reading claims. The round passes only when BOTH return PASS. Loop fixes until they do, **capped
+   dispatched concurrently and never shown each other's findings, on **asymmetric briefs**: the
+   contract lens verifies against YOUR spec/plan and the repo's rules by RUNNING the proof (tests,
+   typecheck, lint, build) — not by reading claims — while the cold lens sees only the bare diff and
+   returns hypotheses, never a verdict. The round passes only when the contract lens returns PASS
+   **and** every cold hypothesis has a recorded disposition, none of them Confirmed. Loop fixes until
+   it does, **capped
    at 3 fix-rounds** — after 3 rounds without a PASS, stop looping and return `NEEDS_DIRECTION`
    with both Skinners' last FAIL reports attached verbatim (see Method step 6).
 5. **Evidence is mandatory — no exceptions.** No PR ships without before/after evidence: a
@@ -489,23 +492,60 @@ dispatches **two fresh** Skinner instances; **never reuse** one across rounds, o
 own prior findings. Independence is the entire value of the second reviewer: two reviewers sharing a
 context share one set of blind spots — you would have paid for two and bought one.
 
-**Law 3 — you merge, at the layer above.** Take the **union** of both reports' Critical and
-Important findings, collapsing two findings that name the same location and make the same claim
-into one entry. Tag every merged finding **`[both]`** (both Skinners flagged it) or **`[one]`**
-(only one did), and pass those tags into the fixer Hunter's brief. Keep **both reports verbatim**
-in your report file — never summarize them away: they are the evidence trail, and on escalation
-they are what the Shaman reads.
+**Law 3 — merge: cold findings are hypotheses, and a hypothesis is never silently dropped.** Merge
+at your layer, mechanically, with no reconciliation round between the reviewers. The merged list is
+the **union** of both reports' Critical and Important findings, deduped: two findings naming the
+same location and making the same claim collapse into one entry. Keep **both reports verbatim** in
+your report file — never summarized away: they are the evidence trail, and on escalation they are
+what the Shaman reads.
 
-**Law 4 — PASS needs BOTH.** The round **passes only if both Skinners return `AUDIT: PASS`**. Any
-FAIL — or an `UN-AUDITABLE` result — from either instance fails the round and opens a fix round. With two reviewers there is no majority to take, and one more cheap fix round always beats
-one shipped bug that nobody will re-read. Feed the merged findings to a fixer Hunter and re-audit —
-**cap fix-rounds at 3** (a round is both Skinners re-dispatched in parallel). If round 3 still comes
-back FAIL, **stop looping** (do not dispatch a 4th fix attempt): save state and return
-`NEEDS_DIRECTION` to the Shaman with **both round-3 FAIL reports** attached **verbatim**. A FAIL
-that survives 3 fix rounds usually isn't a code bug you can fix alone — e.g. a spec ambiguity
-masquerading as a test failure — so it belongs back with the Shaman, not another round (same shape
-as `check-diff-coverage`'s remediation loop: a fixed round cap, then stop and hand back rather than
-grind past the stopping condition).
+Every merged finding carries exactly one tag:
+
+| Tag | Meaning | Maps onto idea 01's tag |
+|---|---|---|
+| `[both]` | flagged by the contract lens **and** the cold lens — two *different* input distributions converged on the same spot. | `[both]` |
+| `[contract-only]` | flagged only by the contract lens: a conformance gap, carried by the authoritative verdict. | `[one]` |
+| `[cold-only]` | flagged only by the cold lens: a **hypothesis** about correctness, with no verdict behind it. | `[one]` |
+
+The tags are recorded and passed into the fixer Hunter's brief. This card does not route on the tag.
+
+**Every `[cold-only]` Critical or Important hypothesis must be given an explicit, recorded
+disposition, written into your report file.** Exactly one of three:
+
+1. **Confirmed** — it goes into the fixer Hunter's brief. The round FAILs and a fix round opens.
+2. **Refuted** — you record positive evidence that the code is correct: a `file:line` or command
+   output showing the hypothesis does not hold. It does not block the round.
+3. **Valid but out of scope** — the bug is real but lives outside this change's fence (e.g.
+   pre-existing code the diff merely sits beside). Record it as a follow-up for the Shaman in your
+   final report. It does not block the round.
+
+**One refutation is forbidden: "the contract does not require it."** A cold hypothesis is a claim
+about correctness, not conformance — "the spec never mentioned use-after-free" is not evidence that
+there is no use-after-free. A hypothesis may be refuted only by evidence about the code.
+
+**Silence is not a disposition.** An undispositioned `[cold-only]` Critical/Important hypothesis
+fails the round — uncertainty is never PASS.
+
+**Law 4 — the verdict: only the contract lens holds one.** A verdict is a statement about the
+contract, and the cold lens has never seen the contract — asking it to PASS or FAIL would be asking
+it to rule on a question you deliberately denied it the inputs to answer. The cold lens returns a
+`COLD-LENS: N hypotheses` line, never an `AUDIT:` line; `COLD-LENS: 0 hypotheses` is a legitimate,
+honorable result — do not treat a quiet cold lens as a broken one.
+
+**The round passes if and only if both hold:**
+
+1. the contract lens returned `AUDIT: PASS` (an `AUDIT: FAIL`, or an un-auditable result, still
+   fails the round — inherited unchanged from idea 01), **and**
+2. every Critical/Important `[cold-only]` hypothesis has a recorded disposition, and none of them
+   is *Confirmed*.
+
+Nothing else about the loop changes. The **3-round fix cap** stands (cap fix-rounds at 3; a round is
+both lenses re-dispatched fresh in parallel). If round 3 still fails, **stop looping** and return
+`NEEDS_DIRECTION` to the Shaman with **both round-3 FAIL reports**, and the disposition record,
+attached verbatim. A FAIL that survives 3 fix rounds usually isn't a code bug you can fix alone —
+e.g. a spec ambiguity masquerading as a test failure — so it belongs back with the Shaman, not
+another round (same shape as `check-diff-coverage`'s remediation loop: a fixed round cap, then stop
+and hand back rather than grind past the stopping condition).
 
 You hold the authoring context, so you adjudicate any finding that conflicts with what the plan
 mandated — including a head-on conflict where the two Skinners demand opposite changes. A genuine

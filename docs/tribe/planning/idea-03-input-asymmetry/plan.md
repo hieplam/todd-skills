@@ -423,7 +423,7 @@ The safety hinge of the card. Idea 01 protected against a missed bug with "both 
 Skinner B's verdict removes that protection, so it must be replaced — by a rule that a cold
 hypothesis can never be *silently dropped*.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `plugins/tribe/scripts/tests/test-input-asymmetry.sh`, immediately before the final
 `printf '\n%d passed, %d failed\n'` line:
@@ -461,7 +461,7 @@ bash plugins/tribe/scripts/tests/test-input-asymmetry.sh
 Expected (RED): `Task 3 assertions appended`, then the 22 earlier assertions print `ok -` and the 11
 new ones print `not ok -`; tally `22 passed, 11 failed`, exit non-zero.
 
-- [ ] **Step 2: Make it green — rewrite the merge and verdict clauses in `warchief.md` step 6**
+- [x] **Step 2: Make it green — rewrite the merge and verdict clauses in `warchief.md` step 6**
 
 Replace idea 01's **"Law 3"** (the merge) and **"Law 4"** (the verdict) clauses with the text below.
 Idea 01's union+dedupe rule and its "both reports preserved verbatim" rule survive inside it —
@@ -526,7 +526,7 @@ and return `NEEDS_DIRECTION` to the Shaman with **both** round-3 reports, and th
 attached verbatim.
 ```
 
-- [ ] **Step 3: Update the two idea-01 assertions this card deliberately supersedes**
+- [x] **Step 3: Update the two idea-01 assertions this card deliberately supersedes**
 
 `test-dual-skinner-cell.sh` (idea 01's tripwire) asserts two things this card intentionally replaces:
 the `identical brief` clause (Law 1) and the both-must-PASS verdict rule (Law 4). Update **only**
@@ -567,7 +567,7 @@ Expected: `patched`, then `test-dual-skinner-cell.sh` ends `N passed, 0 failed`,
 actually in the file — the requirement is that the superseded assertions are **edited with a stated
 reason, never deleted silently**, and that every other assertion in the file still passes unchanged.
 
-- [ ] **Step 4: Verify green + full regression**
+- [x] **Step 4: Verify green + full regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-input-asymmetry.sh && \
@@ -579,7 +579,7 @@ bash plugins/tribe/scripts/tests/test-resume-check.sh
 Expected: `test-input-asymmetry.sh` prints `33 passed, 0 failed`; all three other scripts end
 `N passed, 0 failed`; exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-input-asymmetry.sh \
