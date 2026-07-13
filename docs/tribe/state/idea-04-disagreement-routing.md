@@ -277,6 +277,40 @@ finding the fixer returned as `NOT_REPRODUCED`, exactly one of these three appli
 `agreed`** — the carve-out lives only in a paragraph 30 lines earlier that the rule never acknowledges. A
 reader arriving at the rule has no signal it does not apply to them.
 
+## OPEN — 3rd NEEDS_DIRECTION (task 2, round 5). Branch green @ 15087bd. THE DEFECT IS IN W5, NOT THE CODE.
+
+Round 5 produced the **same head-on lens conflict as round 4, on the same axis** — and that repetition is
+the diagnosis:
+
+- **A (contract lens): FAIL** — 5 assertions redden under a "legal, meaning-preserving reword" (it inserted
+  `, with no exceptions,`, `meaning, still, that…`, and restated sentences at greater length).
+- **B (cold lens): 0 hypotheses** — it *formed the identical fragility hypothesis and refuted it*: the breaks
+  "required an artificially verbose rewrite well beyond what a plausible documentation edit would
+  introduce"; realistic insertions all matched with 3-8x headroom.
+
+**Both are right, because W5 bar 1 — MY OWN RULING — is unbounded and therefore unsatisfiable.** "An
+assertion must not break on a legal rewording" admits no upper bound on the reword. **No grep over prose
+survives arbitrary paraphrase.** So A can always escalate the verbosity and find a new break, and B can
+always call that break implausible. The loop cannot terminate. Task 2 has now burned 4 fix rounds on an
+acceptance bar that no artifact can ever satisfy.
+
+This is exactly what this card says a `conflicting` finding MEANS: two independent samples pointing in
+opposite directions is *the system reporting that the contract is underdetermined.* The contract at fault is
+W5 bar 1. Walking the ladder: **rung 1** — no citation settles it, because the ambiguity IS in the cited
+text. **Rung 2** — no mechanical oracle exists for "is this reword plausible?" **Rung 3** — escalate.
+
+**Note what is NOT in dispute:** the card's actual deliverable — the prompt text — is clean under both
+lenses. B traced four concrete inputs (`[cold-only]`+`single`, `[contract-only]`+`single`, `agreed`,
+`conflicting`) end-to-end and found *exactly one procedure with a concrete named output at every step*. A
+passed the prompt text on all 21 substantive rows. The dispute is **only** about the acceptance bar for the
+test regexes.
+
+**Proposed replacement for W5 bar 1 (bounded, mechanical, terminating):** an assertion must survive
+(i) whitespace reflow, (ii) bold-marker relocation, and (iii) **insertion of up to 30 characters of
+clarifying text at any single bridge point** — i.e. every `.{0,N}` bridge must retain **≥30 characters of
+headroom** over the text's current consumption, and no guarded invariant may be matched as one contiguous
+literal spanning more than a single clause. Mechanically checkable, and it terminates.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
