@@ -277,7 +277,7 @@ Expected: one commit; `bash plugins/tribe/scripts/tests/test-disagreement-routin
 The heart of the card: how a head-on conflict is resolved **without** the Warchief picking a winner
 by taste. Three rungs, strictly ordered, bounded so they can never grind.
 
-- [ ] **Step 1: Append the ladder assertions (RED)**
+- [x] **Step 1: Append the ladder assertions (RED)**
 
 Append before the summary block:
 
@@ -315,7 +315,7 @@ has 'rung 3: escalation carries both reports verbatim' \
 
 Run. Expected: 16 passed, 14 failed, exit 1.
 
-- [ ] **Step 2: Add the ladder to step 6 (GREEN)**
+- [x] **Step 2: Add the ladder to step 6 (GREEN)**
 
 Insert directly beneath the routing table:
 
@@ -371,7 +371,7 @@ answered. Return `NEEDS_DIRECTION` to the Shaman **at once (not at round 3)**, c
 
 Re-run. Expected: 30 passed, 0 failed, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \

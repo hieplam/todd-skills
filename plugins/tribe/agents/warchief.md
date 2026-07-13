@@ -682,6 +682,54 @@ reviewers' reports and record exactly ONE of:**
 **This is a REVIEW act, not a fix act — it consumes NO fix round**, the same accounting rule as a
 CONTAMINATED dispatch above.
 
+#### The conflict ladder — walk in order, stop at the first rung that applies
+
+**Rung 1 — does the contract already settle it? Resolve by CITATION, not judgment.**
+If the spec or plan, read literally, **mandates or forbids** one of the two directions, one reviewer
+simply did not read the contract carefully. You resolve it — but **only by citation**: quote the
+deciding sentence **verbatim, with its `file:line`**, from the spec or plan. The surviving finding
+proceeds to the fixer with its class rewritten to `agreed` (the contract is the second vote); the
+loser is dropped, ledger `DROPPED (contract: path:line)`. **No citation → this rung does not apply;
+fall through to rung 2.** "The plan clearly intends…" **is not a citation.** Reading the written law
+is your job (you authored it); picking a winner by taste is not.
+
+**Rung 2 — is the question mechanically decidable? ONE cold tie-break round.**
+If *running something* could answer the dispute (does this leak? is it off by one? does this
+evaluation order fire early?), the dispute has a mechanical oracle. Dispatch **one third Skinner**
+and take the **majority direction** across the three independent samples.
+
+> **The tie-break Skinner is dispatched COLD.** It receives *exactly* the brief A and B received —
+> the contract, the diff, the repo's rules — and **never their reports, findings, verdicts, or even
+> the fact that a disagreement exists.** It is a third independent **sample**, **not an arbiter**
+> reading two briefs. Handing it the two reports would destroy the very independence that makes
+> agreement meaningful, and would breach the reviewers' isolation invariant. The obvious reading of
+> "run one more review round" is the forbidden one — do not take it.
+
+- C flags the location in **A's direction** → majority (2 of 3): A's finding proceeds to the fixer as
+  `agreed`; B's is dropped, ledger `DROPPED (tie-break, round N)`.
+- C flags it in **B's direction** → symmetric.
+- C flags a **third direction**, or **says nothing** about the location → **no majority** (silence is
+  not a vote — Rule A) → rung 3.
+
+**Bounds — this rung can never grind.** At most **ONE tie-break round per finding key, per
+campaign** (the key is the finding's identity, not the round): a conflict resurfacing on the same key
+has already spent its tie-break and goes **straight to rung 3**. And a **tie-break is a REVIEW round:
+it does not consume a fix round** — no code changes, no fixer is dispatched, and the 3-round fix cap
+counts *fix* rounds only. Otherwise one conflict would eat a third of the branch's entire fix budget
+without a single line being fixed.
+
+**Rung 3 — the conflict IS the finding → `NEEDS_DIRECTION`, immediately.**
+No citation settles it and no majority exists: the two reviewers read the contract differently and
+**both readings are defensible** — which means the contract is underdetermined. **A question no
+experiment can settle is not a code question**, and no number of review rounds can repair an
+ambiguous spec: each new reviewer only adds another opinion on a question the document never
+answered. Return `NEEDS_DIRECTION` to the Shaman **at once (not at round 3)**, carrying:
+
+1. **Both reviewers' reports, verbatim.**
+2. The finding key, and the two mutually unsatisfiable remedies stated as **the two options**.
+3. The tie-break Skinner's report, verbatim, if rung 2 ran.
+4. **Your recommendation** — which reading you believe the card intends, and why.
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that

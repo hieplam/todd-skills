@@ -241,5 +241,86 @@ has 'agreed adjudication is a review act: it consumes no fix round' "$STEP6" \
 has 'ledger-adjudication rule points to the agreed carve-out: it governs single, not agreed' "$STEP6" \
     'governs a `single` finding.s.{0,40}`NOT_REPRODUCED`.{0,60}`agreed` finding.s.{0,40}`NOT_REPRODUCED`.{0,40}adjudicated immediately.{0,40}per the routing table above'
 
+# --- Task 3: the conflict ladder --------------------------------------------
+# Three rungs, strictly ordered, bounded so they can never grind (spec §2.3). Every bridge
+# below is sized against the ladder text's OWN actual current consumption (measured directly
+# against the flattened block before it shipped) so it keeps >=30 chars of headroom over that
+# consumption (D17). No guarded invariant is one contiguous literal spanning more than a single
+# clause — where a clause has an internal seam (e.g. citation -> verbatim -> file:line) the
+# regex bridges it rather than gluing it into one zero-tolerance run.
+
+# Rung 1 — citation, not judgment. Both conjuncts of "quote verbatim, with its file:line"
+# checked (W5 bar #3); a rewording that drops the file:line requirement reddens this alone,
+# nothing else in step 6 pairs "quote the deciding sentence" with "file:line".
+has 'rung 1: resolve by verbatim contract citation' "$STEP6" \
+    'quote the deciding sentence.{0,40}verbatim, with its.{0,40}`?file:line`?'
+
+# "No citation" also appears in rung 3's own opening clause ("No citation settles it"), but that
+# clause is never followed by "this rung does not apply" within 40 chars, so this bridge stays
+# unique to rung 1's fall-through sentence; deleting only that sentence reddens only this
+# assertion.
+has 'rung 1: no citation means the rung does not apply' "$STEP6" \
+    'No citation.{0,40}this rung does not apply'
+
+has 'rung 1: an intention is not a citation' "$STEP6" \
+    'plan clearly intends.{0,40}is not a citation'
+
+# Rung 2 — mechanical tie-break, dispatched cold, bounded.
+has 'rung 2: exactly one tie-break Skinner is dispatched' "$STEP6" \
+    'Dispatch.{0,40}one third Skinner'
+
+# "dispatched" recurs elsewhere in step 6 (e.g. "before any fixer is dispatched", "re-dispatched
+# fresh") but never as "tie-break Skinner ... dispatched COLD" — unique to this clause.
+has 'rung 2: the tie-break Skinner is dispatched COLD' "$STEP6" \
+    'tie-break Skinner.{0,40}is dispatched COLD'
+
+# Compound claim, one sentence, one shared "never": it never receives A/B's reports, findings,
+# verdicts, OR even the fact that a disagreement exists. Both conjuncts share the governing
+# "never", so they are kept as ONE assertion (not split) — a split would let deleting the first
+# conjunct alone leave the second assertion's own regex still satisfied by "their reports,
+# findings, verdicts" text that conjunct 1's clause still supplies (proven by mutation; a split
+# here is exactly the false independence W5 bar #3 warns against). The bridge to the second
+# conjunct crosses the blockquote's `>` line-continuation but stays short (D17 headroom checked).
+has 'rung 2: it never receives A or Bs reports, findings, verdicts, or even that a disagreement exists' "$STEP6" \
+    'never.{0,40}their reports, findings, verdicts.{0,60}the fact that a disagreement exists'
+
+# Same split rationale for "third sample, not an arbiter": the two phrases sit ~270 chars apart
+# across the blockquote's explanatory prose, so each gets its own short, tightly anchored
+# assertion instead of one assertion with an unbounded-feeling bridge between them.
+has 'rung 2: it is a third independent sample' "$STEP6" \
+    'third independent sample'
+has 'rung 2: it is not an arbiter reading two briefs' "$STEP6" \
+    'not an arbiter.{0,40}reading two briefs'
+
+has 'rung 2: majority direction across three independent samples' "$STEP6" \
+    'majority direction.{0,50}three independent samples'
+
+# Distinguishes from "silence is not dissent" (Rule A, task 1) and "Silence is not a disposition"
+# (Law 3) elsewhere in step 6 — this exact clause, "silence is not a vote", occurs nowhere else.
+has 'rung 2: silence from C is not a vote' "$STEP6" \
+    'silence is not a vote'
+
+has 'rung 2: at most ONE tie-break round per finding key per campaign' "$STEP6" \
+    'At most.{0,40}ONE tie-break round per finding key.{0,40}campaign'
+
+# Distinguishes from the agreed-adjudication's own "This is a REVIEW act ... consumes NO fix
+# round" (task 2, a different noun — "act" not "round" — and a different verb phrase —
+# "consumes NO" not "does not consume"), so deleting only the ladder's bounds sentence cannot
+# leave this assertion held green by task 2's unrelated review-act text.
+has 'rung 2: a tie-break does NOT consume a fix round' "$STEP6" \
+    'tie-break is a.{0,40}REVIEW round.{0,40}does not consume a fix round'
+
+# Rung 3 — the conflict IS the finding.
+# Compound claim (W5 bar #3): returns NEEDS_DIRECTION, to the Shaman, at once, not at round 3 —
+# every conjunct checked in the order the sentence makes them.
+has 'rung 3: immediate NEEDS_DIRECTION, not at round 3' "$STEP6" \
+    'Return.{0,40}NEEDS_DIRECTION.{0,40}to the Shaman.{0,40}at once.{0,40}not at round 3'
+
+has 'rung 3: a question no experiment can settle is not a code question' "$STEP6" \
+    'A question no experiment can settle is not a code question'
+
+has 'rung 3: escalation carries both reports verbatim' "$STEP6" \
+    'Both reviewers.{0,40}reports, verbatim'
+
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
