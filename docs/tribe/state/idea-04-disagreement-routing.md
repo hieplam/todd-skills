@@ -159,6 +159,37 @@ A mechanical assertion guards the disambiguation, so a later editor cannot silen
 Additive only, inside the card's own file fence (`warchief.md` step 6). D15 holds: the 3-round-cap
 text is not touched.
 
+## W7 — "do not pre-filter" vs Law 3's dispositions: the boundary must be explicit (authorizes task 2's 2nd fix round)
+
+Second composition seam, again found by the cold lens alone (F9):
+
+- The routing table's **`single`** row says the finding *"goes into the fixer's brief… **do not
+  pre-filter** what you have no evidence about."* Under idea 03's tags, `[cold-only]` → `single`.
+- Idea 03's **shipped Law 3** says every `[cold-only]` Critical/Important gets a Warchief disposition
+  BEFORE any fixer is dispatched: **Confirmed** (→ fixer), **Refuted** (→ does not block, never
+  reaches the fixer), **Valid but out of scope** (→ Shaman follow-up, never reaches the fixer).
+
+Read literally, Law 3 tells the Warchief to filter and the routing table tells it not to. **They are in
+fact compatible — but only under a reading the text never states**, and an unstated reconciliation is
+exactly the improvised merge this card abolishes.
+
+**Ruling:** the two rules are complementary and the text must say so. The operative words in the plan's
+own sentence are *"what you have **no evidence** about"* — Law 3's dispositions are **evidence-backed**
+(a *Refuted* requires positive evidence the code is correct; *out of scope* requires the defect to lie
+outside the fence). So: **Law 3's three dispositions are the ONLY permitted pre-filter, and each is an
+evidence-bearing act. What "do not pre-filter" forbids is the evidence-FREE drop** — discarding a
+finding because you doubt it, with nothing to show. Anything you can neither Refute with evidence nor
+place outside the fence goes to the fixer. Task 2's fix round adds this boundary additively, with a
+mechanical guard. The plan's own sentence stays verbatim.
+
+## F10 — the `conflicting` row's forward reference (dispositioned: valid, out of THIS task's scope)
+
+The cold lens correctly observed that at commit `fc5f933` the `conflicting` row says *"Walk the conflict
+ladder below"* and **no ladder exists in the file**. True at that commit — and it is the plan's own
+sequencing: **task 3 builds the ladder.** Dispositioned **valid but out of scope for task 2**; it is not
+a defect of the branch, only of a mid-plan commit. **Carried forward as a REQUIREMENT of the final
+whole-branch audit: no dangling forward references may survive to the PR.**
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
