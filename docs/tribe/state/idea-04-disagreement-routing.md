@@ -190,6 +190,31 @@ sequencing: **task 3 builds the ladder.** Dispositioned **valid but out of scope
 a defect of the branch, only of a mid-plan commit. **Carried forward as a REQUIREMENT of the final
 whole-branch audit: no dangling forward references may survive to the PR.**
 
+## W8 — W7's own clause over-reached; scope it to `[cold-only]` (authorizes task 2's 3rd fix round)
+
+W7's fix introduced a defect of its own — caught, and this is the card eating its own cooking, by BOTH
+lenses at the same location: the contract lens filed it as a **Minor nit** ("phrased more broadly than
+Law 3 itself"), the cold lens filed it as **Critical**. Two independent samples, one spot, same claim
+direction → class **`agreed`** → **severity raised to Critical by default**, exactly as this card's own
+routing table prescribes. The table adjudicated its own author.
+
+**The defect (F11):** W7's clause says Law 3's three dispositions are the ONLY permitted pre-filter on a
+**`single`** finding. But `single` = `[contract-only]` ∪ `[cold-only]` (the mapping paragraph), while
+Law 3's dispositions are scoped **only to `[cold-only]`**. Read literally, the clause licenses the
+Warchief to *Refute* or out-of-scope a **`[contract-only]` Critical** finding — one that is *"carried by
+the authoritative verdict"* — which collides head-on with Law 4 (*"only the contract lens holds a
+verdict"*). And `[contract-only]` singles are the ORDINARY case, not an edge case.
+
+**Ruling:** scope the clause to the findings Law 3 actually governs. A `[cold-only]` finding is a
+hypothesis and gets one of Law 3's three evidence-bearing dispositions. A **`[contract-only]` finding is
+not a hypothesis at all** — it is carried by the contract lens's authoritative verdict, is **never
+pre-filtered by the Warchief**, and goes to the fixer. Additive; the plan's row and Law 3 stay verbatim.
+
+**F12b (Important, cold-only):** the W7 guard assertion bridges two phrases with a `.{0,250}` span that
+is already 200/250 consumed — a legal, meaning-preserving rewording of the prose *between* them reddens
+it (proven by mutation). That is a W5 bar-1 violation (a test that fails when it should not). Fix: split
+into short assertions anchored on phrases unique to the clause, with no long bridging spans.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
