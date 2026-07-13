@@ -707,6 +707,9 @@ git-committed history (spec §2.3), never the report file, which the crash-safe-
 above already forbids treating as resume truth. The report-file ledger still gets its
 `routed: TIEBREAK` row too, same as always — that row stays the **human-readable audit trail** and
 is **explicitly NON-AUTHORITATIVE** for the cap; the state-file line is the authoritative record.
+**This write is a milestone commit, never a task commit** — it carries
+`Tribe-Milestone: TIEBREAK-<finding-key>` alongside `Tribe-Card:`, never `Tribe-Task: N/TOTAL`:
+spending a tie-break is the Warchief's own housekeeping act, not a Hunter's task-N deliverable.
 
 > **The tie-break Skinner C is dispatched COLD — Skinner B's cold-lens brief above: the bare diff only,
 > and never the contract.** Rung 2 is reached only when rung 1 found no citation, so the
@@ -734,14 +737,26 @@ or a rung-3 escalation if there is no majority.
 
 **Bounds — this rung can never grind.** At most **ONE tie-break round per finding key, per
 campaign** (the key is the finding's identity, not the round): a conflict resurfacing on the same key
-has already spent its tie-break and goes **straight to rung 3**. **A resumed Warchief that finds the
-finding key listed under the state file's `## Tie-breaks spent` heading treats that key's tie-break as
-SPENT** — it goes straight to rung 3 and never dispatches a second tie-break Skinner on that key. **The
-report-file ledger's `TIEBREAK` row is consulted for none of this** — it is the audit trail, not the
-authoritative record, and only the state file's `## Tie-breaks spent` heading decides whether a key's
-tie-break is spent. And a **tie-break is a REVIEW round: it does not consume a fix round** — no code
-changes, no fixer is dispatched, and the 3-round fix cap counts *fix* rounds only. Otherwise one
-conflict would eat a third of the branch's entire fix budget without a single line being fixed.
+has already spent its tie-break and goes **straight to rung 3**. **Any Warchief — fresh or resumed —
+that ENTERS an audit round consults the state file's `## Tie-breaks spent` heading FIRST**, and if it
+finds a finding key listed there, treats that key's tie-break as SPENT — it goes straight to rung 3
+and never dispatches a second tie-break Skinner on that key. **The report-file ledger's `TIEBREAK` row
+is consulted for none of this** — it is the audit trail, not the authoritative record, and only the
+state file's `## Tie-breaks spent` heading decides whether a key's tie-break is spent. And a
+**tie-break is a REVIEW round: it does not consume a fix round** — no code changes, no fixer is
+dispatched, and the 3-round fix cap counts *fix* rounds only. Otherwise one conflict would eat a third
+of the branch's entire fix budget without a single line being fixed.
+
+**What honoring the record is NOT: an automatic resume-time jump back into this rung.**
+`resume-check.sh` is out of this card's fence (spec §3) and has no notion of a mid-flight audit
+round — its `next_action` comes only from commit trailers and plan checkboxes, so a Warchief that
+dies mid-tie-break resumes straight to `CONTINUE task N+1` (or `RESUME_DELIVERY`), never back into
+this rung, and the resume protocol never reads the `## Tie-breaks spent` heading for you. What keeps
+the record safe despite that gap is not automatic resume — it is that **the final whole-branch audit
+always runs before any merge** and is itself a Warchief entering an audit round, so a `TIEBREAK` row
+stranded by an earlier crash is always re-consulted there and its key's spent status honored before
+anything can merge. The honest cost of a crash mid-tie-break is at most **one repeated tie-break
+round — a wasted REVIEW round, never a wrong merge**.
 
 **Rung 3 — the conflict IS the finding → `NEEDS_DIRECTION`, immediately.**
 No citation settles it and no majority exists: the two reviewers read the contract differently and
@@ -811,8 +826,9 @@ defined as never having happened, and the report file is never committed mid-rou
 state file** (`docs/tribe/state/CARD-SLUG.md`, already the tribe's one sanctioned resume artifact)
 under its `## Tie-breaks spent` heading — written and committed before the tie-break Skinner is
 dispatched, per rung 2 above, exactly as the doctrine's commit-before-act discipline already
-requires. An audit round is otherwise idempotent — the diff is unchanged, so a resumed Warchief
-re-runs the round and re-derives the same classes from the same inputs. **Classes are re-derivable
+requires. An audit round is otherwise idempotent — the diff is unchanged, so any audit round that
+runs again (most reliably: the final whole-branch audit, which always runs before merge) re-derives
+the same classes from the same inputs. **Classes are re-derivable
 this way; how many tie-breaks a key has already spent is not — that is history, and history must be
 written down**, which is exactly what the state file's `## Tie-breaks spent` heading is for.
 

@@ -649,23 +649,32 @@ has 'the appended outcome names all three onward values: TO_FIXER, DROPPED tie-b
     "$STEP6" \
     'APPEND the outcome as a new row.{0,90}`TO_FIXER`.{0,40}if C sided with the finding.{0,40}`DROPPED \(tie-break, round N\)`.{0,40}if C sided against it.{0,40}a rung-3 escalation if there is no majority'
 
-# F21a, part 4: the resumed-Warchief-treats-it-as-spent rule -- D18/F22 superseded WHERE the
-# resumed Warchief looks: no longer a `TIEBREAK` row in the (never-committed) report file, now the
-# committed state file's `## Tie-breaks spent` heading. Updated in place (invariant changed).
-# Single long literal, no internal bridge needed (D17 convention for a true zero-gap phrase).
-has 'a resumed Warchief consults the state files Tie-breaks spent heading, not the report file, to know a keys tie-break is spent' \
+# F21a, part 4: WHO looks, and WHEN -- D19/F23 superseded this clause's own subject. It used to
+# read "A resumed Warchief" as if the resume protocol itself delivered a Warchief back into this
+# rung; F23 (cold-only, Critical) proved that is false (resume-check.sh's next_action() has no
+# branch for a mid-flight audit round -- see the "Task 4, 5th fix round (D19/F23)" block below for
+# the reproduction and the honest replacement text). The corrected clause names the actor
+# generically ("any Warchief -- fresh or resumed -- that ENTERS an audit round"), because the only
+# thing that is actually true is that whichever Warchief is running an audit round, at whatever
+# point it reaches this rung, consults the heading first. Updated in place (invariant changed, per
+# the brief's own rule). Two conjuncts (W5 bar #3), each anchored on phrasing unique to this
+# clause; actual gaps 27 and 12 chars, so `.{0,60}`/`.{0,45}` keep >=30 chars of D17 headroom.
+has 'any Warchief entering an audit round consults the state files Tie-breaks spent heading first, fresh or resumed' \
     "$STEP6" \
-    "A resumed Warchief that finds the finding key listed under the state file.s \`## Tie-breaks spent\` heading treats that key.s tie-break as SPENT"
+    'Any Warchief.{0,60}ENTERS an audit round consults the state file.s `## Tie-breaks spent` heading FIRST.{0,45}finds a finding key listed there, treats that key.s tie-break as SPENT'
 
+# This half of the old sentence is untouched by D19/F23 (the consequence of finding the key spent
+# is unchanged), so its assertion keeps its NAME and regex stable (brief's own instruction).
 has 'a spent tie-break sends a resumed Warchief straight to rung 3, never a second tie-break Skinner' \
     "$STEP6" \
     'tie-break as SPENT.{0,40}it goes straight to rung 3.{0,40}never dispatches a second tie-break Skinner on that key'
 
 # F21a, part 5 (W12's reconciliation clause): the idempotence sentence now says out loud that
 # classes are re-derivable from the diff but a key's spent tie-break count is NOT -- it is history
-# that must be written down. The pre-existing idempotence sentence itself is untouched (D15/W1
-# additive-only fence); this is a new, separate clause appended after it. Actual gaps: 2, 3 chars;
-# `.{0,40}` keeps >=36 chars of D17 headroom on each.
+# that must be written down. D19/F23 reworded the LEAD-IN clause ("a resumed Warchief re-runs the
+# round" -> "any audit round that runs again ... re-derives"), for the same reason as the rename
+# above; the tail this assertion anchors on is untouched. Actual gaps: 2, 3 chars; `.{0,40}` keeps
+# >=36 chars of D17 headroom on each.
 has 'classes are re-derivable from the diff, but spent tie-break history is not and must be written down' \
     "$STEP6" \
     'Classes are re-derivable this way.{0,40}how many tie-breaks a key has already spent is not.{0,40}that is history, and history must be written down'
@@ -755,6 +764,94 @@ has 'the state file is the authoritative crash-safe record, the tribes one sanct
 has 'the state-file tie-break line is written and committed before the tie-break Skinner is dispatched' \
     "$STEP6" \
     'under its `## Tie-breaks spent` heading.{0,40}written and committed before the tie-break Skinner is dispatched.{0,40}per rung 2 above'
+
+# --- Task 4, 5th fix round (D19/F23): ship the honest law about resume, and name the trailer ----
+# F23 (cold-only, Critical, Confirmed): the previous text's "A resumed Warchief that finds..."
+# sentence read as if the resume protocol itself delivers a Warchief back into rung 2 whenever a
+# tie-break was interrupted. Reproduced by reading resume-check.sh's next_action(): every branch
+# (VERIFY_SHIPPED / REDO_MERGE / DISCARD_AND_RESUME_DELIVERY / REVERT_AND_REDO task N / RESUME_DELIVERY
+# / CONTINUE task N) is driven only by delivery status, a dirty tree, and the highest completed
+# `Tribe-Task` trailer -- none of it has any notion of "an audit round is mid-flight". Since a
+# Hunter's task-N commit already carries `Tribe-Task: N/TOTAL` before the Warchief's audit of that
+# diff even begins, a Warchief that dies mid-tie-break resumes to `CONTINUE task N+1` (or
+# `RESUME_DELIVERY` if N was the last task) -- never back into this rung. `resume-check.sh` is out
+# of this card's fence (spec §3), so the fix is not there: it is telling the truth in the prompt
+# text instead. D19 (Shaman ruling) ratifies option (a): drop the automatic-return claim, say
+# plainly what `resume-check.sh` does NOT do, and name the real backstop -- the final whole-branch
+# audit always runs before merge, so a stranded record is always re-consulted there. The honest
+# degradation is one wasted REVIEW round, never a wrong merge. Every bridge below is measured
+# against this new text's OWN actual consumption (measured by direct extraction of the shipped
+# clause) and widened to keep >=30 chars of D17 headroom.
+
+# The trailer loose end (also cold-lens-caught, same finding): the pre-dispatch tie-break write is
+# a MILESTONE commit, not a task commit -- it is the Warchief's own housekeeping act, never a
+# Hunter's task-N deliverable, so it takes `Tribe-Milestone:`, never `Tribe-Task:`. Split into two
+# per-clause assertions (W5 bar #2/#3): the label ("milestone, never task") is a separate clause
+# from the concrete trailer values, so deleting either alone reddens only its own guard. Actual
+# gaps 15 and 2 chars; `.{0,50}`/`.{0,40}` keep >=30 chars of D17 headroom.
+has 'the pre-dispatch tie-break write is a milestone commit, never a task commit' "$STEP6" \
+    'milestone commit, never a task commit.{0,50}`Tribe-Milestone: TIEBREAK-<finding-key>`'
+
+has 'the milestone commit carries Tribe-Milestone alongside Tribe-Card, never Tribe-Task' "$STEP6" \
+    '`Tribe-Milestone: TIEBREAK-<finding-key>`.{0,40}alongside `Tribe-Card:`.{0,40}never `Tribe-Task: N/TOTAL`'
+
+# WHY it takes that trailer: spending a tie-break is the Warchief's own act, not a Hunter's task-N
+# deliverable. Self-contained (no bridge back to the trailer-values clause above), so deleting the
+# "alongside .../never Tribe-Task" clause above cannot also redden this one, and vice versa. Actual
+# gap ~2 chars; `.{0,40}` keeps 38 chars of headroom.
+has 'the milestone-commit reasoning: spending a tie-break is the Warchiefs own housekeeping act, not a Hunters task-N deliverable' \
+    "$STEP6" \
+    'spending a tie-break is the Warchief.s own housekeeping act.{0,40}not a Hunter.s task-N deliverable'
+
+# What the record does NOT deliver: resume-check.sh has no branch for a mid-flight audit round.
+# Actual gap (fence -> has no notion) is 15 chars, including the "(spec §3)" aside; `.{0,50}`
+# keeps 35 chars of D17 headroom. Anchored without the "(spec §3)" parenthetical itself (kept as a
+# comment-only citation above) so the regex needs no non-ASCII literal.
+has 'resume-check.sh is out of this cards fence and has no notion of a mid-flight audit round' "$STEP6" \
+    'resume-check\.sh.{0,40}is out of this card.s fence.{0,50}has no notion of a mid-flight audit round'
+
+has 'next_action comes only from commit trailers and plan checkboxes' "$STEP6" \
+    'next_action.{0,40}comes only from commit trailers and plan checkboxes'
+
+# The reproduction, stated as law: dies mid-tie-break -> CONTINUE task N+1 or RESUME_DELIVERY,
+# never back into this rung. `+` is escaped for ERE. "Resumes" is bridged all the way to the quoted
+# token (spanning the disposable connective "straight to", actual gap 13 chars) rather than left as
+# one contiguous literal ending inside the quoted token, since that whole span is a plausible
+# clarifying-insertion point (D17) whichever side of "straight to" it lands on; the other two gaps
+# are 21 and 2 chars. `.{0,50}`/`.{0,55}`/`.{0,40}` keep >=30 chars of D17 headroom on each.
+has 'a Warchief that dies mid-tie-break resumes to CONTINUE task N+1 or RESUME_DELIVERY, never back into this rung' \
+    "$STEP6" \
+    'dies mid-tie-break resumes.{0,50}`CONTINUE task N\+1`.{0,55}or `RESUME_DELIVERY`.{0,40}never back into this rung'
+
+# Self-contained (no bridge back to the "never back into this rung" clause above), so the two
+# assertions mutate independently.
+has 'the resume protocol never reads the Tie-breaks spent heading for you' "$STEP6" \
+    'the resume protocol never reads the `## Tie-breaks spent` heading for you'
+
+# The real backstop: the final whole-branch audit always runs before merge, and it too is a
+# Warchief entering an audit round, so it re-consults the heading. Actual gaps 1 and 5 chars;
+# `.{0,35}`/`.{0,40}` keep >=30 chars of D17 headroom.
+has 'the final whole-branch audit always runs before any merge, and is itself a Warchief entering an audit round' \
+    "$STEP6" \
+    'the final whole-branch audit.{0,35}always runs before any merge.{0,40}is itself a Warchief entering an audit round'
+
+# Self-contained (no bridge back to the previous assertion's own clause), so the two mutate
+# independently. Actual gap 11 chars; `.{0,45}` keeps 34 chars of D17 headroom.
+has 'a TIEBREAK row stranded by a crash is re-consulted by the final audit and its spent status honored before any merge' \
+    "$STEP6" \
+    'a `TIEBREAK` row stranded by an earlier crash is always re-consulted.{0,45}its key.s spent status honored before anything can merge'
+
+# The honest-degradation clause: the worst a crash can do is waste one repeated tie-break round --
+# never a wrong merge. Two independent, self-contained assertions (no shared bridge between them),
+# each anchored on phrasing unique to this new sentence, so they mutate independently. Actual gap
+# (first) 1 char; `.{0,35}` keeps 34 chars of D17 headroom. Second is a bare literal (D17
+# convention: a true zero-gap phrase stays a bare literal rather than manufacturing a bridge that
+# has nothing to span).
+has 'the honest cost of a crash mid-tie-break is one repeated tie-break round' "$STEP6" \
+    'The honest cost of a crash mid-tie-break is at most.{0,35}one repeated tie-break round'
+
+has 'a crash mid-tie-break wastes a REVIEW round but never causes a wrong merge' "$STEP6" \
+    'a wasted REVIEW round, never a wrong merge'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
