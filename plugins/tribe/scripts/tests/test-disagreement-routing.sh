@@ -33,11 +33,11 @@ has 'class token: conflicting'  '^\| `conflicting` \|.*mutually unsatisfiable'
 has 'classes are computed at merge, before the fixer is dispatched' \
     'before any fixer is dispatched|at merge time'
 has 'Rule A: silence is not dissent' \
-    'silence is not dissent'
+    '\*\*Rule A .{1,3} silence is not dissent\.\*\*'
 has 'Rule A: one-flags-one-silent is single, never conflicting' \
     'never.{0,20}`?conflicting`?'
 has 'Rule B: co-location alone is not a conflict' \
-    'co-location is not conflict|mutually unsatisfiable'
+    '\*\*Rule B .{1,3} co-location is not conflict\.\*\*'
 has 'Rule B: the one yes/no compatibility test' \
     'can one edit satisfy both remedies'
 
