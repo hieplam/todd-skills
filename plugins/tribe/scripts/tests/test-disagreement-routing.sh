@@ -905,14 +905,17 @@ has 'the finding is forced to rung 3, a human ruling, on the next audit round th
     "$STEP6" \
     'forced to.{0,35}rung 3.{0,35}a human ruling.{0,35}on the.{0,40}next audit round.{0,40}that.{0,40}touches it'
 
-# Part 3: the consequence is CONSISTENT with the absolute rule above, never in tension with it --
+# Part 3: the consequence is CONSISTENT with the per-key bound above, never in tension with it --
 # no second tie-break Skinner is ever dispatched on that key. Three conjuncts, each bridged
-# separately rather than gluing "the absolute rule" and "above" into one zero-tolerance literal
+# separately rather than gluing "the per-key bound" and "above" into one zero-tolerance literal
 # (D17 mutation class (iii)): actual gaps 3, 1, 2 chars; `.{0,35}` keeps >=32 chars of D17 headroom
-# on each.
-has 'no second tie-break Skinner is dispatched on that key, consistent with the absolute rule, not in tension' \
+# on each. F33 UPDATES this clause in place (invariant changed): the pre-fix text called this "the
+# absolute rule above", which F33 retired -- the Bounds paragraph it points at is no longer framed
+# as an unconditional guarantee (see the "F33" block at the end of this file), so vouching for the
+# word "absolute" would now vouch for a claim the prose itself no longer makes.
+has 'no second tie-break Skinner is dispatched on that key, consistent with the per-key bound, not in tension' \
     "$STEP6" \
-    'no second tie-break Skinner is ever dispatched on that key.{0,35}consistent with the absolute rule.{0,35}above.{0,35}not in tension with it'
+    'no second tie-break Skinner is ever dispatched on that key.{0,35}consistent with the per-key bound.{0,35}above.{0,35}not in tension with it'
 
 # Part 4 (RETIRED by W13/F25): the "needless escalation, never a wrong merge" claim was false and
 # is retired below -- a crash DURING the final whole-branch audit itself has no branch back into any
@@ -1352,6 +1355,53 @@ has 'the expensive error is named: it burns a human ruling and denies the mechan
 # Regression guard: no future editor may re-inflate the tie-break key lookup back into a
 # "greppable"/mechanical guarantee. The word does not survive anywhere in step 6.
 hasnt 'no "greppable" claim survives anywhere in step 6' "$STEP6" 'greppable'
+
+# --- F33 (D19): the Bounds guarantee is qualified to what is actually true --------------------------
+#
+# F33 (Critical, cold-only): the rung-2 Bounds paragraph stated an ABSOLUTE guarantee ("this rung can
+# never grind... At most ONE tie-break round per finding key, per campaign") in the very same section
+# as W16's own on-doubt default, which explicitly prices in a SECOND tie-break Skinner dispatched on
+# what turns out to be the same finding ("wrongly treating a spent key as unspent costs one extra
+# review round"). And the recognition step that decides "same key" is stated (also by W16, a few lines
+# below) to be the Warchief's JUDGMENT over free-text LLM prose, never a grep -- inherently fallible.
+# Reproduced by direct quotation: both sentences sat in the shipped text with the guarantee never
+# qualified. D19's principle ("the law states ONLY WHAT IS TRUE") applies again: the guarantee is
+# qualified to what the machinery actually delivers -- a bound on the PROCEDURE for a key the Warchief
+# RECOGNISES as the same, whose worst-case failure mode (a recognition error) costs exactly the one
+# extra review round W16 already prices in, never an unbounded run of tie-breaks on one finding. The
+# discipline itself (the cap for a recognised key, W16's on-doubt default, its asymmetry reasoning) is
+# UNCHANGED by this fix -- only the overclaiming header sentence is retired.
+#
+# Every bridge below is measured against the shipped, flattened clause and widened to keep >=30 chars
+# of D17 headroom over its actual current consumption; near-zero gaps are left near-bare per this
+# file's convention.
+
+# Regression guard: the retired unconditional "this rung can never grind" claim must never resurface.
+# Proven to bite by construction: this is a verbatim, unique substring of the pre-fix text (confirmed
+# by direct grep against the pre-fix shipped text) and matches nothing in the corrected text below.
+hasnt 'the retired this-rung-can-never-grind unconditional claim does not survive' "$STEP6" \
+    'this rung can never grind'
+
+# The corrected header: bounded PER RECOGNISED KEY, never an unconditional guarantee -- this replaces
+# the retired absolute framing at the exact same location ("Bounds" occurs nowhere else in step 6, so
+# deleting only this header phrase reddens only this assertion). Actual gaps 3 and 2 chars; `.{0,35}`
+# keeps >=32 chars of D17 headroom on each.
+has 'the Bounds header now says bounded per RECOGNISED key, never an unconditional guarantee' "$STEP6" \
+    'Bounds.{0,35}bounded per RECOGNISED key.{0,35}never an unconditional guarantee'
+
+# WHY it is a bound on the procedure, not a promise about the world: key recognition is a judgment
+# call (ties back to W16's own ruling immediately below in the prose). Actual gap 10 chars; `.{0,45}`
+# keeps 35 chars of D17 headroom.
+has 'the cap bounds the procedure, not a promise about the world, because recognition is a judgment call' \
+    "$STEP6" \
+    'bounds the procedure, not a promise about the world.{0,45}key recognition is a judgment call'
+
+# The recognition error's cost is ITSELF bounded -- at most one extra review round, the exact cost
+# W16's on-doubt default already prices in -- never an unbounded run of tie-breaks on one finding.
+# Actual gaps 32 and 23 chars; `.{0,65}`/`.{0,55}` keep >=32 chars of D17 headroom on each.
+has 'a recognition error costs at most one extra review round, the same cost the on-doubt default already prices in' \
+    "$STEP6" \
+    'recognition error is possible.{0,65}at most one extra review round.{0,55}on-doubt default below already prices in'
 
 # --- Task 5: negative assertions (regression guards) ------------------------
 # The three regression guards that matter most (spec §4): each is a specific way this card can

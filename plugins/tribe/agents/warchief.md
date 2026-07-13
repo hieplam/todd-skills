@@ -741,13 +741,18 @@ actually landed — its absence is what a crash mid-oracle leaves behind.
   **no majority** (silence is not a vote — Rule A; C is disagreement-blind, so nothing stops it
   flagging both sides at once) → rung 3.
 
-**Bounds — this rung can never grind.** At most **ONE tie-break round per finding key, per
-campaign** (the key is the finding's identity, not the round): a conflict resurfacing on the same key
-has already spent its tie-break and goes **straight to rung 3**. **Any Warchief — fresh or resumed —
-that ENTERS an audit round consults the state file's `## Tie-breaks spent` heading FIRST**, and if it
-finds a finding key listed there under EITHER status, treats that key's tie-break as SPENT — it goes
-straight to rung 3 and never dispatches a second tie-break Skinner on that key, regardless of which of
-the two triggers below the status decides.
+**Bounds — bounded per RECOGNISED key, never an unconditional guarantee.** At most **ONE tie-break
+round per finding key, per campaign** (the key is the finding's identity, not the round, and — as the
+next paragraph states — recognising "the same key" is the Warchief's judgment, never a string
+compare): a conflict resurfacing on a key the Warchief recognises as the same has already spent its
+tie-break and goes **straight to rung 3**. **This bounds the procedure, not a promise about the
+world**: because key recognition is a judgment call, a recognition error is possible, and its cost is
+bounded too — **at most one extra review round**, exactly the cost the on-doubt default below already
+prices in, never an unbounded run of tie-breaks on the same finding. **Any Warchief — fresh or
+resumed — that ENTERS an audit round consults the state file's `## Tie-breaks spent` heading FIRST**,
+and if it finds a finding key listed there under EITHER status, treats that key's tie-break as SPENT —
+it goes straight to rung 3 and never dispatches a second tie-break Skinner on that key, regardless of
+which of the two triggers below the status decides.
 
 **Recognizing that a listed key IS the current conflict's finding key is the Warchief's JUDGMENT,
 never a grep or string-compare.** The finding key is free-text, LLM-authored prose (`severity |
@@ -814,7 +819,7 @@ honest cost of a crash mid-tie-break, absent a further crash during the final au
 — it is a forced escalation: a crash landing after the spend-commit but before C's outcome lands
 means the key is spent and the mechanical oracle never ran, so that finding is forced to **rung 3 —
 a human ruling** — on the next audit round that touches it, and no second tie-break Skinner is ever
-dispatched on that key — consistent with the absolute rule above, not in tension with it. **Per the
+dispatched on that key — consistent with the per-key bound above, not in tension with it. **Per the
 status-based rule above (W15), this is recorded as `ESCALATED (oracle unavailable)` — never as
 `ESCALATED (tie-break spent)`**, because the key's latest state-file line stays `dispatched`; the
 `resolved` line that would have flipped the label never landed.
