@@ -76,7 +76,7 @@ tasks create, so there is **one wave, one worktree, one Hunter at a time**. No s
 The core of the card. Create the contract test, watch it fail against today's single-Skinner step 6,
 then rewrite step 6 to green it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `plugins/tribe/scripts/tests/test-dual-skinner-cell.sh`. It extracts the step 6 section from
 `warchief.md` and asserts each of the four laws is present, and that the old single-Skinner dispatch
@@ -162,7 +162,7 @@ other** assertion is already passing before you edit anything, something has alr
 card's territory: **stop and report `NEEDS_CONTEXT` to the Warchief** rather than editing on top of
 it.
 
-- [ ] **Step 2: Rewrite step 6 to green the test**
+- [x] **Step 2: Rewrite step 6 to green the test**
 
 **Run the anchor check first** (Global Constraints): re-read step 6 as it actually exists. If idea
 05's fixer-brief template, disposition ledger and standoff rule are present, **preserve them
@@ -239,7 +239,7 @@ mandated — including a head-on conflict where the two Skinners demand opposite
 plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting for 3 rounds.
 ```
 
-- [ ] **Step 3: Verify GREEN plus the regression guard**
+- [x] **Step 3: Verify GREEN plus the regression guard**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
@@ -254,7 +254,7 @@ test scripts still end in `0 failed`; `git status --short` shows exactly two pat
 No other file is touched. (Use `git status --short`, **not** `git diff --stat`: the test script is a
 brand-new untracked file and does not appear in `git diff` output until it is staged.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-dual-skinner-cell.sh \

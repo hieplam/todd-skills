@@ -438,20 +438,50 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
   already used for the judgment call in step 6, which stays on the **skinner** (`model:
   sonnet`, unchanged by this).
 
-### 6. Audit every deliverable with the skinner
+### 6. Audit every deliverable with the dual-Skinner cell
 
-After each task (and once more across the whole branch at the end), dispatch the
-**skinner** against the diff, pointed at YOUR spec + plan and the repo's rules. It
-runs the proof. Feed Critical/Important findings back to a fixer Hunter and re-audit — **cap
-fix-rounds at 3.** If round 3 still comes back FAIL, **stop looping** (do not dispatch a 4th fix
-attempt): save state and return `NEEDS_DIRECTION` to the Shaman with the Skinner's round-3 FAIL
-report attached **verbatim**. A FAIL that survives 3 fix rounds usually isn't a code bug you can
-fix alone — e.g. a spec ambiguity masquerading as a test failure — so it belongs back with the
-Shaman, not another round (same shape as `check-diff-coverage`'s remediation loop: a fixed round
-cap, then stop and hand back rather than grind past the stopping condition). You have the
-authoring context, so you adjudicate any finding that conflicts with what the plan mandated — a
-genuine plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting for 3
-rounds.
+After each task (and once more across the whole branch at the end), audit the diff with **two
+Skinners, not one**. A single reviewer is a single sampling run with a single set of blind spots;
+two independent reviewers miss the same bug only when they both miss it. This gate is the tribe's
+whole claim to correctness, so it runs as a pair.
+
+**Law 1 — dispatch both in ONE message.** Issue **two `skinner` dispatches as two tool uses in the
+same message**, so they run concurrently, both **against the diff**. Both are
+`subagent_type: skinner`, `model: sonnet`. Both receive the **identical brief**: the contract (YOUR
+spec + plan), the diff under audit, the repo's rules, and a distinct report path each (e.g. an `-a`
+and a `-b` audit report for this task). Identical on purpose — the pair decorrelates through
+sampling, not through assigned lenses. Do not hand them different lenses, different inputs, or
+different instructions.
+
+**Law 2 — never let them see each other.** Neither Skinner's brief may contain the other's
+findings, verdict, or report — and since dispatching one after the other means you have already
+read the first report before briefing the second, **sequential dispatch is itself the violation**.
+Never ask one Skinner to review, reconcile, or comment on the other's findings. Every fix round
+dispatches **two fresh** Skinner instances; **never reuse** one across rounds, or it anchors on its
+own prior findings. Independence is the entire value of the second reviewer: two reviewers sharing a
+context share one set of blind spots — you would have paid for two and bought one.
+
+**Law 3 — you merge, at the layer above.** Take the **union** of both reports' Critical and
+Important findings, collapsing two findings that name the same location and make the same claim
+into one entry. Tag every merged finding **`[both]`** (both Skinners flagged it) or **`[one]`**
+(only one did), and pass those tags into the fixer Hunter's brief. Keep **both reports verbatim**
+in your report file — never summarize them away: they are the evidence trail, and on escalation
+they are what the Shaman reads.
+
+**Law 4 — PASS needs BOTH.** The round **passes only if both Skinners return `AUDIT: PASS`**. Any
+FAIL — or an `UN-AUDITABLE` result — from either instance fails the round and opens a fix round. With two reviewers there is no majority to take, and one more cheap fix round always beats
+one shipped bug that nobody will re-read. Feed the merged findings to a fixer Hunter and re-audit —
+**cap fix-rounds at 3** (a round is both Skinners re-dispatched in parallel). If round 3 still comes
+back FAIL, **stop looping** (do not dispatch a 4th fix attempt): save state and return
+`NEEDS_DIRECTION` to the Shaman with **both round-3 FAIL reports** attached **verbatim**. A FAIL
+that survives 3 fix rounds usually isn't a code bug you can fix alone — e.g. a spec ambiguity
+masquerading as a test failure — so it belongs back with the Shaman, not another round (same shape
+as `check-diff-coverage`'s remediation loop: a fixed round cap, then stop and hand back rather than
+grind past the stopping condition).
+
+You hold the authoring context, so you adjudicate any finding that conflicts with what the plan
+mandated — including a head-on conflict where the two Skinners demand opposite changes. A genuine
+plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting for 3 rounds.
 
 **Dispatch-content checklist — the Skinner runs COLD (non-negotiable).**
 
