@@ -118,6 +118,17 @@ has 'reproduce-first still applies to an agreed finding' "$STEP6" \
 has 'NOT_REPRODUCED on an agreed finding escalates immediately' "$STEP6" \
     '`NOT_REPRODUCED`.{0,10}for an `agreed` finding.{0,200}escalates to you immediately'
 
+# F9 — Law 3's dispositions vs the single row's "do not pre-filter" must be reconciled explicitly.
+# Compound claim, both conjuncts anchored (W5 bar #3): (1) Law 3's three dispositions are named as
+# the ONLY permitted pre-filter and each an evidence-bearing act, AND (2) "do not pre-filter" is
+# pinned to forbidding the evidence-free drop specifically. Anchored on "ONLY permitted pre-filter"
+# and "evidence-free drop" — both phrases are coined by this new clause and appear nowhere else in
+# step 6 (confirmed against the pre-fix file), so deleting only this clause removes every occurrence
+# and reddens only this assertion; step 6's pre-existing use of "disposition"/"Refuted"/"evidence"/
+# "fixer" elsewhere (Law 3, the fixer-brief section) cannot hold this assertion green on its own.
+has 'Law 3s dispositions are the only permitted pre-filter; do not pre-filter bans the evidence-free drop' "$STEP6" \
+    'Law 3.s three dispositions are the ONLY permitted pre-filter.{0,60}evidence-bearing act.{0,250}evidence-free drop'
+
 # F8 — the agreed/single NOT_REPRODUCED supersession must be said out loud, not just implied.
 # Compound claim, both conjuncts anchored (W5 bar #3): the `agreed` clause explicitly does NOT
 # wait on the ledger-adjudication rule below, AND the `single` clause explicitly says that same
