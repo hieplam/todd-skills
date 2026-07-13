@@ -71,6 +71,26 @@ round is spent on them:
   edit would silently delete"); it weakens no assertion and adds no scope beyond the plan's own
   test file.
 
+- **W5 — the assertion-quality bar, applied at birth to every task (supersedes the plan's literal
+  regex strings, never its assertions).** Three audit rounds on task 1 established that the plan's
+  grep regexes are illustrative, not load-bearing: they are line-based phrase greps, and the repo's
+  own sibling suite (`test-dual-skinner-cell.sh:15-17`) already documents why that is wrong —
+  *"Agent prompts are hard-wrapped prose, so a sentence routinely straddles a newline. grep is
+  line-based and would miss it. Flatten every haystack."* **What is settled law is each assertion's
+  NAME and the invariant it guards; the regex is the How, and the How is mine.** Every assertion in
+  `test-disagreement-routing.sh`, in every task, must meet all three bars:
+  1. **Flattened haystack.** Match against a whitespace-flattened region (the sibling suite's `flat()`
+     convention), so a benign markdown reflow cannot produce a false failure.
+  2. **Per-clause anchoring (D14/W4).** Deleting ONLY the clause the assertion names must turn that
+     assertion — and only that assertion — red. A phrase restated elsewhere in step 6 must not hold
+     it green.
+  3. **Conjunct completeness.** If the assertion's name makes a compound claim ("is `single`, never
+     `conflicting`"), the regex must check every conjunct. An alternation that passes on either half
+     alone does not guard the claim its name makes.
+  Both mutation classes (clause-deletion AND benign reflow) are run for every assertion before a task
+  is called done. This is why tasks 2-5's briefs carry the bar up front instead of discovering it in
+  an audit loop.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
