@@ -77,18 +77,26 @@ has "cold: self-refutation still applies in cold mode"       "$LENS" 'self-refut
 # so the two passages cannot contradict each other.
 has "cold: Method step 1 carves out the cold lens"           "$SKINNER_ALL" 'contract lens only|in .?lens: cold.? this whole step is suspended'
 
+# F-H1: the CONTAMINATED refusal ("Return AUDIT: FAIL — CONTAMINATED", Operating rules) and cold
+# mode's "never emit an AUDIT: line" rule are two orders that would otherwise contradict each other
+# on exactly a contaminated COLD dispatch. An explicit precedence sentence must settle it — checked
+# against the WHOLE file because the carve-out spans both the Lens-mode section and Operating rules,
+# which sit outside the $LENS window (Operating rules starts AFTER "## Lens mode" ends).
+has "H1: contaminated refusal is declared to win over cold mode's no-AUDIT rule" \
+  "$SKINNER_ALL" 'precedence over cold mode.?s no-.?AUDIT:.? rule|one and only .?AUDIT:.? line a .?lens: cold.? dispatch may ever emit'
+
 # --- Task 2 — warchief.md step 6, Delta-Law 1: two lenses, two briefs ----------------------
 STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF" | flat)"
 [[ -n "$STEP6" ]] || { printf 'not ok - could not extract step 6 from warchief.md\n'; exit 1; }
 
 has   "law1: the two lenses are named"                        "$STEP6" 'contract lens.{0,200}cold lens|cold lens.{0,200}contract lens'
 has   "law1: each dispatch declares its lens"                 "$STEP6" 'lens: contract|lens: cold'
-has   "law1: the briefs are NOT identical"                    "$STEP6" 'not identical|differ|asymmetr'
+has   "law1: the briefs are NOT identical"                    "$STEP6" 'deliberately .{0,4}not identical'
 hasnt "law1: the identical-brief clause is gone"              "$STEP6" 'identical brief'
 has   "law1: still one message, still concurrent"             "$STEP6" 'same message'
 has   "law1: cold brief carries the bare diff only"           "$STEP6" 'only the bare diff|bare diff'
 has   "law1: cold brief must not carry the spec/plan"         "$STEP6" '(must not|never).{0,200}(spec|plan|contract)'
-has   "law1: cold brief must not carry the Hunter report"     "$STEP6" "hunter's report|hunter report"
+has   "law1: cold brief must not carry the Hunter report"     "$STEP6" "hunter's report, its reasoning, its red proof, its self-assessment"
 has   "law1: cold brief must not carry commit/branch/PR text" "$STEP6" 'commit message|branch name|PR body'
 has   "law1: the cold lens may still read the codebase"       "$STEP6" 'not blind to the codebase|may read'
 
@@ -98,16 +106,69 @@ has   "law1: the cold lens may still read the codebase"       "$STEP6" 'not blin
 # this repo's contributors actually run) rejects any {m,n} with n > 255 ("maximum repetition
 # exceeds 255"), so a wider bound would make the assertion never executable, on any content.
 has   "law3: three-tag vocabulary"                             "$STEP6" '\[both\].{0,200}\[contract-only\].{0,200}\[cold-only\]'
-has   "law3: cold findings are hypotheses"                     "$STEP6" 'hypothes'
-has   "law3: every cold hypothesis gets a recorded disposition" "$STEP6" 'disposition'
+has   "law3: cold findings are hypotheses"                     "$STEP6" 'cold findings are hypotheses'
+has   "law3: every cold hypothesis gets a recorded disposition" "$STEP6" 'recorded.{0,10}disposition, written into your report file'
 has   "law3: the three dispositions are named"                 "$STEP6" 'confirmed.{0,200}refuted.{0,200}(out of scope|follow-up)'
 has   "law3: refuting needs evidence about the CODE"           "$STEP6" 'evidence that the code is correct|evidence about the code'
 has   "law3: the contract-does-not-require-it refutation is forbidden" "$STEP6" 'contract does not require'
 has   "law3: an undispositioned hypothesis fails the round"    "$STEP6" 'undispositioned|silence is not a disposition'
 has   "law4: only the contract lens holds the verdict"         "$STEP6" 'only the contract lens'
 has   "law4: the round-PASS rule is stated"                    "$STEP6" 'round passes if and only if'
-hasnt "law4: the both-must-PASS rule is gone"                  "$STEP6" 'pass requires both|requires both skinners'
+hasnt "law4: the both-must-PASS rule is gone"                  "$STEP6" 'pass needs both|passes only if both skinners'
 has   "law4: the 3-round cap is untouched"                     "$STEP6" '3-round fix cap|3 fix-rounds'
+
+# --- F-H4 — evals.json ids 10-12 must stay asymmetric-design content, not the superseded --------
+# pre-asymmetry claims (idea 01's evals 10/11/12 were REWRITTEN, correctly, to match the shipped
+# asymmetric design; nothing else in the suite guards that content, so a silent revert would pass
+# every other test). Offline: read the file with python3, no network.
+EVALS="$HERE/../../evals/evals.json"
+[[ -f "$EVALS" ]] || { printf 'not ok - evals.json not found\n'; exit 1; }
+
+EVAL_CHECKS="$(python3 - "$EVALS" <<'PY'
+import json, sys
+
+path = sys.argv[1]
+with open(path) as f:
+    data = json.load(f)
+evals = data.get("evals", [])
+ids = [e.get("id") for e in evals]
+by_id = {e.get("id"): e for e in evals}
+
+def out(name, ok):
+    print(("OK " if ok else "BAD ") + name)
+
+out("evals-file-has-16-evals", len(evals) == 16)
+out("evals-file-ids-are-unique", len(ids) == len(set(ids)))
+
+e10 = (by_id.get(10) or {}).get("expected_output", "").lower()
+e11 = (by_id.get(11) or {}).get("expected_output", "").lower()
+e12 = (by_id.get(12) or {}).get("expected_output", "").lower()
+
+out("eval10-present", 10 in by_id)
+out("eval11-present", 11 in by_id)
+out("eval12-present", 12 in by_id)
+
+# Must reflect the shipped asymmetric design (two named lenses, not one shared brief).
+out("eval10-names-both-lenses", "lens: contract" in e10 and "lens: cold" in e10)
+out("eval12-names-both-lenses", "lens: contract" in e12 and "lens: cold" in e12)
+
+# Must NOT still assert idea 01's superseded, now-contradicted pre-asymmetry claims.
+out("eval10-no-longer-claims-identical-briefs",
+    "does not assign the two reviewers different lenses" not in e10
+    and "both briefs are identical" not in e10)
+out("eval11-no-longer-claims-both-must-pass",
+    "pass requires both" not in e11)
+out("eval12-no-longer-claims-identical-briefs",
+    "identical, isolated briefs" not in e12)
+PY
+)"
+
+while IFS= read -r _line; do
+  [[ -n "$_line" ]] || continue
+  _status="${_line%% *}"
+  _name="${_line#* }"
+  if [[ "$_status" == "OK" ]]; then ok "eval-content: $_name"; else bad "eval-content: $_name"; fi
+done <<<"$EVAL_CHECKS"
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

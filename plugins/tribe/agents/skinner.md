@@ -96,7 +96,10 @@ In cold mode, these rules REPLACE the corresponding parts of the Method below:
 
 **Cold-mode output format** — return this structure, and end with the `COLD-LENS:` line, which is
 the machine-judgeable terminator. **Never emit an `AUDIT:` line in cold mode**: that line is the
-contract lens's verdict, and an automated caller reads it as one.
+contract lens's verdict, and an automated caller reads it as one. **The one exception is
+contamination:** the contaminated-dispatch refusal in Operating rules below runs BEFORE lens-specific
+review begins, in every lens including `lens: cold` — see Operating rules for the precedence rule
+that makes this the one `AUDIT:` line a cold dispatch may ever emit.
 
 The three bands below are severity of **consequence in the code as written**, not severity of your
 prose, and each has a precise test:
@@ -149,6 +152,13 @@ destroys this role: a reviewer that cries wolf devalues every review that comes 
   "this part was tricky"), a prior audit's findings, or a fixer's explanation of why it fixed
   something — **STOP. Do not audit.** Return `AUDIT: FAIL — CONTAMINATED: <what leaked>` and nothing
   else.
+  - **Precedence over cold mode's no-`AUDIT:` rule (settled, not a conflict):** this contamination
+    check runs in EVERY lens, including `lens: cold`, and it runs BEFORE lens-specific review begins.
+    A contaminated `lens: cold` dispatch is refused right here and never reaches cold-mode review at
+    all — so it never triggers cold mode's "never emit an `AUDIT:` line" rule, which only governs
+    output from a review that actually ran. The `AUDIT: FAIL — CONTAMINATED: <what leaked>` line above
+    is therefore the one and only `AUDIT:` line a `lens: cold` dispatch may ever emit; every other cold
+    output ends `COLD-LENS:` as before.
   - **Why refuse instead of reading it and ignoring it:** once the narrative is in your context
     window, ignoring it is unverifiable — the bias has already been applied. The only cure is a
     fresh context: a fresh Skinner with a clean dispatch. (Same stop-and-refuse shape as
