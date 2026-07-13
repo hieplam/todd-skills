@@ -700,7 +700,7 @@ and take the **majority direction** across the three independent samples.
 
 **Before dispatching C, WRITE AND COMMIT the finding key under a `## Tie-breaks spent` heading in
 the card's state file** (`docs/tribe/state/CARD-SLUG.md`) — **the heading records key PLUS STATUS,
-never a bare key** (W15): the concrete, greppable line format is **`<finding-key>: dispatched`**,
+never a bare key** (W15): the line format is **`<finding-key>: dispatched`**,
 one status line per event, appended, never overwritten — the same
 commit-before-act discipline as D12a: a record is an artifact, not a claim. That write is what
 SPENDS the key's one tie-break, and it lands before C is dispatched exactly so a crash mid-tie-break
@@ -748,6 +748,19 @@ that ENTERS an audit round consults the state file's `## Tie-breaks spent` headi
 finds a finding key listed there under EITHER status, treats that key's tie-break as SPENT — it goes
 straight to rung 3 and never dispatches a second tie-break Skinner on that key, regardless of which of
 the two triggers below the status decides.
+
+**Recognizing that a listed key IS the current conflict's finding key is the Warchief's JUDGMENT,
+never a grep or string-compare.** The finding key is free-text, LLM-authored prose (`severity |
+location | one-line claim`) with no normalization, no hash, no canonical form — two independent
+Skinner runs will not reproduce a one-line claim byte-for-byte across a commit boundary or a crash.
+Telling "this listed key IS the current finding, re-raised" from "this is merely a similar-looking
+new finding" is **the same recognition Law 3's merge already relies on** when it calls two findings
+the same, not a new capability the state file invents. **On doubt, treat the key as NOT SPENT** —
+the two errors this default trades off are not symmetric: wrongly treating a spent key as unspent
+costs one extra review round, a second tie-break Skinner dispatched on what turns out to be the same
+finding; wrongly treating an unspent key as spent burns a human ruling at rung 3 and denies a
+genuinely new finding the mechanical oracle this rung exists to give it. The cheaper error is the
+default.
 
 **Which of the two it records is decided by the key's LATEST status line (W15) — never by the key's
 bare presence:**

@@ -1198,16 +1198,17 @@ has 'the Bounds-paragraph trigger is the spent key, never a crash, never an ambi
 # D17 headroom on every one; a true near-zero gap is left as a bare (or near-bare) literal per this
 # file's own established convention.
 
-# The concrete, greppable line format itself: key plus status, never a bare key. Two short assertions
-# (W5 bar #2), each on its own unique clause. First: the format change is named. Actual gap 2 chars
-# (near-zero, left bare per convention).
+# The line format itself: key plus status, never a bare key. Two short assertions (W5 bar #2), each
+# on its own unique clause. First: the format change is named. Actual gap 2 chars (near-zero, left
+# bare per convention).
 has 'the Tie-breaks spent heading now records key PLUS STATUS, never a bare key' "$STEP6" \
     'heading records key PLUS STATUS.{0,40}never a bare key'
 
-# Second: the concrete format itself is stated -- `<finding-key>: dispatched`. Actual gap 1 char
+# Second: the format itself is stated -- `<finding-key>: dispatched`. F30/W16 fix: this used to read
+# "the concrete, greppable line format is" -- a false mechanism claim (below). Actual gap 2 chars
 # (near-zero, left bare per convention).
-has 'the concrete greppable line format is stated: <finding-key>: dispatched' "$STEP6" \
-    'concrete, greppable line format is.{0,40}`<finding-key>: dispatched`'
+has 'the line format itself is stated: <finding-key>: dispatched' "$STEP6" \
+    'the line format is.{0,40}`<finding-key>: dispatched`'
 
 # When C's outcome lands, `resolved` is APPENDED (never overwriting `dispatched`) to the SAME state
 # file heading -- this is the other half of the format, without which `resolved` could never be
@@ -1254,6 +1255,62 @@ has 'oracle unavailable reciprocally excludes tie-break spent: fires only when l
 has 'the crash-cost paragraph names its own outcome as ESCALATED (oracle unavailable), never tie-break spent' \
     "$STEP6" \
     'Per the status-based rule above.{0,50}recorded as `ESCALATED \(oracle unavailable\)`.{0,40}never as `ESCALATED \(tie-break spent\)`'
+
+# --- F30 / W16: the tie-break key lookup is a JUDGMENT, not a grep -- and doubt defaults SAFE -------
+#
+# F30 (Critical, cold-only): the rung-2 write-format sentence called the `## Tie-breaks spent` lookup
+# "concrete, greppable", and (separately) the pre-existing idea-05 finding-key definition (out of this
+# card's fence -- left verbatim, see the assertions above at "loop termination below mechanical instead
+# of a judgment call") claims the key is what makes termination mechanical. But the finding key is
+# free-text, LLM-authored prose with no normalization, no hash, no canonical form, and no script
+# anywhere implements the lookup -- `grep -rn "Tie-breaks spent" plugins/tribe/scripts/` matches only
+# THIS test file's own prose-greps of step 6, never an actual key-comparison implementation. Two
+# independent Skinner runs will not reproduce a one-line claim byte-for-byte across a commit boundary
+# or a crash, so the cap's enforcement is a Warchief JUDGMENT, and the old text promised a mechanism it
+# does not have. W16 (Shaman ruling) fixes this: drop the false "greppable" framing for THIS lookup
+# (the old assertion asserting it, above, was retired/rewritten rather than left vouching for a false
+# claim), state the judgment plainly, and make the SAFE error (treat an ambiguous key as NOT spent) the
+# default, because the two errors are not symmetric.
+#
+# Every bridge below is measured against the shipped, flattened clause and widened to keep >=30 chars
+# of D17 headroom over its actual current consumption; near-zero gaps are left near-bare per this
+# file's convention.
+
+# The lookup is stated as a JUDGMENT, never a grep/string-compare. Actual gap 2 chars; `.{0,40}` keeps
+# 38 chars of headroom.
+has 'recognizing a listed key as the current finding is the Warchiefs JUDGMENT, never a grep or string-compare' \
+    "$STEP6" \
+    'the Warchief.s JUDGMENT.{0,40}never a grep or string-compare'
+
+# That judgment is explicitly the SAME recognition Law 3's merge already relies on -- not a new
+# capability the state file invents (guards against re-treating this as a novel mechanical faculty).
+# Actual gap 38 chars; `.{0,70}` keeps 32 chars of headroom.
+has 'the key-recognition judgment is the same recognition Laws 3 merge already relies on, not a new capability' \
+    "$STEP6" \
+    'the same recognition Law 3.s merge already relies on.{0,70}not a new capability the state file invents'
+
+# On doubt, the key is treated as NOT SPENT -- the safe default, stated plainly. Actual gap 3 chars;
+# `.{0,35}` keeps 32 chars of headroom.
+has 'on doubt, the key is treated as NOT SPENT because the two errors are not symmetric' "$STEP6" \
+    'On doubt, treat the key as NOT SPENT.{0,35}the two errors this default trades off are not symmetric'
+
+# The asymmetry's two conjuncts (W5 bar #3 -- conjunct completeness): the cheap error (one extra
+# review round) AND the expensive error (a burned human ruling, a denied mechanical oracle) are both
+# named, never just one side of the trade. Each assertion below is anchored WITHIN its own clause only
+# (D14/W4 per-clause isolation) so deleting one conjunct's clause cannot redden the other's assertion.
+# Cheap-error clause, self-contained: actual gap 1 char; `.{0,40}` keeps 39 chars of headroom.
+has 'the cheap error is named: wrongly treating a spent key as unspent costs one extra review round' \
+    "$STEP6" \
+    'wrongly treating a spent key as unspent.{0,40}costs one extra review round'
+
+# Expensive-error clause, self-contained, its own two conjuncts (burns AND denies): actual gaps 1 and
+# 5 chars; `.{0,40}` keeps >=35 chars of headroom on each.
+has 'the expensive error is named: it burns a human ruling and denies the mechanical oracle' "$STEP6" \
+    'wrongly treating an unspent key as spent.{0,40}burns a human ruling at rung 3.{0,40}denies a genuinely new finding the mechanical oracle this rung exists to give it'
+
+# Regression guard: no future editor may re-inflate the tie-break key lookup back into a
+# "greppable"/mechanical guarantee. The word does not survive anywhere in step 6.
+hasnt 'no "greppable" claim survives anywhere in step 6' "$STEP6" 'greppable'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
