@@ -1312,5 +1312,60 @@ has 'the expensive error is named: it burns a human ruling and denies the mechan
 # "greppable"/mechanical guarantee. The word does not survive anywhere in step 6.
 hasnt 'no "greppable" claim survives anywhere in step 6' "$STEP6" 'greppable'
 
+# --- Task 5: negative assertions (regression guards) ------------------------
+# The three regression guards that matter most (spec §4): each is a specific way this card can
+# be silently un-done by a later edit, unrelated to whether the positive assertions above still
+# pass. Per W4/D14, every one of these is proven to BITE by mutation: injected forbidden text
+# turns it red, and the guard is currently green because step 6, as shipped, contains none of
+# these forbidden phrasings (confirmed by direct grep against the shipped, flattened text before
+# these assertions were written — none of the three regexes below match anything currently in
+# step 6). D17 headroom is measured the same way as every assertion above.
+
+# The rung-1 loophole: resolving a conflict by picking a winner, dressed up as adjudication,
+# with no contract citation. This is a pure alternation of fixed phrases (no `.{0,N}` bridge, so
+# no D17 headroom applies — per this file's own convention, a zero-gap phrase is left bare rather
+# than manufacturing a bridge with nothing to span). It is carefully NOT a bare "winner"/"pick"
+# grep: step 6 already legitimately contains "picking a winner by taste is not [your job]" (rung
+# 1's own prohibition) and "either oscillates or silently picks one" (the routing table's own
+# explanation of why `conflicting` must never reach the fixer) — both are NEGATIONS of the
+# loophole, not instances of it, and neither contains the literal "pick the winner" / "choose
+# the winner" / "decide which reviewer is right" shapes this regex requires. Proven to bite:
+# injecting "On a conflict, decide which reviewer is right." (this task's own RED repro, below)
+# turns this red; the shipped text (no such sentence) leaves it green.
+hasnt 'rung-1 loophole: no permission to resolve a conflict by picking a winner without a contract citation' \
+      "$STEP6" \
+      'choose (the )?winner|pick (the )?winner|decide which reviewer is right'
+
+# The rung-2 leak: handing the tie-break Skinner (C) either reviewer's report, findings, or even
+# the bare fact that a disagreement exists — the thing that would turn C from a third independent
+# sample into an arbiter reading two briefs. Bridges are widened past a realistic actual gap
+# ("both reports" ~1 char, "that a disagreement exists" ~1 char) to `.{0,50}`, keeping >=30 chars
+# of D17 headroom even against a verbose future insertion. This is deliberately NOT a bare
+# "reports"/"disagreement" grep: step 6 already legitimately says C "never receives their reports,
+# findings, verdicts, or even the fact that a disagreement exists" and that "handing it the two
+# reports would destroy the very independence that makes agreement meaningful" — both are the
+# PROHIBITION itself, worded as a negation, and neither matches "(attach|include|hand|pass|
+# forward|give) (both|A's and B's|the two) ... (reports|findings)" or "tell C ... a disagreement
+# exists" (confirmed: the shipped, flattened text does not satisfy either alternative — the
+# forbidding sentences use "never receives"/"would destroy", never an imperative instruction to
+# attach/hand/tell). Proven to bite: injecting "Attach both reports to C's brief so it can weigh
+# in." or "Also tell C up front that a disagreement exists between A and B." turns this red.
+hasnt 'rung-2 leak: no text hands, attaches, or tells the tie-break Skinner either reviewers reports, findings, or that a disagreement exists' \
+      "$STEP6" \
+      "(attach|include|hand|pass|forward|give) (both|A.s and B.s|the two).{0,50}(reports?|findings?)|tell C.{0,50}(a disagreement|there is disagreement|that a disagreement exists)"
+
+# Delegating an unresolvable conflict downward: routing a `conflicting` finding to the fixer
+# as-is instead of walking the ladder. The bridge (`.{0,50}`) is widened past the realistic actual
+# gap (the word "finding" plus punctuation, ~8-10 chars) to keep >=30 chars of D17 headroom. This
+# is deliberately NOT a bare "conflicting"/"fixer" grep: the routing table's own row already says
+# `conflicting` is "Never routed to the fixer as-is" — but that sentence puts "conflicting" BEFORE
+# "routed", where this regex requires "route" to come BEFORE "conflicting" (the shipped negation
+# is never a substring match for this forbidding-instruction shape; confirmed against the shipped,
+# flattened text). Proven to bite: injecting "When rung 2 finds no majority, just route the
+# `conflicting` finding to the fixer anyway." turns this red.
+hasnt 'delegating an unresolvable conflict downward: no text routes a conflicting finding to the fixer as-is' \
+      "$STEP6" \
+      'route (the )?`?conflicting`? .{0,50}to the fixer'
+
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

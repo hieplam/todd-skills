@@ -467,7 +467,7 @@ Expected: one commit; the full test file exits 0.
 The three regression guards that keep this card from being silently un-done by a later edit, plus
 the behavioral evals and proof that the neighbouring cards' suites still pass.
 
-- [ ] **Step 1: Append the negative assertions and run the full suite (RED)**
+- [x] **Step 1: Append the negative assertions and run the full suite (RED)**
 
 Each negative assertion names a specific way the card can be quietly reversed. Append before the
 summary block:
@@ -530,7 +530,7 @@ not ok - no permission to pick a conflict winner without a contract citation (fo
 exit=1
 ```
 
-- [ ] **Step 2: Restore, then prove the whole suite green (GREEN)**
+- [x] **Step 2: Restore, then prove the whole suite green (GREEN)**
 
 With `warchief.md` restored, run this card's test **and** every neighbouring suite — this card edits
 the same section of step 6 that ideas 01 and 05 edited, so their tests are the collateral-damage
@@ -547,7 +547,7 @@ Expected: every suite prints only `ok - ...` lines and exits 0; the last command
 `evals.json parses`. Any `not ok` from ideas 01's or 05's suite means this card broke a neighbour —
 stop and report to the Warchief.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \
