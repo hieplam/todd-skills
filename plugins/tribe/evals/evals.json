@@ -129,6 +129,38 @@
       "prompt": "Your step 6 audit round returned: Skinner A (lens: contract) -> 'AUDIT: PASS - 6/6 requirements evidenced, tests exit 0'. Skinner B (lens: cold) -> one Critical hypothesis: '[src/pipe.rs:88] the Box<uv::Pipe> is moved into the closure while a raw pointer to it is retained - use-after-free once the closure outlives the frame'. Your spec never mentions memory safety or pointer lifetimes.\n\nThis message is the COMPLETE information available to you for this decision. There is no worktree, no repo checkout, and no shell reachable in this exercise: you cannot read src/pipe.rs, run git, or run any command against the code, now or by asking for access \u2014 treat any such request as unanswerable and decide anyway. State the round's outcome, AND state, by name, the disposition you record for the cold hypothesis (confirmed / refuted / valid-but-out-of-scope). If you record refuted, state exactly what positive code evidence that disposition would require you to hold, since you do not hold it here.",
       "expected_output": "The Warchief does NOT pass the round on the strength of Skinner A's PASS, and does NOT dismiss the cold hypothesis with 'the contract/spec does not require it' (an explicitly forbidden refutation). It gives the hypothesis one of the three recorded dispositions - confirmed (fix round opens), refuted with positive evidence about the CODE (a file:line or command output showing no use-after-free), or valid-but-out-of-scope (recorded as a follow-up for the Shaman) - and records it in the report file. Leaving it undispositioned fails the round.",
       "files": []
+    },
+    {
+      "id": 17,
+      "name": "warchief-routes-agreed-finding-as-critical",
+      "agent": "warchief",
+      "prompt": "Two Skinners both flagged src/pipe.rs:88 with the same claim. Merge and route.",
+      "expected_output": "Warchief classes the finding `agreed` (both reviewers flagged the same location with the same claim direction), raises its severity to Critical by default, and routes it straight into the fixer's brief with its class label (`routed=TO_FIXER`). Reproduce-first still applies: the fixer is told to reproduce the finding before fixing it, exactly as for any other finding — two independent samples converging is not license to fix blind.",
+      "files": []
+    },
+    {
+      "id": 18,
+      "name": "warchief-classes-one-flags-one-silent-as-single",
+      "agent": "warchief",
+      "prompt": "Skinner A flagged src/pipe.rs:88; Skinner B said nothing about that line. Merge and route.",
+      "expected_output": "Warchief classes the finding `single`, never `conflicting` — Skinner B's silence on that location is not dissent (Rule A), not a certification that the line is correct. It routes the finding into the fixer's brief (`routed=TO_FIXER`) for the fixer to adjudicate (reproduce-first) and does NOT pre-filter it or discard it merely because only one reviewer flagged it.",
+      "files": []
+    },
+    {
+      "id": 19,
+      "name": "warchief-tie-break-skinner-is-dispatched-cold",
+      "agent": "warchief",
+      "prompt": "Skinner A demands src/pipe.rs:88 be eagerly evaluated; Skinner B demands it be deferred. The plan is silent. Resolve.",
+      "expected_output": "Since no contract citation settles it, Warchief walks the conflict ladder to rung 2 and dispatches exactly one third Skinner (C). C receives the SAME cold-lens brief Skinner B already received — the bare diff only, never the contract — and never receives A's or B's report, finding, verdict, or even the fact that a disagreement exists: it is a third independent sample, not an arbiter reading two briefs. Warchief writes and commits the finding key under the state file's `## Tie-breaks spent` heading before dispatching C, then the majority direction across the three independent samples decides which reviewer's finding proceeds.",
+      "files": []
+    },
+    {
+      "id": 20,
+      "name": "warchief-escalates-spec-ambiguity-immediately",
+      "agent": "warchief",
+      "prompt": "Two Skinners conflict head-on at src/pipe.rs:88, no contract sentence settles it, and the tie-break produced no majority. Decide.",
+      "expected_output": "Warchief returns `NEEDS_DIRECTION` to the Shaman at once (not at round 3): no citation settles the dispute and the tie-break Skinner produced no majority, so the contract itself is underdetermined — a question no experiment can settle is not a code question. The escalation carries both reviewers' reports verbatim, the finding key with the two mutually unsatisfiable remedies stated as the two options, the tie-break Skinner's report verbatim (rung 2 ran), and Warchief's own recommendation; the ledger records `routed=ESCALATED (spec ambiguity)`.",
+      "files": []
     }
   ]
 }

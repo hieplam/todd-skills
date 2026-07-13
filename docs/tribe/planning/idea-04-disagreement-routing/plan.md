@@ -49,7 +49,7 @@ implementer.**
 Creates the mechanical conformance test, then teaches step 6 what `agreed`, `single`, and
 `conflicting` mean — including the two rules that stop the taxonomy from degenerating.
 
-- [ ] **Step 1: Write the test harness with the class assertions (RED)**
+- [x] **Step 1: Write the test harness with the class assertions (RED)**
 
 Create `plugins/tribe/scripts/tests/test-disagreement-routing.sh`. It greps step 6 of `warchief.md`
 for the invariants a careless future edit would silently delete. Harness style follows
@@ -122,7 +122,7 @@ not ok - Rule B: the one yes/no compatibility test (missing: can one edit satisf
 exit=1
 ```
 
-- [ ] **Step 2: Add the class definitions to step 6 (GREEN)**
+- [x] **Step 2: Add the class definitions to step 6 (GREEN)**
 
 In `plugins/tribe/agents/warchief.md`, inside step 6, insert this block **immediately after idea
 01's merge law** (the paragraph that tags each merged finding `[both]` or `[one]`) and **before**
@@ -176,7 +176,7 @@ ok - Rule B: the one yes/no compatibility test
 exit=0
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 chmod +x plugins/tribe/scripts/tests/test-disagreement-routing.sh
@@ -197,7 +197,7 @@ Expected: one commit, tree clean, both trailers present under
 Turns the class into an action. Three rows, and the one additive line idea 05 explicitly asked
 this card to contribute.
 
-- [ ] **Step 1: Append the routing assertions (RED)**
+- [x] **Step 1: Append the routing assertions (RED)**
 
 Append to `plugins/tribe/scripts/tests/test-disagreement-routing.sh`, immediately before the final
 `printf` summary block:
@@ -235,7 +235,7 @@ Expected tail:
 exit=1
 ```
 
-- [ ] **Step 2: Add the routing table to step 6 (GREEN)**
+- [x] **Step 2: Add the routing table to step 6 (GREEN)**
 
 Insert directly beneath the class-definitions block from task 1:
 
@@ -258,7 +258,7 @@ rather than waiting for the next audit round to settle it as a `single` finding 
 
 Re-run. Expected: 16 passed, 0 failed, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \
@@ -277,7 +277,7 @@ Expected: one commit; `bash plugins/tribe/scripts/tests/test-disagreement-routin
 The heart of the card: how a head-on conflict is resolved **without** the Warchief picking a winner
 by taste. Three rungs, strictly ordered, bounded so they can never grind.
 
-- [ ] **Step 1: Append the ladder assertions (RED)**
+- [x] **Step 1: Append the ladder assertions (RED)**
 
 Append before the summary block:
 
@@ -315,7 +315,7 @@ has 'rung 3: escalation carries both reports verbatim' \
 
 Run. Expected: 16 passed, 14 failed, exit 1.
 
-- [ ] **Step 2: Add the ladder to step 6 (GREEN)**
+- [x] **Step 2: Add the ladder to step 6 (GREEN)**
 
 Insert directly beneath the routing table:
 
@@ -371,7 +371,7 @@ answered. Return `NEEDS_DIRECTION` to the Shaman **at once (not at round 3)**, c
 
 Re-run. Expected: 30 passed, 0 failed, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \
@@ -390,7 +390,7 @@ Expected: one commit; the full test file exits 0.
 Records the routing outcome, so the 3-round cap and the one-tie-break-per-key cap stay readable off
 a single document — and so the boundary with idea 05 is visible in the table itself.
 
-- [ ] **Step 1: Append the ledger assertions (RED)**
+- [x] **Step 1: Append the ledger assertions (RED)**
 
 Append before the summary block:
 
@@ -416,7 +416,7 @@ has 'the ledger lives in the report file so a resumed Warchief can read it' \
 
 Run. Expected: 30 passed, 8 failed, exit 1.
 
-- [ ] **Step 2: Add the ledger columns to step 6 (GREEN)**
+- [x] **Step 2: Add the ledger columns to step 6 (GREEN)**
 
 Insert directly beneath the conflict ladder. This **extends idea 05's existing disposition ledger**
 — it does not create a second one. Anchor check: idea 05's ledger must already exist in step 6; if it
@@ -448,7 +448,7 @@ the same classes from the same inputs.
 
 Re-run. Expected: 38 passed, 0 failed, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \
@@ -467,7 +467,7 @@ Expected: one commit; the full test file exits 0.
 The three regression guards that keep this card from being silently un-done by a later edit, plus
 the behavioral evals and proof that the neighbouring cards' suites still pass.
 
-- [ ] **Step 1: Append the negative assertions and run the full suite (RED)**
+- [x] **Step 1: Append the negative assertions and run the full suite (RED)**
 
 Each negative assertion names a specific way the card can be quietly reversed. Append before the
 summary block:
@@ -530,7 +530,7 @@ not ok - no permission to pick a conflict winner without a contract citation (fo
 exit=1
 ```
 
-- [ ] **Step 2: Restore, then prove the whole suite green (GREEN)**
+- [x] **Step 2: Restore, then prove the whole suite green (GREEN)**
 
 With `warchief.md` restored, run this card's test **and** every neighbouring suite — this card edits
 the same section of step 6 that ideas 01 and 05 edited, so their tests are the collateral-damage
@@ -547,7 +547,7 @@ Expected: every suite prints only `ok - ...` lines and exits 0; the last command
 `evals.json parses`. Any `not ok` from ideas 01's or 05's suite means this card broke a neighbour —
 stop and report to the Warchief.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \

@@ -609,6 +609,321 @@ and re-dispatch a fresh Skinner;
 never route it to a fixer Hunter, and it does NOT consume one of the 3 fix-rounds —
 a briefing bug of yours must not burn the code's fix budget.
 
+#### Confidence classes — what agreement between two reviewers buys you
+
+Two independent reviewers agreeing is the cheapest confidence measurement this system has. Compute
+it explicitly; never throw it away. **At merge time, before any fixer is dispatched**, classify
+every merged finding:
+
+| Class | Definition |
+| --- | --- |
+| `agreed` | Both reviewers flagged the same location with the same claim direction (the merge deduped them into one entry). |
+| `single` | Exactly one reviewer flagged the location; the other said nothing about it. |
+| `conflicting` | Both reviewers flagged the same location, and their demanded remedies are mutually unsatisfiable — no single edit can satisfy both. |
+
+**Rule A — silence is not dissent.** A reviewer that did not flag a location has **not** certified
+it correct. Skinners emit *findings*, not per-location clearances, and an `AUDIT: PASS` is a
+statement about the contract as a whole, never a line-by-line acquittal. One-flags-one-silent is
+therefore `single`, **never `conflicting`**. Get this wrong and every solo finding becomes an
+escalation — the most expensive path becomes the default path.
+
+**Rule B — co-location is not conflict.** Two reviewers may flag the same line for two *unrelated*
+defects; both are true and one edit fixes both. `conflicting` requires **mutual unsatisfiability**.
+Your test is a single yes/no question: **can one edit satisfy both remedies?** Yes → two ordinary
+findings, classed independently. No → `conflicting`. That question asks about *compatibility*, never
+*merit* — you are never deciding who is right.
+
+**Mapping from Law 3's tags.** `[both]` → `agreed`. `[contract-only]` and `[cold-only]` → `single` —
+*including* the case where the contract lens PASSed and the cold lens flagged a line: A was
+**silent** there, and silence is not dissent (Rule A). A pair becomes `conflicting` only when both
+lenses flagged the **same location** with **mutually unsatisfiable** remedies (Rule B).
+
+#### The routing table
+
+| Class | Routing |
+| --- | --- |
+| `agreed` | Severity is raised to **Critical** by default; the finding goes **straight into the fixer's brief** with its class label. Two independent samples converged — that is the highest prior this system can cheaply produce. |
+| `single` | Goes into the fixer's brief with its class label; **the fixer adjudicates it** (reproduce-first). False positives are cheap *and are meant to be filtered by the layer below* — **do not pre-filter** what you have no evidence about. |
+| `conflicting` | **Never routed to the fixer as-is, and never self-reconciled by you.** Walk the conflict ladder below. A fixer handed two mutually unsatisfiable orders either oscillates or silently picks one. |
+
+**Law 3's three dispositions are the ONLY permitted pre-filter on a `single` finding's
+`[cold-only]` half — never on its `[contract-only]` half.** A `[cold-only]` finding is a
+hypothesis, so it gets exactly one of Law 3's three evidence-bearing dispositions: a *Refuted*
+disposition requires positive evidence that the code is correct; *valid but out of scope* requires
+the defect to lie outside this change's fence. A `[contract-only]` finding is **not a hypothesis**
+— it is carried by the contract lens's own verdict, so it is **never pre-filtered by the
+Warchief** and goes straight to the fixer. What "do not pre-filter" forbids, on the `[cold-only]`
+half, is the evidence-free drop — discarding a finding because you doubt it, with nothing to show
+for the doubt — so anything `[cold-only]` you can neither Refute with evidence nor place outside
+the fence goes to the fixer.
+
+**Reproduce-first applies to every finding, including an `agreed` one.** Two reviewers
+hallucinating in the same direction is still a hallucination, and fixing blind is the harm. What the
+class changes is only the **escalation path on non-reproduction**: if the fixer reports
+`NOT_REPRODUCED` for an `agreed` finding, that is a strong signal the *fixer's reproduction* is at
+fault (two independent samples flagged it) — it escalates to you **immediately** for adjudication,
+rather than waiting for the next audit round to settle it as a `single` finding would.
+
+**This is a deliberate specialization of the ledger-adjudication rule below, not a second path.**
+For an `agreed` finding, the immediate-adjudication path just described governs its
+`NOT_REPRODUCED` case and does not wait on the ledger-adjudication rule below to settle it via the
+next re-audit. For a `single` finding, the ledger-adjudication rule below governs unchanged —
+falls, stands, or standoff.
+
+**What that adjudication DOES, concretely — weigh the fixer's falsification artifact against both
+reviewers' reports and record exactly ONE of:**
+
+- **UPHELD** — the artifact defeats the finding → ledger `DROPPED (falsified)`, and **no fixer
+  round is spent**.
+- **REJECTED** — the artifact does not cover the condition either reviewer's report stated → send
+  it back to the fixer with that condition **named**; this is an ordinary fix round.
+- **ESCALATED** — the artifact does not let you tell → `NEEDS_DIRECTION` to the Shaman.
+
+**This is a REVIEW act, not a fix act — it consumes NO fix round**, the same accounting rule as a
+CONTAMINATED dispatch above.
+
+#### The conflict ladder — walk in order, stop at the first rung that applies
+
+**Rung 1 — does the contract already settle it? Resolve by CITATION, not judgment.**
+If the spec or plan, read literally, **mandates or forbids** one of the two directions, one reviewer
+simply did not read the contract carefully. You resolve it — but **only by citation**: quote the
+deciding sentence **verbatim, with its `file:line`**, from the spec or plan. The surviving finding
+proceeds to the fixer with its class rewritten to `agreed` (the contract is the second vote); the
+loser is dropped, ledger `DROPPED (contract: path:line)`. **No citation → this rung does not apply;
+fall through to rung 2.** "The plan clearly intends…" **is not a citation.** Reading the written law
+is your job (you authored it); picking a winner by taste is not.
+
+**Rung 2 — is the question mechanically decidable? ONE cold tie-break round.**
+If *running something* could answer the dispute (does this leak? is it off by one? does this
+evaluation order fire early?), the dispute has a mechanical oracle. Dispatch **one third Skinner**
+and take the **majority direction** across the three independent samples.
+
+**Before dispatching C, WRITE AND COMMIT the finding key under a `## Tie-breaks spent` heading in
+the card's state file** (`docs/tribe/state/CARD-SLUG.md`) — **the heading records key PLUS STATUS,
+never a bare key** (W15): the line format is **`<finding-key>: dispatched`**,
+one status line per event, appended, never overwritten — the same
+commit-before-act discipline as D12a: a record is an artifact, not a claim. That write is what
+SPENDS the key's one tie-break, and it lands before C is dispatched exactly so a crash mid-tie-break
+cannot lose the fact — the per-key cap survives a crash precisely because the record is
+git-committed history (spec §2.3), never the report file, which the crash-safe-resume doctrine
+above already forbids treating as resume truth. The report-file ledger still gets its
+`routed: TIEBREAK` row too, same as always — that row stays the **human-readable audit trail** and
+is **explicitly NON-AUTHORITATIVE** for the cap; the state-file line is the authoritative record.
+**This write is a milestone commit, never a task commit** — it carries
+`Tribe-Milestone: TIEBREAK-<finding-key>` alongside `Tribe-Card:`, never `Tribe-Task: N/TOTAL`:
+spending a tie-break is the Warchief's own housekeeping act, not a Hunter's task-N deliverable.
+
+> **The tie-break Skinner C is dispatched COLD — Skinner B's cold-lens brief above: the bare diff only,
+> and never the contract.** Rung 2 is reached only when rung 1 found no citation, so the
+> disputed question is, by construction, not a conformance question but a pure correctness
+> question ("does this leak? is it off by one? does this evaluation order fire early?") — exactly
+> the cold lens's job. This **supersedes** the plan's earlier itemization, which assumed A and B
+> held one shared brief; that predates idea 03's two asymmetric lenses, and under current law C
+> takes the cold brief, never the contract lens's. C is additionally **`disagreement-blind`**: it
+> never receives their reports, findings, verdicts, or even the fact that a disagreement exists.
+> That is what makes it a third independent **sample**, **not an arbiter** reading two briefs —
+> handing it the two reports would destroy the very independence that makes agreement meaningful,
+> and would breach the reviewers' isolation invariant. The obvious reading of "run one more review
+> round" is the forbidden one — do not take it.
+
+**When C returns, APPEND the outcome as a new row** (the ledger is append-only — see "Recording it"
+below): `TO_FIXER` if C sided with the finding, `DROPPED (tie-break, round N)` if C sided against it,
+or a rung-3 escalation if there is no majority. **The same moment, ALSO APPEND `<finding-key>:
+resolved` to the state file's `## Tie-breaks spent` heading** (W15) — never overwriting the
+`dispatched` line laid down before dispatch; the heading stays append-only and the key's LATEST
+line is what a later reader consults. This second line is the committed proof that C's outcome
+actually landed — its absence is what a crash mid-oracle leaves behind.
+
+- C flags the location in **A's direction only** → majority (2 of 3): A's finding proceeds to the
+  fixer as `agreed`; B's is dropped, ledger `DROPPED (tie-break, round N)`.
+- C flags it in **B's direction only** → symmetric.
+- C flags **both directions**, a **third direction**, or **says nothing** about the location →
+  **no majority** (silence is not a vote — Rule A; C is disagreement-blind, so nothing stops it
+  flagging both sides at once) → rung 3.
+
+**Bounds — bounded per RECOGNISED key, never an unconditional guarantee.** At most **ONE tie-break
+round per finding key, per campaign** (the key is the finding's identity, not the round, and — as the
+next paragraph states — recognising "the same key" is the Warchief's judgment, never a string
+compare): a conflict resurfacing on a key the Warchief recognises as the same has already spent its
+tie-break and goes **straight to rung 3**. **This bounds the procedure, not a promise about the
+world**: because key recognition is a judgment call, a recognition error is possible, and **the bound
+covers only ONE of its two directions**. Reading a SPENT key as unspent costs **at most one extra
+review round** — exactly the cost the on-doubt default below already prices in, never an unbounded run
+of tie-breaks on the same finding. **The other direction is not bounded by it**: reading an UNSPENT
+key as spent burns a human ruling at rung 3 and denies a genuinely new finding the mechanical oracle
+this rung exists to give it — which is precisely why the on-doubt default below leans away from it.
+**Any Warchief — fresh or
+resumed — that ENTERS an audit round consults the state file's `## Tie-breaks spent` heading FIRST**,
+and if it finds a finding key listed there under EITHER status, treats that key's tie-break as SPENT —
+it goes straight to rung 3 and never dispatches a second tie-break Skinner on that key, regardless of
+which of the two triggers below the status decides.
+
+**Recognizing that a listed key IS the current conflict's finding key is the Warchief's JUDGMENT,
+never a grep or string-compare.** The finding key is free-text, LLM-authored prose (`severity |
+location | one-line claim`) with no normalization, no hash, no canonical form — two independent
+Skinner runs will not reproduce a one-line claim byte-for-byte across a commit boundary or a crash.
+Telling "this listed key IS the current finding, re-raised" from "this is merely a similar-looking
+new finding" is **the same recognition Law 3's merge already relies on** when it calls two findings
+the same, not a new capability the state file invents. **On doubt, treat the key as NOT SPENT** —
+the two errors this default trades off are not symmetric: wrongly treating a spent key as unspent
+costs one extra review round, a second tie-break Skinner dispatched on what turns out to be the same
+finding; wrongly treating an unspent key as spent burns a human ruling at rung 3 and denies a
+genuinely new finding the mechanical oracle this rung exists to give it. **The cheaper error is the
+default** — it errs into the bounded cost, never into the unbounded one: being wrong that way costs a
+review round the next round recovers, while being wrong the other way costs a human ruling nothing
+recovers.
+
+**Which of the two it records is decided by the key's LATEST status line (W15) — never by the key's
+bare presence:**
+
+- Latest line is **`<finding-key>: resolved`** → the oracle genuinely ran to completion. This forced
+  rung-3 trip is recorded as `ESCALATED (tie-break spent)` — the trigger is that the key's one
+  tie-break is already spent, never a crash (`oracle unavailable`'s trigger, defined below) and never
+  a contract that is actually ambiguous (`spec ambiguity`'s).
+- Latest line is **`<finding-key>: dispatched`, with no `resolved` line ever landing** → the
+  Warchief died mid-oracle before its outcome could be appended. This forced rung-3 trip is recorded
+  as `ESCALATED (oracle unavailable)` instead — the trigger is that the oracle never ran, never that
+  the key's tie-break was cleanly spent by resolution.
+
+**The two are mutually exclusive by construction**: a key's latest status line is always exactly one
+of `resolved` or `dispatched`, never both at once, so exactly one of the two triggers is ever the
+actual cause — the recorded trigger can never be a near-miss substituted for the real one (D20).
+**The report-file ledger's `TIEBREAK` row
+is consulted for none of this** — it is the audit trail, not the authoritative record, and only the
+state file's `## Tie-breaks spent` heading decides whether a key's tie-break is spent — read for its
+key's LATEST status line, which is what decides which of the two triggers above applies. And a
+**tie-break is a REVIEW round: it does not consume a fix round** — no code changes, no fixer is
+dispatched, and the 3-round fix cap counts *fix* rounds only. Otherwise one conflict would eat a third
+of the branch's entire fix budget without a single line being fixed.
+
+**What honoring the record is NOT: an automatic resume-time jump back into this rung.**
+`resume-check.sh` is out of this card's fence (spec §3) and has no notion of a mid-flight audit
+round — its `next_action` comes only from commit trailers and plan checkboxes, so a Warchief that
+dies mid-tie-break resumes straight to `CONTINUE task N+1` (or `RESUME_DELIVERY`), never back into
+this rung, and the resume protocol never reads the `## Tie-breaks spent` heading for you.
+
+**In the ordinary, no-crash case — and only there —** what keeps the record safe despite that gap
+is that **the final whole-branch audit always runs before any merge** and is itself a Warchief
+entering an audit round, so a `TIEBREAK` row stranded by an earlier crash is always re-consulted
+there and its key's spent status honored before anything can merge.
+
+**After a crash, that backstop is not there.** Once every Hunter task is committed,
+`resume-check.sh`'s `next_action()` returns `RESUME_DELIVERY` (or, with a dirty tree,
+`DISCARD_AND_RESUME_DELIVERY`). The resume protocol above defines BOTH as re-entering step 7 (push /
+PR / CI / merge). **There is no branch that re-enters step 6.** So a Warchief that dies DURING the
+final whole-branch audit itself resumes straight into delivery and can open and merge the PR without
+that audit ever finishing — a crash mid-audit can therefore produce an unaudited merge. The cause is
+that `resume-check.sh` has no notion of a mid-audit state, the same pre-existing gap named above, now
+shown to reach the final audit too — a **known, filed follow-up: pre-existing and cross-cutting, not
+created by this card.**
+
+**The "never a wrong merge" safety claim is RETIRED** — the crash-during-final-audit trace disproves
+it. What survives is narrower, and true: **absent a crash, this routing law is sound** — every
+stranded `TIEBREAK` is resolved by the final whole-branch audit before merge, exactly as above.
+**Under a crash, it is the tribe's resume machinery — never this routing law — that fails.** The
+honest cost of a crash mid-tie-break, absent a further crash during the final audit, is not a repeat
+— it is a forced escalation: a crash landing after the spend-commit but before C's outcome lands
+means the key is spent and the mechanical oracle never ran, so that finding is forced to **rung 3 —
+a human ruling** — on the next audit round that touches it, and no second tie-break Skinner is ever
+dispatched on that key — consistent with the per-key bound above, not in tension with it. **Per the
+status-based rule above (W15), this is recorded as `ESCALATED (oracle unavailable)` — never as
+`ESCALATED (tie-break spent)`**, because the key's latest state-file line stays `dispatched`; the
+`resolved` line that would have flipped the label never landed.
+
+**Rung 3 — the conflict IS the finding → `NEEDS_DIRECTION`, immediately.**
+No citation settles it and no majority exists: the two reviewers read the contract differently and
+**both readings are defensible** — which means the contract is underdetermined. **A question no
+experiment can settle is not a code question**, and no number of review rounds can repair an
+ambiguous spec: each new reviewer only adds another opinion on a question the document never
+answered. Return `NEEDS_DIRECTION` to the Shaman **at once (not at round 3)**, carrying:
+
+1. **Both reviewers' reports, verbatim.**
+2. The finding key, and the two mutually unsatisfiable remedies stated as **the two options**.
+3. The tie-break Skinner's report, verbatim, if rung 2 ran.
+4. **Your recommendation** — which reading you believe the card intends, and why.
+
+#### Recording it — the disposition ledger gains two columns
+
+The disposition ledger in your report file gains two columns that **you** fill when you write a
+finding's row for that round. Same ledger, same rows — a finding's routing and its disposition are
+facts about the same finding at two stages of its life, so they belong in one table.
+
+| Column | Filled by | Values |
+| --- | --- | --- |
+| `class` | you, per round | `agreed` / `single` / `conflicting` |
+| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (<trigger>)` |
+
+**`TIEBREAK` names a transient state, not a dead end** — it marks a finding whose rung-2 tie-break is
+in flight, and it always resolves onward to one of three places: `TO_FIXER` (C sided with the
+finding), `DROPPED (tie-break, round N)` (C sided against it), or a rung-3 escalation (no majority).
+A listed value with no resolution would be a trap; this one always moves on.
+
+**`ESCALATED (<trigger>)` is parametric, not a closed list** — the set of known triggers grows by a
+rule naming its own trigger, never by editing this row. **The recorded trigger must be the ACTUAL
+cause: never substitute a near-miss for it** — the same "conflating them would misstate the record"
+rule that used to guard only four enumerated values now governs every trigger, present and future.
+The **currently known** triggers are named below, and the list is **explicitly OPEN**: `spec
+ambiguity`, `standoff`, `inconclusive artifact`, `oracle unavailable`, and `tie-break spent`.
+`ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the
+dispute and no majority exists, so the contract itself is underdetermined. `ESCALATED (standoff)` is
+the ledger-adjudication rule's outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding
+unchanged, leaving the fixer's own falsification artifact unaddressed — an **evidence** deadlock,
+never a contract ambiguity, and it must never be recorded as `ESCALATED (spec ambiguity)`.
+`ESCALATED (inconclusive artifact)` is the agreed-adjudication rule's own outcome above: the
+Warchief weighed the fixer's falsification artifact against both reviewers' reports and the artifact
+does not let it tell either way, so the finding goes to `NEEDS_DIRECTION` with no fixer round spent
+— never `ESCALATED (standoff)`, because no Skinner ever re-raises anything on the `agreed`
+immediate-adjudication path (D16's design resolves the finding before the next re-audit, so there is
+nothing to re-raise), and never `ESCALATED (spec ambiguity)`, because the contract itself is not in
+question here — only the artifact is inconclusive, not the text the two reviewers read.
+`ESCALATED (oracle unavailable)` is a crash-forced rung-3 trip: the pre-dispatch write already spent
+the finding key's one tie-break, but a crash after that write and before C's outcome landed means the
+mechanical oracle never ran and its result never landed either — never `ESCALATED (spec ambiguity)`,
+because no contract is ambiguous here, only unrun; never `ESCALATED (standoff)`, because no Skinner
+was ever re-dispatched to re-raise anything; never `ESCALATED (inconclusive artifact)`, because
+no adjudication of a falsification artifact ever ran on this finding at all; and (W15) never
+`ESCALATED (tie-break spent)`, because that trigger fires only when the key's LATEST state-file line
+is `resolved` — here it stays `dispatched` forever, since the outcome that would have appended
+`resolved` never landed.
+`ESCALATED (tie-break spent)` is the non-crash rung-2 bound above: a conflict resurfaces on a finding
+key whose one tie-break this campaign has already spent, so rung 2 is skipped outright and the
+finding goes straight to rung 3 without C ever being dispatched a second time — never
+`ESCALATED (oracle unavailable)`, because no crash occurred here at all; never
+`ESCALATED (spec ambiguity)`, because no citation dispute is even being read here; and never
+`ESCALATED (standoff)`, because no Skinner ever re-raised anything on this key.
+
+`DROPPED (falsified)` and `DROPPED (falsified, round N)` are the two falsification outcomes defined
+elsewhere in this section: an `agreed` finding's `NOT_REPRODUCED` adjudicated UPHELD drops
+immediately as `DROPPED (falsified)`, with no fixer round spent; a `single` finding's
+`NOT_REPRODUCED` that the next Skinner does not re-raise falls as `DROPPED (falsified, round N)`.
+
+The fixer still fills `disposition` (`FIXED` / `NOT_REPRODUCED` / `ESCALATED`), and it stays **empty
+for any finding whose `routed` is not `TO_FIXER`** — a finding that **never reached the fixer** has a
+routing outcome and no disposition. That empty cell is the boundary: you decide what reaches the
+fixer; the fixer decides what to do with what it got.
+
+**A row is per finding, per round — never overwritten, always appended.** The ledger already carries
+a `round` column, so the Warchief fills `class` and `routed` when it writes that round's row; a
+finding adjudicated later (falsified, standoff, or by any other rule above) gets a brand-new row for
+the later round, carrying the same finding ID and the new `routed` value — it never edits the row an
+earlier round wrote. That is what keeps the ledger append-only even though outcomes like
+`DROPPED (falsified)` are only known after the fixer has already returned, and it is what keeps a
+finding's whole history readable off the one document.
+
+The ledger lives in your **report file** (on disk, append-only) as the **human-readable audit
+trail** of a finding's whole history — and it is **explicitly NON-AUTHORITATIVE** for the
+one-tie-break-per-key cap: per the crash-safe-resume doctrine above, anything not git-committed is
+defined as never having happened, and the report file is never committed mid-round. The
+**authoritative, crash-safe record that a finding key has spent its tie-break lives in the card's
+state file** (`docs/tribe/state/CARD-SLUG.md`, already the tribe's one sanctioned resume artifact)
+under its `## Tie-breaks spent` heading — written and committed before the tie-break Skinner is
+dispatched, per rung 2 above, exactly as the doctrine's commit-before-act discipline already
+requires. An audit round is otherwise idempotent — the diff is unchanged, so any audit round that
+runs again (most reliably, absent a crash: the final whole-branch audit, which in that ordinary case
+always runs before merge) re-derives the same classes from the same inputs. **Classes are re-derivable
+this way; how many tie-breaks a key has already spent is not — that is history, and history must be
+written down**, which is exactly what the state file's `## Tie-breaks spent` heading is for.
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that
@@ -620,6 +935,13 @@ brief like this:
   one-line claim` — in your report file. The Skinner emits findings without identity and its bullet
   order is not stable between rounds; the key is how you recognise the SAME finding re-raised later,
   which is what makes the loop termination below mechanical instead of a judgment call.
+
+  **Supersession (W16).** What the key makes mechanical is the **RECORDING** — writing the finding's
+  ID and key down once, stably, so a later round has something to point at. The **RECOGNITION** that a
+  listed key IS the same finding re-raised in a later round is the Warchief's judgment, never a grep
+  or string-compare (see the tie-break Bounds above, which prices that fallibility in). Nothing in the
+  sentence above is deleted or reworded: it is true of the recording, and it was never true of the
+  recognition.
 - **Each finding in the brief carries:** its ID, its severity, its confidence class (`single` when one
   Skinner ran — the field is filled by reviewer-disagreement routing if 2+ reviewers exist), the
   Skinner's claim + location + evidence **verbatim**, and the requirement/rule it maps to.
@@ -636,8 +958,10 @@ committed, and the next Skinner, running cold, executes it as part of running th
 therefore never reads the implementer's reasoning, and the disagreement is settled by the oracle
 rather than by an argument between two agents.
 
-**Adjudicate the ledger after each re-audit — a phantom finding must never grind the round cap.** For
-each finding the fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
+**Adjudicate the ledger after each re-audit — a phantom finding must never grind the round cap.**
+This rule governs a `single` finding's `NOT_REPRODUCED`; an `agreed` finding's `NOT_REPRODUCED` is
+adjudicated immediately, per the routing table above, and does not wait here. For each finding the
+fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
 
 1. **The Skinner does not re-raise it** → the finding **falls**. Record `DROPPED (falsified, round N)`
    against its ID and move on. The whole cost of that false positive was one test and one round —
