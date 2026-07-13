@@ -430,8 +430,11 @@ has 'routed value DROPPED with a contract citation' "$STEP6" \
 has 'routed value DROPPED by tie-break' "$STEP6" \
     '`routed`[[:space:]]*\|[^|]*\|[^|]*DROPPED \(tie-break'
 
-has 'routed value ESCALATED for spec ambiguity' "$STEP6" \
-    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(spec ambiguity\)'
+# D20 retires this closed-list ROW assertion (`ESCALATED (spec ambiguity)` as a literal enum
+# member): the value went PARAMETRIC (`ESCALATED (<trigger>)`), so the row no longer lists
+# individual triggers at all. See the "Task 4, D20 fix round" block at the end of this file for the
+# parametric-form assertion that replaces this one, and for why retiring it (rather than leaving it
+# to redden permanently) is the correct response to a design change, not a silently-abandoned guard.
 
 # Compound claim (W5 bar #3): disposition stays empty — AND — that emptiness is scoped to a
 # finding whose `routed` is not `TO_FIXER` (i.e. one that never reached the fixer). Both conjuncts
@@ -475,8 +478,9 @@ has 'routed value DROPPED falsified (agreed UPHELD, no fixer round spent)' "$STE
 has 'routed value DROPPED falsified round N (single finding not re-raised)' "$STEP6" \
     '`routed`[[:space:]]*\|[^|]*\|[^|]*DROPPED \(falsified, round N\)'
 
-has 'routed value ESCALATED standoff, listed distinctly from ESCALATED spec ambiguity' "$STEP6" \
-    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(standoff\)'
+# D20 retires this closed-list ROW assertion (`ESCALATED (standoff)` as a literal enum member) for
+# the same reason as the spec-ambiguity one above: the value is now parametric. See the "Task 4,
+# D20 fix round" block at the end of this file.
 
 # TIEBREAK must have a stated trigger and a stated resolution — a listed value nobody ever
 # produces is a trap (W10 ruling 2). First assertion is the definition's own header sentence
@@ -547,29 +551,12 @@ has 'append-only holds even though falsified outcomes are only known after the f
 # `ESCALATED (inconclusive artifact)` and extends the disambiguation prose to name all three
 # triggers so no two of them can be collapsed into each other.
 #
-# Structural, pipe-bounded anchor for the new enum value (same technique as the pre-existing
-# enum-value assertions above): immune to text-length changes by construction, no D17 headroom
-# needed.
-has 'routed value ESCALATED inconclusive artifact (D16 adjudication cannot tell either way)' \
-    "$STEP6" \
-    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(inconclusive artifact\)'
-
-# The header sentence must now say FOUR, not three (W13/F26 adds a fourth trigger) — a later editor
-# silently leaving "three" while a fourth value sits in the enum is exactly the mislabelling this
-# rule exists to prevent. Actual gap between "failures" and "conflating" is 6 chars (", and ");
-# `.{0,40}` keeps 34 chars of D17 headroom.
-has 'the disambiguation header now names four ESCALATED values, not three' "$STEP6" \
-    'The four `ESCALATED` values name four different failures.{0,40}conflating any of them would misstate the record'
-
-# Regression guard: the old two-value header wording must not survive verbatim (it would mean the
-# third value was added to the enum/table but the prose above it was never updated to match).
-hasnt 'the header no longer claims only two ESCALATED values exist' "$STEP6" \
-    'The two `ESCALATED` values name two different failures'
-
-# Regression guard (W13/F26): the immediately-prior three-value header wording must not survive
-# either, now that a fourth trigger (`ESCALATED (oracle unavailable)`) exists in the enum.
-hasnt 'the header no longer claims only three ESCALATED values exist' "$STEP6" \
-    'The three `ESCALATED` values name three different failures'
+# D20 retires the ROW assertion this comment used to introduce (`ESCALATED (inconclusive
+# artifact)` as a literal enum member) and the three "header names N ESCALATED values" assertions
+# that followed it — the enum went PARAMETRIC and the header no longer counts values at all. See
+# the "Task 4, D20 fix round" block at the end of this file for the parametric-form, actual-cause,
+# openness, and named-triggers assertions that replace all four, plus regression guards for every
+# retired fixed-count wording (two/three/four/five).
 
 # The new value's own definition: it is D16's own agreed-adjudication outcome, triggered when the
 # artifact does not let the Warchief tell either way, and it consumes no fixer round (same
@@ -993,44 +980,184 @@ has 'what survives: absent a crash, this routing law is sound' "$STEP6" \
 has "under a crash, it is the tribe's resume machinery, never this routing law, that fails" "$STEP6" \
     'Under a crash, it is the tribe.s resume machinery.{0,35}never this routing law.{0,35}that fails'
 
-# F26, part 1: the fourth `routed` value itself, row-anchored like its 9 siblings above (same
-# structural, pipe-bounded technique -- immune to text-length changes by construction, no D17
-# headroom needed).
-has 'routed value ESCALATED oracle unavailable (crash-forced rung-3 trip; tie-break spent, oracle never landed)' \
-    "$STEP6" \
-    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(oracle unavailable\)'
+# F26, part 1: D20 retires this row-anchored assertion (`ESCALATED (oracle unavailable)` as a
+# literal enum member) -- the value went PARAMETRIC. See the "Task 4, D20 fix round" block below
+# for the parametric-form assertion that replaces it.
 
 # F26, part 2: its own definition -- a crash-forced rung-3 trip, where the pre-dispatch write
 # already spent the finding key's one tie-break. Actual gaps 1 and 2 chars; `.{0,35}` keeps >=33
-# chars of D17 headroom on each.
+# chars of D17 headroom on each. Unchanged by D20/F27 (this assertion was never one of the four
+# flagged as a zero-bridge, whole-clause literal).
 has 'ESCALATED oracle unavailable is defined as a crash-forced rung-3 trip where the tie-break was already spent' \
     "$STEP6" \
     '`ESCALATED \(oracle unavailable\)` is a crash-forced rung-3 trip.{0,35}the pre-dispatch write already spent the finding key.s one tie-break'
 
-# F26, part 3: WHAT fires it -- a crash landing after that write and before C's outcome landed means
-# the mechanical oracle never ran and its result never landed either. Literal (near-zero internal
-# gaps), D17 convention.
+# F27 fix (was F26 part 3): this assertion used to match the ENTIRE "trigger, means, consequence"
+# sentence as one bare literal with NO bridge at the "means" joint -- a legal 7-16 char clarifying
+# insertion right there (D17's own bound) reddened it (reproduced: inserting ", unfortunately,"
+# before "means" broke the old regex). Bridged the same way the W11 exclusion clauses a few lines
+# above this block already do for the identical sentence shape. Actual gap at the "landed
+# means the mechanical" joint is 1 char; `.{0,40}` keeps 39 chars of D17 headroom.
 has 'oracle unavailable fires when a crash lands before Cs outcome landed, so the oracle never ran and its result never landed' \
     "$STEP6" \
-    'a crash after that write and before C.s outcome landed means the mechanical oracle never ran and its result never landed either'
+    "a crash after that write and before C.s outcome landed.{0,40}means the mechanical oracle never ran and its result never landed either"
 
-# F26, part 4: distinguished from `ESCALATED (spec ambiguity)` -- no contract is ambiguous here, only
-# unrun. Literal, D17 convention.
+# F27 fix (was F26 part 4): same defect, at the "because" joint -- a legal 7-char insertion
+# ("simply ") reddened the old bare-literal regex (reproduced). Actual gap 2 chars; `.{0,40}` keeps
+# 38 chars of D17 headroom.
 has 'oracle unavailable is never a spec ambiguity: no contract is ambiguous, only unrun' "$STEP6" \
-    'never `ESCALATED \(spec ambiguity\)`, because no contract is ambiguous here, only unrun'
+    'never `ESCALATED \(spec ambiguity\)`.{0,40}because no contract is ambiguous here, only unrun'
 
-# F26, part 5: distinguished from `ESCALATED (standoff)` -- no Skinner was ever re-dispatched to
-# re-raise anything (unlike a real standoff, where a Skinner DOES re-raise). Literal, D17 convention.
+# F27 fix (was F26 part 5): same defect -- a legal 16-char insertion (", unfortunately,") reddened
+# the old bare-literal regex (reproduced). Actual gap 2 chars; `.{0,40}` keeps 38 chars of headroom.
 has 'oracle unavailable is never a standoff: no Skinner was ever re-dispatched to re-raise anything' \
     "$STEP6" \
-    'never `ESCALATED \(standoff\)`, because no Skinner was ever re-dispatched to re-raise anything'
+    'never `ESCALATED \(standoff\)`.{0,40}because no Skinner was ever re-dispatched to re-raise anything'
 
-# F26, part 6: distinguished from `ESCALATED (inconclusive artifact)` -- no adjudication of a
-# falsification artifact ever ran on this finding at all (unlike the inconclusive-artifact path,
-# where an adjudication DID run and just couldn't tell). Literal, D17 convention.
+# F27 fix (was F26 part 6): same defect -- a legal 7-char insertion ("simply ") reddened the old
+# bare-literal regex (reproduced). Actual gap 2 chars; `.{0,40}` keeps 38 chars of headroom.
 has 'oracle unavailable is never an inconclusive artifact: no adjudication of a falsification artifact ever ran on this finding' \
     "$STEP6" \
-    'never `ESCALATED \(inconclusive artifact\)`, because no adjudication of a falsification artifact ever ran on this finding at all'
+    'never `ESCALATED \(inconclusive artifact\)`.{0,40}because no adjudication of a falsification artifact ever ran on this finding at all'
+
+# --- Task 4, D20 fix round (F27/F28): ESCALATED (<trigger>) goes PARAMETRIC ------------------------
+# F27 (Critical, contract lens): the four assertions just above used to match a full "trigger,
+# because/means, consequence" sentence as ONE bare literal with no `.{0,N}` bridge at the
+# because/means joint at all -- a legal 7-16 char clarifying insertion right there (well inside
+# D17's 30-char survival bound) reddened each one (reproduced above, and every other bridge in this
+# file already keeps >=30 chars of headroom at that same joint shape). Fixed by bridging the joint,
+# per the convention the W11 exclusion clauses already use a few hundred lines above.
+#
+# F28 (Important, cold lens): the non-crash path "a conflict resurfacing on the same key has
+# already spent its tie-break and goes straight to rung 3" (the rung-2 Bounds paragraph) had NO
+# legal `routed` value -- `ESCALATED (spec ambiguity)` would lie (no contract is ambiguous) and
+# `ESCALATED (oracle unavailable)` would lie (no crash occurred). Two prior rounds (W11, W13) each
+# patched one homeless trigger and another turned up. D20 (Shaman ruling) ends the whack-a-mole:
+# `ESCALATED (<trigger>)` goes PARAMETRIC, not a closed list. The recorded trigger must be the
+# ACTUAL cause (never a near-miss) -- the existing "conflating misstates the record" rule,
+# generalized to govern every trigger, not just the enumerated ones. The currently known triggers
+# are named and the list is explicitly OPEN: spec ambiguity, standoff, inconclusive artifact,
+# oracle unavailable, and the new `tie-break spent` (the non-crash resurfacing case F28 found
+# homeless). Per D20 ruling 4, the suite below guards the RULE mechanically, not the list: the
+# parametric form, the actual-cause rule, the list's openness, and each currently-known trigger
+# being *named* -- so a future trigger needs a new prose sentence naming itself, never a new
+# assertion here or an edit to the enum row.
+
+# The parametric marker itself, row-anchored the same structural, pipe-bounded way as its
+# siblings above (`` `routed`[^|]*\|[^|]*VALUE ``, bounded by the row's own pipes) -- immune to
+# text-length changes by construction, no D17 headroom needed. This is what replaces all four
+# closed-list ROW assertions D20 retired above (spec ambiguity / standoff / inconclusive artifact /
+# oracle unavailable): the row no longer lists individual triggers, so there is nothing left in the
+# row for those four to guard, and one parametric-form assertion covers every trigger, present and
+# future, without ever touching this row again.
+has 'routed value is the parametric ESCALATED (<trigger>), not a closed list of individual values' \
+    "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(<trigger>\)'
+
+# Regression guards: none of the four retired closed-list ROW literals may resurface in the enum
+# row's own cell -- a later editor reverting to a fixed list (even partially) is exactly the
+# whack-a-mole D20 ends. Anchored to the ROW specifically (same pipe-bounded shape), so a trigger
+# name appearing in the DEFINITION prose below (where it legitimately belongs) cannot falsely
+# redden these.
+hasnt 'the routed row no longer lists ESCALATED (spec ambiguity) as a fixed member' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(spec ambiguity\)'
+hasnt 'the routed row no longer lists ESCALATED (standoff) as a fixed member' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(standoff\)'
+hasnt 'the routed row no longer lists ESCALATED (inconclusive artifact) as a fixed member' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(inconclusive artifact\)'
+hasnt 'the routed row no longer lists ESCALATED (oracle unavailable) as a fixed member' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(oracle unavailable\)'
+
+# The parametric-form statement itself, and that it grows by a trigger naming itself rather than by
+# editing the row. Actual gap 3 chars; `.{0,40}` keeps 37 chars of D17 headroom.
+has 'the ESCALATED value is parametric, not a closed list, and grows by a trigger naming itself, never by editing the row' \
+    "$STEP6" \
+    'ESCALATED \(<trigger>\)` is parametric, not a closed list.{0,40}the set of known triggers grows by a rule naming its own trigger, never by editing this row'
+
+# (b) The actual-cause rule, generalized to govern every trigger (D20 ruling 2): the recorded
+# trigger must be the real cause, never a near-miss, and this is the SAME "conflating misstates the
+# record" rule that used to guard only the four enumerated values -- now made general. Four
+# conjuncts (W5 bar #3), each its own bridge. Actual gaps 2, 13, 2, 1 chars; the second bridge is
+# widened to `.{0,45}` (45-13=32 headroom -- `.{0,40}` would only give 27, under D17's floor); the
+# other three keep `.{0,40}`, giving >=38 chars of headroom each.
+has 'the recorded ESCALATED trigger must be the actual cause; never a near-miss; this generalizes conflating-misstates-the-record to every trigger' \
+    "$STEP6" \
+    'The recorded trigger must be the ACTUAL cause.{0,40}never substitute a near-miss for it.{0,45}conflating them would misstate the record.{0,40}rule that used to guard only four enumerated values.{0,40}now governs every trigger'
+
+# (c) Openness of the list: it is explicitly OPEN, not exhaustive. Actual gap 6 chars; `.{0,40}`
+# keeps 34 chars of D17 headroom.
+has 'the currently known trigger list is explicitly OPEN, not exhaustive' "$STEP6" \
+    'The currently known triggers are named below.{0,40}the list is explicitly OPEN'
+
+# (d) Each currently-known trigger is NAMED (conjunct completeness, W5 bar #3: all five, not an
+# alternation satisfied by any one) -- independent of (c)'s openness clause, per mutation: deleting
+# ONLY "explicitly OPEN" must redden (c) alone, never this assertion too, so the lead-in bridge is
+# widened to cross that clause rather than stopping just short of it. Anchored on "named below" (not
+# "explicitly OPEN") so this cannot be hollowly satisfied by the same five words appearing scattered
+# elsewhere in the trigger definitions below (they never appear in this exact order there). Actual
+# gap from "named below" to the first name is 35 chars (spans "and the list is explicitly OPEN: ");
+# `.{0,70}` keeps 35 chars of D17 headroom. The remaining four bridges have actual gaps 2, 2, 2, 2,
+# 6 chars; `.{0,40}` keeps >=34 chars of headroom on each.
+has 'all five currently known triggers are named: spec ambiguity, standoff, inconclusive artifact, oracle unavailable, tie-break spent' \
+    "$STEP6" \
+    'triggers are named below.{0,70}`spec ambiguity`.{0,40}`standoff`.{0,40}`inconclusive artifact`.{0,40}`oracle unavailable`.{0,40}`tie-break spent`'
+
+# Regression guards: no fixed-count phrasing may resurface -- neither the ones D20 retired (two/
+# three/four) nor the naive next mistake of just bumping the count again to five. This is the
+# direct, mechanical expression of D20's own point: a fifth fixed enum value would only buy a
+# sixth.
+hasnt 'the header no longer claims a fixed two-value count' "$STEP6" \
+    'The two `ESCALATED` values name two different failures'
+hasnt 'the header no longer claims a fixed three-value count' "$STEP6" \
+    'The three `ESCALATED` values name three different failures'
+hasnt 'the header no longer claims a fixed four-value count' "$STEP6" \
+    'The four `ESCALATED` values name four different failures'
+hasnt 'the header does not just bump the fixed count to five -- that is the whack-a-mole D20 ends' \
+    "$STEP6" 'The five `ESCALATED` values name five different failures'
+
+# The new `tie-break spent` trigger's OWN definition, matching the shape every other trigger's
+# definition already has in this file: what it is, what fires it, and what it is never confused
+# with. Every bridge below is measured against this new text's own actual consumption and widened
+# to keep >=30 chars of D17 headroom, applying F27's lesson from birth rather than shipping a fifth
+# zero-bridge literal.
+
+has 'ESCALATED tie-break spent is defined as the non-crash rung-2 bound' "$STEP6" \
+    '`ESCALATED \(tie-break spent\)` is the non-crash rung-2 bound above'
+
+# Trigger condition, bridged at its own "so" joint (actual gap 2 chars; `.{0,40}` keeps 38 chars of
+# headroom) -- the same joint shape F27 flagged, fixed from birth.
+has 'tie-break spent fires when a conflict resurfaces on a key whose one tie-break is already spent' \
+    "$STEP6" \
+    'a conflict resurfaces on a finding key whose one tie-break this campaign has already spent.{0,40}so rung 2 is skipped outright'
+
+# Never confused with `oracle unavailable` (no crash occurred) -- actual gap 2 chars; `.{0,40}`
+# keeps 38 chars of headroom.
+has 'tie-break spent is never oracle unavailable: no crash occurred' "$STEP6" \
+    'never `ESCALATED \(oracle unavailable\)`.{0,40}because no crash occurred here at all'
+
+# Never confused with `spec ambiguity` (no citation dispute is even being read) -- actual gap 2
+# chars; `.{0,40}` keeps 38 chars of headroom.
+has 'tie-break spent is never spec ambiguity: no citation dispute is even being read' "$STEP6" \
+    'never `ESCALATED \(spec ambiguity\)`.{0,40}because no citation dispute is even being read here'
+
+# Never confused with `standoff` (no Skinner ever re-raised anything on this key) -- actual gap 2
+# chars; `.{0,40}` keeps 38 chars of headroom.
+has 'tie-break spent is never a standoff: no Skinner ever re-raised anything on this key' "$STEP6" \
+    'never `ESCALATED \(standoff\)`.{0,40}because no Skinner ever re-raised anything on this key'
+
+# The rung-2 Bounds paragraph itself (F28's original site) now names its own trigger explicitly,
+# per D20 ruling 3 ("every new escalation rule must name its own trigger"). Actual gap 3 chars;
+# `.{0,40}` keeps 37 chars of headroom.
+has 'the resurfacing forced rung-3 trip in the Bounds paragraph is recorded as ESCALATED (tie-break spent)' \
+    "$STEP6" \
+    'This forced rung-3 trip is recorded as `ESCALATED \(tie-break spent\)`.{0,40}the trigger is that the key.s one tie-break is already spent'
+
+# Compound claim (W5 bar #3): the trigger is the spent key -- AND -- never a crash -- AND -- never
+# an actually-ambiguous contract. Three conjuncts, each its own bridge. Actual gaps 2, 2, 2, 2
+# chars; `.{0,40}` keeps 38 chars of D17 headroom on each.
+has 'the Bounds-paragraph trigger is the spent key, never a crash, never an ambiguous contract' \
+    "$STEP6" \
+    'is already spent.{0,40}never a crash.{0,40}`oracle unavailable`.s trigger, defined below.{0,40}never a contract that is actually ambiguous.{0,40}`spec ambiguity`.s'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

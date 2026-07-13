@@ -740,7 +740,10 @@ campaign** (the key is the finding's identity, not the round): a conflict resurf
 has already spent its tie-break and goes **straight to rung 3**. **Any Warchief — fresh or resumed —
 that ENTERS an audit round consults the state file's `## Tie-breaks spent` heading FIRST**, and if it
 finds a finding key listed there, treats that key's tie-break as SPENT — it goes straight to rung 3
-and never dispatches a second tie-break Skinner on that key. **The report-file ledger's `TIEBREAK` row
+and never dispatches a second tie-break Skinner on that key. This forced rung-3 trip is recorded as
+`ESCALATED (tie-break spent)` — the trigger is that the key's one tie-break is already spent, never a
+crash (`oracle unavailable`'s trigger, defined below) and never a contract that is actually ambiguous
+(`spec ambiguity`'s). **The report-file ledger's `TIEBREAK` row
 is consulted for none of this** — it is the audit trail, not the authoritative record, and only the
 state file's `## Tie-breaks spent` heading decides whether a key's tie-break is spent. And a
 **tie-break is a REVIEW round: it does not consume a fix round** — no code changes, no fixer is
@@ -799,15 +802,20 @@ facts about the same finding at two stages of its life, so they belong in one ta
 | Column | Filled by | Values |
 | --- | --- | --- |
 | `class` | you, per round | `agreed` / `single` / `conflicting` |
-| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` / `ESCALATED (standoff)` / `ESCALATED (inconclusive artifact)` / `ESCALATED (oracle unavailable)` |
+| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (<trigger>)` |
 
 **`TIEBREAK` names a transient state, not a dead end** — it marks a finding whose rung-2 tie-break is
 in flight, and it always resolves onward to one of three places: `TO_FIXER` (C sided with the
 finding), `DROPPED (tie-break, round N)` (C sided against it), or a rung-3 escalation (no majority).
 A listed value with no resolution would be a trap; this one always moves on.
 
-**The four `ESCALATED` values name four different failures, and conflating any of them would
-misstate the record.** `ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the
+**`ESCALATED (<trigger>)` is parametric, not a closed list** — the set of known triggers grows by a
+rule naming its own trigger, never by editing this row. **The recorded trigger must be the ACTUAL
+cause: never substitute a near-miss for it** — the same "conflating them would misstate the record"
+rule that used to guard only four enumerated values now governs every trigger, present and future.
+The **currently known** triggers are named below, and the list is **explicitly OPEN**: `spec
+ambiguity`, `standoff`, `inconclusive artifact`, `oracle unavailable`, and `tie-break spent`.
+`ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the
 dispute and no majority exists, so the contract itself is underdetermined. `ESCALATED (standoff)` is
 the ledger-adjudication rule's outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding
 unchanged, leaving the fixer's own falsification artifact unaddressed — an **evidence** deadlock,
@@ -825,6 +833,12 @@ mechanical oracle never ran and its result never landed either — never `ESCALA
 because no contract is ambiguous here, only unrun; never `ESCALATED (standoff)`, because no Skinner
 was ever re-dispatched to re-raise anything; and never `ESCALATED (inconclusive artifact)`, because
 no adjudication of a falsification artifact ever ran on this finding at all.
+`ESCALATED (tie-break spent)` is the non-crash rung-2 bound above: a conflict resurfaces on a finding
+key whose one tie-break this campaign has already spent, so rung 2 is skipped outright and the
+finding goes straight to rung 3 without C ever being dispatched a second time — never
+`ESCALATED (oracle unavailable)`, because no crash occurred here at all; never
+`ESCALATED (spec ambiguity)`, because no citation dispute is even being read here; and never
+`ESCALATED (standoff)`, because no Skinner ever re-raised anything on this key.
 
 `DROPPED (falsified)` and `DROPPED (falsified, round N)` are the two falsification outcomes defined
 elsewhere in this section: an `agreed` finding's `NOT_REPRODUCED` adjudicated UPHELD drops
