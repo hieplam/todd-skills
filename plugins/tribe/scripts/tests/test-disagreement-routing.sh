@@ -14,8 +14,11 @@ bad() { FAIL=$((FAIL+1)); printf 'not ok - %s\n' "$1"; }
 # Agent prompts are hard-wrapped prose, so a sentence routinely straddles a newline. grep is
 # line-based and would miss it. Flatten every haystack to one whitespace-normalized line first:
 # assertions then match meaning, not line-breaking accidents (W5 bar #1; see
-# test-dual-skinner-cell.sh for the established convention this follows).
-flat() { tr '\n' ' ' | tr -s ' '; }
+# test-dual-skinner-cell.sh for the established convention this follows). Also strip literal
+# `**` bold markers: which words a legal reword chooses to bold is decoration, not invariant
+# (F7 — a re-bolding that keeps only the label, e.g. `**Rule A** — silence is not dissent.`,
+# must not redden an assertion that never asked to own the bold span in the first place).
+flat() { tr '\n' ' ' | tr -s ' ' | sed -E 's/\*\*//g'; }
 
 # Step 6 spans from its own heading up to (but not including) the step 7 heading.
 STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF" | flat)"
@@ -44,8 +47,13 @@ has 'class token: conflicting'  "$STEP6" '`conflicting`[[:space:]]*\|[^|]*mutual
 has 'classes are computed at merge, before the fixer is dispatched' "$STEP6" \
     'at merge time.{0,40}before any fixer is dispatched'
 
+# Word-order anchor, not a bold-span anchor: a legal, meaning-preserving re-bolding of the
+# clause (e.g. bolding only the "Rule A" label instead of the whole sentence) must not redden
+# this assertion (W5 bar #1/F7). This stays unique to the guarded clause because the W2 mapping
+# paragraph's restatement puts "(Rule A)" AFTER the phrase ("...silence is not dissent (Rule A)"),
+# which cannot satisfy a "Rule A ... silence is not dissent" word-order match (D14 survives).
 has 'Rule A: silence is not dissent' "$STEP6" \
-    '\*\*Rule A .{1,3} silence is not dissent\.\*\*'
+    'Rule A .{1,3} silence is not dissent'
 
 # Compound claim: one-flags-one-silent is classed `single` — AND — the same sentence
 # says it is never `conflicting`. Both conjuncts, anchored to the sentence that makes
@@ -54,8 +62,10 @@ has 'Rule A: silence is not dissent' "$STEP6" \
 has 'Rule A: one-flags-one-silent is single, never conflicting' "$STEP6" \
     'one-flags-one-silent is therefore `single`.{0,20}never.{0,15}`?conflicting`?'
 
+# Same word-order anchor as Rule A above (F7): stays unique to the guarded clause because the
+# W2 mapping paragraph never restates "Rule B" before "co-location"/"conflict" in this order.
 has 'Rule B: co-location alone is not a conflict' "$STEP6" \
-    '\*\*Rule B .{1,3} co-location is not conflict\.\*\*'
+    'Rule B .{1,3} co-location is not conflict'
 
 has 'Rule B: the one yes/no compatibility test' "$STEP6" \
     'can one edit satisfy both remedies'
