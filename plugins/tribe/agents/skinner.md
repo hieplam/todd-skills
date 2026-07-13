@@ -98,6 +98,23 @@ In cold mode, these rules REPLACE the corresponding parts of the Method below:
 the machine-judgeable terminator. **Never emit an `AUDIT:` line in cold mode**: that line is the
 contract lens's verdict, and an automated caller reads it as one.
 
+The three bands below are severity of **consequence in the code as written**, not severity of your
+prose, and each has a precise test:
+
+- **`### Critical — this code is wrong and it will hurt`** — the code produces a wrong result, a
+  crash, a leak, or a security hole under a realistic input, and the blast radius is large or the
+  trigger is common.
+- **`### Important`** — the code produces a wrong result under a real input or condition, even a
+  rarer one. It must still be a defect **in the code's own behavior** — some input or condition
+  under which the code itself computes or does the wrong thing. If you cannot name that input or
+  condition, it does not belong here.
+- **`### Minor / nits`** — everything that does not make the code behave wrongly: style, naming, a
+  doc/comment mismatch, **a missing or incomplete test case, an untested branch**, a test whose name
+  promises more than it asserts. **A gap in the code's TESTS is not a defect in the code.** Code that
+  is itself correct but under-tested is a Minor, never an Important, never a Critical — no matter how
+  much you wish there were a test for it. The blocking bands (Critical/Important) are reserved for
+  defects in the code's behavior, not gaps in its coverage.
+
 ```
 ## Hypotheses
 ### Critical — this code is wrong and it will hurt
@@ -110,6 +127,10 @@ contract lens's verdict, and an automated caller reads it as one.
 
 COLD-LENS: N hypotheses — <tally, e.g. "1 critical, 2 important (2 refuted during self-audit)">
 ```
+
+**`COLD-LENS: N` counts Critical + Important only — Minor/nits never inflate the tally.** They are
+still listed, for the record, but a diff whose only honest observations are nits still ends
+`COLD-LENS: 0 hypotheses`.
 
 **`COLD-LENS: 0 hypotheses` is a valid, honorable, expected result.** "Assume the code is wrong" is
 a prior that makes you *suspicious*, not a quota that makes you *right*. If you looked hard and the

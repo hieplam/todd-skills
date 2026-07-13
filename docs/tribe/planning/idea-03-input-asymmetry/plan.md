@@ -596,7 +596,7 @@ git commit -m 'feat(tribe): cold hypotheses get dispositioned, contract lens hol
 The tripwire proves the laws are *written*. These prove an agent *behaves* by them. Schema is the
 existing one: `{skill_name, kind, evals: [{id, name, agent, prompt, expected_output, files}]}`.
 
-- [ ] **Step 1: Write the failing check**
+- [x] **Step 1: Write the failing check**
 
 The eval harness is the test here. First confirm the four evals are absent and capture the current
 count:
@@ -612,7 +612,7 @@ print('idea-03 evals present:', [n for n in names if 'cold-lens' in n or 'asymme
 
 Expected (RED): `idea-03 evals present: []` — an empty list.
 
-- [ ] **Step 2: Make it green — append the four evals**
+- [x] **Step 2: Make it green — append the four evals**
 
 IDs are computed as `max(existing)+1` so this cannot collide with whatever ids idea 01 (or a sibling
 card) already appended:
@@ -663,7 +663,7 @@ python3 -c "import json;d=json.load(open('plugins/tribe/evals/evals.json'));prin
 Expected: `appended 4 evals, ids N-N+3; total 13` (or higher, if a sibling card appended first),
 then `valid JSON, 13 evals`.
 
-- [ ] **Step 3: Run the evals and the full suite**
+- [x] **Step 3: Run the evals and the full suite**
 
 ```bash
 python3 scripts/evals/run_evals.py 2>&1 | tail -20
@@ -678,7 +678,7 @@ README); all four test scripts end `N passed, 0 failed`, exit 0. A failing *eval
 the prompt text is written but an agent does not actually behave by it — and it must be fixed in the
 prompt, never by weakening the eval's `expected_output`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/evals/evals.json docs/tribe/planning/idea-03-input-asymmetry/plan.md
@@ -690,18 +690,18 @@ git commit -m 'test(tribe): behavioral evals for the input-asymmetric Skinner pa
 
 ## Definition of Done
 
-- [ ] `skinner.md` supports `lens: cold` — contract hunt and `UN-AUDITABLE` suspended, no `AUDIT:`
+- [x] `skinner.md` supports `lens: cold` — contract hunt and `UN-AUDITABLE` suspended, no `AUDIT:`
       line, `COLD-LENS: N hypotheses` terminator, `0 hypotheses` honorable, self-refutation intact.
-- [ ] `warchief.md` step 6 dispatches two **asymmetric** briefs in one message, with the cold
+- [x] `warchief.md` step 6 dispatches two **asymmetric** briefs in one message, with the cold
       brief's forbidden-contents list written out.
-- [ ] Cold findings are tagged `[cold-only]`, must be dispositioned, and cannot be refuted with
+- [x] Cold findings are tagged `[cold-only]`, must be dispositioned, and cannot be refuted with
       "the contract does not require it".
-- [ ] A round PASSes only when the contract lens PASSes **and** no cold hypothesis is undispositioned
+- [x] A round PASSes only when the contract lens PASSes **and** no cold hypothesis is undispositioned
       or confirmed.
-- [ ] `test-input-asymmetry.sh` green (`33 passed, 0 failed`); `test-dual-skinner-cell.sh`,
+- [x] `test-input-asymmetry.sh` green (`34 passed, 0 failed`); `test-dual-skinner-cell.sh`,
       `test-validate-plan.sh`, `test-resume-check.sh` all green.
-- [ ] Four new evals in `evals.json`, graded passing by `run_evals.py`.
-- [ ] Idea 01's cell mechanics (concurrency, isolation, union+dedupe, both-reports-verbatim, 3-round
+- [x] Four new evals in `evals.json`, graded passing by `run_evals.py`.
+- [x] Idea 01's cell mechanics (concurrency, isolation, union+dedupe, both-reports-verbatim, 3-round
       cap, `sonnet` tier) are **unchanged**; `hunter.md` is untouched; no routing table was added.
 - [ ] PR squash-merged into the default branch with before/after prompt-text evidence attached, and
       "no CI registered" recorded explicitly (this repo has no CI workflows).
