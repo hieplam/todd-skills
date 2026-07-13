@@ -106,17 +106,40 @@ has 'conflicting is never routed to the fixer as-is' "$STEP6" \
 has 'conflicting is never self-reconciled' "$STEP6" \
     '`conflicting`[[:space:]]*\|[^|]*never self-reconciled by you'
 
-# Compound claim: the reproduce-first mandate applies to EVERY finding AND explicitly names
-# `agreed` as included, in that order — a rewrite that keeps only the general rule but drops
-# the explicit agreed callout (or vice versa) must redden this assertion.
-has 'reproduce-first still applies to an agreed finding' "$STEP6" \
-    'Reproduce-first applies to every finding.{0,20}including an `agreed` one'
+# F14 — these two were a single bridging regex apiece and reddened under a legal,
+# meaning-preserving reword that simply added a few words inside the bridge (a W5 bar-1
+# violation, proven by mutation). Re-cut per W5's own guidance: several short assertions, each
+# anchored on a phrase unique to its clause, beat one assertion spanning editorial prose with a
+# long `.{0,N}` bridge. The ORIGINAL assertion NAME is kept for the half that most directly
+# carries it; a differently-named companion assertion covers the other conjunct, so the
+# invariant's full coverage survives the split (both conjuncts still checked, just not by a
+# single regex that has to bridge between them).
 
-# Compound claim: NOT_REPRODUCED tied to an agreed finding, AND that this escalates to the
-# Warchief immediately (not at the next audit round). Anchored on word order, unique to this
-# sentence — no other "immediately" in step 6 is preceded by this NOT_REPRODUCED/agreed pairing.
+# "applies to every finding" is a literal, zero-gap anchor: nothing needs to be bridged past it,
+# so no insertion anywhere else in the sentence can ever touch this assertion.
+has 'reproduce-first still applies to an agreed finding' "$STEP6" \
+    'Reproduce-first applies to every finding'
+
+# "including an `agreed` one" is likewise a literal, zero-gap anchor for the other conjunct —
+# that `agreed` is explicitly named as included, not an accidental omission.
+has 'reproduce-first explicitly names agreed as included, not exempt' "$STEP6" \
+    'including an `agreed` one'
+
+# The NOT_REPRODUCED/agreed trigger needs a short bridge (the two tokens are not literally
+# adjacent), but the bridge is now bounded generously (5x the actual ~9-char gap) instead of the
+# old `.{0,10}` that a mere "is reported" insertion could already overflow. Word order
+# (`NOT_REPRODUCED` before `agreed`) keeps this unique: the only other co-occurrence in step 6
+# reverses the order ("For an `agreed` finding ... `NOT_REPRODUCED` case"), which cannot satisfy
+# this pattern.
 has 'NOT_REPRODUCED on an agreed finding escalates immediately' "$STEP6" \
-    '`NOT_REPRODUCED`.{0,10}for an `agreed` finding.{0,200}escalates to you immediately'
+    '`NOT_REPRODUCED`.{0,50}for an `agreed` finding'
+
+# "escalates to you immediately for adjudication" is its own literal, zero-gap anchor — it no
+# longer needs to bridge all the way back to the NOT_REPRODUCED/agreed trigger (that was the
+# `.{0,200}` span that a longer, still meaning-preserving restatement of the reasoning in between
+# could overflow). This phrase is unique to this sentence.
+has 'a NOT_REPRODUCED, agreed finding escalates to the Warchief immediately, not next round' "$STEP6" \
+    'escalates to you immediately for adjudication'
 
 # F9/F11 — Law 3's dispositions vs the single row's "do not pre-filter" must be reconciled
 # explicitly, AND the reconciliation must be scoped to the `[cold-only]` half only — a
@@ -144,15 +167,55 @@ has 'do not pre-filter forbids the evidence-free drop, scoped to cold-only' "$ST
     'do not pre-filter.{0,40}forbids.{0,40}`\[cold-only\]` half.{0,40}evidence-free drop'
 
 # F8 — the agreed/single NOT_REPRODUCED supersession must be said out loud, not just implied.
-# Compound claim, both conjuncts anchored (W5 bar #3): the `agreed` clause explicitly does NOT
-# wait on the ledger-adjudication rule below, AND the `single` clause explicitly says that same
-# ledger rule governs it unchanged. Anchored on "ledger-adjudication rule below", a phrase this
-# disambiguation clause coins and which appears nowhere else in step 6 — deleting only this new
-# clause removes every occurrence and reddens only this assertion (W5 bar #2/D14); the pre-existing
-# "Adjudicate the ledger after each re-audit" heading and the reproduce-first paragraph above never
-# use this exact wording, so neither can hold this assertion green in the clause's absence.
+# F14 recut: the original single assertion bridged FOUR anchors with a `.{0,250}` span ending in
+# a fully literal, zero-gap tail ("...rule below governs unchanged") that a one-word insertion
+# ("still") broke outright. Split into two, each anchored on "ledger-adjudication rule below" — a
+# phrase this disambiguation clause coins and that appears nowhere else in step 6, so deleting
+# only this new clause removes every occurrence and reddens both assertions (W5 bar #2/D14); the
+# pre-existing "Adjudicate the ledger after each re-audit" heading and the reproduce-first
+# paragraph above never use this exact wording, so neither can hold these green in its absence.
+
+# First conjunct: the `agreed` clause explicitly does NOT wait on the ledger rule below. No
+# bridge to `single` is needed for this half — "does not wait on the ledger-adjudication rule
+# below" is itself unique in step 6.
 has 'agreed does not wait on the ledger rule below; single is governed by it unchanged' "$STEP6" \
-    '`agreed`.{0,150}does not wait on the ledger-adjudication rule below.{0,250}`single`.{0,80}ledger-adjudication rule below governs unchanged'
+    'does not wait on the ledger-adjudication rule below'
+
+# Second conjunct: the `single` clause explicitly says that same ledger rule governs it
+# unchanged. A short bounded bridge (15 chars, vs. the old zero-gap literal) survives an
+# insertion like "still" between "below" and "governs" without needing a huge span.
+has 'single finding: the ledger-adjudication rule below governs it unchanged' "$STEP6" \
+    'ledger-adjudication rule below.{0,15}governs unchanged'
+
+# --- Item 1 (F13/D16): what the agreed/NOT_REPRODUCED adjudication DOES -----------------------
+# The plan's mandated text says a `NOT_REPRODUCED` on an `agreed` finding "escalates to you
+# immediately for adjudication" but never said what that adjudication DOES — no output, no
+# evidence bar, no effect on the fix-round cap (F13, cold-lens Critical). D16 ratifies option (a):
+# the Warchief weighs the fixer's falsification artifact against both reviewers' reports and
+# records exactly one of UPHELD / REJECTED / ESCALATED, and the act consumes no fix round. Each
+# outcome is its own short assertion, anchored on its own unique all-caps token plus its
+# consequence phrase, with no bridge that has to span across to a sibling outcome.
+
+has 'agreed adjudication UPHELD drops the finding as falsified, no fixer round spent' "$STEP6" \
+    'UPHELD.{0,40}artifact defeats the finding.{0,60}DROPPED \(falsified\).{0,50}no fixer round is spent'
+
+has 'agreed adjudication REJECTED sends it back to the fixer with the condition named' "$STEP6" \
+    'REJECTED.{0,50}does not cover the condition.{0,150}back to the fixer with that condition named'
+
+has 'agreed adjudication ESCALATED goes to the Shaman as NEEDS_DIRECTION' "$STEP6" \
+    'ESCALATED.{0,50}does not let you tell.{0,40}NEEDS_DIRECTION.{0,15}to the Shaman'
+
+has 'agreed adjudication is a review act: it consumes no fix round' "$STEP6" \
+    'is a REVIEW act.{0,100}consumes NO fix round'
+
+# --- Item 2 (D16 cross-card pointer): the ledger rule names its own boundary --------------------
+# Idea-05's shipped ledger-adjudication rule opened with no signal that an `agreed` finding's
+# `NOT_REPRODUCED` does not wait for it (the carve-out lived only in a paragraph 30 lines earlier
+# that the rule never acknowledged). D16 authorizes exactly one pointer clause, added to the
+# rule's own text, changing no duties and none of its three outcomes.
+
+has 'ledger-adjudication rule points to the agreed carve-out: it governs single, not agreed' "$STEP6" \
+    'governs a `single` finding.s `NOT_REPRODUCED`.{0,60}`agreed` finding.s `NOT_REPRODUCED`.{0,40}adjudicated immediately.{0,40}per the routing table above'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

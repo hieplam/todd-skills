@@ -670,6 +670,18 @@ For an `agreed` finding, the immediate-adjudication path just described governs 
 next re-audit. For a `single` finding, the ledger-adjudication rule below governs unchanged —
 falls, stands, or standoff.
 
+**What that adjudication DOES, concretely — weigh the fixer's falsification artifact against both
+reviewers' reports and record exactly ONE of:**
+
+- **UPHELD** — the artifact defeats the finding → ledger `DROPPED (falsified)`, and **no fixer
+  round is spent**.
+- **REJECTED** — the artifact does not cover the condition either reviewer's report stated → send
+  it back to the fixer with that condition **named**; this is an ordinary fix round.
+- **ESCALATED** — the artifact does not let you tell → `NEEDS_DIRECTION` to the Shaman.
+
+**This is a REVIEW act, not a fix act — it consumes NO fix round**, the same accounting rule as a
+CONTAMINATED dispatch above.
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that
@@ -697,8 +709,10 @@ committed, and the next Skinner, running cold, executes it as part of running th
 therefore never reads the implementer's reasoning, and the disagreement is settled by the oracle
 rather than by an argument between two agents.
 
-**Adjudicate the ledger after each re-audit — a phantom finding must never grind the round cap.** For
-each finding the fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
+**Adjudicate the ledger after each re-audit — a phantom finding must never grind the round cap.**
+This rule governs a `single` finding's `NOT_REPRODUCED`; an `agreed` finding's `NOT_REPRODUCED` is
+adjudicated immediately, per the routing table above, and does not wait here. For each finding the
+fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
 
 1. **The Skinner does not re-raise it** → the finding **falls**. Record `DROPPED (falsified, round N)`
    against its ID and move on. The whole cost of that false positive was one test and one round —
