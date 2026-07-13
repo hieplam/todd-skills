@@ -95,7 +95,7 @@ has   "law1: the briefs are NOT identical"                    "$STEP6" 'delibera
 hasnt "law1: the identical-brief clause is gone"              "$STEP6" 'identical brief'
 has   "law1: still one message, still concurrent"             "$STEP6" 'same message'
 has   "law1: cold brief carries the bare diff only"           "$STEP6" 'only the bare diff|bare diff'
-has   "law1: cold brief must not carry the spec/plan"         "$STEP6" '(must not|never).{0,200}(spec|plan|contract)'
+has   "law1: cold brief must not carry the spec/plan"         "$STEP6" 'the spec, the plan, the idea card, a ticket, or any path to them'
 has   "law1: cold brief must not carry the Hunter report"     "$STEP6" "hunter's report, its reasoning, its red proof, its self-assessment"
 has   "law1: cold brief must not carry commit/branch/PR text" "$STEP6" 'commit message|branch name|PR body'
 has   "law1: the cold lens may still read the codebase"       "$STEP6" 'not blind to the codebase|may read'

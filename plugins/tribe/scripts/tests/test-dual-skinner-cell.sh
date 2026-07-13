@@ -49,7 +49,12 @@ has   "law2: never reuse a Skinner across rounds"    "$STEP6" 'never reuse.{0,40
 # Law 3 — the Warchief merges: union of findings, tagged by agreement, both reports kept verbatim.
 has   "law3: findings are merged as a union"         "$STEP6" 'union'
 has   "law3: agreement tag for both-flagged findings" "$STEP6" '\[both\]'
-has   "law3: agreement tag for single-flagged findings" "$STEP6" '\[one\]'
+# SUPERSEDED by idea 03 (input asymmetry): `[one]` was idea 01's single-flagged tag. warchief.md's
+# Law 3 table now uses the three-tag vocabulary `[both]`/`[contract-only]`/`[cold-only]`; `[one]`
+# survives only as a historical "Maps onto idea 01's tag" reference-column footnote, so an assertion
+# anchored on it guards documentation, not behavior, and would go spuriously red on a benign doc
+# cleanup of that column. The real coverage for the tag vocabulary is asserted in full by
+# test-input-asymmetry.sh:108 ('\[both\].{0,200}\[contract-only\].{0,200}\[cold-only\]').
 has   "law3: both reports preserved verbatim"        "$STEP6" 'both reports verbatim'
 
 # Law 4 — PASS requires BOTH; the 3-round cap survives; escalation carries both reports.
