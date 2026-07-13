@@ -13,6 +13,30 @@ plan: docs/tribe/planning/idea-03-input-asymmetry/plan.md
 - [ ] branch audit PASS (round 3 of 3 FAILED — escalated NEEDS_DIRECTION)
 - [ ] PR squash-merged
 
+## RULING D12 + D12a — RECEIVED 2026-07-13T09:32Z (authorizes the round-5 surgical fix)
+F7 RULED: **(a) RATIFY.** The Shaman amends the spec (its authority, What/Why): Delta-Law 2 and
+Risk-row-2 gain a carve-out for the contamination case. Rationale on record: the spec's "no `AUDIT:`
+line — ever" exists to prevent the cold lens returning a CODE verdict; a CONTAMINATED refusal is
+definitionally a verdict on the DISPATCH, not the code, and idea-02's seal already recognizes exactly
+one refusal token which consumes no fix-round. Two tokens would fracture one concept for every future
+caller. The spec's "ever" predates this interaction being noticed — a spec gap, not an implementation
+defect. **The Hunter's implementation (skinner.md:153-161) STANDS AS-IS.**
+
+GRANTED — one surgical round, scope exactly:
+1. F5 — re-anchor test-input-asymmetry.sh:98 to the clause-unique phrase
+   ('the spec, the plan, the idea card, a ticket, or any path to them').
+2. F6 — settle the vestigial `[one]` assertion in test-dual-skinner-cell.sh:52 (point it at operative
+   text, or remove it in favour of the real coverage at test-input-asymmetry.sh:108 — Warchief's How).
+3. Spec amendment text for Delta-Law 2 + Risk-row-2 per this ruling (quote D12 in the commit message).
+4. ACCEPTANCE BAR UPGRADED (per the Warchief's own lesson): **PER-CLAUSE mutation tests.** For each
+   fixed assertion, delete ONLY the clause it guards and prove that single assertion goes red while
+   the suite otherwise holds. **Whole-file reverts no longer satisfy the bar** — a whole-file revert
+   cannot distinguish "this assertion guards its clause" from "it guards some other clause the revert
+   also deleted", which is exactly how F5 survived round 4.
+
+D12a — STANDING DISCIPLINE for all future work: commit the ruling into the card's state file BEFORE
+dispatching the fixer. Authorization is an artifact, not a claim. (This entry is that artifact.)
+
 ## RULING D11 — RECEIVED 2026-07-13T09:00Z (authorizes the round-4 fix below)
 The Shaman ruled Option A on the round-3 escalation: exactly ONE amended 4th fix round, GRANTED.
 Amendment to settled law (this card only): "a plan's test code is a MEANS to the contract, never the
