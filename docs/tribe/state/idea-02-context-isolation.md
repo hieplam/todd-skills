@@ -10,9 +10,10 @@ plan: docs/tribe/planning/idea-02-context-isolation/plan.md
 - [x] spec committed (planning campaign, PR #25)
 - [x] plan committed (planning campaign, PR #25)
 - [x] plan validated (validate-plan.sh: pass)
-- [ ] task 1 — governance test + warchief outbound allowlist
-- [ ] task 2 — skinner inbound quarantine
-- [ ] task 3 — hunter report clause + no-regression
-- [ ] wave 1 integrated (single wave, single worktree)
+- [x] task 1 — governance test + warchief outbound allowlist (1d9e0ca, audited PASS)
+- [x] task 2 — skinner inbound quarantine (cd90f3e)
+- [x] task 3 — hunter report clause + no-regression (b1b4582)
+- [x] wave 1 integrated (single wave, single worktree — no cross-branch merge needed)
+- [x] final whole-branch Skinner audit: PASS (dispatched cold, under this card's own new rule)
 
 Note: IMPLEMENTATION campaign. Spec + plan are settled law from the planning campaign (PR #25).
