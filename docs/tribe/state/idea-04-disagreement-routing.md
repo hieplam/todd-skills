@@ -335,6 +335,43 @@ clarifying text at any single bridge point** — i.e. every `.{0,N}` bridge must
 headroom** over the text's current consumption, and no guarded invariant may be matched as one contiguous
 literal spanning more than a single clause. Mechanically checkable, and it terminates.
 
+## W9 — rung 2's tie-break Skinner: "cold" collides with idea-03's reserved term (authorizes task 3's fix round)
+
+The cold lens caught a genuine composition seam in task 3 (F15, Critical) that the contract lens passed:
+
+- The plan's rung-2 text (authored **before** idea 03 shipped, when A and B were symmetric) says the
+  tie-break Skinner "is dispatched **COLD**" and "receives *exactly* the brief A and B received — **the
+  contract**, the diff, the repo's rules."
+- But idea 03 made **"cold" a reserved term in this very file**: the cold lens gets **only the bare diff**,
+  and the contract is explicitly on its *forbidden* list. And A and B never received the same brief — Law 1
+  says their briefs are "deliberately **not identical**."
+
+So rung 2, read literally, tells the Warchief to hand a **cold**-labelled reviewer exactly what the cold
+brief forbids, and the itemization it gives is the **contract lens's** brief. An agent executing it cannot
+satisfy both clauses. The plan's word "cold" meant *"not told a disagreement exists"*; idea 03 took that word
+for something else.
+
+**Ruling — supersede deliberately, and derive the right answer rather than patching the label:**
+
+1. **Rung 2's question is never a conformance question.** Rung 2 is reached ONLY when rung 1 found no
+   citation — i.e. the contract does not settle it. What remains is a pure correctness question ("does this
+   leak? is it off by one? does this evaluation order fire early?"), which is **exactly the cold lens's job**.
+   **Therefore the tie-break Skinner C is a genuine cold-lens sample: the bare diff, no contract.** The word
+   "cold" now means what the file says it means, and it is *correct*, not merely relabelled.
+2. **The property the plan actually cared about gets its own name: `disagreement-blind`.** C is never shown
+   A's or B's reports, findings or verdicts, and is **never told a disagreement exists**. That is the
+   invariant that makes C a third independent *sample* rather than an *arbiter*, and it must be prompt text
+   and grep-guarded, separately from the lens question.
+3. The rung-2 itemization ("the contract, the diff, the repo's rules") is **corrected** to the cold brief.
+   This is a supersession of plan text by shipped law — stated out loud, never silent.
+
+**F16 (Important, also cold-lens): the rung-2 branch set has a hole.** C is disagreement-blind, so nothing
+stops C from raising findings in **both** disputed directions at the same location (it never knows the two
+are mutually unsatisfiable — that recognition is Rule B's job, and C is never asked to make it). Then
+"C flags it in A's direction" and "C flags it in B's direction" both fire and the ladder names no winner.
+**Ruling:** a C report supporting **both** directions is **no majority** → **rung 3**, exactly like a third
+direction or silence. Additive; makes the branch set exhaustive and mutually exclusive.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
