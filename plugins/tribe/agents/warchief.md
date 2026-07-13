@@ -913,8 +913,8 @@ state file** (`docs/tribe/state/CARD-SLUG.md`, already the tribe's one sanctione
 under its `## Tie-breaks spent` heading — written and committed before the tie-break Skinner is
 dispatched, per rung 2 above, exactly as the doctrine's commit-before-act discipline already
 requires. An audit round is otherwise idempotent — the diff is unchanged, so any audit round that
-runs again (most reliably: the final whole-branch audit, which always runs before merge) re-derives
-the same classes from the same inputs. **Classes are re-derivable
+runs again (most reliably, absent a crash: the final whole-branch audit, which in that ordinary case
+always runs before merge) re-derives the same classes from the same inputs. **Classes are re-derivable
 this way; how many tie-breaks a key has already spent is not — that is history, and history must be
 written down**, which is exactly what the state file's `## Tie-breaks spent` heading is for.
 

@@ -1403,6 +1403,48 @@ has 'a recognition error costs at most one extra review round, the same cost the
     "$STEP6" \
     'recognition error is possible.{0,65}at most one extra review round.{0,55}on-doubt default below already prices in'
 
+# --- F34 (D19): the ledger's idempotence parenthetical is qualified to what is actually true --------
+#
+# F34 (Critical, cold-only): the ledger section's idempotence sentence said an audit round that runs
+# again "(most reliably: the final whole-branch audit, which always runs before merge) re-derives the
+# same classes" -- a BARE, unqualified restatement of the exact "never a wrong merge" safety claim
+# this same file explicitly RETIRES ~100 lines earlier ("The 'never a wrong merge' safety claim is
+# RETIRED -- the crash-during-final-audit trace disproves it. What survives is narrower, and true:
+# absent a crash, this routing law is sound"), backed by a reproduction against resume-check.sh's
+# next_action(): it returns VERIFY_SHIPPED / REDO_MERGE / DISCARD_AND_RESUME_DELIVERY /
+# REVERT_AND_REDO task N / RESUME_DELIVERY / CONTINUE task N -- no branch re-enters step 6 (the audit
+# round), so a Warchief that dies DURING the final whole-branch audit resumes straight into delivery
+# and can merge before that audit ever finishes, exactly the gap the file itself narrates two
+# paragraphs above ("a crash mid-audit can therefore produce an unaudited merge"). Every OTHER
+# occurrence of this claim in step 6 is correctly qualified ("In the ordinary, no-crash case -- and
+# only there --" / "absent a crash, this routing law is sound"); only this one, in the ledger section,
+# was left bare -- the W13 fix round never revisited this section. D19's principle ("the law states
+# ONLY WHAT IS TRUE") applies again: the parenthetical now says what is actually delivered -- "most
+# reliably, absent a crash", and the audit "which in that ordinary case always runs before merge" --
+# matching the qualifier style already used by its own siblings above, so the file speaks with one
+# voice. Nothing else in the sentence (the idempotence claim itself, or the re-derivable-classes
+# reasoning that follows) is touched.
+#
+# Every bridge below is measured against the shipped, flattened clause and widened to keep >=30 chars
+# of D17 headroom over its actual current consumption (gaps 2, 2, 1 chars respectively).
+
+# Regression guard: the retired bare, unqualified "which always runs before merge" claim must never
+# resurface in the ledger's idempotence parenthetical. Proven to bite by construction: this is a
+# verbatim, unique substring of the pre-fix shipped text (confirmed by direct grep against the
+# pre-fix text) and matches nothing in the corrected text below, where "which" and "always" are now
+# separated by the inserted qualifier "in that ordinary case".
+hasnt 'the retired bare which-always-runs-before-merge claim does not survive in the ledgers idempotence parenthetical' \
+    "$STEP6" \
+    'which always runs before merge'
+
+# The corrected parenthetical: qualified with "most reliably, absent a crash" leading into the same
+# final-whole-branch-audit clause, itself qualified "which in that ordinary case always runs before
+# merge" -- matching the qualifier style ("absent a crash") already used two paragraphs above in this
+# same section. Actual gaps 2, 2, 1 chars; `.{0,35}` keeps >=33 chars of D17 headroom on each.
+has 'the ledgers idempotence parenthetical is now qualified: most reliably, absent a crash, in the ordinary case' \
+    "$STEP6" \
+    'most reliably, absent a crash.{0,35}the final whole-branch audit.{0,35}which in that ordinary case.{0,35}always runs before merge'
+
 # --- Task 5: negative assertions (regression guards) ------------------------
 # The three regression guards that matter most (spec §4): each is a specific way this card can
 # be silently un-done by a later edit, unrelated to whether the positive assertions above still
