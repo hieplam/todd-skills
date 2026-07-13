@@ -530,6 +530,41 @@ round in the tribe is resumable today**), benefits every card. Bundled with the 
 resume/round-accounting machinery does not yet model the audit loop. Now the campaign's clearest next-roadmap
 candidate.
 
+## W13 — the "final whole-branch audit" backstop is ALSO false under crash. Say the whole truth. (task 4, last fix)
+
+D19 ordered: *state only what is true.* The fix that landed swapped one false claim for another, and the cold
+lens caught it (F25, Critical):
+
+- The shipped text names the **final whole-branch audit** as the backstop that resolves a stranded `TIEBREAK`
+  "before any merge".
+- **But after all Hunter tasks are committed, `resume-check.sh`'s `next_action()` returns `RESUME_DELIVERY` (or
+  `DISCARD_AND_RESUME_DELIVERY`) — and `warchief.md` defines BOTH as "re-enter step 7" (push / PR / CI / merge).
+  There is no branch that re-enters step 6.** So a Warchief that dies *during the final whole-branch audit*
+  resumes straight into delivery and **opens and merges the PR without ever finishing that audit.**
+
+**This is not a tie-break problem. It is the same pre-existing hole as F23, and it is worse than we thought:
+today, a crash mid-audit can produce an UNAUDITED MERGE.** Idea-04 did not create it and cannot fix it in-fence
+(`resume-check.sh` is out of fence, spec §3 — already a filed follow-up card).
+
+**Ruling — the law states the whole truth, and claims NO crash backstop:**
+
+1. In the ordinary (no-crash) case the final whole-branch audit always runs, and a `TIEBREAK` row is resolved
+   there. **Say that, and say it is the ordinary case only.**
+2. **After a crash there is NO backstop.** The resume protocol does not route a Warchief back into any audit
+   round — not rung 2, not the final whole-branch audit. **Do not claim otherwise. Do not hedge.** State the
+   hazard plainly and point at the follow-up (`resume-check.sh` has no mid-audit state).
+3. **Retire the "never a wrong merge" safety claim**, which the F25 trace disproves for the crash path. What
+   survives is narrower and true: *in the absence of a crash*, the routing law is sound; *under a crash*, the
+   tribe's resume machinery — not this card — is what fails.
+
+**F26 (Important, cold-only): a crash-forced rung-3 trip has no distinct `routed` value.** Filing it under
+`ESCALATED (spec ambiguity)` would misstate the record (no contract is ambiguous — the oracle simply never
+ran), and W11's own rule says conflating escalation triggers is forbidden. **Ruling:** add
+**`ESCALATED (oracle unavailable)`** — the tie-break was spent but its result never landed — and extend the
+disambiguation prose to name all **four** triggers.
+
+**This is the LAST fix round for task 4.** If the next pair still returns a Critical, escalate — do not grind.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
