@@ -583,6 +583,37 @@ talking, and a fifth fixed enum value would only buy a sixth.
 Plus, same round: the 4 zero-bridge regexes go to **D17's bar** (a bridge at the `because`/`means` joint,
 ≥30 chars headroom), per the convention already used a few lines above them in the same file.
 
+## W15 — the state file must record the OUTCOME, not just the key (task 4, closing fix)
+
+The cold lens found the flaw in D20's landing (F29, Critical), and it is exact:
+
+- The **Bounds rule** says any Warchief — *fresh or resumed* — that finds a key under `## Tie-breaks spent`
+  treats it as spent, goes to rung 3, and records **`ESCALATED (tie-break spent)`** — *"never a crash"*.
+- The **crash paragraph** says a Warchief that died after the spend-commit, its oracle never having run,
+  records **`ESCALATED (oracle unavailable)`**.
+
+**Both fire on the same observable event.** The state file stores *"one finding key per line"* — **no outcome,
+no status**. So the agent literally cannot tell "the tie-break ran and resolved" from "the tie-break was spent
+but C's answer never landed." The Bounds rule hard-wires the first label, which makes `oracle unavailable`
+**unreachable by any rule the document defines** — while D20's own law says *"the recorded trigger must be the
+ACTUAL cause; never substitute a near-miss."* The document breaks its own rule two paragraphs after stating it.
+
+**Ruling — make the record carry what the decision needs:**
+
+1. The `## Tie-breaks spent` heading records **key + status**, not a bare key:
+   - **`dispatched`** — written and committed **BEFORE** C is dispatched (D18's discipline, unchanged);
+   - **`resolved`** — **appended and committed when C's outcome lands** (never overwriting; the ledger is
+     append-only, so the later line supersedes by round).
+2. **The two triggers become decidable from committed state alone:**
+   - key present, latest status **`resolved`** → the oracle genuinely ran → **`ESCALATED (tie-break spent)`**;
+   - key present, latest status **`dispatched`** (no `resolved` ever landed) → the Warchief died mid-oracle →
+     **`ESCALATED (oracle unavailable)`**.
+3. Both triggers are now reachable, mutually exclusive, and each is the **actual** cause — which is all D20
+   ever asked for. State the exclusion **from both sides**, not just one.
+
+In-fence: step-6 prose + the state-file format (which is this card's own). No spec override needed — this is
+D20 implemented correctly.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
