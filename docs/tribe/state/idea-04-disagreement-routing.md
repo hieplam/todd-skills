@@ -372,6 +372,35 @@ are mutually unsatisfiable — that recognition is Rule B's job, and C is never 
 **Ruling:** a C report supporting **both** directions is **no majority** → **rung 3**, exactly like a third
 direction or silence. Additive; makes the branch set exhaustive and mutually exclusive.
 
+## W10 — the `routed` enum must be able to record every outcome the section can produce (authorizes task 4's fix round)
+
+**Both lenses flagged the same location with the same claim → class `agreed` → Critical by default** (the
+card's own routing table, applied to the card again). The `routed` column claims to be *the* enumerated set
+of legal values, but the section's own rules produce outcomes it cannot express:
+
+| Reachable outcome | Produced by | Value in the enum? |
+| --- | --- | --- |
+| `agreed` finding, fixer says `NOT_REPRODUCED`, Warchief adjudicates **UPHELD** → `DROPPED (falsified)` | **D16** (already landed) | **missing** |
+| `single` finding falsified, Skinner does not re-raise → `DROPPED (falsified, round N)` | idea 05's shipped ledger rule | **missing** |
+| **standoff** — reviewer re-raises unchanged against the fixer's artifact → `NEEDS_DIRECTION` | idea 05's shipped standoff rule | **missing** (and it is NOT `ESCALATED (spec ambiguity)` — a standoff is an *evidence* deadlock, not an ambiguous contract; mislabelling it would falsify the record) |
+| `TIEBREAK` | **nothing** — the token appears exactly ONCE in the whole file, in the enum itself | listed but **undefined** |
+
+**Rulings:**
+
+1. **Extend the enum** (additively; the plan's five values stay verbatim) with: **`DROPPED (falsified)`**,
+   **`DROPPED (falsified, round N)`**, and **`ESCALATED (standoff)`** — the last named distinctly from
+   `ESCALATED (spec ambiguity)` precisely because the two escalations mean different things.
+2. **Define `TIEBREAK` rather than delete it** (the plan put it there deliberately): it marks a finding whose
+   **rung-2 tie-break is in flight** — a transient state that resolves to `TO_FIXER` (C sided with it),
+   `DROPPED (tie-break, round N)` (C sided against it), or a rung-3 escalation (no majority). A listed value
+   with no trigger is a trap; a named transient state is a ledger doing its job.
+3. **Fix the timing claim (F19, Important).** "Filled by: you, **at merge**" is false for the falsified/standoff
+   outcomes, which are written *after* the fixer returns — and the ledger is **append-only**, so a cell cannot
+   be rewritten. **Resolution: the ledger already has a `round` column — so a row is per finding PER ROUND.**
+   The Warchief fills `class` + `routed` when it writes that round's row; a later adjudication **appends a new
+   row** for the same finding ID with the later round and the new `routed` value. It never overwrites, and the
+   finding's history stays readable off the one document — which is the whole point spec §2.4 makes.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
