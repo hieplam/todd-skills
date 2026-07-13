@@ -698,18 +698,25 @@ If *running something* could answer the dispute (does this leak? is it off by on
 evaluation order fire early?), the dispute has a mechanical oracle. Dispatch **one third Skinner**
 and take the **majority direction** across the three independent samples.
 
-> **The tie-break Skinner is dispatched COLD.** It receives *exactly* the brief A and B received —
-> the contract, the diff, the repo's rules — and **never their reports, findings, verdicts, or even
-> the fact that a disagreement exists.** It is a third independent **sample**, **not an arbiter**
-> reading two briefs. Handing it the two reports would destroy the very independence that makes
-> agreement meaningful, and would breach the reviewers' isolation invariant. The obvious reading of
-> "run one more review round" is the forbidden one — do not take it.
+> **The tie-break Skinner C is dispatched COLD — Skinner B's cold-lens brief above: the bare diff only,
+> and never the contract.** Rung 2 is reached only when rung 1 found no citation, so the
+> disputed question is, by construction, not a conformance question but a pure correctness
+> question ("does this leak? is it off by one? does this evaluation order fire early?") — exactly
+> the cold lens's job. This **supersedes** the plan's earlier itemization, which assumed A and B
+> held one shared brief; that predates idea 03's two asymmetric lenses, and under current law C
+> takes the cold brief, never the contract lens's. C is additionally **`disagreement-blind`**: it
+> never receives their reports, findings, verdicts, or even the fact that a disagreement exists.
+> That is what makes it a third independent **sample**, **not an arbiter** reading two briefs —
+> handing it the two reports would destroy the very independence that makes agreement meaningful,
+> and would breach the reviewers' isolation invariant. The obvious reading of "run one more review
+> round" is the forbidden one — do not take it.
 
-- C flags the location in **A's direction** → majority (2 of 3): A's finding proceeds to the fixer as
-  `agreed`; B's is dropped, ledger `DROPPED (tie-break, round N)`.
-- C flags it in **B's direction** → symmetric.
-- C flags a **third direction**, or **says nothing** about the location → **no majority** (silence is
-  not a vote — Rule A) → rung 3.
+- C flags the location in **A's direction only** → majority (2 of 3): A's finding proceeds to the
+  fixer as `agreed`; B's is dropped, ledger `DROPPED (tie-break, round N)`.
+- C flags it in **B's direction only** → symmetric.
+- C flags **both directions**, a **third direction**, or **says nothing** about the location →
+  **no majority** (silence is not a vote — Rule A; C is disagreement-blind, so nothing stops it
+  flagging both sides at once) → rung 3.
 
 **Bounds — this rung can never grind.** At most **ONE tie-break round per finding key, per
 campaign** (the key is the finding's identity, not the round): a conflict resurfacing on the same key

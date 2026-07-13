@@ -27,7 +27,15 @@ bad() { FAIL=$((FAIL+1)); printf 'not ok - %s\n' "$1"; }
 # clause; a literal covering an entire clause (e.g. "artifact ... defeats the finding") is itself
 # split by an internal bridge rather than left as a zero-tolerance run of words. Unbounded
 # paraphrase remains explicitly out of scope.
-flat() { tr '\n' ' ' | tr -s ' ' | sed -E 's/\*\*//g'; }
+#
+# F15 fix round: rung 2's tie-break clause lives in a markdown blockquote, so every physical
+# line starts with `> `. Joining newlines with a bare space (as above) used to leave that `> `
+# sitting mid-sentence wherever the blockquote happened to be hard-wrapped — a pure formatting
+# accident, not invariant content, and no assertion in this file's regex ever names a literal
+# `>` — so also strip a leading `> ` from every line before flattening. This is the same
+# reflow-immunity `flat()` already exists to buy (D17, mutation class (i)); it just closes a gap
+# specific to blockquote prose that plain paragraphs, tables, and bullets never hit.
+flat() { sed -E 's/^> ?//' | tr '\n' ' ' | tr -s ' ' | sed -E 's/\*\*//g'; }
 
 # Step 6 spans from its own heading up to (but not including) the step 7 heading.
 STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF" | flat)"
@@ -274,6 +282,44 @@ has 'rung 2: exactly one tie-break Skinner is dispatched' "$STEP6" \
 has 'rung 2: the tie-break Skinner is dispatched COLD' "$STEP6" \
     'tie-break Skinner.{0,40}is dispatched COLD'
 
+# F15 (Critical, cold-only) — rung 2's old itemization claimed C "receives exactly the brief A and
+# B received — the contract, the diff, the repo's rules", which collides with idea 03's reserved
+# "cold" (the cold brief forbids the contract by name) AND with Law 1's own "briefs are deliberately
+# not identical" (A and B never shared a brief to begin with). W9 rules the fix is a derivation, not
+# a relabel: rung 2 is reached only once rung 1 found no citation, so the dispute is never a
+# conformance question — it is exactly the cold lens's job, so C gets the cold brief (bare diff,
+# never the contract), the same brief as Skinner B. This is the positive assertion that the fixed
+# itemization says so; actual bridge consumption (measured against the shipped clause) is 42 chars,
+# so `.{0,80}` keeps 38 chars of D17 headroom.
+has 'rung 2: C receives the cold lens brief — bare diff only, never the contract' "$STEP6" \
+    'tie-break Skinner C is dispatched COLD.{0,80}bare.{0,10}diff.{0,40}only.{0,40}and never the contract'
+
+# W9's supersession must be said OUT LOUD, not silently: the plan's original itemization assumed A
+# and B held one identical brief, and that assumption predates idea 03's two asymmetric lenses. Two
+# short, tightly anchored assertions rather than one long bridge (W5 bar #2): each clause's own
+# actual gap is small (<=5 chars), so `.{0,40}` keeps well over 30 chars of headroom on the first,
+# and the second is a near-literal run with no bridge to overflow.
+has 'rung 2: the fix states its own supersession of the plans one-identical-brief text' "$STEP6" \
+    'This supersedes.{0,40}plan.s earlier itemization'
+has 'rung 2: supersession is because idea 03 made the two lenses asymmetric' "$STEP6" \
+    'predates idea 03.s two asymmetric lenses'
+
+# The property the plan called "cold" but actually meant gets its own name (W9 item 2): C is never
+# shown a report, finding, or verdict, and never told a disagreement exists — that is what makes it
+# a genuine third *sample* and not an *arbiter*. Grep-guarded as its own token, separate from the
+# lens question above.
+has 'rung 2: C is disagreement-blind' "$STEP6" \
+    '`disagreement.{0,10}blind`'
+
+# Regression guards (F15) — the exact broken phrases from the pre-fix text must never come back.
+# Both are literal, unique substrings of the old itemization (confirmed absent from every other use
+# of "the contract"/"the diff"/"the repo's rules" in step 6, which always appears as a numbered
+# list, never this comma-joined run) so no legitimate rewrite collides with either guard.
+hasnt 'rung 2 no longer claims C receives exactly the brief A and B received' "$STEP6" \
+    'exactly the brief A and B received'
+hasnt 'rung 2 no longer itemizes the contract, the diff, the repos rules as Cs brief' "$STEP6" \
+    "the contract, the diff, the repo's rules"
+
 # Compound claim, one sentence, one shared "never": it never receives A/B's reports, findings,
 # verdicts, OR even the fact that a disagreement exists. Both conjuncts share the governing
 # "never", so they are kept as ONE assertion (not split) — a split would let deleting the first
@@ -282,7 +328,7 @@ has 'rung 2: the tie-break Skinner is dispatched COLD' "$STEP6" \
 # here is exactly the false independence W5 bar #3 warns against). The bridge to the second
 # conjunct crosses the blockquote's `>` line-continuation but stays short (D17 headroom checked).
 has 'rung 2: it never receives A or Bs reports, findings, verdicts, or even that a disagreement exists' "$STEP6" \
-    'never.{0,40}their reports, findings, verdicts.{0,60}the fact that a disagreement exists'
+    'never.{0,40}their reports, findings, verdicts.{0,60}the.{0,15}fact that a disagreement exists'
 
 # Same split rationale for "third sample, not an arbiter": the two phrases sit ~270 chars apart
 # across the blockquote's explanatory prose, so each gets its own short, tightly anchored
@@ -290,7 +336,7 @@ has 'rung 2: it never receives A or Bs reports, findings, verdicts, or even that
 has 'rung 2: it is a third independent sample' "$STEP6" \
     'third independent sample'
 has 'rung 2: it is not an arbiter reading two briefs' "$STEP6" \
-    'not an arbiter.{0,40}reading two briefs'
+    'not.{0,10}an arbiter.{0,40}reading two briefs'
 
 has 'rung 2: majority direction across three independent samples' "$STEP6" \
     'majority direction.{0,50}three independent samples'
@@ -299,6 +345,24 @@ has 'rung 2: majority direction across three independent samples' "$STEP6" \
 # (Law 3) elsewhere in step 6 — this exact clause, "silence is not a vote", occurs nowhere else.
 has 'rung 2: silence from C is not a vote' "$STEP6" \
     'silence is not a vote'
+
+# F16 (Important, cold-only) — the old 3-bullet branch set had a hole: C is disagreement-blind, so
+# nothing stopped it flagging BOTH disputed directions at once (recognizing the two remedies are
+# mutually unsatisfiable is Rule B's job, never asked of C), and neither "A's direction" nor "B's
+# direction" excluded the other firing too. W9 rules this is additive: a both-directions report is
+# `no majority`, exactly like a third direction or silence — making the branch set exhaustive and
+# mutually exclusive. Guarded as its own assertion so deleting only the "both directions" clause
+# reddens this alone, not the pre-existing silence/third-direction coverage above.
+has 'rung 2: C flagging both disputed directions is no majority, not a tie-break win for either' \
+    "$STEP6" 'both directions.{0,90}no majority'
+
+# The A/B majority bullets are scoped to "only" their own direction (not merely "A's direction"),
+# which is what makes the both-directions branch above mutually exclusive with these two rather
+# than silently overlapping them.
+has 'rung 2: A-direction majority requires A only (never shared with a both-directions report)' \
+    "$STEP6" "A.s direction only.{0,40}majority \\(2 of 3\\)"
+has 'rung 2: B-direction majority requires B only, symmetric' "$STEP6" \
+    "B.s direction only.{0,40}symmetric"
 
 has 'rung 2: at most ONE tie-break round per finding key per campaign' "$STEP6" \
     'At most.{0,40}ONE tie-break round per finding key.{0,40}campaign'
