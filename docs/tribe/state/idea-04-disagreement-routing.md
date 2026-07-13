@@ -823,6 +823,39 @@ briefs). **Both were terminated mid-run by an API session limit** (`You've hit y
    path — record it via `gh pr checks`) → squash-merge → delete branch → remove worktree.
 3. On a Critical → **escalate to the Shaman** per W19. Do not grind.
 
+## W23 — final branch audit, round 1: merged adjudication → ESCALATED (spec ambiguity). W17 is a fence extension I never had the authority to grant. (2026-07-14)
+
+Fresh pair, concurrent, asymmetric briefs (per W21). **Round FAILS.**
+
+| Lens | Result |
+| --- | --- |
+| **A — contract** | **`AUDIT: FAIL`** — one Critical (scope fence). Every other row PASS: all 5 spec/plan requirements delivered in shipped prompt text; 358/358 assertions across 7/7 suites; 20/20 evals (card's four = ids 17-20); 61/61 commits carry correct trailers, zero `Co-Authored-By`; `skinner.md`/`hunter.md` untouched; F10's no-dangling-forward-reference requirement satisfied; **D17's bounded bar verified by LIVE MUTATION** (30-char insertion survives; the 33-char break correctly falls outside what D17 requires). |
+| **B — cold** | **`COLD-LENS: 0 hypotheses`** — no Critical, no Important. It attacked and self-refuted three candidate defects, and **independently verified against `resume-check.sh`'s ACTUAL CODE that the crash-during-final-audit hazard is real and the prose's claim about it is accurate, not overstated** — corroborating W13/W20 from a lens that was never shown them. Two Minor prose nits (below), which the round-pass criteria do not gate on. |
+
+**Merged findings (Law 3 union, deduped):**
+
+| ID | Tag | Severity | Finding | Disposition |
+| --- | --- | --- | --- | --- |
+| **F38** | `[contract-only]` | **Critical** | The branch edits `plugins/tribe/scripts/tests/test-input-asymmetry.sh` (idea-03's suite; `len(evals)==16` → `==20`). That file is **not on this card's allow-list**, and it is **not** the D16 exception — D16 governs the *additive-vs-non-additive* axis of edits *inside* `warchief.md`, and supplies no cover for a new file appearing in the diff. **W17, which authorized it, is a WARCHIEF ruling, never Shaman-ratified** — unlike every other fence departure in this campaign (**D16** for the non-additive text edit, **D18** for the state-file write channel), each of which the campaign's own precedent shows required Shaman ratification *before* landing. | **ESCALATED (spec ambiguity)** — see below. Not routed to a fixer: no fix exists inside the fence. |
+| F39 | `[cold-only]` | Minor | Rule B's "classed independently" outcome does not explicitly name which class each independent finding gets. | **Valid, out of scope** — Minor; recorded as a follow-up. Does not gate the round. |
+| F40 | `[cold-only]` | Minor | The `agreed`/REJECTED outcome leaves its `routed` value implicit (`TO_FIXER` is the only consistent value). | **Valid, out of scope** — Minor; recorded as a follow-up. Does not gate the round. |
+
+**F38 is correct, and the finding is against ME, not the Hunter.** I checked it rather than deferring to it:
+`test-input-asymmetry.sh:148` hardcodes `len(evals) == 16`. This card's spec **requires** 4 new evals (task 5) →
+20. So the two constraints are jointly unsatisfiable inside the fence:
+
+- **Touch the sibling file** → cross a fence I was never granted;
+- **Leave it** → idea-03's suite goes **RED**, which fails *this plan's own DoD* ("all neighbour suites stay green").
+
+**There is no in-fence option that ships this card.** W17 called the bump *"arithmetic, not law"* and extended the
+fence on its own authority. That reasoning is sound on the merits — and it is still **not mine to make**. The fence
+is the Shaman's; a Warchief that widens its own fence because the widening looks harmless is exactly the failure
+mode D16 and D18 were each escalated to avoid. **Rung 3: no citation settles it (the contract is silent on this
+file), no mechanical oracle exists for "may this fence widen." Escalating.**
+
+**Round accounting:** this is fix-round **1 of 3** for the final branch audit — but the cap is NOT what stops me.
+A fence question is a What/Why question, and my charter routes it up **immediately, without waiting for the cap**.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
