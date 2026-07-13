@@ -13,6 +13,42 @@ plan: docs/tribe/planning/idea-03-input-asymmetry/plan.md
 - [ ] branch audit PASS (round 3 of 3 FAILED — escalated NEEDS_DIRECTION)
 - [ ] PR squash-merged
 
+## AUDIT R6/R6b (post-round-5, range b1f508a..6070bca) — ROUND FAILED, escalated 2026-07-13T09:55Z
+Skinner A (lens: contract): **AUDIT: PASS** — 16/16 rows; ran its own mutation tests; ran eval 14 LIVE
+(cold lens refuses the contract sitting on disk) -> PASS. Suites 45/27/35/28/32/7.
+Skinner B (lens: cold), first attempt: CONTAMINATED — it read spec.md and the state file. ROOT CAUSE
+WAS THE DISPATCH, NOT THE SKINNER: the contract is INSIDE the diff (spec.md, plan.md and this state
+file are all in the range). Per warchief.md:606 a contaminated result is a verdict on the DISPATCH,
+consumes NO fix round: re-dispatched fresh against a PATH-SCOPED diff (plugins/** only).
+  - F9 [cold-only] Important (from the contaminated read) — "retiring the `[one]` assertion dropped
+    coverage." **REFUTED on code evidence**: `[one]` occurs exactly twice in warchief.md (:507, :508),
+    both inside the reference column of Law 3's table, and in ZERO instructions — no rule emits,
+    consumes or routes on it. It has no operative force. The operative vocabulary IS guarded and
+    mutation-proved to trip (44/1). Head-on reviewer conflict (round 5's cold lens called that
+    assertion DEFECTIVE for guarding a doc footnote; round 6's wants it restored) adjudicated by the
+    Warchief, who holds the authoring context: round 5's fix stands.
+Skinner B2 (lens: cold, clean path-scoped read): COLD-LENS: 1 hypothesis — 0 Critical, 1 Important.
+
+  F10 [cold-only] IMPORTANT — **CONFIRMED** — skinner.md's pre-Lens-mode text is never suspended for
+  the cold lens. :19-24 (persona) orders "independently re-read the contract... verify the codework
+  against it"; :44 ("## Your scope: review only") orders "Return a `PASS`/`FAIL` result... nothing
+  more". But :74 scopes cold mode's replacements to "the Method **below**" — so both passages, which
+  sit ABOVE, are never suspended, while cold mode later says "You hold no PASS/FAIL" (:92) and "Never
+  emit an `AUDIT:` line" (:98). A cold Skinner reading top-to-bottom gets contradictory orders. SAME
+  CLASS as H1 (already ruled a real defect and fixed with a precedence sentence) — the pattern was
+  applied to H1 and missed at the file's own opening. No tripwire guards the pre-Lens-mode text.
+  Important, not Critical: empirically the later rules win (eval 14 live PASS; B2 itself ran cold and
+  emitted COLD-LENS with no AUDIT: line). But if it bites, the cold lens collapses into a second
+  contract lens — the card's entire value — or emits an AUDIT: line a caller misreads as a verdict.
+  F11 [cold-only] Minor — test-input-asymmetry.sh:98's anchor is satisfied by BOTH the prose lead-in
+  and the table row; deleting only the table row leaves it green. Content genuinely present twice.
+  Not blocking.
+
+  ROUND RESULT: FAIL (Law 4: a Confirmed [cold-only] Important fails the round). Escalated per the
+  Shaman's standing instruction. Bounded fix proposed: ONE precedence sentence declaring ALL text
+  before the Lens-mode section contract-lens-only (closing the whole class at once — :19-24 and :44
+  are the complete set of pre-Lens-mode normative text), plus one tripwire anchored on it.
+
 ## RULING D12 + D12a — RECEIVED 2026-07-13T09:32Z (authorizes the round-5 surgical fix)
 F7 RULED: **(a) RATIFY.** The Shaman amends the spec (its authority, What/Why): Delta-Law 2 and
 Risk-row-2 gain a carve-out for the contamination case. Rationale on record: the spec's "no `AUDIT:`
