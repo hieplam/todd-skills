@@ -415,11 +415,11 @@ has 'rung 3: escalation carries both reports verbatim' "$STEP6" \
 # with a first cell reading `` `class` `` or `` `routed` ``, so deleting only this task's new table
 # reddens only these assertions.
 
-has 'ledger has a class column, filled by the Warchief at merge' "$STEP6" \
-    '`class`[[:space:]]*\|[[:space:]]*you, at merge'
+has 'ledger has a class column, filled by the Warchief per round' "$STEP6" \
+    '`class`[[:space:]]*\|[[:space:]]*you, per round'
 
-has 'ledger has a routed column, filled by the Warchief at merge' "$STEP6" \
-    '`routed`[[:space:]]*\|[[:space:]]*you, at merge'
+has 'ledger has a routed column, filled by the Warchief per round' "$STEP6" \
+    '`routed`[[:space:]]*\|[[:space:]]*you, per round'
 
 has 'routed value TO_FIXER' "$STEP6" \
     '`routed`[[:space:]]*\|[^|]*\|[^|]*TO_FIXER'
@@ -455,6 +455,91 @@ has 'the ledger lives in the report file, on disk and append-only' "$STEP6" \
 # whole reason this ledger lives on disk rather than in the Warchief's head.
 has 'the report file lets a re-dispatched Warchief see which findings already spent their tie-break' "$STEP6" \
     're-dispatched Warchief resuming this card.{0,90}spent their one tie-break round'
+
+# --- Task 4 fix round (W10/F18/F19): the enum must express every outcome the section --------
+# already produces, and the timing claim must not contradict the ledger's own append-only rule.
+# F18: the pre-fix enum (5 values) could not express D16's `DROPPED (falsified)`, idea 05's
+# `DROPPED (falsified, round N)`, or the standoff `NEEDS_DIRECTION` outcome, and `TIEBREAK` was
+# listed with no trigger anywhere else in the file. F19: "you, at merge ... before the fixer is
+# dispatched" is false for outcomes only known after the fixer returns, and the ledger is
+# append-only so a cell can never be rewritten later — resolved by making each row per finding
+# PER ROUND, appended, never overwritten. Every bridge below is measured against this new text's
+# OWN actual consumption (1-9 chars per gap, confirmed by direct measurement of the shipped
+# clause) and widened to `.{0,40}`, keeping >=30 chars of D17 headroom on every one.
+
+# The three added enum values, each anchored the same structural way as the plan's original five
+# above: `` `routed`[^|]*\|[^|]*VALUE `` is bounded by the row's own pipes, not a `.{0,N}` bridge,
+# so it is immune to text-length changes by construction and reddens only when the value is
+# removed from THIS table row (the literal closing paren after "falsified" also keeps the plain
+# and round-N forms mutually exclusive: "DROPPED (falsified)" cannot match inside "DROPPED
+# (falsified, round N)", which has a comma, not a paren, immediately after "falsified").
+has 'routed value DROPPED falsified (agreed UPHELD, no fixer round spent)' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*DROPPED \(falsified\)'
+
+has 'routed value DROPPED falsified round N (single finding not re-raised)' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*DROPPED \(falsified, round N\)'
+
+has 'routed value ESCALATED standoff, listed distinctly from ESCALATED spec ambiguity' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(standoff\)'
+
+# TIEBREAK must have a stated trigger and a stated resolution — a listed value nobody ever
+# produces is a trap (W10 ruling 2). First assertion is the definition's own header sentence
+# (near-adjacent, no bridge needed — matches D17's own convention of leaving a true zero-gap
+# phrase as a bare literal rather than manufacturing a bridge that has nothing to span).
+has 'TIEBREAK is defined as a transient state, not a dead end' "$STEP6" \
+    '`TIEBREAK` names a transient state, not a dead end'
+
+# Compound claim: all three resolutions named, in order, each conjunct anchored on phrasing
+# unique to this clause ("C sided with the finding" / "C sided against it" / "no majority" occur
+# nowhere else in step 6 paired with these tokens) so deleting any one resolution reddens only
+# this assertion (W5 bar #3).
+has 'TIEBREAK resolves onward to TO_FIXER, DROPPED tie-break round N, or a rung-3 escalation' \
+    "$STEP6" \
+    'resolves onward to one of three places.{0,40}`TO_FIXER`.{0,40}C sided with the.{0,40}finding.{0,40}`DROPPED \(tie-break, round N\)`.{0,40}C sided against it.{0,40}rung-3 escalation \(no majority\)'
+
+# ESCALATED (standoff) must be distinct from ESCALATED (spec ambiguity) — mislabelling a standoff
+# as a spec ambiguity would falsify the record (W10 ruling 1). Each definition is its own
+# assertion, anchored on phrasing unique to that outcome; the final assertion guards the
+# conflation warning itself so a later edit cannot silently drop the distinction.
+has 'ESCALATED spec ambiguity is defined as rung 3s contract-underdetermined outcome' "$STEP6" \
+    '`ESCALATED \(spec ambiguity\)` is rung 3.{0,40}outcome: no citation settles the dispute and no majority exists.{0,40}contract itself is underdetermined'
+
+has 'ESCALATED standoff is defined as the ledger-adjudication rules own outcome' "$STEP6" \
+    '`ESCALATED \(standoff\)` is the ledger-adjudication rule.{0,40}outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding unchanged'
+
+has 'ESCALATED standoff is an evidence deadlock, never a contract ambiguity' "$STEP6" \
+    'evidence.{0,40}deadlock.{0,40}never a.{0,40}contract ambiguity'
+
+has 'the two ESCALATED values are never to be conflated' "$STEP6" \
+    'must never be recorded as `ESCALATED \(spec ambiguity\)`'
+
+# DROPPED (falsified) and DROPPED (falsified, round N) get their own definitions, tying each back
+# to the rule that produces it (D16's UPHELD adjudication vs the ledger-adjudication rule's
+# not-re-raised branch), so the enum value is never left floating without a producing rule.
+has 'DROPPED falsified and DROPPED falsified round N are defined as the two falsification outcomes' \
+    "$STEP6" \
+    '`DROPPED \(falsified\)`.{0,40}and `DROPPED \(falsified, round N\)`.{0,40}two falsification outcomes'
+
+has 'DROPPED falsified is an agreed findings NOT_REPRODUCED adjudicated UPHELD, no fixer round spent' \
+    "$STEP6" \
+    'adjudicated UPHELD drops.{0,40}immediately as `DROPPED \(falsified\)`.{0,40}no fixer round spent'
+
+has 'DROPPED falsified round N is a single findings NOT_REPRODUCED the next Skinner does not re-raise' \
+    "$STEP6" \
+    'does not re-raise.{0,40}falls as `DROPPED \(falsified, round N\)`'
+
+# F19: the ledger is per finding PER ROUND — appended, never overwritten. Each conjunct of the
+# rule is its own assertion so deleting any one clause alone reddens only its own guard.
+has 'a ledger row is per finding per round, never overwritten, always appended' "$STEP6" \
+    'A row is per finding, per round.{0,40}never overwritten, always appended'
+
+has 'a later adjudication appends a brand-new row for the later round rather than editing an earlier one' \
+    "$STEP6" \
+    'finding adjudicated later.{0,90}gets a brand-new row for.{0,40}the later round.{0,90}the new `routed` value.{0,40}it never edits the row an earlier round wrote'
+
+has 'append-only holds even though falsified outcomes are only known after the fixer has returned' \
+    "$STEP6" \
+    'keeps the ledger append-only even though outcomes like.{0,40}`DROPPED \(falsified\)`.{0,40}are only known after the fixer has already returned'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

@@ -739,19 +739,44 @@ answered. Return `NEEDS_DIRECTION` to the Shaman **at once (not at round 3)**, c
 
 #### Recording it — the disposition ledger gains two columns
 
-The disposition ledger in your report file gains two columns that **you** fill at merge time, before
-the fixer is dispatched. Same ledger, same rows — a finding's routing and its disposition are facts
-about the same finding at two stages of its life, so they belong in one table.
+The disposition ledger in your report file gains two columns that **you** fill when you write a
+finding's row for that round. Same ledger, same rows — a finding's routing and its disposition are
+facts about the same finding at two stages of its life, so they belong in one table.
 
 | Column | Filled by | Values |
 | --- | --- | --- |
-| `class` | you, at merge | `agreed` / `single` / `conflicting` |
-| `routed` | you, at merge | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` |
+| `class` | you, per round | `agreed` / `single` / `conflicting` |
+| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` / `ESCALATED (standoff)` |
+
+**`TIEBREAK` names a transient state, not a dead end** — it marks a finding whose rung-2 tie-break is
+in flight, and it always resolves onward to one of three places: `TO_FIXER` (C sided with the
+finding), `DROPPED (tie-break, round N)` (C sided against it), or a rung-3 escalation (no majority).
+A listed value with no resolution would be a trap; this one always moves on.
+
+**The two `ESCALATED` values name two different failures, and conflating them would misstate the
+record.** `ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the dispute and no
+majority exists, so the contract itself is underdetermined. `ESCALATED (standoff)` is the
+ledger-adjudication rule's outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding unchanged,
+leaving the fixer's own falsification artifact unaddressed — an **evidence** deadlock, never a
+contract ambiguity, and it must never be recorded as `ESCALATED (spec ambiguity)`.
+
+`DROPPED (falsified)` and `DROPPED (falsified, round N)` are the two falsification outcomes defined
+elsewhere in this section: an `agreed` finding's `NOT_REPRODUCED` adjudicated UPHELD drops
+immediately as `DROPPED (falsified)`, with no fixer round spent; a `single` finding's
+`NOT_REPRODUCED` that the next Skinner does not re-raise falls as `DROPPED (falsified, round N)`.
 
 The fixer still fills `disposition` (`FIXED` / `NOT_REPRODUCED` / `ESCALATED`), and it stays **empty
 for any finding whose `routed` is not `TO_FIXER`** — a finding that **never reached the fixer** has a
 routing outcome and no disposition. That empty cell is the boundary: you decide what reaches the
 fixer; the fixer decides what to do with what it got.
+
+**A row is per finding, per round — never overwritten, always appended.** The ledger already carries
+a `round` column, so the Warchief fills `class` and `routed` when it writes that round's row; a
+finding adjudicated later (falsified, standoff, or by any other rule above) gets a brand-new row for
+the later round, carrying the same finding ID and the new `routed` value — it never edits the row an
+earlier round wrote. That is what keeps the ledger append-only even though outcomes like
+`DROPPED (falsified)` are only known after the fixer has already returned, and it is what keeps a
+finding's whole history readable off the one document.
 
 The ledger lives in your **report file** (on disk, append-only), which is what lets a re-dispatched
 Warchief resuming this card see **which finding keys have already spent their one tie-break round**.
