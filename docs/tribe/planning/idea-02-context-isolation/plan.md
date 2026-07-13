@@ -54,7 +54,7 @@ dogfooding itself.
 
 Creates the test harness and seals the sending side. Assertions T1-T5 from the spec.
 
-- [ ] **Step 1: Write the failing test (RED).** Create `plugins/tribe/scripts/tests/test-context-isolation.sh`
+- [x] **Step 1: Write the failing test (RED).** Create `plugins/tribe/scripts/tests/test-context-isolation.sh`
       with exactly this content:
 
 ```bash
@@ -128,7 +128,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
   `# passed 0, failed 21`, and `exit=1`. If any assertion passes here, stop and report back —
   it means the anchor string is matching unrelated prose, and the test is not proving what it claims.
 
-- [ ] **Step 2: Make it green — add the allowlist to `warchief.md` step 6.** In
+- [x] **Step 2: Make it green — add the allowlist to `warchief.md` step 6.** In
       `plugins/tribe/agents/warchief.md`, find the section `### 6. Audit every deliverable with the
       skinner` (currently line 441). Keep its existing paragraph exactly as it is, and insert the
       following **immediately after** that paragraph (i.e. after the sentence ending "...without
@@ -204,7 +204,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
 
   **Expected (GREEN):** all 21 assertions print `ok`, summary `# passed 21, failed 0`, `exit=0`.
 
-- [ ] **Step 3: Commit** — tick this task's boxes in the same commit as the code.
+- [x] **Step 3: Commit** — tick this task's boxes in the same commit as the code.
 
 ```bash
 git add plugins/tribe/scripts/tests/test-context-isolation.sh plugins/tribe/agents/warchief.md docs/tribe/planning/idea-02-context-isolation/plan.md
