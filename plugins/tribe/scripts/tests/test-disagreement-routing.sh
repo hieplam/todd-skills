@@ -118,5 +118,16 @@ has 'reproduce-first still applies to an agreed finding' "$STEP6" \
 has 'NOT_REPRODUCED on an agreed finding escalates immediately' "$STEP6" \
     '`NOT_REPRODUCED`.{0,10}for an `agreed` finding.{0,200}escalates to you immediately'
 
+# F8 — the agreed/single NOT_REPRODUCED supersession must be said out loud, not just implied.
+# Compound claim, both conjuncts anchored (W5 bar #3): the `agreed` clause explicitly does NOT
+# wait on the ledger-adjudication rule below, AND the `single` clause explicitly says that same
+# ledger rule governs it unchanged. Anchored on "ledger-adjudication rule below", a phrase this
+# disambiguation clause coins and which appears nowhere else in step 6 — deleting only this new
+# clause removes every occurrence and reddens only this assertion (W5 bar #2/D14); the pre-existing
+# "Adjudicate the ledger after each re-audit" heading and the reproduce-first paragraph above never
+# use this exact wording, so neither can hold this assertion green in the clause's absence.
+has 'agreed does not wait on the ledger rule below; single is governed by it unchanged' "$STEP6" \
+    '`agreed`.{0,150}does not wait on the ledger-adjudication rule below.{0,250}`single`.{0,80}ledger-adjudication rule below governs unchanged'
+
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

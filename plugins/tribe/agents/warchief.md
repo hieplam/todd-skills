@@ -653,6 +653,12 @@ class changes is only the **escalation path on non-reproduction**: if the fixer 
 fault (two independent samples flagged it) — it escalates to you **immediately** for adjudication,
 rather than waiting for the next audit round to settle it as a `single` finding would.
 
+**This is a deliberate specialization of the ledger-adjudication rule below, not a second path.**
+For an `agreed` finding, the immediate-adjudication path just described governs its
+`NOT_REPRODUCED` case and does not wait on the ledger-adjudication rule below to settle it via the
+next re-audit. For a `single` finding, the ledger-adjudication rule below governs unchanged —
+falls, stands, or standoff.
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that
