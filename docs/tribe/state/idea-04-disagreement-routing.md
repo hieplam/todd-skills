@@ -756,6 +756,34 @@ ratified (D18: the state file is the resume truth; D19/W13: the script cannot re
 those rulings predicted. Recorded here so the next resumer does not re-derive it — and so the campaign's PR can
 cite it as the follow-up card's motivating incident.
 
+## W21 — D17's "into BOTH briefs" collides with idea-03's cold brief. Same treatment as W9: supersede out loud. (final audit dispatch, 2026-07-14)
+
+D17's PROCEED clause says: *"a fresh pair audits against the BOUNDED bar (**D17 goes verbatim into both
+briefs' contract context**)."* Idea-03's **Law 1**, shipped in `warchief.md` and the law I execute under, says
+the cold brief must carry **no contract** — the spec, the plan, the card, *"or any path to them"* — and calls
+that ban list *"exhaustive… a rule, not a preference."* **Both cannot be honoured. This is W9's collision
+again** (the plan's word "cold" vs idea-03's reserved term), so it gets W9's treatment: derive the right
+answer, state the supersession out loud, never patch it silently.
+
+**Ruling — D17 goes verbatim into the CONTRACT lens's brief only, and its intent is fully served there:**
+
+1. **D17's intent is that the branch be judged against the BOUNDED bar, not the unbounded one it replaced.**
+   Under Law 4, **only the contract lens holds a verdict.** Put D17 in that brief and the verdict is
+   necessarily rendered against the bounded bar — D17's intent is satisfied *completely*.
+2. **The cold lens holds no verdict**, so it cannot mis-apply a bar it was never handed. If it forms a
+   robustness hypothesis anyway, that hypothesis reaches **me**, and I adjudicate it against D17 at my layer.
+   **That is not a hypothetical — it is exactly what happened at W18** (rung 1, by citation).
+3. **Handing D17 to the cold lens would be actively harmful**, not merely illegal: assertion robustness is the
+   precise axis on which all three lens conflicts in this campaign occurred. Giving B the bar would collapse it
+   into a second contract lens on that axis — paying for two reviewers and buying one, which is the exact
+   failure idea-03 exists to prevent.
+
+**Also mechanically enforced this round:** the cold lens's diff is scoped to the three PRODUCT files
+(`warchief.md`, `test-disagreement-routing.sh`, `evals.json`). **This state file is excluded from its diff** —
+it contains every ruling in the campaign, i.e. the entire contract. A cold lens handed the branch's full diff
+(or its `git log`, 55 commits of ruling messages) would be reading the contract through the back door. Scoping
+*which bytes* is mechanical address information and is required; it leaks no judgment.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
