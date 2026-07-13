@@ -399,5 +399,62 @@ has 'rung 3: a question no experiment can settle is not a code question' "$STEP6
 has 'rung 3: escalation carries both reports verbatim' "$STEP6" \
     'Both reviewers.{0,40}reports, verbatim'
 
+# --- Task 4: the ledger columns ---------------------------------------------
+# This EXTENDS idea 05's existing disposition ledger (its finding-ID / finding-key / disposition
+# machinery is already above, in "Assign each routed Critical/Important finding a stable ID" and
+# "Require a disposition ledger back") with two Warchief-owned columns (spec §2.4) — it does not
+# create a second ledger. A bare-phrase grep on this task's own vocabulary would be HOLLOW: `class`
+# (capitalized, unbackticked) is already this file's own confidence-classes table header;
+# `DROPPED (contract` and `DROPPED (tie-break` already occur in rung 1 and rung 2's prose above;
+# bare `ESCALATED` already occurs three times in the agreed-adjudication outcomes. Every assertion
+# below is therefore anchored to THIS task's own `| Column | Filled by | Values |` table
+# specifically — `` `class`|`routed`[[:space:]]*\|[^|]*\|[^|]*VALUE `` — which crosses the row's own
+# "Filled by" cell via a structural, pipe-bounded `[^|]*` (immune to text-length changes by
+# construction — it is not a `.{0,N}` bridge and needs no D17 headroom measurement; the same
+# technique already used by task 2's `single`-row assertion above). No other row in step 6 opens
+# with a first cell reading `` `class` `` or `` `routed` ``, so deleting only this task's new table
+# reddens only these assertions.
+
+has 'ledger has a class column, filled by the Warchief at merge' "$STEP6" \
+    '`class`[[:space:]]*\|[[:space:]]*you, at merge'
+
+has 'ledger has a routed column, filled by the Warchief at merge' "$STEP6" \
+    '`routed`[[:space:]]*\|[[:space:]]*you, at merge'
+
+has 'routed value TO_FIXER' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*TO_FIXER'
+
+has 'routed value DROPPED with a contract citation' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*DROPPED \(contract'
+
+has 'routed value DROPPED by tie-break' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*DROPPED \(tie-break'
+
+has 'routed value ESCALATED for spec ambiguity' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(spec ambiguity\)'
+
+# Compound claim (W5 bar #3): disposition stays empty — AND — that emptiness is scoped to a
+# finding whose `routed` is not `TO_FIXER` (i.e. one that never reached the fixer). Both conjuncts
+# checked, in the order the sentence makes them. Each bridge is measured against this sentence's
+# own actual consumption (~17-18 chars per gap) and widened to keep >=30 chars of D17 headroom.
+has 'disposition stays empty when the finding never reached the fixer' "$STEP6" \
+    'stays empty.{0,50}whose `routed` is not `TO_FIXER`.{0,50}never reached the fixer'
+
+# "report file" alone already occurs 4 times earlier in step 6 (idea 05's ledger machinery), so a
+# bare grep would be hollow. Anchored instead to this clause's own literal, zero-gap phrase
+# ("ledger lives in your report file"), then (D17 bridge, ~2-char actual gap) to the parenthetical
+# that is unique to this sentence.
+has 'the ledger lives in the report file, on disk and append-only' "$STEP6" \
+    'ledger lives in your report file.{0,40}on disk, append-only'
+
+# Second conjunct of the same paragraph (W5 bar #3, split per the F14/F8 precedent above rather
+# than one long bridge): WHY it lives there — so a re-dispatched Warchief resuming this card can
+# see which finding keys already spent their one tie-break round. "re-dispatched Warchief resuming
+# this card" is itself a literal, zero-gap phrase coined only by this clause (never used elsewhere
+# in step 6); bridged (~37-char actual gap, D17 headroom) to the tie-break-round phrase that is the
+# whole reason this ledger lives on disk rather than in the Warchief's head.
+has 'the report file lets a re-dispatched Warchief see which findings already spent their tie-break' "$STEP6" \
+    're-dispatched Warchief resuming this card.{0,90}spent their one tie-break round'
+
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

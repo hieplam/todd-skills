@@ -737,6 +737,28 @@ answered. Return `NEEDS_DIRECTION` to the Shaman **at once (not at round 3)**, c
 3. The tie-break Skinner's report, verbatim, if rung 2 ran.
 4. **Your recommendation** — which reading you believe the card intends, and why.
 
+#### Recording it — the disposition ledger gains two columns
+
+The disposition ledger in your report file gains two columns that **you** fill at merge time, before
+the fixer is dispatched. Same ledger, same rows — a finding's routing and its disposition are facts
+about the same finding at two stages of its life, so they belong in one table.
+
+| Column | Filled by | Values |
+| --- | --- | --- |
+| `class` | you, at merge | `agreed` / `single` / `conflicting` |
+| `routed` | you, at merge | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` |
+
+The fixer still fills `disposition` (`FIXED` / `NOT_REPRODUCED` / `ESCALATED`), and it stays **empty
+for any finding whose `routed` is not `TO_FIXER`** — a finding that **never reached the fixer** has a
+routing outcome and no disposition. That empty cell is the boundary: you decide what reaches the
+fixer; the fixer decides what to do with what it got.
+
+The ledger lives in your **report file** (on disk, append-only), which is what lets a re-dispatched
+Warchief resuming this card see **which finding keys have already spent their one tie-break round**.
+No state-file change is needed: `docs/tribe/state/` tracks crash-resume milestones, and an audit
+round is idempotent — the diff is unchanged, so a resumed Warchief re-runs the round and re-derives
+the same classes from the same inputs.
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that

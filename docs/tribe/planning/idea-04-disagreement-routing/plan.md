@@ -390,7 +390,7 @@ Expected: one commit; the full test file exits 0.
 Records the routing outcome, so the 3-round cap and the one-tie-break-per-key cap stay readable off
 a single document — and so the boundary with idea 05 is visible in the table itself.
 
-- [ ] **Step 1: Append the ledger assertions (RED)**
+- [x] **Step 1: Append the ledger assertions (RED)**
 
 Append before the summary block:
 
@@ -416,7 +416,7 @@ has 'the ledger lives in the report file so a resumed Warchief can read it' \
 
 Run. Expected: 30 passed, 8 failed, exit 1.
 
-- [ ] **Step 2: Add the ledger columns to step 6 (GREEN)**
+- [x] **Step 2: Add the ledger columns to step 6 (GREEN)**
 
 Insert directly beneath the conflict ladder. This **extends idea 05's existing disposition ledger**
 — it does not create a second one. Anchor check: idea 05's ledger must already exist in step 6; if it
@@ -448,7 +448,7 @@ the same classes from the same inputs.
 
 Re-run. Expected: 38 passed, 0 failed, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \
