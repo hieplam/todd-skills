@@ -738,9 +738,14 @@ has 'the report-file row is explicitly non-authoritative for the cap; the state-
 # The resumed-Warchief bounds paragraph: the report-file TIEBREAK row is consulted for NONE of
 # this on resume -- only the state file's heading decides. Three conjuncts (W5 bar #3). Actual
 # gaps 3, 1, 6 chars; `.{0,40}` keeps >=34 chars of headroom on each.
+# F32 sweep: the 67-char tail "only the state file's `## Tie-breaks spent` heading decides whether
+# a key's tie-break is spent" was itself a zero-gap literal spanning more than a single clause, and
+# reddened on independent legal insertions -- "definitively" after "decides" (reproduced) and
+# "already" before "spent" (reproduced). Bridged at all three internal joints (actual gaps 1 char
+# each; `.{0,40}` keeps 39 chars of headroom on each).
 has 'on resume, the report-file TIEBREAK row is consulted for none of it; only the state file decides' \
     "$STEP6" \
-    "report-file ledger.s \`TIEBREAK\` row is consulted for none of this.{0,40}it is the audit trail, not the.{0,40}authoritative record.{0,40}only the state file.s \`## Tie-breaks spent\` heading decides whether a key.s tie-break is spent"
+    "report-file ledger.s \`TIEBREAK\` row is consulted for none of this.{0,40}it is the audit trail, not the.{0,40}authoritative record.{0,40}only the state file.s \`## Tie-breaks spent\` heading decides.{0,40}whether a key.s tie-break.{0,40}is.{0,40}spent"
 
 # The "Recording it" reconciliation paragraph: the report file is explicitly non-authoritative for
 # the one-tie-break-per-key cap (distinct wording from rung 2's "for the cap" clause above, so
@@ -761,9 +766,14 @@ has 'the reconciliation clause: uncommitted is never-happened, and the report fi
 # The state file is named as THE authoritative, crash-safe record -- already the tribe's one
 # sanctioned resume artifact (the crash-safe-resume doctrine's own vocabulary, cited rather than
 # reworded). Actual gap 1 char; `.{0,40}` keeps 39 chars of headroom.
+# F32 sweep: the 106-char lead-in "authoritative, crash-safe record that a finding key has spent
+# its tie-break lives in the card's state file" was itself a zero-gap literal spanning more than a
+# single clause, and reddened on two independent legal insertions -- "already" before "spent"
+# (reproduced) and "one" before "tie-break" (reproduced). Bridged at both internal joints (actual
+# gaps 1 char each; `.{0,40}` keeps 39 chars of headroom on each).
 has 'the state file is the authoritative crash-safe record, the tribes one sanctioned resume artifact' \
     "$STEP6" \
-    'authoritative, crash-safe record that a finding key has spent its tie-break lives in the card.s state file.{0,40}docs/tribe/state/CARD-SLUG.md.{0,40}already the tribe.s one sanctioned resume artifact'
+    'authoritative, crash-safe record that a finding key has.{0,40}spent its.{0,40}tie-break lives in the card.s state file.{0,40}docs/tribe/state/CARD-SLUG.md.{0,40}already the tribe.s one sanctioned resume artifact'
 
 # ...and it is written and committed BEFORE the tie-break Skinner is dispatched, per rung 2 above
 # -- the Shaman's one binding requirement from D18. Actual gaps 3, 2 chars; `.{0,40}` keeps >=36
@@ -838,9 +848,14 @@ has 'the resume protocol never reads the Tie-breaks spent heading for you' "$STE
 # The real backstop: the final whole-branch audit always runs before merge, and it too is a
 # Warchief entering an audit round, so it re-consults the heading. Actual gaps 1 and 5 chars;
 # `.{0,35}`/`.{0,40}` keep >=30 chars of D17 headroom.
+# F32 fix: "always runs before any merge" was itself a 28-char zero-gap literal spanning more than
+# a single clause (D17), and reddened on two independent legal, meaning-preserving insertions —
+# ", without fail," after "always" (reproduced) and "absolutely" before "any merge" (reproduced).
+# Bridged at both internal joints (actual gaps 1 char each; `.{0,40}` keeps 39 chars of headroom on
+# each), matching the convention already used at this assertion's own other two bridges.
 has 'the final whole-branch audit always runs before any merge, and is itself a Warchief entering an audit round' \
     "$STEP6" \
-    'the final whole-branch audit.{0,35}always runs before any merge.{0,40}is itself a Warchief entering an audit round'
+    'the final whole-branch audit.{0,35}always.{0,40}runs before.{0,40}any merge.{0,40}is itself a Warchief entering an audit round'
 
 # Self-contained (no bridge back to the previous assertion's own clause), so the two mutate
 # independently. Actual gap 11 chars; `.{0,45}` keeps 34 chars of D17 headroom.
@@ -882,9 +897,13 @@ has 'a crash after the spend-commit but before Cs outcome lands means the key is
 # Part 2: the CONSEQUENCE -- forced to rung 3 (a human ruling) on the next audit round that touches
 # it. Three conjuncts (W5 bar #3), each anchored on phrasing unique to this clause. Actual gaps 1,
 # 3, 3 chars; `.{0,35}` keeps >=32 chars of D17 headroom on each.
+# F32 fix: the 39-char tail "on the next audit round that touches it" was itself a zero-gap literal
+# spanning more than a single clause, and reddened on two independent legal insertions -- "very"
+# after "the" (reproduced) and "eventually" before "touches" (reproduced). Bridged at all three
+# internal joints (actual gaps 1 char each; `.{0,40}` keeps 39 chars of headroom on each).
 has 'the finding is forced to rung 3, a human ruling, on the next audit round that touches it' \
     "$STEP6" \
-    'forced to.{0,35}rung 3.{0,35}a human ruling.{0,35}on the next audit round that touches it'
+    'forced to.{0,35}rung 3.{0,35}a human ruling.{0,35}on the.{0,40}next audit round.{0,40}that.{0,40}touches it'
 
 # Part 3: the consequence is CONSISTENT with the absolute rule above, never in tension with it --
 # no second tie-break Skinner is ever dispatched on that key. Three conjuncts, each bridged
@@ -963,9 +982,15 @@ has 'the resume protocol above defines both outcomes as re-entering step 7, and 
 # F25, part 5: the concrete hazard this produces -- a Warchief dying during the final whole-branch
 # audit resumes into delivery and can merge before that audit ever finishes. Actual gap 3 chars;
 # `.{0,35}` keeps 32 chars of D17 headroom.
+# F32 sweep: the 142-char lead-in "dies DURING the final whole-branch audit itself resumes straight
+# into delivery and can open and merge the PR without that audit ever finishing" was itself a
+# zero-gap literal spanning more than a single clause, and reddened on two independent legal
+# insertions -- "eventually" before "resumes" (reproduced) and "eventually" before "open"
+# (reproduced). Bridged at both internal joints (actual gaps 1 char each; `.{0,40}` keeps 39 chars
+# of headroom on each).
 has 'a Warchief dying during the final whole-branch audit resumes into delivery and can merge before that audit finishes' \
     "$STEP6" \
-    'dies DURING the final whole-branch audit itself resumes straight into delivery and can open and merge the PR without that audit ever finishing.{0,35}a crash mid-audit can therefore produce an unaudited merge'
+    'dies DURING the final whole-branch audit itself.{0,40}resumes straight into delivery and can.{0,40}open and merge the PR without that audit ever finishing.{0,35}a crash mid-audit can therefore produce an unaudited merge'
 
 # F25, part 6: the cause is named -- resume-check.sh has no notion of a mid-audit state, the same
 # pre-existing gap named earlier in this rung, now shown to reach the final audit too. Actual gaps 2
@@ -976,9 +1001,14 @@ has 'the mid-audit gap is named as resume-check.sh having no notion of a mid-aud
 
 # F25, part 7: it is a KNOWN, FILED follow-up -- pre-existing and cross-cutting, not created by this
 # card. Actual gap 3 chars; `.{0,35}` keeps 32 chars of D17 headroom.
+# F32 fix: the 56-char tail "pre-existing and cross-cutting, not created by this card" was itself a
+# zero-gap literal spanning more than a single clause, and reddened on two independent legal
+# insertions -- "in nature" before the comma (reproduced) and "or introduced" after "created"
+# (reproduced). Bridged at both internal joints (actual gaps 2 and 1 chars; `.{0,40}` keeps >=38
+# chars of headroom on each).
 has 'the mid-audit gap is a known, filed follow-up: pre-existing and cross-cutting, not created by this card' \
     "$STEP6" \
-    'a known, filed follow-up.{0,35}pre-existing and cross-cutting, not created by this card'
+    'a known, filed follow-up.{0,35}pre-existing and cross-cutting.{0,40}not created.{0,40}by this card'
 
 # F25, part 8: the retraction, in so many words -- the "never a wrong merge" safety claim is
 # explicitly RETIRED. Literal, zero-gap phrase (D17 convention).
@@ -1085,9 +1115,14 @@ hasnt 'the routed row no longer lists ESCALATED (oracle unavailable) as a fixed 
 
 # The parametric-form statement itself, and that it grows by a trigger naming itself rather than by
 # editing the row. Actual gap 3 chars; `.{0,40}` keeps 37 chars of D17 headroom.
+# F32 sweep: the 91-char tail "the set of known triggers grows by a rule naming its own trigger,
+# never by editing this row" was itself a zero-gap literal spanning more than a single clause, and
+# reddened on two independent legal insertions -- "organically" after "grows" (reproduced) and
+# "and certainly" before "never" (reproduced). Bridged at both internal joints (actual gaps 1 char
+# each; `.{0,40}` keeps 39 chars of headroom on each).
 has 'the ESCALATED value is parametric, not a closed list, and grows by a trigger naming itself, never by editing the row' \
     "$STEP6" \
-    'ESCALATED \(<trigger>\)` is parametric, not a closed list.{0,40}the set of known triggers grows by a rule naming its own trigger, never by editing this row'
+    'ESCALATED \(<trigger>\)` is parametric, not a closed list.{0,40}the set of known triggers grows.{0,40}by a rule naming its own trigger,.{0,40}never by editing this row'
 
 # (b) The actual-cause rule, generalized to govern every trigger (D20 ruling 2): the recorded
 # trigger must be the real cause, never a near-miss, and this is the SAME "conflating misstates the
@@ -1244,9 +1279,15 @@ has 'the two statuses are mutually exclusive by construction: always exactly one
 # Second: `oracle unavailable`'s OWN definition now reciprocally excludes `tie-break spent` -- this is
 # the reinforcing-evidence gap F29 named explicitly (the exclusion existed only from the tie-break-spent
 # side before this fix). Near-zero actual gap (2 chars), left as a near-bare literal per convention.
+# F32 sweep: this assertion's own regex was a 120-char zero-gap literal spanning more than a single
+# clause -- unlike its three sibling exclusion assertions above (spec ambiguity / standoff /
+# inconclusive artifact), which already bridge their own "because" joint per F27's fix, this later
+# W15-added sibling never got the same treatment. Reddened on two independent legal insertions --
+# "simply" before "because" (reproduced) and "genuinely" before "`resolved`" (reproduced). Bridged
+# at both internal joints (actual gaps 1 char each; `.{0,40}` keeps 39 chars of headroom on each).
 has 'oracle unavailable reciprocally excludes tie-break spent: fires only when latest status is resolved' \
     "$STEP6" \
-    'never `ESCALATED \(tie-break spent\)`, because that trigger fires only when the key.s LATEST state-file line is `resolved`'
+    'never `ESCALATED \(tie-break spent\)`,.{0,40}because that trigger fires only when the key.s LATEST state-file line.{0,40}is `resolved`'
 
 # The crash-cost paragraph (rung 2's honest-cost sentence) now names its OWN produced trigger
 # explicitly, tying the general decision rule above to the concrete crash-window scenario it describes.
