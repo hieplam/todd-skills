@@ -53,5 +53,25 @@ has "T5a warchief: contaminated is a dispatch fault"   "$WARCHIEF" "a verdict on
 has "T5b warchief: never route it to a fixer"          "$WARCHIEF" "never route it to a fixer Hunter"
 has "T5c warchief: it costs no fix-round"              "$WARCHIEF" "does NOT consume one of the 3 fix-rounds"
 
+# --- T6: skinner refuses a contaminated dispatch --------------------------------
+has "T6a skinner: refuse-contaminated rule exists"  "$SKINNER" "Refuse a contaminated dispatch"
+has "T6b skinner: names the four admissible items"  "$SKINNER" "the contract (spec/plan), the diff, the repo's rules, and mechanical scope"
+has "T6c skinner: may contain less, never more"     "$SKINNER" "It may contain less; it may never contain more"
+has "T6d skinner: bans the Hunter's report"         "$SKINNER" "the Hunter's report file or any excerpt of it"
+has "T6e skinner: exact refusal token"              "$SKINNER" "AUDIT: FAIL — CONTAMINATED:"
+has "T6f skinner: refusal not 'read it but ignore'" "$SKINNER" "ignoring it is unverifiable"
+has "T6g skinner: verdict on dispatch not code"     "$SKINNER" "a verdict on the DISPATCH, not the code"
+
+# --- T7: contract-chain level 1 carries the caveat ------------------------------
+has "T7 skinner: caller-given material is limited"  "$SKINNER" "admissible ONLY as contract, diff, rules, or mechanical scope"
+
+# --- T9 (anti-regression): the seal must NOT ban artifacts in the diff -----------
+# Guards sibling idea-05: a fixer's counter-evidence travels as a committed test in the
+# diff. If a future edit ever tightens this rule into "the Skinner sees less than the full
+# diff", these fail.
+has "T9a skinner: artifacts in the diff are admissible" "$SKINNER" "everything the code side COMMITTED is in the diff and is fully admissible"
+has "T9b skinner: still reads the whole diff"           "$SKINNER" "git diff --name-only"
+has "T9c warchief: still points the Skinner at the diff" "$WARCHIEF" "against the diff"
+
 printf '\n# passed %d, failed %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

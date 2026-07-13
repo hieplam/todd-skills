@@ -223,7 +223,7 @@ Seals the receiving side, so a contaminated dispatch is refused even when the ca
 Warchief (the Skinner is also dispatched for owner self-audits and "review this PR"). Adds assertions
 T6, T7, and the T9 anti-regression guard.
 
-- [ ] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
+- [x] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
       **before** the final `printf`/`[[ "$FAIL" -eq 0 ]]` lines (move those two lines to the end):
 
 ```bash
@@ -272,7 +272,7 @@ cp /tmp/skinner.bak plugins/tribe/agents/skinner.md && rm /tmp/skinner.bak
   **Expected:** the mutated run prints `not ok - T9b skinner: still reads the whole diff`, and after
   the restore the file is byte-identical (`git diff --quiet plugins/tribe/agents/skinner.md` exits 0).
 
-- [ ] **Step 2: Make it green — add the quarantine to `skinner.md`.** Two edits.
+- [x] **Step 2: Make it green — add the quarantine to `skinner.md`.** Two edits.
 
   **(a)** In `plugins/tribe/agents/skinner.md`, in the `## Operating rules` section (currently starting
   line 48), insert this as the **first** bullet — before "Read + verify only. NEVER mutate." — so it is
@@ -328,7 +328,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
 
   **Expected (GREEN):** `# passed 32, failed 0`, `exit=0`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-context-isolation.sh plugins/tribe/agents/skinner.md docs/tribe/planning/idea-02-context-isolation/plan.md
