@@ -643,6 +643,21 @@ the key was never byte-stable. This card added the *persistence*, and with it th
 4. **Guard the honesty mechanically** (no "greppable"/"mechanical" claim for this lookup; the judgment
    statement; the on-doubt-not-spent default) so no future editor re-inflates the guarantee.
 
+## W17 — bump idea-03's hardcoded eval count (task 5 collateral; minimal fence extension)
+
+Task 5 adds this card's 4 evals (16 → 20), and `test-input-asymmetry.sh` (idea 03's suite) asserts a
+**hardcoded `len(evals) == 16`**. It now fails — not because anything is wrong, but because **any card that
+ever adds an eval must bump that number.**
+
+The plan's DoD requires the neighbouring suites stay green, and the plan could not foresee this. **Ruling:**
+bump the count `16 → 20` in `test-input-asymmetry.sh`. This is **arithmetic, not law** — no assertion's meaning
+changes, no invariant is weakened, and the exact-count design that card chose is preserved. Minimal fence
+extension, recorded here and disclosed in the PR.
+
+**Follow-up noted (not fixed here):** an exact-count eval assertion is a tripwire that fires on every future
+card. A `>=` bound, or an assertion on the *presence of specific eval ids*, would guard the same invariant
+without breaking every neighbour. Bundle with the campaign's other follow-ups.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
