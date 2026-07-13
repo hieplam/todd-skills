@@ -23,9 +23,13 @@ hasnt() { # hasnt NAME REGEX — step 6 must NOT match
 }
 
 # --- Task 1: the three confidence classes -----------------------------------
-has 'class token: agreed'       '`?agreed`?'
-has 'class token: single'       '`?single`?'
-has 'class token: conflicting'  '`?conflicting`?'
+# Each regex binds to the class-table row itself (its own token cell PLUS a
+# phrase unique to that row's definition), not to a bare token that may occur
+# incidentally anywhere else in step 6 — see D14 (per-clause mutation is the
+# acceptance bar).
+has 'class token: agreed'       '^\| `agreed` \|.*same claim direction'
+has 'class token: single'       '^\| `single` \|.*said nothing about it'
+has 'class token: conflicting'  '^\| `conflicting` \|.*mutually unsatisfiable'
 has 'classes are computed at merge, before the fixer is dispatched' \
     'before any fixer is dispatched|at merge time'
 has 'Rule A: silence is not dissent' \
