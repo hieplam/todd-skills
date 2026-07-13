@@ -691,6 +691,32 @@ standard D17 was ratified (D17/NEEDS_DIRECTION #3) to abolish, and would restart
 card ships has now settled all three lens conflicts in this campaign — every one by citation, never by taste,
 and never by spending a tie-break round.
 
+## W19 — the last two truths (final fix; both additive, no new Shaman ruling required)
+
+**F36 (Critical, contract lens).** Idea-05's **pre-existing** sentence in step 6 still says the finding key
+*"is what makes the loop termination below **mechanical instead of a judgment call**."* W16 retired exactly
+that claim for exactly that recognition act (*"the Warchief's JUDGMENT, never a grep or string-compare"*). The
+document now says both. The shipped `hasnt 'greppable'` guard is a literal-string check and does not catch the
+same overclaim worded as *"mechanical"*.
+
+**Ruling — fix it ADDITIVELY, which needs no new authorization.** D16 spent this campaign's one *non-additive*
+edit; this one does not need it. Add a short supersession clause **immediately after** idea-05's sentence,
+deleting and rewording nothing: **what the key makes mechanical is the RECORDING; the RECOGNITION of the same
+finding across rounds is a Warchief judgment (see the tie-break bounds above).** Then broaden the guard so it
+catches this claim class by *meaning*, not by the single word "greppable".
+
+**F37 (Important, cold lens).** My own Bounds paragraph says a key-recognition error's *"cost is bounded too —
+at most one extra review round."* That is true for **one** of the two error directions. The other — wrongly
+treating an **unspent** key as spent — **burns a human ruling at rung 3 and denies a genuinely new finding the
+mechanical oracle**, which the on-doubt paragraph itself says thirteen lines later. The blanket claim
+understates it.
+
+**Ruling:** scope the bound to the direction it actually covers, and name the other direction's cost in the
+same breath. The on-doubt default already leans away from the expensive error — say *why* there, not just
+*what*.
+
+**This is the campaign's final fix.** If the next pair returns a Critical, escalate — do not grind.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
