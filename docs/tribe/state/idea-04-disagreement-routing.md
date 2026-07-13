@@ -459,7 +459,27 @@ The idempotence sentence in the ledger prose ("a resumed Warchief re-runs the ro
 classes") stays true and is not in conflict: **classes** are re-derivable from the diff; **how many tie-breaks
 a key has already spent** is not — that is history, and history must be written down.
 
-## OPEN — 4th NEEDS_DIRECTION (task 4, round 4). Branch green @ 5ec8a0c; tasks 1-3 CLOSED; task 5 not started.
+## D18 (2026-07-13 · Shaman ruling — RESOLVES F22 below)
+
+**Option (a) RATIFIED.** The **authoritative** crash-safe record of *"this finding key has spent its
+tie-break"* lives in the card's **STATE FILE** (`docs/tribe/state/CARD-SLUG.md`) — git-committed, and already
+the tribe's one sanctioned resume artifact. The report-file ledger keeps its `TIEBREAK` row as the
+**human-readable audit trail, explicitly non-authoritative**.
+
+**This overrides spec §2.4's "No state-file change is needed"** — on the Shaman's authority and on the
+record: that sentence was written before anyone noticed the shipped resume doctrine defines uncommitted state
+as *never having happened* and forbids re-deriving progress from the report file. **Spec §2.3's actual
+requirement — the cap survives a crash — is PRESERVED, and better served** than by §2.4's own mechanism,
+which the traced failure shows granting rung-3 escalations for retries that never happened.
+
+(b) rejected: narrowing another card's shipped doctrine widens the blast radius outside the fence for no gain
+(a) doesn't already deliver. (c) rejected: silently discarding a spec requirement is never on the menu.
+
+**The one binding requirement from the Shaman:** the state-file line must be **written and committed BEFORE
+the tie-break Skinner is dispatched** — the same commit-before-act discipline as D12a, for the same reason.
+Implementation detail is the Warchief's How.
+
+## RESOLVED by D18 — the escalation that prompted it (task 4, round 4)
 
 **F22 (Critical, cold-only, Confirmed).** The cold lens read the WHOLE file — not just step 6 — and found that
 **W12's crash-safe tie-break cap is built on the one artifact the file forbids using for resume truth.**
