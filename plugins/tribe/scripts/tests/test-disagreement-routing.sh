@@ -841,17 +841,57 @@ has 'a TIEBREAK row stranded by a crash is re-consulted by the final audit and i
     "$STEP6" \
     'a `TIEBREAK` row stranded by an earlier crash is always re-consulted.{0,45}its key.s spent status honored before anything can merge'
 
-# The honest-degradation clause: the worst a crash can do is waste one repeated tie-break round --
-# never a wrong merge. Two independent, self-contained assertions (no shared bridge between them),
-# each anchored on phrasing unique to this new sentence, so they mutate independently. Actual gap
-# (first) 1 char; `.{0,35}` keeps 34 chars of D17 headroom. Second is a bare literal (D17
-# convention: a true zero-gap phrase stays a bare literal rather than manufacturing a bridge that
-# has nothing to span).
-has 'the honest cost of a crash mid-tie-break is one repeated tie-break round' "$STEP6" \
-    'The honest cost of a crash mid-tie-break is at most.{0,35}one repeated tie-break round'
+# --- Task 4, 6th fix round (D19/F24): the degradation clause must state the TRUE cost ----------
+# F24 (cold-only, Important, Confirmed): the old degradation sentence claimed the worst a crash can
+# do is "one repeated tie-break round" -- but the pre-dispatch write above (rung 2) SPENDS the key
+# BEFORE C is dispatched, and the absolute rule a few lines above this clause says a spent key
+# "never dispatches a second tie-break Skinner on that key". Reproduced by tracing the crash window:
+# Warchief commits the spend record -> dispatches C -> dies before C's outcome is appended. Any
+# Warchief that later enters an audit round (including the mandatory final whole-branch audit)
+# finds the key already listed as spent and, per the absolute rule, goes straight to rung 3 --
+# NO second C is ever dispatched on that key. So the mechanical-oracle resolution for that finding
+# is lost permanently, not merely "repeated": the two sentences cannot both be true, and the vague
+# "repeated tie-break round" phrasing reads as licence to redispatch C, directly contradicting the
+# absolute rule two sentences above it. D19 (Shaman ruling) ratifies the precise cost: a crash in
+# that window means the key is spent and the mechanical oracle never ran, so the finding is forced
+# to rung 3 (a human ruling) on the next audit round that touches it, with no second tie-break
+# Skinner ever dispatched on that key -- and the ONLY safety property that survives is that this is
+# a needless escalation, never a wrong merge. Every bridge below is measured against this new
+# text's OWN actual consumption (measured by direct extraction of the shipped clause) and widened to
+# keep >=30 chars of D17 headroom.
 
-has 'a crash mid-tie-break wastes a REVIEW round but never causes a wrong merge' "$STEP6" \
-    'a wasted REVIEW round, never a wrong merge'
+# Regression guard: the old, false "repeated tie-break round" cost claim must never come back --
+# it is exactly the phrasing F24 proved contradicts the absolute rule above it.
+hasnt 'the old, false one-repeated-tie-break-round cost claim does not survive' "$STEP6" \
+    'one repeated tie-break round'
+
+# Part 1: WHAT actually happens in the crash window -- the key is spent and the mechanical oracle
+# never ran. Actual gap ("outcome lands" -> "the key is spent") is 7 chars; `.{0,40}` keeps 33
+# chars of D17 headroom.
+has 'a crash after the spend-commit but before Cs outcome lands means the key is spent and the oracle never ran' \
+    "$STEP6" \
+    'crash landing after the spend-commit but before C.s outcome lands.{0,40}the key is spent and the mechanical oracle never ran'
+
+# Part 2: the CONSEQUENCE -- forced to rung 3 (a human ruling) on the next audit round that touches
+# it. Three conjuncts (W5 bar #3), each anchored on phrasing unique to this clause. Actual gaps 1,
+# 3, 3 chars; `.{0,35}` keeps >=32 chars of D17 headroom on each.
+has 'the finding is forced to rung 3, a human ruling, on the next audit round that touches it' \
+    "$STEP6" \
+    'forced to.{0,35}rung 3.{0,35}a human ruling.{0,35}on the next audit round that touches it'
+
+# Part 3: the consequence is CONSISTENT with the absolute rule above, never in tension with it --
+# no second tie-break Skinner is ever dispatched on that key. Three conjuncts, each bridged
+# separately rather than gluing "the absolute rule" and "above" into one zero-tolerance literal
+# (D17 mutation class (iii)): actual gaps 3, 1, 2 chars; `.{0,35}` keeps >=32 chars of D17 headroom
+# on each.
+has 'no second tie-break Skinner is dispatched on that key, consistent with the absolute rule, not in tension' \
+    "$STEP6" \
+    'no second tie-break Skinner is ever dispatched on that key.{0,35}consistent with the absolute rule.{0,35}above.{0,35}not in tension with it'
+
+# Part 4: the ONLY safety property that survives, stated no more strongly than true -- a needless
+# escalation, never a wrong merge. Literal, zero-gap phrase (D17 convention).
+has 'the surviving safety property is a needless escalation, never a wrong merge' "$STEP6" \
+    'needless escalation, never a wrong merge'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

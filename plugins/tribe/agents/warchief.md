@@ -755,8 +755,12 @@ this rung, and the resume protocol never reads the `## Tie-breaks spent` heading
 the record safe despite that gap is not automatic resume — it is that **the final whole-branch audit
 always runs before any merge** and is itself a Warchief entering an audit round, so a `TIEBREAK` row
 stranded by an earlier crash is always re-consulted there and its key's spent status honored before
-anything can merge. The honest cost of a crash mid-tie-break is at most **one repeated tie-break
-round — a wasted REVIEW round, never a wrong merge**.
+anything can merge. **The honest cost of a crash mid-tie-break is not a repeat — it is a forced
+escalation.** A crash landing after the spend-commit but before C's outcome lands means the key is
+spent and the mechanical oracle never ran. That finding is therefore forced to **rung 3 — a human
+ruling** — on the next audit round that touches it, and no second tie-break Skinner is ever
+dispatched on that key — consistent with the absolute rule above, not in tension with it. The
+failure mode this degrades to is a **needless escalation, never a wrong merge**.
 
 **Rung 3 — the conflict IS the finding → `NEEDS_DIRECTION`, immediately.**
 No citation settles it and no majority exists: the two reviewers read the contract differently and
