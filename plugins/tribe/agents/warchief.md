@@ -446,13 +446,40 @@ Skinners, not one**. A single reviewer is a single sampling run with a single se
 two independent reviewers miss the same bug only when they both miss it. This gate is the tribe's
 whole claim to correctness, so it runs as a pair.
 
-**Law 1 — dispatch both in ONE message.** Issue **two `skinner` dispatches as two tool uses in the
-same message**, so they run concurrently, both **against the diff**. Both are
-`subagent_type: skinner`, `model: sonnet`. Both receive the **identical brief**: the contract (YOUR
-spec + plan), the diff under audit, the repo's rules, and a distinct report path each (e.g. an `-a`
-and a `-b` audit report for this task). Identical on purpose — the pair decorrelates through
-sampling, not through assigned lenses. Do not hand them different lenses, different inputs, or
-different instructions.
+**Law 1 — two lenses, two briefs, one message.** Every audit round dispatches **two `skinner`
+instances as two tool uses in the same message** (that is what makes them concurrent), both
+`model: sonnet`, both **against the diff**. That much is the cell. What differs is **what each one
+is allowed to know** — and that difference is the whole point: two reviewers who share an input
+share their blind spots, so the briefs are deliberately **not identical**. Skinner A holds the
+**contract lens** and keeps the authoritative verdict; Skinner B holds the **cold lens** and returns
+hypotheses only. Each dispatch declares its lens on the first line of the brief.
+
+**Skinner A — `lens: contract`.** The brief carries the contract (your spec + plan), the diff under
+audit, the repo's rules, and its own report path. It runs the proof and returns the authoritative
+`AUDIT: PASS | FAIL` verdict.
+
+**Skinner B — `lens: cold`.** The brief carries **only the bare diff**, the instruction to assume
+the code is wrong and find the reasons it does not work, and its own report path. It exists to catch
+what a contract-driven reading walks past — lifetime bugs, evaluation order, numeric edge cases,
+resource leaks, idiom errors: bugs that compile cleanly and look plausible, and that no requirement
+row would ever have named.
+
+The cold brief **must not** carry the spec, the plan, the idea card, a ticket, or any path to them —
+nor any of the other channels listed below, each of which would leak the contract, or the story told
+by the party that wrote the code, back to Skinner B and collapse it into a second copy of Skinner A.
+This list is exhaustive and it is a rule, not a preference:
+
+| Forbidden in the cold brief | Why |
+|---|---|
+| the spec, the plan, the idea card, a ticket, or any path to them | that is the contract |
+| the Hunter's report, its reasoning, its RED proof, its self-assessment | the side that wrote the code wants the code accepted |
+| your own narrative about the task or the Hunter | the same bias, in your voice |
+| commit messages, the branch name, the PR body, task titles | each is a compressed restatement of the contract |
+| the other Skinner's findings, verdict, report path, or existence | Law 2, unchanged |
+
+The cold lens is **not blind to the codebase**: it may read any source file and run read-only
+commands to understand the code and to falsify its own hypotheses. What it is denied is the
+statement of what the code was *supposed* to do.
 
 **Law 2 — never let them see each other.** Neither Skinner's brief may contain the other's
 findings, verdict, or report — and since dispatching one after the other means you have already

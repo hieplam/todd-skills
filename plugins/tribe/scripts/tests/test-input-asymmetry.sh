@@ -77,5 +77,20 @@ has "cold: self-refutation still applies in cold mode"       "$LENS" 'self-refut
 # so the two passages cannot contradict each other.
 has "cold: Method step 1 carves out the cold lens"           "$SKINNER_ALL" 'contract lens only|in .?lens: cold.? this whole step is suspended'
 
+# --- Task 2 — warchief.md step 6, Delta-Law 1: two lenses, two briefs ----------------------
+STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF" | flat)"
+[[ -n "$STEP6" ]] || { printf 'not ok - could not extract step 6 from warchief.md\n'; exit 1; }
+
+has   "law1: the two lenses are named"                        "$STEP6" 'contract lens.{0,200}cold lens|cold lens.{0,200}contract lens'
+has   "law1: each dispatch declares its lens"                 "$STEP6" 'lens: contract|lens: cold'
+has   "law1: the briefs are NOT identical"                    "$STEP6" 'not identical|differ|asymmetr'
+hasnt "law1: the identical-brief clause is gone"              "$STEP6" 'identical brief'
+has   "law1: still one message, still concurrent"             "$STEP6" 'same message'
+has   "law1: cold brief carries the bare diff only"           "$STEP6" 'only the bare diff|bare diff'
+has   "law1: cold brief must not carry the spec/plan"         "$STEP6" '(must not|never).{0,200}(spec|plan|contract)'
+has   "law1: cold brief must not carry the Hunter report"     "$STEP6" "hunter's report|hunter report"
+has   "law1: cold brief must not carry commit/branch/PR text" "$STEP6" 'commit message|branch name|PR body'
+has   "law1: the cold lens may still read the codebase"       "$STEP6" 'not blind to the codebase|may read'
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

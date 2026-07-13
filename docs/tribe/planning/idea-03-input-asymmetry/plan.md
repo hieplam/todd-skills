@@ -308,7 +308,7 @@ git commit -m 'feat(tribe): cold-lens mode for the Skinner' \
 Idea 01's step 6 dispatches two Skinners on an **identical brief**. Replace that clause with the
 two-lens brief specification, including the cold brief's exhaustive forbidden-contents list.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `plugins/tribe/scripts/tests/test-input-asymmetry.sh`, immediately before the final
 `printf '\n%d passed, %d failed\n'` line:
@@ -349,7 +349,7 @@ Expected (RED): `Task 2 assertions appended`, then the 12 Task-1 assertions stil
 the 10 new Law-1 assertions print `not ok -` (step 6 still carries idea 01's identical-brief
 clause); tally `12 passed, 10 failed`, exit non-zero.
 
-- [ ] **Step 2: Make it green — rewrite the brief clause in `warchief.md` step 6**
+- [x] **Step 2: Make it green — rewrite the brief clause in `warchief.md` step 6**
 
 In `plugins/tribe/agents/warchief.md`, find the clause idea 01 labelled **"Law 1"** in step 6 (its
 spec guarantees each law is a separately-labelled, self-contained clause) and replace **only that
@@ -392,7 +392,7 @@ commands to understand the code and to falsify its own hypotheses. What it is de
 statement of what the code was *supposed* to do.
 ```
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-input-asymmetry.sh && \
@@ -406,7 +406,7 @@ its identical-brief assertion is now superseded and Task 3 updates it. It is exp
 exactly that one assertion between Task 2 and Task 3, and it must be green again at the end of
 Task 3.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-input-asymmetry.sh \
