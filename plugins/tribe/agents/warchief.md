@@ -698,6 +698,11 @@ If *running something* could answer the dispute (does this leak? is it off by on
 evaluation order fire early?), the dispute has a mechanical oracle. Dispatch **one third Skinner**
 and take the **majority direction** across the three independent samples.
 
+**Before dispatching C, WRITE the finding's ledger row with `routed: TIEBREAK`.** That write is what
+SPENDS the key's one tie-break, and it lands before C is dispatched exactly so a crash mid-tie-break
+cannot lose the fact — the per-key cap survives a crash precisely because the count lives in a file
+rather than in the dead Warchief's head (spec §2.3).
+
 > **The tie-break Skinner C is dispatched COLD — Skinner B's cold-lens brief above: the bare diff only,
 > and never the contract.** Rung 2 is reached only when rung 1 found no citation, so the
 > disputed question is, by construction, not a conformance question but a pure correctness
@@ -711,6 +716,10 @@ and take the **majority direction** across the three independent samples.
 > and would breach the reviewers' isolation invariant. The obvious reading of "run one more review
 > round" is the forbidden one — do not take it.
 
+**When C returns, APPEND the outcome as a new row** (the ledger is append-only — see "Recording it"
+below): `TO_FIXER` if C sided with the finding, `DROPPED (tie-break, round N)` if C sided against it,
+or a rung-3 escalation if there is no majority.
+
 - C flags the location in **A's direction only** → majority (2 of 3): A's finding proceeds to the
   fixer as `agreed`; B's is dropped, ledger `DROPPED (tie-break, round N)`.
 - C flags it in **B's direction only** → symmetric.
@@ -720,7 +729,9 @@ and take the **majority direction** across the three independent samples.
 
 **Bounds — this rung can never grind.** At most **ONE tie-break round per finding key, per
 campaign** (the key is the finding's identity, not the round): a conflict resurfacing on the same key
-has already spent its tie-break and goes **straight to rung 3**. And a **tie-break is a REVIEW round:
+has already spent its tie-break and goes **straight to rung 3**. **A resumed Warchief that finds a
+`TIEBREAK` row for a finding key treats that key's tie-break as SPENT** — it goes straight to rung 3
+and never dispatches a second tie-break Skinner on that key. And a **tie-break is a REVIEW round:
 it does not consume a fix round** — no code changes, no fixer is dispatched, and the 3-round fix cap
 counts *fix* rounds only. Otherwise one conflict would eat a third of the branch's entire fix budget
 without a single line being fixed.
@@ -789,7 +800,9 @@ The ledger lives in your **report file** (on disk, append-only), which is what l
 Warchief resuming this card see **which finding keys have already spent their one tie-break round**.
 No state-file change is needed: `docs/tribe/state/` tracks crash-resume milestones, and an audit
 round is idempotent — the diff is unchanged, so a resumed Warchief re-runs the round and re-derives
-the same classes from the same inputs.
+the same classes from the same inputs. **Classes are re-derivable this way; how many tie-breaks a
+key has already spent is not — that is history, and history must be written down**, which is exactly
+what the `TIEBREAK` row above is for.
 
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a

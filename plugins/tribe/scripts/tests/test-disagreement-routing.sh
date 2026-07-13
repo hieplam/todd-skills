@@ -603,5 +603,70 @@ has 'ESCALATED inconclusive artifact spec-ambiguity-exclusion is because only th
     "$STEP6" \
     'only the artifact is inconclusive.{0,40}not the text the two reviewers read'
 
+# --- Task 4, 3rd fix round (W12/F21): TIEBREAK needs a write-time AND a row-anchored guard -----
+# F21a (cold lens): rung 2 read as synchronous (dispatch C -> apply majority -> record the FINAL
+# outcome), so the in-flight `TIEBREAK` state was never persisted -- a legal value no rule ever
+# writes. F21b (contract lens): `TIEBREAK`'s membership in the enum row had NO row-anchored
+# assertion (unlike its 8 siblings above) -- deleting ` / `TIEBREAK`` from the row left the whole
+# suite green. W12 fixes both: a write-BEFORE-dispatch rule (spends the key's one tie-break so a
+# crash can't lose it), an append-on-return rule, a resumed-Warchief-treats-it-as-spent rule, and
+# the row anchor itself.
+
+# F21b: the row-anchored guard `TIEBREAK` itself never had, in the exact structural shape as its
+# 8 siblings above (`` `routed`[^|]*\|[^|]*VALUE `` bounded by the row's own pipes -- immune to
+# text-length changes by construction, no D17 headroom needed). Proven to bite: deleting only
+# ` / `TIEBREAK`` from the enum row reddens this assertion and none other (see task's repro).
+has 'routed value TIEBREAK is row-anchored in the enum, like its siblings' "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*`TIEBREAK`'
+
+# F21a, part 1: the write-time rule itself. This is a single short imperative clause with no
+# internal bridge needed (same D17 convention already used for "TIEBREAK names a transient
+# state..." above: a true zero-gap phrase is left as a bare literal rather than manufacturing a
+# bridge that has nothing to span).
+has 'before dispatching C, the Warchief WRITEs the ledger row with routed TIEBREAK' "$STEP6" \
+    "Before dispatching C, WRITE the finding.s ledger row with \`routed: TIEBREAK\`"
+
+# F21a, part 2: WHY that write happens before dispatch -- it is what SPENDS the key's one
+# tie-break, and the timing (before, not after) is what survives a crash. Three conjuncts
+# (W5 bar #3), each anchored on phrasing unique to this clause. Actual gaps are 9 and 12 chars;
+# `.{0,40}`/`.{0,45}` keep >=28-31 chars of D17 headroom.
+has 'the write spends the keys one tie-break' "$STEP6" \
+    'SPENDS the key.s one tie-break'
+
+has 'the write lands before C is dispatched so a crash mid-tie-break cannot lose the fact' \
+    "$STEP6" \
+    'SPENDS the key.s one tie-break.{0,40}lands before C is dispatched.{0,45}a crash mid-tie-break cannot lose the fact'
+
+# F21a, part 3: the append-on-return rule -- when C returns, the outcome is a NEW appended row,
+# not an overwrite, and the three onward outcomes are named (same three as the pre-existing
+# "TIEBREAK resolves onward to..." assertion above, restated here at the write/append-rule's own
+# location so a later editor cannot silently drop this rule while leaving the outcome definition).
+# Actual gaps: 58, 2, 3, 2, 5 chars; bridges widened to keep >=30 chars of D17 headroom each.
+has 'when C returns, the outcome is APPENDED as a new row' "$STEP6" \
+    'When C returns, APPEND the outcome as a new row'
+
+has 'the appended outcome names all three onward values: TO_FIXER, DROPPED tie-break round N, or a rung-3 escalation' \
+    "$STEP6" \
+    'APPEND the outcome as a new row.{0,90}`TO_FIXER`.{0,40}if C sided with the finding.{0,40}`DROPPED \(tie-break, round N\)`.{0,40}if C sided against it.{0,40}a rung-3 escalation if there is no majority'
+
+# F21a, part 4: the resumed-Warchief-treats-it-as-spent rule -- a `TIEBREAK` row found on resume
+# means the key's one tie-break is already gone; it never dispatches a second one. Actual gaps:
+# 2, 2, 3, 5 chars; `.{0,40}` throughout keeps >=35 chars of D17 headroom on every bridge.
+has 'a resumed Warchief that finds a TIEBREAK row treats that keys tie-break as spent' "$STEP6" \
+    'A resumed Warchief that finds a.{0,40}`TIEBREAK`.{0,40}row for a finding key treats that key.s tie-break as SPENT'
+
+has 'a spent tie-break sends a resumed Warchief straight to rung 3, never a second tie-break Skinner' \
+    "$STEP6" \
+    'tie-break as SPENT.{0,40}it goes straight to rung 3.{0,40}never dispatches a second tie-break Skinner on that key'
+
+# F21a, part 5 (W12's reconciliation clause): the idempotence sentence now says out loud that
+# classes are re-derivable from the diff but a key's spent tie-break count is NOT -- it is history
+# that must be written down. The pre-existing idempotence sentence itself is untouched (D15/W1
+# additive-only fence); this is a new, separate clause appended after it. Actual gaps: 2, 3 chars;
+# `.{0,40}` keeps >=36 chars of D17 headroom on each.
+has 'classes are re-derivable from the diff, but spent tie-break history is not and must be written down' \
+    "$STEP6" \
+    'Classes are re-derivable this way.{0,40}how many tie-breaks a key has already spent is not.{0,40}that is history, and history must be written down'
+
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
