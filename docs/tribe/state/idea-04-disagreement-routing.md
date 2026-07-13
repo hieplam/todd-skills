@@ -565,6 +565,24 @@ disambiguation prose to name all **four** triggers.
 
 **This is the LAST fix round for task 4.** If the next pair still returns a Critical, escalate — do not grind.
 
+## D20 (2026-07-14 · Shaman ruling — W14 RATIFIED; ends the escalation-enum whack-a-mole)
+
+**`ESCALATED (<trigger>)` goes PARAMETRIC.** Two audit rounds each surfaced one more homeless escalation
+trigger (W11's *inconclusive artifact*, W13's *oracle unavailable*, now *tie-break spent*) — that is the design
+talking, and a fifth fixed enum value would only buy a sixth.
+
+1. The `routed` escalation value is **`ESCALATED (<trigger>)`**, parametric — not a closed list.
+2. **The recorded trigger must be the ACTUAL cause. Never substitute a near-miss** (the "conflating them
+   misstates the record" rule, generalized).
+3. The **currently known** triggers are named and the list is **explicitly OPEN**: *spec ambiguity*,
+   *standoff*, *inconclusive artifact*, *oracle unavailable*, ***tie-break spent*** (the non-crash case: a
+   conflict resurfaces on a key whose one tie-break is already spent). **Every new escalation rule must name
+   its own trigger.**
+4. **The suite guards the RULE mechanically, not the list** — so no new assertion is needed per value.
+
+Plus, same round: the 4 zero-bridge regexes go to **D17's bar** (a bridge at the `because`/`means` joint,
+≥30 chars headroom), per the convention already used a few lines above them in the same file.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
