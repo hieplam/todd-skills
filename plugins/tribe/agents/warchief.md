@@ -751,16 +751,32 @@ of the branch's entire fix budget without a single line being fixed.
 `resume-check.sh` is out of this card's fence (spec §3) and has no notion of a mid-flight audit
 round — its `next_action` comes only from commit trailers and plan checkboxes, so a Warchief that
 dies mid-tie-break resumes straight to `CONTINUE task N+1` (or `RESUME_DELIVERY`), never back into
-this rung, and the resume protocol never reads the `## Tie-breaks spent` heading for you. What keeps
-the record safe despite that gap is not automatic resume — it is that **the final whole-branch audit
-always runs before any merge** and is itself a Warchief entering an audit round, so a `TIEBREAK` row
-stranded by an earlier crash is always re-consulted there and its key's spent status honored before
-anything can merge. **The honest cost of a crash mid-tie-break is not a repeat — it is a forced
-escalation.** A crash landing after the spend-commit but before C's outcome lands means the key is
-spent and the mechanical oracle never ran. That finding is therefore forced to **rung 3 — a human
-ruling** — on the next audit round that touches it, and no second tie-break Skinner is ever
-dispatched on that key — consistent with the absolute rule above, not in tension with it. The
-failure mode this degrades to is a **needless escalation, never a wrong merge**.
+this rung, and the resume protocol never reads the `## Tie-breaks spent` heading for you.
+
+**In the ordinary, no-crash case — and only there —** what keeps the record safe despite that gap
+is that **the final whole-branch audit always runs before any merge** and is itself a Warchief
+entering an audit round, so a `TIEBREAK` row stranded by an earlier crash is always re-consulted
+there and its key's spent status honored before anything can merge.
+
+**After a crash, that backstop is not there.** Once every Hunter task is committed,
+`resume-check.sh`'s `next_action()` returns `RESUME_DELIVERY` (or, with a dirty tree,
+`DISCARD_AND_RESUME_DELIVERY`). The resume protocol above defines BOTH as re-entering step 7 (push /
+PR / CI / merge). **There is no branch that re-enters step 6.** So a Warchief that dies DURING the
+final whole-branch audit itself resumes straight into delivery and can open and merge the PR without
+that audit ever finishing — a crash mid-audit can therefore produce an unaudited merge. The cause is
+that `resume-check.sh` has no notion of a mid-audit state, the same pre-existing gap named above, now
+shown to reach the final audit too — a **known, filed follow-up: pre-existing and cross-cutting, not
+created by this card.**
+
+**The "never a wrong merge" safety claim is RETIRED** — the crash-during-final-audit trace disproves
+it. What survives is narrower, and true: **absent a crash, this routing law is sound** — every
+stranded `TIEBREAK` is resolved by the final whole-branch audit before merge, exactly as above.
+**Under a crash, it is the tribe's resume machinery — never this routing law — that fails.** The
+honest cost of a crash mid-tie-break, absent a further crash during the final audit, is not a repeat
+— it is a forced escalation: a crash landing after the spend-commit but before C's outcome lands
+means the key is spent and the mechanical oracle never ran, so that finding is forced to **rung 3 —
+a human ruling** — on the next audit round that touches it, and no second tie-break Skinner is ever
+dispatched on that key — consistent with the absolute rule above, not in tension with it.
 
 **Rung 3 — the conflict IS the finding → `NEEDS_DIRECTION`, immediately.**
 No citation settles it and no majority exists: the two reviewers read the contract differently and
@@ -783,14 +799,14 @@ facts about the same finding at two stages of its life, so they belong in one ta
 | Column | Filled by | Values |
 | --- | --- | --- |
 | `class` | you, per round | `agreed` / `single` / `conflicting` |
-| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` / `ESCALATED (standoff)` / `ESCALATED (inconclusive artifact)` |
+| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` / `ESCALATED (standoff)` / `ESCALATED (inconclusive artifact)` / `ESCALATED (oracle unavailable)` |
 
 **`TIEBREAK` names a transient state, not a dead end** — it marks a finding whose rung-2 tie-break is
 in flight, and it always resolves onward to one of three places: `TO_FIXER` (C sided with the
 finding), `DROPPED (tie-break, round N)` (C sided against it), or a rung-3 escalation (no majority).
 A listed value with no resolution would be a trap; this one always moves on.
 
-**The three `ESCALATED` values name three different failures, and conflating any of them would
+**The four `ESCALATED` values name four different failures, and conflating any of them would
 misstate the record.** `ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the
 dispute and no majority exists, so the contract itself is underdetermined. `ESCALATED (standoff)` is
 the ledger-adjudication rule's outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding
@@ -803,6 +819,12 @@ does not let it tell either way, so the finding goes to `NEEDS_DIRECTION` with n
 immediate-adjudication path (D16's design resolves the finding before the next re-audit, so there is
 nothing to re-raise), and never `ESCALATED (spec ambiguity)`, because the contract itself is not in
 question here — only the artifact is inconclusive, not the text the two reviewers read.
+`ESCALATED (oracle unavailable)` is a crash-forced rung-3 trip: the pre-dispatch write already spent
+the finding key's one tie-break, but a crash after that write and before C's outcome landed means the
+mechanical oracle never ran and its result never landed either — never `ESCALATED (spec ambiguity)`,
+because no contract is ambiguous here, only unrun; never `ESCALATED (standoff)`, because no Skinner
+was ever re-dispatched to re-raise anything; and never `ESCALATED (inconclusive artifact)`, because
+no adjudication of a falsification artifact ever ran on this finding at all.
 
 `DROPPED (falsified)` and `DROPPED (falsified, round N)` are the two falsification outcomes defined
 elsewhere in this section: an `agreed` finding's `NOT_REPRODUCED` adjudicated UPHELD drops

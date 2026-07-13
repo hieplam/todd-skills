@@ -554,17 +554,22 @@ has 'routed value ESCALATED inconclusive artifact (D16 adjudication cannot tell 
     "$STEP6" \
     '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(inconclusive artifact\)'
 
-# The header sentence must now say THREE, not two — a later editor silently leaving "two" while a
-# third value sits in the enum is exactly the mislabelling this rule exists to prevent. Actual gap
-# between "failures" and "conflating" is 6 chars (", and "); `.{0,40}` keeps 34 chars of D17
-# headroom.
-has 'the disambiguation header now names three ESCALATED values, not two' "$STEP6" \
-    'The three `ESCALATED` values name three different failures.{0,40}conflating any of them would misstate the record'
+# The header sentence must now say FOUR, not three (W13/F26 adds a fourth trigger) — a later editor
+# silently leaving "three" while a fourth value sits in the enum is exactly the mislabelling this
+# rule exists to prevent. Actual gap between "failures" and "conflating" is 6 chars (", and ");
+# `.{0,40}` keeps 34 chars of D17 headroom.
+has 'the disambiguation header now names four ESCALATED values, not three' "$STEP6" \
+    'The four `ESCALATED` values name four different failures.{0,40}conflating any of them would misstate the record'
 
 # Regression guard: the old two-value header wording must not survive verbatim (it would mean the
 # third value was added to the enum/table but the prose above it was never updated to match).
 hasnt 'the header no longer claims only two ESCALATED values exist' "$STEP6" \
     'The two `ESCALATED` values name two different failures'
+
+# Regression guard (W13/F26): the immediately-prior three-value header wording must not survive
+# either, now that a fourth trigger (`ESCALATED (oracle unavailable)`) exists in the enum.
+hasnt 'the header no longer claims only three ESCALATED values exist' "$STEP6" \
+    'The three `ESCALATED` values name three different failures'
 
 # The new value's own definition: it is D16's own agreed-adjudication outcome, triggered when the
 # artifact does not let the Warchief tell either way, and it consumes no fixer round (same
@@ -888,10 +893,144 @@ has 'no second tie-break Skinner is dispatched on that key, consistent with the 
     "$STEP6" \
     'no second tie-break Skinner is ever dispatched on that key.{0,35}consistent with the absolute rule.{0,35}above.{0,35}not in tension with it'
 
-# Part 4: the ONLY safety property that survives, stated no more strongly than true -- a needless
-# escalation, never a wrong merge. Literal, zero-gap phrase (D17 convention).
-has 'the surviving safety property is a needless escalation, never a wrong merge' "$STEP6" \
-    'needless escalation, never a wrong merge'
+# Part 4 (RETIRED by W13/F25): the "needless escalation, never a wrong merge" claim was false and
+# is retired below -- a crash DURING the final whole-branch audit itself has no branch back into any
+# audit round (resume-check.sh's next_action() returns RESUME_DELIVERY / DISCARD_AND_RESUME_DELIVERY
+# once every task is committed, and warchief.md's own resume protocol defines both as "re-enter step
+# 7"), so a crash there can produce an unaudited merge. See the "Task 4, LAST fix round (W13/F25 &
+# F26)" block below for the honest replacement text and its assertions.
+hasnt 'the retired needless-escalation-never-a-wrong-merge claim (F25) does not survive unqualified' \
+    "$STEP6" 'needless escalation, never a wrong merge'
+
+# --- Task 4, LAST fix round (W13/F25 & F26): say the whole truth about the crash-during-audit -----
+# hazard, and give the crash-forced rung-3 trip its own `routed` value ----------------------------
+#
+# F25 (cold-only, Critical, Confirmed): the previous text claimed the final whole-branch audit is a
+# backstop that resolves a stranded `TIEBREAK` "before any merge", full stop -- but reproduction
+# shows that is false once a crash lands DURING that very audit. `resume-check.sh`'s `next_action()`
+# has exactly two branches once every Hunter task is committed: `DISCARD_AND_RESUME_DELIVERY` (tree
+# dirty) or `RESUME_DELIVERY` (tree clean) -- see resume-check.sh lines 198-211 (`next_action`):
+# both are reached only via `card["total_tasks"] and card["last_completed_task"] >= ...`, and
+# warchief.md's own "Crash-safe state & resume" section (~500 lines above step 6) defines BOTH as
+# "re-enter step 7" verbatim ("re-enter step 7 -- never redo a committed task" /
+# "re-enter step 7 (push / PR / CI watch)"). There is NO branch anywhere in `next_action()` that
+# re-enters step 6, rung 2, or the final whole-branch audit. So a Warchief that dies mid-final-audit
+# resumes straight into delivery and can open/merge the PR with that audit never finished -- exactly
+# the "wrong merge" the retired claim said could never happen. W13 (Shaman ruling) orders the law to
+# say the WHOLE truth: the backstop holds in the ordinary, no-crash case only; under a crash there is
+# NO backstop at all (a pre-existing, cross-cutting, already-filed gap, not created by this card);
+# and the "never a wrong merge" claim is RETIRED, replaced by the narrower true claim that survives.
+#
+# F26 (cold-only, Important, Confirmed): a crash-forced rung-3 trip (tie-break spent, oracle never
+# ran) has no distinct `routed` value -- filing it under `ESCALATED (spec ambiguity)` would misstate
+# the record (no contract is ambiguous; the oracle simply never ran), which the file's own
+# conflation-is-forbidden rule already outlaws. W13 adds `ESCALATED (oracle unavailable)` and extends
+# the disambiguation prose to name all FOUR triggers distinctly (the header update above is part of
+# this same fix).
+#
+# Every bridge below is measured against this new text's OWN actual consumption (measured by direct
+# extraction of the shipped, flattened clause) and widened to keep >=30 chars of D17 headroom on
+# every one; a true zero/near-zero gap is left as a bare (or near-bare) literal per this file's own
+# established convention rather than manufacturing a bridge that has nothing real to span.
+
+# F25, part 1: the backstop is now scoped explicitly to the ordinary, no-crash case -- and ONLY
+# there. Actual gaps 3 and 3 chars; `.{0,35}` keeps 32 chars of D17 headroom on each.
+has 'the final-audit backstop is now scoped explicitly to the ordinary, no-crash case, and only there' \
+    "$STEP6" \
+    'In the ordinary, no-crash case.{0,35}and only there.{0,35}what keeps the record safe despite that gap'
+
+# F25, part 2: the hazard, stated plainly -- after a crash, the backstop above is simply not there.
+# Literal, zero-gap phrase (D17 convention).
+has 'after a crash, that backstop is not there' "$STEP6" \
+    'After a crash, that backstop is not there'
+
+# F25, part 3: the reproduction, stated as law -- resume-check.sh's next_action() returns
+# RESUME_DELIVERY or DISCARD_AND_RESUME_DELIVERY once every task is committed. Actual gaps 2, 1, 26
+# chars; `.{0,35}`/`.{0,35}`/`.{0,60}` keep >=33 chars of D17 headroom on each.
+has 'once every Hunter task is committed, next_action returns RESUME_DELIVERY or DISCARD_AND_RESUME_DELIVERY' \
+    "$STEP6" \
+    'next_action\(\).{0,35}returns.{0,35}`RESUME_DELIVERY`.{0,60}DISCARD_AND_RESUME_DELIVERY'
+
+# F25, part 4: BOTH values mean "re-enter step 7" per the resume protocol above -- and there is no
+# branch that re-enters step 6. Actual gaps 1 and 36 chars; `.{0,35}`/`.{0,70}` keep >=34 chars of
+# D17 headroom on each.
+has 'the resume protocol above defines both outcomes as re-entering step 7, and no branch re-enters step 6' \
+    "$STEP6" \
+    'defines BOTH as.{0,35}re-entering step 7.{0,70}no branch that re-enters step 6'
+
+# F25, part 5: the concrete hazard this produces -- a Warchief dying during the final whole-branch
+# audit resumes into delivery and can merge before that audit ever finishes. Actual gap 3 chars;
+# `.{0,35}` keeps 32 chars of D17 headroom.
+has 'a Warchief dying during the final whole-branch audit resumes into delivery and can merge before that audit finishes' \
+    "$STEP6" \
+    'dies DURING the final whole-branch audit itself resumes straight into delivery and can open and merge the PR without that audit ever finishing.{0,35}a crash mid-audit can therefore produce an unaudited merge'
+
+# F25, part 6: the cause is named -- resume-check.sh has no notion of a mid-audit state, the same
+# pre-existing gap named earlier in this rung, now shown to reach the final audit too. Actual gaps 2
+# and 2 chars; `.{0,35}` keeps 33 chars of D17 headroom on each.
+has 'the mid-audit gap is named as resume-check.sh having no notion of a mid-audit state, the same pre-existing gap, now reaching the final audit too' \
+    "$STEP6" \
+    'has no notion of a mid-audit state.{0,35}the same pre-existing gap named above.{0,35}now shown to reach the final audit too'
+
+# F25, part 7: it is a KNOWN, FILED follow-up -- pre-existing and cross-cutting, not created by this
+# card. Actual gap 3 chars; `.{0,35}` keeps 32 chars of D17 headroom.
+has 'the mid-audit gap is a known, filed follow-up: pre-existing and cross-cutting, not created by this card' \
+    "$STEP6" \
+    'a known, filed follow-up.{0,35}pre-existing and cross-cutting, not created by this card'
+
+# F25, part 8: the retraction, in so many words -- the "never a wrong merge" safety claim is
+# explicitly RETIRED. Literal, zero-gap phrase (D17 convention).
+has 'the never a wrong merge safety claim is explicitly RETIRED' "$STEP6" \
+    'The "never a wrong merge" safety claim is RETIRED'
+
+# F25, part 9: what survives, stated no more strongly than true -- absent a crash, this routing law
+# is sound. Literal, zero-gap phrase (D17 convention).
+has 'what survives: absent a crash, this routing law is sound' "$STEP6" \
+    'absent a crash, this routing law is sound'
+
+# F25, part 10: and under a crash, it is the tribe's resume machinery -- never this routing law --
+# that fails. Actual gaps 3 and 3 chars; `.{0,35}` keeps 32 chars of D17 headroom on each.
+has "under a crash, it is the tribe's resume machinery, never this routing law, that fails" "$STEP6" \
+    'Under a crash, it is the tribe.s resume machinery.{0,35}never this routing law.{0,35}that fails'
+
+# F26, part 1: the fourth `routed` value itself, row-anchored like its 9 siblings above (same
+# structural, pipe-bounded technique -- immune to text-length changes by construction, no D17
+# headroom needed).
+has 'routed value ESCALATED oracle unavailable (crash-forced rung-3 trip; tie-break spent, oracle never landed)' \
+    "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(oracle unavailable\)'
+
+# F26, part 2: its own definition -- a crash-forced rung-3 trip, where the pre-dispatch write
+# already spent the finding key's one tie-break. Actual gaps 1 and 2 chars; `.{0,35}` keeps >=33
+# chars of D17 headroom on each.
+has 'ESCALATED oracle unavailable is defined as a crash-forced rung-3 trip where the tie-break was already spent' \
+    "$STEP6" \
+    '`ESCALATED \(oracle unavailable\)` is a crash-forced rung-3 trip.{0,35}the pre-dispatch write already spent the finding key.s one tie-break'
+
+# F26, part 3: WHAT fires it -- a crash landing after that write and before C's outcome landed means
+# the mechanical oracle never ran and its result never landed either. Literal (near-zero internal
+# gaps), D17 convention.
+has 'oracle unavailable fires when a crash lands before Cs outcome landed, so the oracle never ran and its result never landed' \
+    "$STEP6" \
+    'a crash after that write and before C.s outcome landed means the mechanical oracle never ran and its result never landed either'
+
+# F26, part 4: distinguished from `ESCALATED (spec ambiguity)` -- no contract is ambiguous here, only
+# unrun. Literal, D17 convention.
+has 'oracle unavailable is never a spec ambiguity: no contract is ambiguous, only unrun' "$STEP6" \
+    'never `ESCALATED \(spec ambiguity\)`, because no contract is ambiguous here, only unrun'
+
+# F26, part 5: distinguished from `ESCALATED (standoff)` -- no Skinner was ever re-dispatched to
+# re-raise anything (unlike a real standoff, where a Skinner DOES re-raise). Literal, D17 convention.
+has 'oracle unavailable is never a standoff: no Skinner was ever re-dispatched to re-raise anything' \
+    "$STEP6" \
+    'never `ESCALATED \(standoff\)`, because no Skinner was ever re-dispatched to re-raise anything'
+
+# F26, part 6: distinguished from `ESCALATED (inconclusive artifact)` -- no adjudication of a
+# falsification artifact ever ran on this finding at all (unlike the inconclusive-artifact path,
+# where an adjudication DID run and just couldn't tell). Literal, D17 convention.
+has 'oracle unavailable is never an inconclusive artifact: no adjudication of a falsification artifact ever ran on this finding' \
+    "$STEP6" \
+    'never `ESCALATED \(inconclusive artifact\)`, because no adjudication of a falsification artifact ever ran on this finding at all'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
