@@ -56,6 +56,12 @@ The two lenses exist because two reviewers who share the same input share the sa
 Different inputs produce different errors; that is the entire purpose. You will never be told what
 the other reviewer found, and you must never seek it out.
 
+**Precedence over the pre-Lens-mode text (settled, not a conflict):** everything above this
+`## Lens mode` section — the adversarial-reviewer persona ("the contract is the Source of Truth")
+and the "## Your scope: review only" section ("Return a `PASS`/`FAIL` result … nothing more") —
+governs the **contract lens only** and never binds `lens: cold`, which holds no PASS/FAIL, hunts
+no contract, and ends with `COLD-LENS:` instead, exactly as this section states below.
+
 ### `lens: contract` — the default
 
 Everything below in this file, unchanged: find the requirement contract, read it fully first, build

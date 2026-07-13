@@ -117,6 +117,14 @@ has   "law4: the round-PASS rule is stated"                    "$STEP6" 'round p
 hasnt "law4: the both-must-PASS rule is gone"                  "$STEP6" 'pass needs both|passes only if both skinners'
 has   "law4: the 3-round cap is untouched"                     "$STEP6" '3-round fix cap|3 fix-rounds'
 
+# F10 — the pre-Lens-mode persona and "scope: review only" section are never suspended for cold
+# mode by anything in the Method's replace-list ("these rules REPLACE the corresponding parts of
+# the Method below" only scopes to the Method, which comes AFTER; the persona and scope-only
+# section sit BEFORE "## Lens mode" and were never carved out). An explicit precedence sentence
+# must settle it, checked against $LENS since that is where the sentence lives.
+has "F10: pre-Lens-mode persona/scope text is declared contract-lens only" \
+  "$LENS" 'persona.{0,200}scope: review only.{0,200}contract lens only'
+
 # --- F-H4 — evals.json ids 10-12 must stay asymmetric-design content, not the superseded --------
 # pre-asymmetry claims (idea 01's evals 10/11/12 were REWRITTEN, correctly, to match the shipped
 # asymmetric design; nothing else in the suite guards that content, so a silent revert would pass
