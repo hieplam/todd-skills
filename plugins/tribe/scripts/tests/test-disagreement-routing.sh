@@ -290,9 +290,12 @@ has 'rung 2: the tie-break Skinner is dispatched COLD' "$STEP6" \
 # conformance question — it is exactly the cold lens's job, so C gets the cold brief (bare diff,
 # never the contract), the same brief as Skinner B. This is the positive assertion that the fixed
 # itemization says so; actual bridge consumption (measured against the shipped clause) is 42 chars,
-# so `.{0,80}` keeps 38 chars of D17 headroom.
+# so `.{0,80}` keeps 38 chars of D17 headroom. F17: the inner `bare ... diff` bridge was left at
+# `.{0,10}` (actual gap 1 char, so only 9 chars of headroom — under D17's floor and demonstrated to
+# break on a 14-char insertion). Widened to `.{0,40}` for the same >=30-headroom reason as every
+# other bridge in this file.
 has 'rung 2: C receives the cold lens brief — bare diff only, never the contract' "$STEP6" \
-    'tie-break Skinner C is dispatched COLD.{0,80}bare.{0,10}diff.{0,40}only.{0,40}and never the contract'
+    'tie-break Skinner C is dispatched COLD.{0,80}bare.{0,40}diff.{0,40}only.{0,40}and never the contract'
 
 # W9's supersession must be said OUT LOUD, not silently: the plan's original itemization assumed A
 # and B held one identical brief, and that assumption predates idea 03's two asymmetric lenses. Two
@@ -307,9 +310,11 @@ has 'rung 2: supersession is because idea 03 made the two lenses asymmetric' "$S
 # The property the plan called "cold" but actually meant gets its own name (W9 item 2): C is never
 # shown a report, finding, or verdict, and never told a disagreement exists — that is what makes it
 # a genuine third *sample* and not an *arbiter*. Grep-guarded as its own token, separate from the
-# lens question above.
+# lens question above. F17: the bridge was `.{0,10}` over a 1-char actual gap (the hyphen) — 9
+# chars of headroom, under D17's floor and demonstrated to break on an 18-char insertion. Widened
+# to `.{0,40}`.
 has 'rung 2: C is disagreement-blind' "$STEP6" \
-    '`disagreement.{0,10}blind`'
+    '`disagreement.{0,40}blind`'
 
 # Regression guards (F15) — the exact broken phrases from the pre-fix text must never come back.
 # Both are literal, unique substrings of the old itemization (confirmed absent from every other use
@@ -327,16 +332,24 @@ hasnt 'rung 2 no longer itemizes the contract, the diff, the repos rules as Cs b
 # findings, verdicts" text that conjunct 1's clause still supplies (proven by mutation; a split
 # here is exactly the false independence W5 bar #3 warns against). The bridge to the second
 # conjunct crosses the blockquote's `>` line-continuation but stays short (D17 headroom checked).
+# F17: a prior fix round needlessly loosened "the fact" into a `the.{0,15}fact` bridge (actual
+# gap 1 char, so only 14 chars of headroom — under D17's floor, and demonstrated to break on a
+# 20-char insertion) against unchanged prompt text. "the" and "fact" are literally adjacent in
+# the clause, so there is nothing to bridge: reverted to the bare literal.
 has 'rung 2: it never receives A or Bs reports, findings, verdicts, or even that a disagreement exists' "$STEP6" \
-    'never.{0,40}their reports, findings, verdicts.{0,60}the.{0,15}fact that a disagreement exists'
+    'never.{0,40}their reports, findings, verdicts.{0,60}the fact that a disagreement exists'
 
 # Same split rationale for "third sample, not an arbiter": the two phrases sit ~270 chars apart
 # across the blockquote's explanatory prose, so each gets its own short, tightly anchored
-# assertion instead of one assertion with an unbounded-feeling bridge between them.
+# assertion instead of one assertion with an unbounded-feeling bridge between them. F17: a prior
+# fix round needlessly loosened "not an arbiter" into a `not.{0,10}an arbiter` bridge (actual gap
+# 1 char, so only 9 chars of headroom — under D17's floor, and demonstrated to break on a 23-char
+# insertion) against unchanged prompt text. "not" and "an" are literally adjacent in the clause, so
+# there is nothing to bridge: reverted to the bare literal.
 has 'rung 2: it is a third independent sample' "$STEP6" \
     'third independent sample'
 has 'rung 2: it is not an arbiter reading two briefs' "$STEP6" \
-    'not.{0,10}an arbiter.{0,40}reading two briefs'
+    'not an arbiter.{0,40}reading two briefs'
 
 has 'rung 2: majority direction across three independent samples' "$STEP6" \
     'majority direction.{0,50}three independent samples'
