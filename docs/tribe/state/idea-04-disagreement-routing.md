@@ -131,6 +131,34 @@ W1/W2/W4/W5 approved as sound How-level calls. **W5 is to be baked into tasks 2-
 - Tasks 2-5 are NOT started. Their briefs must carry **W5** up front so assertions are born at the bar
   rather than discovered at it.
 
+## W6 — the `agreed` / `NOT_REPRODUCED` supersession must be EXPLICIT (authorizes task 2's fix round)
+
+Task 2's audit surfaced a genuine composition seam, found by the cold lens alone (the contract lens's
+neighbour-consistency check was a `grep` for "reproduce-first" and passed it):
+
+- The plan's mandated text (spec §2.2, quoted verbatim from idea-05's own request) says: a fixer's
+  `NOT_REPRODUCED` on an **`agreed`** finding *"escalates to you **immediately** for adjudication,
+  rather than waiting for the next audit round to settle it."*
+- Idea 05's **shipped** neighbouring rule ("Adjudicate the ledger after each re-audit") says the
+  opposite sequence for the same trigger: a `NOT_REPRODUCED` is settled by the NEXT re-audit — the
+  finding either **falls** (not re-raised), **stands** (re-raised with new evidence), or **standoff**
+  (re-raised unchanged → `NEEDS_DIRECTION`).
+
+Both are law. As written, a Warchief holding a `NOT_REPRODUCED` on an `agreed` finding meets two rules
+and must improvise — **which is the exact defect this entire card exists to abolish.** Shipping the
+card with that seam open would be self-refuting.
+
+**Ruling:** the plan's text stays **verbatim** (it is spec-quoted, settled law, and its intent is a
+deliberate *specialization*, not an accident). What is missing is the supersession being **said out
+loud**, per the Shaman's dispatch — *"deliberate supersession, never silent deletion."* Task 2's fix
+round adds ONE additive clause making the specialization explicit and its boundary sharp: for an
+`agreed` finding the immediate-adjudication path governs and the ledger-adjudication rule below does
+not wait for a re-audit; for `single` findings the ledger-adjudication rule governs **unchanged**.
+A mechanical assertion guards the disambiguation, so a later editor cannot silently reopen the seam.
+
+Additive only, inside the card's own file fence (`warchief.md` step 6). D15 holds: the 3-round-cap
+text is not touched.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
