@@ -70,5 +70,53 @@ has 'Rule B: co-location alone is not a conflict' "$STEP6" \
 has 'Rule B: the one yes/no compatibility test' "$STEP6" \
     'can one edit satisfy both remedies'
 
+# --- Task 2: the routing table ----------------------------------------------
+# Each regex anchors to its own class token immediately followed by the table's cell
+# separator, then to a phrase inside THAT cell only ([^|]* never crosses into the next
+# cell or the next row) — same per-clause technique as task 1 (W5 bar #2). This is what
+# stops "agreed"/"single"/"conflicting" bare-token collisions with task 1's class-definition
+# table and with idea 03's Law-3-tag mapping paragraph, both of which also use these tokens.
+
+# Simple claim, anchored to the agreed row's own clause; deleting only this clause reddens
+# only this assertion (the "straight into the fixer's brief" clause is a separate substring
+# in the same cell, guarded by the next assertion).
+has 'agreed raises severity to Critical' "$STEP6" \
+    '`agreed`[[:space:]]*\|[^|]*raised to Critical by default'
+
+# The apostrophe in "fixer's" is matched with a wildcard (`.`) rather than a literal quote,
+# since bash single-quoted regex strings cannot contain a literal apostrophe.
+has 'agreed goes straight into the fixer brief' "$STEP6" \
+    '`agreed`[[:space:]]*\|[^|]*straight into the fixer.s brief'
+
+# Compound claim: single is ROUTED to the fixer's brief AND the fixer (not the Warchief)
+# ADJUDICATES it. Both conjuncts checked, in the order they appear in the single row, so
+# deleting either clause alone reddens this assertion (W5 bar #3). This also disambiguates
+# from the Warchief's own "you adjudicate any finding that conflicts with what the plan
+# mandated" text elsewhere in step 6, which is a different subject doing the adjudicating.
+has 'single is routed to the fixer, which adjudicates' "$STEP6" \
+    '`single`[[:space:]]*\|[^|]*fixer.s brief[^|]*fixer adjudicates it'
+
+has 'single findings are not pre-filtered by the Warchief' "$STEP6" \
+    '`single`[[:space:]]*\|[^|]*do not pre-filter'
+
+# Two independent clauses in the same conflicting-row sentence, each guarded separately so
+# deleting either alone reddens only its own assertion.
+has 'conflicting is never routed to the fixer as-is' "$STEP6" \
+    '`conflicting`[[:space:]]*\|[^|]*never routed to the fixer as-is'
+has 'conflicting is never self-reconciled' "$STEP6" \
+    '`conflicting`[[:space:]]*\|[^|]*never self-reconciled by you'
+
+# Compound claim: the reproduce-first mandate applies to EVERY finding AND explicitly names
+# `agreed` as included, in that order — a rewrite that keeps only the general rule but drops
+# the explicit agreed callout (or vice versa) must redden this assertion.
+has 'reproduce-first still applies to an agreed finding' "$STEP6" \
+    'Reproduce-first applies to every finding.{0,20}including an `agreed` one'
+
+# Compound claim: NOT_REPRODUCED tied to an agreed finding, AND that this escalates to the
+# Warchief immediately (not at the next audit round). Anchored on word order, unique to this
+# sentence — no other "immediately" in step 6 is preceded by this NOT_REPRODUCED/agreed pairing.
+has 'NOT_REPRODUCED on an agreed finding escalates immediately' "$STEP6" \
+    '`NOT_REPRODUCED`.{0,10}for an `agreed` finding.{0,200}escalates to you immediately'
+
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

@@ -638,6 +638,21 @@ findings, classed independently. No → `conflicting`. That question asks about 
 **silent** there, and silence is not dissent (Rule A). A pair becomes `conflicting` only when both
 lenses flagged the **same location** with **mutually unsatisfiable** remedies (Rule B).
 
+#### The routing table
+
+| Class | Routing |
+| --- | --- |
+| `agreed` | Severity is raised to **Critical** by default; the finding goes **straight into the fixer's brief** with its class label. Two independent samples converged — that is the highest prior this system can cheaply produce. |
+| `single` | Goes into the fixer's brief with its class label; **the fixer adjudicates it** (reproduce-first). False positives are cheap *and are meant to be filtered by the layer below* — **do not pre-filter** what you have no evidence about. |
+| `conflicting` | **Never routed to the fixer as-is, and never self-reconciled by you.** Walk the conflict ladder below. A fixer handed two mutually unsatisfiable orders either oscillates or silently picks one. |
+
+**Reproduce-first applies to every finding, including an `agreed` one.** Two reviewers
+hallucinating in the same direction is still a hallucination, and fixing blind is the harm. What the
+class changes is only the **escalation path on non-reproduction**: if the fixer reports
+`NOT_REPRODUCED` for an `agreed` finding, that is a strong signal the *fixer's reproduction* is at
+fault (two independent samples flagged it) — it escalates to you **immediately** for adjudication,
+rather than waiting for the next audit round to settle it as a `single` finding would.
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that

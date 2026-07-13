@@ -197,7 +197,7 @@ Expected: one commit, tree clean, both trailers present under
 Turns the class into an action. Three rows, and the one additive line idea 05 explicitly asked
 this card to contribute.
 
-- [ ] **Step 1: Append the routing assertions (RED)**
+- [x] **Step 1: Append the routing assertions (RED)**
 
 Append to `plugins/tribe/scripts/tests/test-disagreement-routing.sh`, immediately before the final
 `printf` summary block:
@@ -235,7 +235,7 @@ Expected tail:
 exit=1
 ```
 
-- [ ] **Step 2: Add the routing table to step 6 (GREEN)**
+- [x] **Step 2: Add the routing table to step 6 (GREEN)**
 
 Insert directly beneath the class-definitions block from task 1:
 
@@ -258,7 +258,7 @@ rather than waiting for the next audit round to settle it as a `single` finding 
 
 Re-run. Expected: 16 passed, 0 failed, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-disagreement-routing.sh \
