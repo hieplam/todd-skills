@@ -541,5 +541,67 @@ has 'append-only holds even though falsified outcomes are only known after the f
     "$STEP6" \
     'keeps the ledger append-only even though outcomes like.{0,40}`DROPPED \(falsified\)`.{0,40}are only known after the fixer has already returned'
 
+# --- Task 4, 2nd fix round (W11/F20): the enum's THIRD escalation trigger has no home ---------
+# D16 defines three outcomes for the Warchief's immediate adjudication of an `agreed` finding's
+# `NOT_REPRODUCED`: UPHELD, REJECTED, and ESCALATED ("the artifact does not let you tell" ->
+# NEEDS_DIRECTION). W10 sharpened the enum with TWO distinctly-triggered ESCALATED values
+# (spec ambiguity / standoff) but left D16's third outcome with no legal `routed` value: it is
+# neither a re-raised standoff (no Skinner ever re-raises on the `agreed` immediate-adjudication
+# path) nor a spec ambiguity (the contract is fine; only the artifact is inconclusive). W11 adds
+# `ESCALATED (inconclusive artifact)` and extends the disambiguation prose to name all three
+# triggers so no two of them can be collapsed into each other.
+#
+# Structural, pipe-bounded anchor for the new enum value (same technique as the pre-existing
+# enum-value assertions above): immune to text-length changes by construction, no D17 headroom
+# needed.
+has 'routed value ESCALATED inconclusive artifact (D16 adjudication cannot tell either way)' \
+    "$STEP6" \
+    '`routed`[[:space:]]*\|[^|]*\|[^|]*ESCALATED \(inconclusive artifact\)'
+
+# The header sentence must now say THREE, not two — a later editor silently leaving "two" while a
+# third value sits in the enum is exactly the mislabelling this rule exists to prevent. Actual gap
+# between "failures" and "conflating" is 6 chars (", and "); `.{0,40}` keeps 34 chars of D17
+# headroom.
+has 'the disambiguation header now names three ESCALATED values, not two' "$STEP6" \
+    'The three `ESCALATED` values name three different failures.{0,40}conflating any of them would misstate the record'
+
+# Regression guard: the old two-value header wording must not survive verbatim (it would mean the
+# third value was added to the enum/table but the prose above it was never updated to match).
+hasnt 'the header no longer claims only two ESCALATED values exist' "$STEP6" \
+    'The two `ESCALATED` values name two different failures'
+
+# The new value's own definition: it is D16's own agreed-adjudication outcome, triggered when the
+# artifact does not let the Warchief tell either way, and it consumes no fixer round (same
+# no-fixer-round accounting as the other two "no fixer round"/"no majority" outcomes already
+# guarded above). Split into short, per-clause-anchored assertions (W5 bar #2/#3) rather than one
+# long bridge, each on phrasing unique to this new sentence.
+has 'ESCALATED inconclusive artifact is defined as the agreed-adjudication rules own outcome' \
+    "$STEP6" \
+    '`ESCALATED \(inconclusive artifact\)` is the agreed-adjudication rule.{0,40}own outcome above'
+
+has 'ESCALATED inconclusive artifact fires when the artifact does not let the Warchief tell either way' \
+    "$STEP6" \
+    'the artifact does not let it tell either way.{0,60}goes to `NEEDS_DIRECTION`.{0,40}no fixer round spent'
+
+# Distinguishes it from `ESCALATED (standoff)`: no Skinner ever re-raises anything on the `agreed`
+# immediate-adjudication path, because D16's design resolves the finding before the next re-audit.
+has 'ESCALATED inconclusive artifact is never a standoff: no Skinner ever re-raises on the agreed path' \
+    "$STEP6" \
+    'never.{0,40}`ESCALATED \(standoff\)`.{0,60}no Skinner ever re-raises anything on the `agreed`.{0,40}immediate-adjudication path'
+
+has 'ESCALATED inconclusive artifact standoff-exclusion is because D16 resolves before the next re-audit' \
+    "$STEP6" \
+    "D16.s design resolves the finding before the next re-audit.{0,50}nothing to re-raise"
+
+# Distinguishes it from `ESCALATED (spec ambiguity)`: the contract itself is not in question here
+# -- only the artifact is inconclusive, not the text the two reviewers read.
+has 'ESCALATED inconclusive artifact is never a spec ambiguity: the contract itself is not in question' \
+    "$STEP6" \
+    'never.{0,40}`ESCALATED \(spec ambiguity\)`.{0,60}the contract itself is not in question here'
+
+has 'ESCALATED inconclusive artifact spec-ambiguity-exclusion is because only the artifact is inconclusive' \
+    "$STEP6" \
+    'only the artifact is inconclusive.{0,40}not the text the two reviewers read'
+
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

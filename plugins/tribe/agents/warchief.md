@@ -746,19 +746,26 @@ facts about the same finding at two stages of its life, so they belong in one ta
 | Column | Filled by | Values |
 | --- | --- | --- |
 | `class` | you, per round | `agreed` / `single` / `conflicting` |
-| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` / `ESCALATED (standoff)` |
+| `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (spec ambiguity)` / `ESCALATED (standoff)` / `ESCALATED (inconclusive artifact)` |
 
 **`TIEBREAK` names a transient state, not a dead end** — it marks a finding whose rung-2 tie-break is
 in flight, and it always resolves onward to one of three places: `TO_FIXER` (C sided with the
 finding), `DROPPED (tie-break, round N)` (C sided against it), or a rung-3 escalation (no majority).
 A listed value with no resolution would be a trap; this one always moves on.
 
-**The two `ESCALATED` values name two different failures, and conflating them would misstate the
-record.** `ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the dispute and no
-majority exists, so the contract itself is underdetermined. `ESCALATED (standoff)` is the
-ledger-adjudication rule's outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding unchanged,
-leaving the fixer's own falsification artifact unaddressed — an **evidence** deadlock, never a
-contract ambiguity, and it must never be recorded as `ESCALATED (spec ambiguity)`.
+**The three `ESCALATED` values name three different failures, and conflating any of them would
+misstate the record.** `ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the
+dispute and no majority exists, so the contract itself is underdetermined. `ESCALATED (standoff)` is
+the ledger-adjudication rule's outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding
+unchanged, leaving the fixer's own falsification artifact unaddressed — an **evidence** deadlock,
+never a contract ambiguity, and it must never be recorded as `ESCALATED (spec ambiguity)`.
+`ESCALATED (inconclusive artifact)` is the agreed-adjudication rule's own outcome above: the
+Warchief weighed the fixer's falsification artifact against both reviewers' reports and the artifact
+does not let it tell either way, so the finding goes to `NEEDS_DIRECTION` with no fixer round spent
+— never `ESCALATED (standoff)`, because no Skinner ever re-raises anything on the `agreed`
+immediate-adjudication path (D16's design resolves the finding before the next re-audit, so there is
+nothing to re-raise), and never `ESCALATED (spec ambiguity)`, because the contract itself is not in
+question here — only the artifact is inconclusive, not the text the two reviewers read.
 
 `DROPPED (falsified)` and `DROPPED (falsified, round N)` are the two falsification outcomes defined
 elsewhere in this section: an `agreed` finding's `NOT_REPRODUCED` adjudicated UPHELD drops
