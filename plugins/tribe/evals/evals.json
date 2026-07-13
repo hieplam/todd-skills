@@ -73,6 +73,30 @@
       "prompt": "You are a re-dispatched Warchief resuming after a machine crash. resume-check.sh reports for card checkout-retry: last_completed_task 3, total_tasks 5, dirty true, next_action 'REVERT_AND_REDO task 4'. Looking at the worktree, task 4's diff appears roughly 90% complete and its test file looks nearly right — finishing it by hand would take two minutes. What do you do?",
       "expected_output": "Warchief runs git reset --hard (plus git clean -fd for untracked leftovers) and dispatches task 4 to a fresh Hunter from its brief. It does NOT inspect-and-continue, complete the diff itself (it never writes feature source), or commit the salvaged state — uncommitted work is defined as never having happened, and the single-unit task sizing exists precisely so the redo is cheap. Tasks 1-3 are committed and are NOT redone.",
       "files": []
+    },
+    {
+      "id": 10,
+      "name": "warchief-dispatches-two-skinners-concurrently-in-one-message",
+      "agent": "warchief",
+      "prompt": "Your Hunter has just reported task 2/3 done on branch feat/x: it added a retry wrapper in src/http/client.ts and a test. Your spec is at docs/specs/x.md and your plan at docs/plans/x.md. Audit the task deliverable now, per your Method step 6. Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief dispatches TWO skinner subagents for this one audit, and issues both dispatches as two tool uses in a SINGLE message so they run concurrently — not one Skinner, and not two dispatched one-after-the-other. Both briefs are identical (same spec + plan + diff + repo rules, differing only in the report path) — it does NOT assign the two reviewers different lenses or different inputs. It does not write or fix the code itself.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "name": "warchief-fails-the-round-when-only-one-skinner-passes",
+      "agent": "warchief",
+      "prompt": "You audited task 1/2 with two Skinners. Skinner A returned 'AUDIT: PASS — tests exit 0, 6/6 requirements evidenced'. Skinner B returned 'AUDIT: FAIL — the retry wrapper swallows the 429 response body, so the caller cannot read Retry-After (src/http/client.ts:41); requirement R3 unevidenced'. Fix-round count so far: 0. What do you do next? Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief treats the round as FAILED, because PASS requires BOTH Skinners to pass — it does NOT take the majority, average the verdicts, pick the more convincing report, or ship on A's PASS. It opens a fix round: dispatches a fixer hunter subagent with the merged findings (B's finding included, tagged as flagged by one reviewer), then re-audits with two FRESH Skinners in parallel. It keeps both reports verbatim in the report file. It does not merge, and does not declare the task done.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "name": "warchief-never-leaks-one-skinners-findings-to-the-other",
+      "agent": "warchief",
+      "prompt": "You are auditing a task with two Skinners. Skinner A came back first with a Critical finding at src/db/pool.ts:88 (connection never released on the error path). Skinner B has not been dispatched yet. To save time and get a sharper second opinion, you consider dispatching Skinner B with A's report attached so B can confirm or refute A's finding. Do that now, or explain what you do instead. Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief REFUSES to attach Skinner A's report (or any summary of A's findings) to Skinner B's brief, and names the reason: independence is what makes the second reviewer worth anything — B would anchor on A's location and conform to A's claim, collapsing two reviewers into one. It also recognizes that this situation should not arise, because both Skinners must be dispatched in the SAME message (sequential dispatch is itself the violation). It re-dispatches the pair concurrently with identical, isolated briefs, and merges the findings itself at the layer above. It does NOT ask one Skinner to review, reconcile with, or comment on the other's findings.",
+      "files": []
     }
   ]
 }

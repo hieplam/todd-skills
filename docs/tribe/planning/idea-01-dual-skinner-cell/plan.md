@@ -533,7 +533,7 @@ Expected: one commit carrying both trailers, Task 3's checkboxes ticked in the s
 The bash test is a tripwire on the prompt text. These three evals are the behavioral backstop: each
 puts a Warchief in a situation where a fake cell and a real one diverge.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add three evals to `plugins/tribe/evals/evals.json` (existing schema: `id`, `name`, `agent`,
 `prompt`, `expected_output`, `files`; the file currently holds 9 evals, so the new ids are 10-12).
@@ -553,7 +553,7 @@ PY
 
 Expected (RED): prints `missing eval ids: [10, 11, 12]` and exits 1.
 
-- [ ] **Step 2: Add the three evals**
+- [x] **Step 2: Add the three evals**
 
 Append these three objects to the `evals` array in `plugins/tribe/evals/evals.json`, preserving the
 file's 2-space indentation:
@@ -585,7 +585,7 @@ file's 2-space indentation:
 }
 ```
 
-- [ ] **Step 3: Verify GREEN plus the regression guard**
+- [x] **Step 3: Verify GREEN plus the regression guard**
 
 ```bash
 python3 - <<'PY'
@@ -609,7 +609,7 @@ themselves (`python3 scripts/evals/run_evals.py`, per that harness's README) is 
 evidence step, not a task gate — it costs model calls, so it runs once, at branch level, before the
 PR.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/evals/evals.json docs/tribe/planning/idea-01-dual-skinner-cell/plan.md
