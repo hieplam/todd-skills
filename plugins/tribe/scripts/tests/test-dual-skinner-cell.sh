@@ -55,5 +55,11 @@ has   "law4: un-auditable from either is a fail"     "$STEP6" 'un-auditable'
 has   "law4: the 3-round fix cap is unchanged"       "$STEP6" 'cap fix-rounds at 3'
 has   "law4: escalation attaches both reports"       "$STEP6" 'both round-3 fail reports'
 
+# Skinner-side reciprocal invariant — it must know it is one of two, and refuse the peer's findings.
+SKIN="$(flat <"$SKINNER")"
+has "skinner: knows it is one of two independent reviewers" "$SKIN" 'one of two independent reviewers'
+has "skinner: never seeks or accepts the peer findings"     "$SKIN" 'never seek'
+has "skinner: reports only what it independently derived"   "$SKIN" 'independently derived'
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

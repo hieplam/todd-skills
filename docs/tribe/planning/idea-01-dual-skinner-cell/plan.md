@@ -274,7 +274,7 @@ includes this plan file with Task 1's four checkboxes ticked.
 The Warchief is now forbidden from leaking one reviewer's findings to the other. Close the loop from
 the other side: the Skinner itself must refuse to seek or accept a peer's findings.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append the skinner-side assertions to the test file, just above its final tally:
 
@@ -301,7 +301,7 @@ bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 Expected (RED): the three new `skinner:` assertions fail — `skinner.md` says nothing about a peer
 reviewer today. The tally reads `15 passed, 3 failed` and the script exits 1.
 
-- [ ] **Step 2: Add the invariant to the Skinner's Operating rules**
+- [x] **Step 2: Add the invariant to the Skinner's Operating rules**
 
 In `plugins/tribe/agents/skinner.md`, in the `## Operating rules` list (which today ends at line 59
 with the "Be precise and unsparing" bullet), append one new bullet as the last item of that list:
@@ -317,7 +317,7 @@ with the "Be precise and unsparing" bullet), append one new bullet as the last i
   reviewer.
 ```
 
-- [ ] **Step 3: Verify GREEN plus the regression guard**
+- [x] **Step 3: Verify GREEN plus the regression guard**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
@@ -331,7 +331,7 @@ touches only `plugins/tribe/agents/skinner.md` and the test script. The Skinner'
 PASS/FAIL criteria and `model: sonnet` tier are untouched — confirm with
 `git diff plugins/tribe/agents/skinner.md`, which must show a pure addition of one bullet.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/skinner.md plugins/tribe/scripts/tests/test-dual-skinner-cell.sh \
