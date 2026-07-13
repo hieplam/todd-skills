@@ -13,6 +13,23 @@ plan: docs/tribe/planning/idea-03-input-asymmetry/plan.md
 - [ ] branch audit PASS (round 3 of 3 FAILED — escalated NEEDS_DIRECTION)
 - [ ] PR squash-merged
 
+## RULING D13 — RECEIVED 2026-07-13T10:00Z (authorizes the FINAL round; hard stop after it)
+GRANTED: (a) — ONE final bounded round. Rationale on record: F10 is the unfinished half of H1, which
+the Shaman already ruled a real defect — the precedence fix covered the Method but not the file's
+opening. Completing an authorized fix is not "one more round" creep.
+Scope, exactly and nothing else:
+  1. ONE precedence sentence in the Lens-mode section declaring ALL text before it contract-lens-only.
+  2. ONE tripwire assertion anchored on that sentence, proven by the PER-CLAUSE mutation bar.
+Then one fresh dual audit.
+**HARD STOP (on record):** after that audit —
+  - PASS -> PR -> squash-merge -> cleanup. Ship.
+  - Any remaining Minor findings (including F11) -> SHIP ANYWAY, filed as follow-up candidates in the
+    PR body and final report.
+  - The ONLY thing that returns to the Shaman is a NEW **Critical** from the fresh pair. An Important
+    no longer blocks; it ships as a documented follow-up.
+The convergence trend (Critical class -> Critical -> 0 Critical/1 Important) justifies the cutoff, and
+"a Warchief who always says one more round is a slower way of never shipping" is now law for this card.
+
 ## AUDIT R6/R6b (post-round-5, range b1f508a..6070bca) — ROUND FAILED, escalated 2026-07-13T09:55Z
 Skinner A (lens: contract): **AUDIT: PASS** — 16/16 rows; ran its own mutation tests; ran eval 14 LIVE
 (cold lens refuses the contract sitting on disk) -> PASS. Suites 45/27/35/28/32/7.
