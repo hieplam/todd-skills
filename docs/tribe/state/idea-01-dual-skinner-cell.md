@@ -13,11 +13,31 @@ plan's 4 tasks: Warchief Method steps 1, 4, 5, 6, 7, 8.
 ## Milestones
 - [x] spec committed (settled law — PR #25)
 - [x] plan committed (settled law — PR #25, validate-plan.sh verdict pass)
-- [ ] task 1 — dual dispatch, isolation, merge, verdict (warchief.md step 6)
-- [ ] task 2 — reciprocal independence invariant (skinner.md)
-- [ ] task 3 — consistency sweep (7 singular-Skinner passages)
-- [ ] task 4 — three behavioral evals
-- [ ] wave 1 integrated (single wave, single worktree, one Hunter at a time)
+- [x] task 1 — dual dispatch, isolation, merge, verdict (warchief.md step 6) — 493ee3c
+- [x] task 2 — reciprocal independence invariant (skinner.md) — 5f74685
+- [x] task 3 — consistency sweep (7 singular-Skinner passages) — d847827
+- [x] task 4 — three behavioral evals — 876e3f8, amended faa9819
+- [x] wave 1 integrated (single wave, single worktree, one Hunter at a time)
+- [x] branch audit — TWO Skinners, concurrent + isolated: BOTH PASS (Law 4 unanimity)
+
+## Branch audit result (dogfooded the cell this card ships)
+Two Skinners dispatched as two tool uses in ONE message, each cold per idea 02's allowlist
+(contract + diff + repo rules + mechanical scope), neither told the other existed. Both returned
+`AUDIT: PASS`. Merged findings, union + agreement-tagged:
+
+- **F1 `[one]` Important** — the campaign had not run the 9 pre-existing evals, which plan DoD #4
+  and C3's Change-Safety row for `c3-215-tribe` (agent-definition edit → full `run_evals.py`) both
+  require. **CLOSED by the Warchief:** full 12-eval suite re-run on the branch with harness defaults
+  → **12 PASS / 0 FAIL**. (Skinner B saw eval 2 fail under `--exec-model haiku`; it passes at the
+  default tier, so that was a model-tier flake, not a regression — `hunter.md` is byte-identical
+  base↔HEAD.)
+- **F2 `[one]` Minor** — this state file's milestone checklist was stale. **CLOSED** (this commit).
+- **F3 `[one]` Minor** — idea 02's singular Skinner phrasing inside step 6. Out of fence, already
+  disclosed below as a follow-up. No action.
+- **F4 `[one]` Minor** — dispatch said "5 commits", actual 6 (the state-file commit). Immaterial.
+
+No Critical or Important finding survives. No fixer round was needed: F1 was an evidence gap the
+Warchief closes by running the proof, not a code defect.
 
 ## Anchor check (Warchief, at ground step — BINDING for every task)
 Base `cc45990` carries BOTH idea 05 (PR #27, fixer adjudication) and idea 02 (PR #28, context
