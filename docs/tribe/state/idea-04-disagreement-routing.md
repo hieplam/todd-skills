@@ -57,6 +57,19 @@ round is spent on them:
   plan assertion and is what lets the card compose with shipped law instead of the law the plan was
   written against.
 - **W3 — Law 4's escalation wording (follow-up F12) is NOT this campaign's to fix.** Out of fence.
+- **W4 — D14 mutation sweep over EVERY assertion in the new suite (authorizes task 5).** Task 1's
+  RED run surfaced that the plan's `class token: single` assertion (regex `` `?single`? ``) was
+  ALREADY green before the prompt edit existed: idea 05's shipped fixer-brief text uses the word
+  `single` for its confidence-class field. The assertion therefore passes even if the `single` class
+  row is deleted — which is precisely the failure D14 exists to catch ("delete only the guarded
+  clause, prove that assertion goes red"). A tripwire that cannot go red is decoration.
+  **Ruling:** task 5 runs a per-clause mutation sweep over EVERY assertion in
+  `test-disagreement-routing.sh` (positive and negative), and any assertion that does not go red
+  when its own guarded clause alone is deleted is TIGHTENED until it does — anchoring to the table
+  row rather than the bare token. This is a strengthening of the plan's tests in service of the
+  plan's own stated intent (spec §4: "greps the prompt text for the invariants a careless future
+  edit would silently delete"); it weakens no assertion and adds no scope beyond the plan's own
+  test file.
 
 ## Scope fence (from the plan's Global Constraints)
 
