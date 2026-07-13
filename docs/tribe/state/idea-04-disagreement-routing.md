@@ -507,6 +507,29 @@ is spent (3 fix rounds: F18/F19 → F20 → F21). Escalating.
 brief scoped it to step 6. Only the lens with no contract, reading the document as its actual reader would,
 walked 500 lines up and found the collision. That is the input-asymmetry design (idea 03) paying for itself.
 
+## D19 (2026-07-13 · Shaman ruling — RESOLVES F23; ship the honest law)
+
+**Option (a) RATIFIED.** In-fence, the law states **only what is true**:
+
+- the state-file record is **durable and authoritative**;
+- **any Warchief ENTERING an audit round consults it first** — and the final whole-branch audit always runs,
+  so a stranded `TIEBREAK` is resolved **before any merge**;
+- **the claim that the resume protocol automatically returns a Warchief to a mid-flight rung 2 is DROPPED** —
+  it is not true, and `resume-check.sh` is out of this card's fence (spec §3);
+- the pre-dispatch commit carries **`Tribe-Milestone:`** (the trailer loose end the cold lens also caught).
+
+**Safety analysis accepted and on the record:** the degraded failure mode is **one wasted REVIEW round, never a
+wrong merge**. That asymmetry is why (a) is shippable.
+
+(b) rejected: a card's worth of resume-machinery work, with its own blast radius on the tribe's single source of
+resume truth, does not ride in on another card's PR. (c) rejected: law that lies is what this cluster exists to
+prevent.
+
+**FOLLOW-UP FILED:** *"teach `resume-check.sh` mid-audit state"* — pre-existing and cross-cutting (**no audit
+round in the tribe is resumable today**), benefits every card. Bundled with the D15(c) + F12 + D17 family: the
+resume/round-accounting machinery does not yet model the audit loop. Now the campaign's clearest next-roadmap
+candidate.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
