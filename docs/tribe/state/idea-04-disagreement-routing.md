@@ -658,6 +658,39 @@ extension, recorded here and disclosed in the PR.
 card. A `>=` bound, or an assertion on the *presence of specific eval ids*, would guard the same invariant
 without breaking every neighbour. Bundle with the campaign's other follow-ups.
 
+## W18 — rung 1 adjudicates the third A/B conflict, by citation (final branch audit)
+
+The final branch pair conflicted head-on for the **third time**, on the same axis (assertion robustness):
+
+- **A (contract lens): FAIL** — 8/9 sampled assertions redden under ≤30-char insertions.
+- **B (cold lens): 0 hypotheses** — it formed the identical hypothesis, tested the bridges at 20/26/28/29/30
+  chars, found them all surviving, and **refuted it**: the break required **34 chars**, past D17's bound.
+
+**Rung 1 — the contract settles it. Citing D17 verbatim** (`docs/tribe/state/...`, ratified by the Shaman):
+
+> "…insertion of up to 30 characters of clarifying text **at any single bridge point** — i.e. every `.{0,N}`
+> bridge keeps ≥30 characters of headroom…, and no invariant is matched as one contiguous literal spanning
+> **more than a single clause**."
+
+Two things follow, and they split A's findings:
+
+1. **Mid-clause insertion is NOT the D17 test.** A's mutations mostly inserted *inside* a single-clause literal
+   ("raised to Critical **automatically** by default"). D17 bounds requirement (iii) to a **bridge point**, and
+   explicitly permits a bare literal **within one clause**. Those findings **fall** — A over-applied the bar.
+   (Two earlier contract lenses independently reached the same conclusion and refuted this same mutation as
+   invalid; B refuted it this round too.)
+2. **A bare literal spanning MORE THAN ONE clause is a genuine violation, and A found some.** Clearest:
+   the ~119-char run *"Before dispatching C, … WRITE AND COMMIT …"* — two clauses, no joint bridge. **Those
+   stand and get fixed.**
+
+**Ruling:** fix ONLY the literals that genuinely span more than one clause — bridge at the clause joint,
+≥30 chars headroom. Do not "fix" single-clause literals; doing so would chase the unbounded-paraphrase
+standard D17 was ratified (D17/NEEDS_DIRECTION #3) to abolish, and would restart the non-terminating loop.
+
+**No new Shaman ruling needed: rung 1 resolves by citing law the Shaman already ratified.** The ladder this
+card ships has now settled all three lens conflicts in this campaign — every one by citation, never by taste,
+and never by spending a tie-break round.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
