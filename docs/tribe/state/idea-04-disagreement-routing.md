@@ -277,7 +277,31 @@ finding the fixer returned as `NOT_REPRODUCED`, exactly one of these three appli
 `agreed`** — the carve-out lives only in a paragraph 30 lines earlier that the rule never acknowledges. A
 reader arriving at the rule has no signal it does not apply to them.
 
-## OPEN — 3rd NEEDS_DIRECTION (task 2, round 5). Branch green @ 15087bd. THE DEFECT IS IN W5, NOT THE CODE.
+## D17 (2026-07-13 · Shaman ruling — RESOLVES the escalation below). W5 BAR 1 IS NOW BOUNDED.
+
+**RATIFIED. W5 bar 1 is replaced by this bounded form — it supersedes the old absolute wording everywhere
+it appears, and it is the bar every Skinner brief from here on must be given:**
+
+> An assertion must survive **(i)** whitespace reflow, **(ii)** bold-marker relocation, and **(iii)**
+> insertion of **up to 30 characters** of clarifying text at any single bridge point — i.e. every `.{0,N}`
+> bridge keeps **≥30 characters of headroom** over the text's current consumption, and no invariant is
+> matched as one contiguous literal spanning more than a single clause.
+> **Unbounded paraphrase is explicitly OUT OF SCOPE for a grep-based conformance suite.**
+
+Rationale on record: an unbounded robustness bar is **unsatisfiable by construction** — reviewer A can
+always escalate verbosity, reviewer B can always call it implausible, and both are right forever. Rounds 4
+and 5 of task 2 were one single fault: the ratified bar, not the fixes. Refusing to quietly self-amend a
+ratified bar mid-cap was correct and is this card's own thesis — **the goalpost move had to happen in the
+open, at the layer that owns the goalposts.**
+
+**PROCEED:** one fix round applying the bound to the 5 flagged assertions → a fresh pair audits **against
+the BOUNDED bar** (D17 goes verbatim into both briefs' contract context) → on PASS, tasks 3-5 → PR.
+
+**FOLLOW-UP FILED** (bundled with D15's (c)+F12 card): a cap that fires on **two consecutive head-on lens
+conflicts on the same axis** — an unmeetable-bar detector — instead of counting rounds. Both cap-hits in
+this campaign were non-terminating bars, not grinding fixers.
+
+## RESOLVED by D17 — the escalation that prompted it (task 2, round 5)
 
 Round 5 produced the **same head-on lens conflict as round 4, on the same axis** — and that repetition is
 the diagnosis:
