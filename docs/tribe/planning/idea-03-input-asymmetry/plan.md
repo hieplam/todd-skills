@@ -80,7 +80,7 @@ Today a Skinner with no contract must STOP and return `FAIL — UN-AUDITABLE` (`
 A cold lens *has* no contract by design, so without this task the whole card returns instant
 garbage. Build the tripwire first, watch it fail, then add the mode.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `plugins/tribe/scripts/tests/test-input-asymmetry.sh`. It first asserts idea 01's baseline is
 present (this doubles as the dependency check), then asserts this card's laws. Style follows the
@@ -178,7 +178,7 @@ Expected (RED): the dependency line prints `ok -`, then all 11 cold-lens asserti
 (`skinner.md` has no lens mode yet), the tally reads `1 passed, 11 failed`, and the script exits
 non-zero.
 
-- [ ] **Step 2: Make it green — add the cold-lens mode to `skinner.md`**
+- [x] **Step 2: Make it green — add the cold-lens mode to `skinner.md`**
 
 Insert this section into `plugins/tribe/agents/skinner.md` immediately **before** the
 `## Operating rules` heading (i.e. between the `## Your scope: review only` section and
@@ -278,7 +278,7 @@ this whole step is suspended — having no contract is the assignment, and `UN-A
 never applies. See "Lens mode" above.)
 ```
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-input-asymmetry.sh && \
@@ -290,7 +290,7 @@ bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 Expected: `test-input-asymmetry.sh` prints `12 passed, 0 failed`; the three regression scripts each
 end `N passed, 0 failed`; overall exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 One commit, both trailers on two lines of the message's single final paragraph:
 
