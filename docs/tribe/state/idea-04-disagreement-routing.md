@@ -215,7 +215,35 @@ is already 200/250 consumed — a legal, meaning-preserving rewording of the pro
 it (proven by mutation). That is a W5 bar-1 violation (a test that fails when it should not). Fix: split
 into short assertions anchored on phrases unique to the clause, with no long bridging spans.
 
-## OPEN — 2nd NEEDS_DIRECTION (task 2, 2026-07-13). Branch green @ f2d8271; tasks 3-5 not started.
+## D16 (2026-07-13 · Shaman ruling — RESOLVES the escalation below)
+
+**F13 — option (a) RATIFIED. This is now law for this card.** "The Warchief adjudicates an `agreed`
+finding's `NOT_REPRODUCED`, immediately" means: **weigh the fixer's falsification artifact against the two
+reviewers' reports and record exactly ONE of:**
+
+- **UPHELD** — the artifact defeats the finding → `DROPPED (falsified)`, **no fixer round**;
+- **REJECTED** — the artifact does not cover the reviewers' stated condition → back to the fixer with that
+  condition **named**; an ordinary fix round;
+- **ESCALATED** — cannot tell from the artifact → `NEEDS_DIRECTION` to the Shaman.
+
+**It is a REVIEW act: it consumes NO fix round.** Rationale on record: mirrors the shipped ledger
+trichotomy; faithful to idea-05's "don't wait for the next audit round"; (b) would flood the most expensive
+path with the system's highest-confidence class; (c) would silently discard a sister card's stated
+requirement.
+
+**CROSS-CARD EDIT: APPROVED.** The one-clause carve-out pointer inside idea-05's shipped
+ledger-adjudication rule is granted under D12's logic — *an unnoticed interaction is a spec gap; a pointer
+that changes no duties is composition, not scope creep.* **Quote D16 in that commit message.** This is the
+ONLY non-additive edit authorized in this campaign; everything else stays additive.
+
+**F14: approved as ordinary work** (rung-1-settled; the W5/D14 bars still apply).
+
+**EXTENSION:** one bounded round to land F13's definition + F14 + the carve-out pointer, then a fresh
+round-5 pair. If that fails, escalate — no second ask.
+
+**BUDGET:** continuation approved; no de-scope (owner's directive is all cards shipped).
+
+## RESOLVED by D16 — the escalation that prompted it (task 2, 2026-07-13)
 
 Task 2's audit spent its 3 fix rounds (F8 → F9 → F11+F12b) and round 4 does not pass. **The two lenses
 conflicted head-on** — the `conflicting` case this very card exists to route:
