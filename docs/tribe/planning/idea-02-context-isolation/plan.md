@@ -348,7 +348,7 @@ diff with the `skinner`" — one sentence that sets the report file beside the S
 between them. This task turns that accidental invitation into a restatement of the seal, and tells the
 Hunter where to put what it was tempted to narrate. Adds assertion T8.
 
-- [ ] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
+- [x] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
       again before the final `printf` / `[[ "$FAIL" -eq 0 ]]` lines:
 
 ```bash
@@ -367,7 +367,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
   **Expected (RED):** the three `T8*` lines print `not ok`; everything else stays `ok`. Summary:
   `# passed 32, failed 3`, `exit=1`.
 
-- [ ] **Step 2: Make it green — edit `plugins/tribe/agents/hunter.md`.** Replace the closing paragraph
+- [x] **Step 2: Make it green — edit `plugins/tribe/agents/hunter.md`.** Replace the closing paragraph
       (currently lines 122-124), which reads:
 
 ```text
@@ -404,7 +404,7 @@ done
   **Expected (GREEN):** `test-context-isolation.sh` reports `# passed 35, failed 0`; the two existing
   suites report their own all-passing summaries and exit 0. No suite regresses.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-context-isolation.sh plugins/tribe/agents/hunter.md docs/tribe/planning/idea-02-context-isolation/plan.md

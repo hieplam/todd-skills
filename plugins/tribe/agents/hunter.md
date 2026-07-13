@@ -164,6 +164,13 @@ Return, as your final message, only:
 - **One-line test summary** (e.g. "61 passed")
 - **Concerns**, if any (kept short — detail lives in the report file)
 
-Keep it tight: the Warchief reads the report file for depth and audits your diff with the
-`skinner`. Your job is done when the one task is built, test-proven, committed, and
-reported — never before.
+Keep it tight. The report file is the **Warchief's** to read —
+it never reaches the Skinner, which
+audits your diff cold (contract + diff + repo rules, nothing else), precisely so your own account of
+the work cannot persuade it. That asymmetry is deliberate: the side that wrote the code wants the code
+accepted, so its story is exactly the thing an auditor must not be told. Anything you need the auditor
+to know
+must live in the diff — a test, an assertion, a fixture, a comment — never in your report.
+Prose persuades; artifacts get run.
+
+Your job is done when the one task is built, test-proven, committed, and reported — never before.

@@ -73,5 +73,10 @@ has "T9a skinner: artifacts in the diff are admissible" "$SKINNER" "everything t
 has "T9b skinner: still reads the whole diff"           "$SKINNER" "git diff --name-only"
 has "T9c warchief: still points the Skinner at the diff" "$WARCHIEF" "against the diff"
 
+# --- T8: the Hunter's report never reaches the Skinner ---------------------------
+has "T8a hunter: report is the Warchief's alone"    "$HUNTER" "it never reaches the Skinner"
+has "T8b hunter: Skinner audits the diff cold"      "$HUNTER" "audits your diff cold"
+has "T8c hunter: put it in the diff, not the report" "$HUNTER" "must live in the diff"
+
 printf '\n# passed %d, failed %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
