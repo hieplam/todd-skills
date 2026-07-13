@@ -453,6 +453,64 @@ authoring context, so you adjudicate any finding that conflicts with what the pl
 genuine plan-vs-card conflict goes up as `NEEDS_DIRECTION` immediately, without waiting for 3
 rounds.
 
+**Dispatch-content checklist — the Skinner runs COLD (non-negotiable).**
+
+A Skinner dispatch may contain ONLY these four things:
+
+1. **The contract** — the spec and/or plan (paths or content), authored before the code existed.
+2. **The diff** — the change under audit, in full, identified mechanically (a git range, a PR
+   number, or file paths).
+3. **The repo's rules** — `CLAUDE.md`, `.claude/rules/`, C3 docs, and the like.
+4. **Mechanical scope** — which change to audit and where: the git range / PR number / worktree
+   path, the base branch, and the report-file path for the Skinner's OWN output.
+
+This list is a **CEILING, not a floor**: a dispatch may contain *less* (a deliberately
+contract-blind reviewer is a valid variant), but **never more**.
+
+**BANNED — never put these in a Skinner dispatch:**
+
+- **the Hunter's report file** — its path or any excerpt of it;
+- **the Hunter's return message** — its `DONE` / `DONE_WITH_CONCERNS` status, its test counts, its
+  concerns;
+- **your own narrative about the build** — "the Hunter was careful", "this bit was tricky", "the
+  first failure was expected", "I already reviewed it";
+- **prior Skinner reports on the same code**, and any fixer's explanation of why it fixed something.
+
+**Why:** *"the Claude that wrote the code wants the code to get accepted"* — reading the code
+side's self-justification **persuades** the reviewer into letting bugs through. The real bugs this
+kind of review exists to catch all compiled cleanly and looked plausible; only a context that was
+never told the code is fine catches them. A Skinner that has read "all tests green, no concerns" is
+no longer auditing — it is confirming. You are holding the Hunter's report when you dispatch; that
+is exactly why the rule names it.
+
+**The diff is the ONLY channel from the code side to the auditor.** The ban is on out-of-band
+narrative, **never on artifacts inside the diff**: if the code side needs the auditor to know
+something, it **commits** it — a test, an assertion, a fixture, a comment — and the Skinner reads it
+as part of the change and **runs** it. *Prose persuades; artifacts get run.*
+
+**Scope mechanically, never judgmentally.** Telling the Skinner *which bytes* to audit is address
+information and is required. Telling it *what to think* about them is anchoring — it imports the
+code side's model of its own work, which is what handing over the reasoning does, only shorter:
+
+| Allowed (mechanical) | Banned (judgmental) |
+|---|---|
+| "Audit commit range `abc123..def456`." | "Focus on the caching logic — that's where it got hairy." |
+| "Audit branch X vs `origin/master`." | "The Hunter says the edge case is handled; verify that." |
+| "Task 3 of the plan is the contract for this diff." | "Tasks 1-2 already passed audit, so just check 3." |
+
+**Every audit starts cold — including re-audits.**
+Each fix-round gets a FRESH Skinner with a clean allowlist dispatch: no previous findings, no fixer
+explanation, and no account of what changed in response. The fixer's answer to a finding must already
+be in the diff. The final whole-branch audit likewise carries
+no accumulated per-task audit history and no "all tasks already passed" preamble — it is the coldest
+read of the whole change and must stay that way.
+
+**If a Skinner returns `AUDIT: FAIL — CONTAMINATED: <what leaked>`**, that is
+a verdict on YOUR dispatch, not on the code. Nothing about the code has been judged. Fix the dispatch
+and re-dispatch a fresh Skinner;
+never route it to a fixer Hunter, and it does NOT consume one of the 3 fix-rounds —
+a briefing bug of yours must not burn the code's fix budget.
+
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that

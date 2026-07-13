@@ -54,7 +54,7 @@ dogfooding itself.
 
 Creates the test harness and seals the sending side. Assertions T1-T5 from the spec.
 
-- [ ] **Step 1: Write the failing test (RED).** Create `plugins/tribe/scripts/tests/test-context-isolation.sh`
+- [x] **Step 1: Write the failing test (RED).** Create `plugins/tribe/scripts/tests/test-context-isolation.sh`
       with exactly this content:
 
 ```bash
@@ -128,7 +128,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
   `# passed 0, failed 21`, and `exit=1`. If any assertion passes here, stop and report back —
   it means the anchor string is matching unrelated prose, and the test is not proving what it claims.
 
-- [ ] **Step 2: Make it green — add the allowlist to `warchief.md` step 6.** In
+- [x] **Step 2: Make it green — add the allowlist to `warchief.md` step 6.** In
       `plugins/tribe/agents/warchief.md`, find the section `### 6. Audit every deliverable with the
       skinner` (currently line 441). Keep its existing paragraph exactly as it is, and insert the
       following **immediately after** that paragraph (i.e. after the sentence ending "...without
@@ -204,7 +204,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
 
   **Expected (GREEN):** all 21 assertions print `ok`, summary `# passed 21, failed 0`, `exit=0`.
 
-- [ ] **Step 3: Commit** — tick this task's boxes in the same commit as the code.
+- [x] **Step 3: Commit** — tick this task's boxes in the same commit as the code.
 
 ```bash
 git add plugins/tribe/scripts/tests/test-context-isolation.sh plugins/tribe/agents/warchief.md docs/tribe/planning/idea-02-context-isolation/plan.md
@@ -223,7 +223,7 @@ Seals the receiving side, so a contaminated dispatch is refused even when the ca
 Warchief (the Skinner is also dispatched for owner self-audits and "review this PR"). Adds assertions
 T6, T7, and the T9 anti-regression guard.
 
-- [ ] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
+- [x] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
       **before** the final `printf`/`[[ "$FAIL" -eq 0 ]]` lines (move those two lines to the end):
 
 ```bash
@@ -272,7 +272,7 @@ cp /tmp/skinner.bak plugins/tribe/agents/skinner.md && rm /tmp/skinner.bak
   **Expected:** the mutated run prints `not ok - T9b skinner: still reads the whole diff`, and after
   the restore the file is byte-identical (`git diff --quiet plugins/tribe/agents/skinner.md` exits 0).
 
-- [ ] **Step 2: Make it green — add the quarantine to `skinner.md`.** Two edits.
+- [x] **Step 2: Make it green — add the quarantine to `skinner.md`.** Two edits.
 
   **(a)** In `plugins/tribe/agents/skinner.md`, in the `## Operating rules` section (currently starting
   line 48), insert this as the **first** bullet — before "Read + verify only. NEVER mutate." — so it is
@@ -328,7 +328,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
 
   **Expected (GREEN):** `# passed 32, failed 0`, `exit=0`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-context-isolation.sh plugins/tribe/agents/skinner.md docs/tribe/planning/idea-02-context-isolation/plan.md
@@ -348,7 +348,7 @@ diff with the `skinner`" — one sentence that sets the report file beside the S
 between them. This task turns that accidental invitation into a restatement of the seal, and tells the
 Hunter where to put what it was tempted to narrate. Adds assertion T8.
 
-- [ ] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
+- [x] **Step 1: Extend the test (RED).** Append to `plugins/tribe/scripts/tests/test-context-isolation.sh`,
       again before the final `printf` / `[[ "$FAIL" -eq 0 ]]` lines:
 
 ```bash
@@ -367,7 +367,7 @@ bash plugins/tribe/scripts/tests/test-context-isolation.sh; echo "exit=$?"
   **Expected (RED):** the three `T8*` lines print `not ok`; everything else stays `ok`. Summary:
   `# passed 32, failed 3`, `exit=1`.
 
-- [ ] **Step 2: Make it green — edit `plugins/tribe/agents/hunter.md`.** Replace the closing paragraph
+- [x] **Step 2: Make it green — edit `plugins/tribe/agents/hunter.md`.** Replace the closing paragraph
       (currently lines 122-124), which reads:
 
 ```text
@@ -404,7 +404,7 @@ done
   **Expected (GREEN):** `test-context-isolation.sh` reports `# passed 35, failed 0`; the two existing
   suites report their own all-passing summaries and exit 0. No suite regresses.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tests/test-context-isolation.sh plugins/tribe/agents/hunter.md docs/tribe/planning/idea-02-context-isolation/plan.md
