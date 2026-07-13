@@ -646,12 +646,16 @@ lenses flagged the **same location** with **mutually unsatisfiable** remedies (R
 | `single` | Goes into the fixer's brief with its class label; **the fixer adjudicates it** (reproduce-first). False positives are cheap *and are meant to be filtered by the layer below* — **do not pre-filter** what you have no evidence about. |
 | `conflicting` | **Never routed to the fixer as-is, and never self-reconciled by you.** Walk the conflict ladder below. A fixer handed two mutually unsatisfiable orders either oscillates or silently picks one. |
 
-**Law 3's three dispositions are the ONLY permitted pre-filter on a `single` finding, and each is
-an evidence-bearing act.** A *Refuted* disposition requires positive evidence that the code is
-correct; *valid but out of scope* requires the defect to lie outside this change's fence. What
-"do not pre-filter" forbids is the evidence-free drop — discarding a finding because you doubt it,
-with nothing to show for the doubt — so anything you can neither Refute with evidence nor place
-outside the fence goes to the fixer.
+**Law 3's three dispositions are the ONLY permitted pre-filter on a `single` finding's
+`[cold-only]` half — never on its `[contract-only]` half.** A `[cold-only]` finding is a
+hypothesis, so it gets exactly one of Law 3's three evidence-bearing dispositions: a *Refuted*
+disposition requires positive evidence that the code is correct; *valid but out of scope* requires
+the defect to lie outside this change's fence. A `[contract-only]` finding is **not a hypothesis**
+— it is carried by the contract lens's own verdict, so it is **never pre-filtered by the
+Warchief** and goes straight to the fixer. What "do not pre-filter" forbids, on the `[cold-only]`
+half, is the evidence-free drop — discarding a finding because you doubt it, with nothing to show
+for the doubt — so anything `[cold-only]` you can neither Refute with evidence nor place outside
+the fence goes to the fixer.
 
 **Reproduce-first applies to every finding, including an `agreed` one.** Two reviewers
 hallucinating in the same direction is still a hallucination, and fixing blind is the harm. What the

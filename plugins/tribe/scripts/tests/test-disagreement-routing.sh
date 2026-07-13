@@ -118,16 +118,30 @@ has 'reproduce-first still applies to an agreed finding' "$STEP6" \
 has 'NOT_REPRODUCED on an agreed finding escalates immediately' "$STEP6" \
     '`NOT_REPRODUCED`.{0,10}for an `agreed` finding.{0,200}escalates to you immediately'
 
-# F9 — Law 3's dispositions vs the single row's "do not pre-filter" must be reconciled explicitly.
-# Compound claim, both conjuncts anchored (W5 bar #3): (1) Law 3's three dispositions are named as
-# the ONLY permitted pre-filter and each an evidence-bearing act, AND (2) "do not pre-filter" is
-# pinned to forbidding the evidence-free drop specifically. Anchored on "ONLY permitted pre-filter"
-# and "evidence-free drop" — both phrases are coined by this new clause and appear nowhere else in
-# step 6 (confirmed against the pre-fix file), so deleting only this clause removes every occurrence
-# and reddens only this assertion; step 6's pre-existing use of "disposition"/"Refuted"/"evidence"/
-# "fixer" elsewhere (Law 3, the fixer-brief section) cannot hold this assertion green on its own.
-has 'Law 3s dispositions are the only permitted pre-filter; do not pre-filter bans the evidence-free drop' "$STEP6" \
-    'Law 3.s three dispositions are the ONLY permitted pre-filter.{0,60}evidence-bearing act.{0,250}evidence-free drop'
+# F9/F11 — Law 3's dispositions vs the single row's "do not pre-filter" must be reconciled
+# explicitly, AND the reconciliation must be scoped to the `[cold-only]` half only — a
+# `[contract-only]` finding is carried by the contract lens's own verdict (Law 4) and is never a
+# hypothesis for the Warchief to pre-filter (W8/F11). Each assertion below is short and anchored on
+# a phrase unique to its own conjunct, with no long bridging span (W5 bar #1, F12b): a legal,
+# meaning-preserving rewording of the prose between two phrases must not push a bridge span past
+# its budget and redden an assertion that never asked to guard that prose. Every phrase named is
+# coined by this clause and appears nowhere else in step 6 (confirmed against the pre-fix file), so
+# deleting only this clause reddens only these five assertions.
+
+has 'pre-filter is scoped to cold-only, never to contract-only' "$STEP6" \
+    'ONLY permitted pre-filter on a `single` finding.s `\[cold-only\]` half.{0,40}never on its `\[contract-only\]` half'
+
+has 'cold-only finding is a hypothesis and gets an evidence-bearing disposition' "$STEP6" \
+    '`\[cold-only\]` finding is a hypothesis.{0,40}exactly one of Law 3.s three evidence-bearing dispositions'
+
+has 'contract-only finding is not a hypothesis; carried by the contract lens own verdict' "$STEP6" \
+    '`\[contract-only\]` finding is not a hypothesis.{0,40}carried by the contract lens.s own verdict'
+
+has 'contract-only finding is never pre-filtered by the Warchief and goes to the fixer' "$STEP6" \
+    'never pre-filtered by the Warchief.{0,40}goes straight to the fixer'
+
+has 'do not pre-filter forbids the evidence-free drop, scoped to cold-only' "$STEP6" \
+    'do not pre-filter.{0,40}forbids.{0,40}`\[cold-only\]` half.{0,40}evidence-free drop'
 
 # F8 — the agreed/single NOT_REPRODUCED supersession must be said out loud, not just implied.
 # Compound claim, both conjuncts anchored (W5 bar #3): the `agreed` clause explicitly does NOT
