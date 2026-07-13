@@ -447,14 +447,10 @@ has 'disposition stays empty when the finding never reached the fixer' "$STEP6" 
 has 'the ledger lives in the report file, on disk and append-only' "$STEP6" \
     'ledger lives in your report file.{0,40}on disk, append-only'
 
-# Second conjunct of the same paragraph (W5 bar #3, split per the F14/F8 precedent above rather
-# than one long bridge): WHY it lives there — so a re-dispatched Warchief resuming this card can
-# see which finding keys already spent their one tie-break round. "re-dispatched Warchief resuming
-# this card" is itself a literal, zero-gap phrase coined only by this clause (never used elsewhere
-# in step 6); bridged (~37-char actual gap, D17 headroom) to the tie-break-round phrase that is the
-# whole reason this ledger lives on disk rather than in the Warchief's head.
-has 'the report file lets a re-dispatched Warchief see which findings already spent their tie-break' "$STEP6" \
-    're-dispatched Warchief resuming this card.{0,90}spent their one tie-break round'
+# D18/F22 superseded the original second conjunct here ("the report file is what lets a
+# re-dispatched Warchief see spent tie-breaks") — that claim is exactly the collision F22 found
+# against the crash-safe-resume doctrine 500 lines above, and it is now false. See the "Task 4,
+# 4th fix round (D18/F22)" block below for the replacement assertions guarding the corrected text.
 
 # --- Task 4 fix round (W10/F18/F19): the enum must express every outcome the section --------
 # already produces, and the timing claim must not contradict the ledger's own append-only rule.
@@ -619,12 +615,16 @@ has 'ESCALATED inconclusive artifact spec-ambiguity-exclusion is because only th
 has 'routed value TIEBREAK is row-anchored in the enum, like its siblings' "$STEP6" \
     '`routed`[[:space:]]*\|[^|]*\|[^|]*`TIEBREAK`'
 
-# F21a, part 1: the write-time rule itself. This is a single short imperative clause with no
-# internal bridge needed (same D17 convention already used for "TIEBREAK names a transient
-# state..." above: a true zero-gap phrase is left as a bare literal rather than manufacturing a
-# bridge that has nothing to span).
-has 'before dispatching C, the Warchief WRITEs the ledger row with routed TIEBREAK' "$STEP6" \
-    "Before dispatching C, WRITE the finding.s ledger row with \`routed: TIEBREAK\`"
+# F21a, part 1: the write-time rule itself. D18/F22 superseded this clause's own artifact — the
+# write-BEFORE-dispatch act that spends the key's one tie-break is no longer the report-file
+# ledger row, it is a committed state-file line (see the "Task 4, 4th fix round (D18/F22)" block
+# below for why: the report file is never git-committed mid-round, so it cannot be what a crash
+# survives). This assertion is updated in place because its invariant changed, per the brief's own
+# rule ("update any assertion whose invariant D18 has now changed"). Single long literal, no
+# internal bridge needed (D17 convention: a true zero-gap phrase stays a bare literal).
+has 'before dispatching C, the Warchief WRITEs AND COMMITS the finding key to the state files Tie-breaks spent heading' \
+    "$STEP6" \
+    "Before dispatching C, WRITE AND COMMIT the finding key under a \`## Tie-breaks spent\` heading in the card.s state file"
 
 # F21a, part 2: WHY that write happens before dispatch -- it is what SPENDS the key's one
 # tie-break, and the timing (before, not after) is what survives a crash. Three conjuncts
@@ -649,11 +649,13 @@ has 'the appended outcome names all three onward values: TO_FIXER, DROPPED tie-b
     "$STEP6" \
     'APPEND the outcome as a new row.{0,90}`TO_FIXER`.{0,40}if C sided with the finding.{0,40}`DROPPED \(tie-break, round N\)`.{0,40}if C sided against it.{0,40}a rung-3 escalation if there is no majority'
 
-# F21a, part 4: the resumed-Warchief-treats-it-as-spent rule -- a `TIEBREAK` row found on resume
-# means the key's one tie-break is already gone; it never dispatches a second one. Actual gaps:
-# 2, 2, 3, 5 chars; `.{0,40}` throughout keeps >=35 chars of D17 headroom on every bridge.
-has 'a resumed Warchief that finds a TIEBREAK row treats that keys tie-break as spent' "$STEP6" \
-    'A resumed Warchief that finds a.{0,40}`TIEBREAK`.{0,40}row for a finding key treats that key.s tie-break as SPENT'
+# F21a, part 4: the resumed-Warchief-treats-it-as-spent rule -- D18/F22 superseded WHERE the
+# resumed Warchief looks: no longer a `TIEBREAK` row in the (never-committed) report file, now the
+# committed state file's `## Tie-breaks spent` heading. Updated in place (invariant changed).
+# Single long literal, no internal bridge needed (D17 convention for a true zero-gap phrase).
+has 'a resumed Warchief consults the state files Tie-breaks spent heading, not the report file, to know a keys tie-break is spent' \
+    "$STEP6" \
+    "A resumed Warchief that finds the finding key listed under the state file.s \`## Tie-breaks spent\` heading treats that key.s tie-break as SPENT"
 
 has 'a spent tie-break sends a resumed Warchief straight to rung 3, never a second tie-break Skinner' \
     "$STEP6" \
@@ -667,6 +669,92 @@ has 'a spent tie-break sends a resumed Warchief straight to rung 3, never a seco
 has 'classes are re-derivable from the diff, but spent tie-break history is not and must be written down' \
     "$STEP6" \
     'Classes are re-derivable this way.{0,40}how many tie-breaks a key has already spent is not.{0,40}that is history, and history must be written down'
+
+# --- Task 4, 4th fix round (D18/F22): the tie-break-spent record moves to the STATE FILE --------
+# F22 (cold-only, Critical, Confirmed): warchief.md's own shipped "Crash-safe state & resume"
+# doctrine (~500 lines above step 6, untouched by this campaign) says twice that anything
+# uncommitted is DEFINED as never having happened, and that the report file must never be used to
+# re-derive resume progress. But W12/spec §2.4 put the TIEBREAK-spent record in the report file --
+# which lives in scratch, is never git-committed mid-round, and is exactly the artifact the
+# doctrine forbids. Traced failure: Warchief writes the TIEBREAK row, dispatches C, dies;
+# resume-check.sh says REVERT_AND_REDO; the round's work is discarded and "never happened" -- but
+# the report-file ledger still claims the key's tie-break is spent, so the resumed Warchief
+# escalates to a human instead of ever retrying the mechanical oracle. D18 (Shaman ruling) settles
+# it: the AUTHORITATIVE record moves to the card's STATE FILE (docs/tribe/state/CARD-SLUG.md,
+# already the tribe's one sanctioned resume artifact), written and committed BEFORE the tie-break
+# Skinner is dispatched -- the same commit-before-act discipline as D12a. The report-file ledger
+# keeps its TIEBREAK row as the human-readable audit trail, EXPLICITLY NON-AUTHORITATIVE for the
+# cap. Every bridge below is measured against this new text's OWN actual consumption (measured by
+# direct extraction of the shipped clause) and widened to keep >=30 chars of D17 headroom.
+
+# Regression guard: the exact sentence that caused F22 (spec §2.4's "No state-file change is
+# needed", carried into the pre-fix ledger prose) must never survive a later edit reverting it.
+hasnt 'the old No state-file change is needed claim (the cause of F22) does not survive' "$STEP6" \
+    'No state-file change is needed'
+
+# The write-and-commit-BEFORE-dispatch rule cites D12a's own commit-before-act discipline: a
+# record is an artifact, not a claim. Actual gap 2 chars; `.{0,40}` keeps 38 chars of headroom.
+has 'the pre-dispatch state-file write cites D12as commit-before-act discipline' "$STEP6" \
+    'the same commit-before-act discipline as D12a.{0,40}a record is an artifact, not a claim'
+
+# WHY the record now survives a crash: it is git-committed history, never the report file, which
+# the doctrine above already forbids treating as resume truth. Two conjuncts (W5 bar #3), each
+# anchored on phrasing unique to this clause. Actual gaps 14 and 12 chars; `.{0,50}` keeps >=36
+# chars of headroom on each.
+has 'the per-key cap survives a crash because the record is git-committed history, never the report file' \
+    "$STEP6" \
+    'the record is git-committed history.{0,50}never the report file.{0,50}crash-safe-resume doctrine above already forbids treating as resume truth'
+
+# The report-file ledger row is STILL written (it stays the audit trail) -- this is what keeps
+# D18's fix additive rather than deleting W12's ledger machinery outright. Actual gaps 2, 2, 22
+# chars; bridges widened to keep >=30 chars of headroom on the widest.
+has 'the report-file TIEBREAK row is still written too, as the human-readable audit trail' "$STEP6" \
+    'report-file ledger still gets its.{0,40}routed: TIEBREAK.{0,40}row too, same as always.{0,60}human-readable audit trail'
+
+# ...and it is EXPLICITLY NON-AUTHORITATIVE for the cap -- the state-file line is what is
+# authoritative. Anchored on "for the cap" (not "for the one-tie-break-per-key cap", which is the
+# DIFFERENT, later paragraph's own wording -- see below), so this stays unique to rung 2's clause.
+# Actual gaps 1, 2 chars; `.{0,40}` keeps >=38 chars of headroom.
+has 'the report-file row is explicitly non-authoritative for the cap; the state-file line is authoritative' \
+    "$STEP6" \
+    'explicitly NON-AUTHORITATIVE.{0,40}for the cap.{0,40}the state-file line is the authoritative record'
+
+# The resumed-Warchief bounds paragraph: the report-file TIEBREAK row is consulted for NONE of
+# this on resume -- only the state file's heading decides. Three conjuncts (W5 bar #3). Actual
+# gaps 3, 1, 6 chars; `.{0,40}` keeps >=34 chars of headroom on each.
+has 'on resume, the report-file TIEBREAK row is consulted for none of it; only the state file decides' \
+    "$STEP6" \
+    "report-file ledger.s \`TIEBREAK\` row is consulted for none of this.{0,40}it is the audit trail, not the.{0,40}authoritative record.{0,40}only the state file.s \`## Tie-breaks spent\` heading decides whether a key.s tie-break is spent"
+
+# The "Recording it" reconciliation paragraph: the report file is explicitly non-authoritative for
+# the one-tie-break-per-key cap (distinct wording from rung 2's "for the cap" clause above, so
+# deleting either clause alone reddens only its own assertion). Actual gap 1 char; `.{0,40}` keeps
+# 39 chars of headroom.
+has 'the ledger prose says the report file is explicitly non-authoritative for the one-tie-break-per-key cap' \
+    "$STEP6" \
+    'explicitly NON-AUTHORITATIVE.{0,40}for the one-tie-break-per-key cap'
+
+# WHY: per the crash-safe-resume doctrine above, anything not git-committed is defined as never
+# having happened, and the report file is never committed mid-round -- this is the reconciliation
+# clause conforming to the doctrine without rewording the doctrine itself. Two conjuncts. Actual
+# gaps 2, 6 chars; `.{0,40}` keeps >=34 chars of headroom on each.
+has 'the reconciliation clause: uncommitted is never-happened, and the report file is never committed mid-round' \
+    "$STEP6" \
+    'per the crash-safe-resume doctrine above.{0,40}anything not git-committed is defined as never having happened.{0,40}the report file is never committed mid-round'
+
+# The state file is named as THE authoritative, crash-safe record -- already the tribe's one
+# sanctioned resume artifact (the crash-safe-resume doctrine's own vocabulary, cited rather than
+# reworded). Actual gap 1 char; `.{0,40}` keeps 39 chars of headroom.
+has 'the state file is the authoritative crash-safe record, the tribes one sanctioned resume artifact' \
+    "$STEP6" \
+    'authoritative, crash-safe record that a finding key has spent its tie-break lives in the card.s state file.{0,40}docs/tribe/state/CARD-SLUG.md.{0,40}already the tribe.s one sanctioned resume artifact'
+
+# ...and it is written and committed BEFORE the tie-break Skinner is dispatched, per rung 2 above
+# -- the Shaman's one binding requirement from D18. Actual gaps 3, 2 chars; `.{0,40}` keeps >=36
+# chars of headroom on each.
+has 'the state-file tie-break line is written and committed before the tie-break Skinner is dispatched' \
+    "$STEP6" \
+    'under its `## Tie-breaks spent` heading.{0,40}written and committed before the tie-break Skinner is dispatched.{0,40}per rung 2 above'
 
 printf '\n# passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

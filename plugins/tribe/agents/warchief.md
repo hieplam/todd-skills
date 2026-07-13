@@ -698,10 +698,15 @@ If *running something* could answer the dispute (does this leak? is it off by on
 evaluation order fire early?), the dispute has a mechanical oracle. Dispatch **one third Skinner**
 and take the **majority direction** across the three independent samples.
 
-**Before dispatching C, WRITE the finding's ledger row with `routed: TIEBREAK`.** That write is what
+**Before dispatching C, WRITE AND COMMIT the finding key under a `## Tie-breaks spent` heading in
+the card's state file** (`docs/tribe/state/CARD-SLUG.md`), one finding key per line — the same
+commit-before-act discipline as D12a: a record is an artifact, not a claim. That write is what
 SPENDS the key's one tie-break, and it lands before C is dispatched exactly so a crash mid-tie-break
-cannot lose the fact — the per-key cap survives a crash precisely because the count lives in a file
-rather than in the dead Warchief's head (spec §2.3).
+cannot lose the fact — the per-key cap survives a crash precisely because the record is
+git-committed history (spec §2.3), never the report file, which the crash-safe-resume doctrine
+above already forbids treating as resume truth. The report-file ledger still gets its
+`routed: TIEBREAK` row too, same as always — that row stays the **human-readable audit trail** and
+is **explicitly NON-AUTHORITATIVE** for the cap; the state-file line is the authoritative record.
 
 > **The tie-break Skinner C is dispatched COLD — Skinner B's cold-lens brief above: the bare diff only,
 > and never the contract.** Rung 2 is reached only when rung 1 found no citation, so the
@@ -729,12 +734,14 @@ or a rung-3 escalation if there is no majority.
 
 **Bounds — this rung can never grind.** At most **ONE tie-break round per finding key, per
 campaign** (the key is the finding's identity, not the round): a conflict resurfacing on the same key
-has already spent its tie-break and goes **straight to rung 3**. **A resumed Warchief that finds a
-`TIEBREAK` row for a finding key treats that key's tie-break as SPENT** — it goes straight to rung 3
-and never dispatches a second tie-break Skinner on that key. And a **tie-break is a REVIEW round:
-it does not consume a fix round** — no code changes, no fixer is dispatched, and the 3-round fix cap
-counts *fix* rounds only. Otherwise one conflict would eat a third of the branch's entire fix budget
-without a single line being fixed.
+has already spent its tie-break and goes **straight to rung 3**. **A resumed Warchief that finds the
+finding key listed under the state file's `## Tie-breaks spent` heading treats that key's tie-break as
+SPENT** — it goes straight to rung 3 and never dispatches a second tie-break Skinner on that key. **The
+report-file ledger's `TIEBREAK` row is consulted for none of this** — it is the audit trail, not the
+authoritative record, and only the state file's `## Tie-breaks spent` heading decides whether a key's
+tie-break is spent. And a **tie-break is a REVIEW round: it does not consume a fix round** — no code
+changes, no fixer is dispatched, and the 3-round fix cap counts *fix* rounds only. Otherwise one
+conflict would eat a third of the branch's entire fix budget without a single line being fixed.
 
 **Rung 3 — the conflict IS the finding → `NEEDS_DIRECTION`, immediately.**
 No citation settles it and no majority exists: the two reviewers read the contract differently and
@@ -796,13 +803,18 @@ earlier round wrote. That is what keeps the ledger append-only even though outco
 `DROPPED (falsified)` are only known after the fixer has already returned, and it is what keeps a
 finding's whole history readable off the one document.
 
-The ledger lives in your **report file** (on disk, append-only), which is what lets a re-dispatched
-Warchief resuming this card see **which finding keys have already spent their one tie-break round**.
-No state-file change is needed: `docs/tribe/state/` tracks crash-resume milestones, and an audit
-round is idempotent — the diff is unchanged, so a resumed Warchief re-runs the round and re-derives
-the same classes from the same inputs. **Classes are re-derivable this way; how many tie-breaks a
-key has already spent is not — that is history, and history must be written down**, which is exactly
-what the `TIEBREAK` row above is for.
+The ledger lives in your **report file** (on disk, append-only) as the **human-readable audit
+trail** of a finding's whole history — and it is **explicitly NON-AUTHORITATIVE** for the
+one-tie-break-per-key cap: per the crash-safe-resume doctrine above, anything not git-committed is
+defined as never having happened, and the report file is never committed mid-round. The
+**authoritative, crash-safe record that a finding key has spent its tie-break lives in the card's
+state file** (`docs/tribe/state/CARD-SLUG.md`, already the tribe's one sanctioned resume artifact)
+under its `## Tie-breaks spent` heading — written and committed before the tie-break Skinner is
+dispatched, per rung 2 above, exactly as the doctrine's commit-before-act discipline already
+requires. An audit round is otherwise idempotent — the diff is unchanged, so a resumed Warchief
+re-runs the round and re-derives the same classes from the same inputs. **Classes are re-derivable
+this way; how many tie-breaks a key has already spent is not — that is history, and history must be
+written down**, which is exactly what the state file's `## Tie-breaks spent` heading is for.
 
 **The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
 authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
