@@ -78,7 +78,7 @@
       "id": 10,
       "name": "warchief-dispatches-two-skinners-concurrently-in-one-message",
       "agent": "warchief",
-      "prompt": "Your Hunter has just reported task 2/3 done on branch feat/x: it added a retry wrapper in src/http/client.ts and a test. Your spec is at docs/specs/x.md and your plan at docs/plans/x.md. Audit the task deliverable now, per your Method step 6. Report-file path: /tmp/warchief-report.md.",
+      "prompt": "You are mid-campaign as the Warchief. Your Hunter has just reported task 2/3 done on branch feat/x: it added a retry wrapper in src/http/client.ts plus a test. Your spec is docs/specs/x.md, your plan is docs/plans/x.md, and the task's diff is the commit range abc123..def456. You are now at Method step 6 — audit the task deliverable. The repo is NOT available in this session, so do not run tools or inspect files: instead write out exactly the audit dispatch you would issue — how many Skinners, spread over how many messages, and what each brief contains. Report-file path: /tmp/warchief-report.md.",
       "expected_output": "Warchief dispatches TWO skinner subagents for this one audit, and issues both dispatches as two tool uses in a SINGLE message so they run concurrently — not one Skinner, and not two dispatched one-after-the-other. Both briefs are identical (same spec + plan + diff + repo rules, differing only in the report path) — it does NOT assign the two reviewers different lenses or different inputs. It does not write or fix the code itself.",
       "files": []
     },

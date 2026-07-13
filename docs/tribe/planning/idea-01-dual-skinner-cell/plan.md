@@ -585,6 +585,15 @@ file's 2-space indentation:
 }
 ```
 
+> **Warchief amendment (implementation campaign).** Eval 10's `prompt` as first written ordered the
+> agent to "Audit the task deliverable now" against a sandbox that `"files": []` leaves empty — no
+> spec, no plan, no diff, no branch. A correct Warchief returns `BLOCKED` on that (context-starved
+> dispatch), so the eval could never reach the behavior it grades, and it failed for the wrong
+> reason. The harness cannot host a real `skinner` dispatch either, so what is graded is the
+> dispatch the agent *states*. Eval 10's prompt is therefore reshaped into a self-contained decision
+> prompt, exactly like its siblings 11 and 12. **`expected_output` is unchanged — the pass bar did
+> not move.**
+
 - [x] **Step 3: Verify GREEN plus the regression guard**
 
 ```bash
