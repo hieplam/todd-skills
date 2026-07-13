@@ -459,6 +459,34 @@ The idempotence sentence in the ledger prose ("a resumed Warchief re-runs the ro
 classes") stays true and is not in conflict: **classes** are re-derivable from the diff; **how many tie-breaks
 a key has already spent** is not — that is history, and history must be written down.
 
+## OPEN — 4th NEEDS_DIRECTION (task 4, round 4). Branch green @ 5ec8a0c; tasks 1-3 CLOSED; task 5 not started.
+
+**F22 (Critical, cold-only, Confirmed).** The cold lens read the WHOLE file — not just step 6 — and found that
+**W12's crash-safe tie-break cap is built on the one artifact the file forbids using for resume truth.**
+
+- **W12 / spec §2.4** put the ledger (and so the `TIEBREAK`-spent record) in the **report file**, and spec §2.4
+  says explicitly *"No state-file change is needed."* Spec §2.3 leans on it: the per-key cap survives a crash
+  *"precisely because the count lives in a file rather than in the dead Warchief's head."*
+- **`warchief.md`'s own shipped "Crash-safe state & resume" doctrine** (a section ~500 lines ABOVE step 6,
+  from an earlier card, untouched by this campaign) says the opposite, twice:
+  - *"anything uncommitted is **defined** as never having happened"* — and the report file lives in scratch
+    (`/private/tmp/...`), is **not in the repo**, and is never git-committed mid-round;
+  - *"**Never re-derive progress from prose, memory, or the report file** — the report file stays what it is:
+    a liveness heartbeat."*
+
+Concretely reachable failure the cold lens traced: a Warchief writes the `TIEBREAK` row, dispatches C, dies;
+`resume-check.sh` returns `REVERT_AND_REDO`, the round's uncommitted work is discarded and by doctrine "never
+happened" — **but the ledger still says the key's one tie-break is spent**, so the resumed Warchief must go
+straight to rung 3 (escalate to a human) instead of ever retrying the mechanical oracle. Two in-force rules in
+one file disagree about whether that state happened.
+
+**Both readings are defensible and the contract is underdetermined → this card's own rung 3.** Cap for task 4
+is spent (3 fix rounds: F18/F19 → F20 → F21). Escalating.
+
+**Note:** the contract lens PASSed this round and explicitly traced the crash-safety as holding — because its
+brief scoped it to step 6. Only the lens with no contract, reading the document as its actual reader would,
+walked 500 lines up and found the collision. That is the input-asymmetry design (idea 03) paying for itself.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
