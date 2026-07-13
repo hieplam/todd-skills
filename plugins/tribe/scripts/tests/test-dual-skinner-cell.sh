@@ -35,7 +35,10 @@ STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF" | flat)"
 # Law 1 — two Skinners, dispatched concurrently in ONE message, on an identical brief.
 has   "law1: step 6 audits with two Skinners"        "$STEP6" 'two[[:space:]]+(independent[[:space:]]+)?skinners?'
 has   "law1: both dispatched in the same message"    "$STEP6" 'two tool uses in the same message'
-has   "law1: both get the identical brief"           "$STEP6" 'identical brief'
+# SUPERSEDED by idea 03 (input asymmetry): the briefs are deliberately NOT identical any more.
+# The cell still dispatches two Skinners concurrently in one message; what changed is that one gets
+# the contract lens and one gets the cold lens. Asserted in full by test-input-asymmetry.sh.
+has   "law1: the two briefs are asymmetric (idea 03)" "$STEP6" 'contract lens|cold lens'
 hasnt "law1: the single-Skinner dispatch line is gone" "$STEP6" 'dispatch the \*\*skinner\*\* against the diff'
 
 # Law 2 — isolation: neither reviewer sees the other; sequential dispatch is the violation.
@@ -46,11 +49,19 @@ has   "law2: never reuse a Skinner across rounds"    "$STEP6" 'never reuse.{0,40
 # Law 3 — the Warchief merges: union of findings, tagged by agreement, both reports kept verbatim.
 has   "law3: findings are merged as a union"         "$STEP6" 'union'
 has   "law3: agreement tag for both-flagged findings" "$STEP6" '\[both\]'
-has   "law3: agreement tag for single-flagged findings" "$STEP6" '\[one\]'
+# SUPERSEDED by idea 03 (input asymmetry): `[one]` was idea 01's single-flagged tag. warchief.md's
+# Law 3 table now uses the three-tag vocabulary `[both]`/`[contract-only]`/`[cold-only]`; `[one]`
+# survives only as a historical "Maps onto idea 01's tag" reference-column footnote, so an assertion
+# anchored on it guards documentation, not behavior, and would go spuriously red on a benign doc
+# cleanup of that column. The real coverage for the tag vocabulary is asserted in full by
+# test-input-asymmetry.sh:108 ('\[both\].{0,200}\[contract-only\].{0,200}\[cold-only\]').
 has   "law3: both reports preserved verbatim"        "$STEP6" 'both reports verbatim'
 
 # Law 4 — PASS requires BOTH; the 3-round cap survives; escalation carries both reports.
-has   "law4: the round passes only if both pass"     "$STEP6" 'passes only if both skinners return'
+# SUPERSEDED by idea 03: the cold lens holds no verdict, so unanimity is not the rule any more.
+# The safety property it protected is preserved by the disposition rule (no cold hypothesis may be
+# silently dropped). Asserted in full by test-input-asymmetry.sh.
+has   "law4: only the contract lens holds the verdict (idea 03)" "$STEP6" 'only the contract lens'
 has   "law4: un-auditable from either is a fail"     "$STEP6" 'un-auditable'
 has   "law4: the 3-round fix cap is unchanged"       "$STEP6" 'cap fix-rounds at 3'
 has   "law4: escalation attaches both reports"       "$STEP6" 'both round-3 fail reports'

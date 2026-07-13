@@ -80,7 +80,7 @@ Today a Skinner with no contract must STOP and return `FAIL — UN-AUDITABLE` (`
 A cold lens *has* no contract by design, so without this task the whole card returns instant
 garbage. Build the tripwire first, watch it fail, then add the mode.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `plugins/tribe/scripts/tests/test-input-asymmetry.sh`. It first asserts idea 01's baseline is
 present (this doubles as the dependency check), then asserts this card's laws. Style follows the
@@ -178,7 +178,7 @@ Expected (RED): the dependency line prints `ok -`, then all 11 cold-lens asserti
 (`skinner.md` has no lens mode yet), the tally reads `1 passed, 11 failed`, and the script exits
 non-zero.
 
-- [ ] **Step 2: Make it green — add the cold-lens mode to `skinner.md`**
+- [x] **Step 2: Make it green — add the cold-lens mode to `skinner.md`**
 
 Insert this section into `plugins/tribe/agents/skinner.md` immediately **before** the
 `## Operating rules` heading (i.e. between the `## Your scope: review only` section and
@@ -278,7 +278,7 @@ this whole step is suspended — having no contract is the assignment, and `UN-A
 never applies. See "Lens mode" above.)
 ```
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-input-asymmetry.sh && \
@@ -290,7 +290,7 @@ bash plugins/tribe/scripts/tests/test-dual-skinner-cell.sh
 Expected: `test-input-asymmetry.sh` prints `12 passed, 0 failed`; the three regression scripts each
 end `N passed, 0 failed`; overall exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 One commit, both trailers on two lines of the message's single final paragraph:
 
@@ -308,7 +308,7 @@ git commit -m 'feat(tribe): cold-lens mode for the Skinner' \
 Idea 01's step 6 dispatches two Skinners on an **identical brief**. Replace that clause with the
 two-lens brief specification, including the cold brief's exhaustive forbidden-contents list.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `plugins/tribe/scripts/tests/test-input-asymmetry.sh`, immediately before the final
 `printf '\n%d passed, %d failed\n'` line:
@@ -349,7 +349,7 @@ Expected (RED): `Task 2 assertions appended`, then the 12 Task-1 assertions stil
 the 10 new Law-1 assertions print `not ok -` (step 6 still carries idea 01's identical-brief
 clause); tally `12 passed, 10 failed`, exit non-zero.
 
-- [ ] **Step 2: Make it green — rewrite the brief clause in `warchief.md` step 6**
+- [x] **Step 2: Make it green — rewrite the brief clause in `warchief.md` step 6**
 
 In `plugins/tribe/agents/warchief.md`, find the clause idea 01 labelled **"Law 1"** in step 6 (its
 spec guarantees each law is a separately-labelled, self-contained clause) and replace **only that
@@ -392,7 +392,7 @@ commands to understand the code and to falsify its own hypotheses. What it is de
 statement of what the code was *supposed* to do.
 ```
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-input-asymmetry.sh && \
@@ -406,7 +406,7 @@ its identical-brief assertion is now superseded and Task 3 updates it. It is exp
 exactly that one assertion between Task 2 and Task 3, and it must be green again at the end of
 Task 3.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-input-asymmetry.sh \
@@ -423,7 +423,7 @@ The safety hinge of the card. Idea 01 protected against a missed bug with "both 
 Skinner B's verdict removes that protection, so it must be replaced — by a rule that a cold
 hypothesis can never be *silently dropped*.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `plugins/tribe/scripts/tests/test-input-asymmetry.sh`, immediately before the final
 `printf '\n%d passed, %d failed\n'` line:
@@ -461,7 +461,7 @@ bash plugins/tribe/scripts/tests/test-input-asymmetry.sh
 Expected (RED): `Task 3 assertions appended`, then the 22 earlier assertions print `ok -` and the 11
 new ones print `not ok -`; tally `22 passed, 11 failed`, exit non-zero.
 
-- [ ] **Step 2: Make it green — rewrite the merge and verdict clauses in `warchief.md` step 6**
+- [x] **Step 2: Make it green — rewrite the merge and verdict clauses in `warchief.md` step 6**
 
 Replace idea 01's **"Law 3"** (the merge) and **"Law 4"** (the verdict) clauses with the text below.
 Idea 01's union+dedupe rule and its "both reports preserved verbatim" rule survive inside it —
@@ -526,7 +526,7 @@ and return `NEEDS_DIRECTION` to the Shaman with **both** round-3 reports, and th
 attached verbatim.
 ```
 
-- [ ] **Step 3: Update the two idea-01 assertions this card deliberately supersedes**
+- [x] **Step 3: Update the two idea-01 assertions this card deliberately supersedes**
 
 `test-dual-skinner-cell.sh` (idea 01's tripwire) asserts two things this card intentionally replaces:
 the `identical brief` clause (Law 1) and the both-must-PASS verdict rule (Law 4). Update **only**
@@ -567,7 +567,7 @@ Expected: `patched`, then `test-dual-skinner-cell.sh` ends `N passed, 0 failed`,
 actually in the file — the requirement is that the superseded assertions are **edited with a stated
 reason, never deleted silently**, and that every other assertion in the file still passes unchanged.
 
-- [ ] **Step 4: Verify green + full regression**
+- [x] **Step 4: Verify green + full regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-input-asymmetry.sh && \
@@ -579,7 +579,7 @@ bash plugins/tribe/scripts/tests/test-resume-check.sh
 Expected: `test-input-asymmetry.sh` prints `33 passed, 0 failed`; all three other scripts end
 `N passed, 0 failed`; exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-input-asymmetry.sh \
@@ -596,7 +596,7 @@ git commit -m 'feat(tribe): cold hypotheses get dispositioned, contract lens hol
 The tripwire proves the laws are *written*. These prove an agent *behaves* by them. Schema is the
 existing one: `{skill_name, kind, evals: [{id, name, agent, prompt, expected_output, files}]}`.
 
-- [ ] **Step 1: Write the failing check**
+- [x] **Step 1: Write the failing check**
 
 The eval harness is the test here. First confirm the four evals are absent and capture the current
 count:
@@ -612,7 +612,7 @@ print('idea-03 evals present:', [n for n in names if 'cold-lens' in n or 'asymme
 
 Expected (RED): `idea-03 evals present: []` — an empty list.
 
-- [ ] **Step 2: Make it green — append the four evals**
+- [x] **Step 2: Make it green — append the four evals**
 
 IDs are computed as `max(existing)+1` so this cannot collide with whatever ids idea 01 (or a sibling
 card) already appended:
@@ -663,7 +663,7 @@ python3 -c "import json;d=json.load(open('plugins/tribe/evals/evals.json'));prin
 Expected: `appended 4 evals, ids N-N+3; total 13` (or higher, if a sibling card appended first),
 then `valid JSON, 13 evals`.
 
-- [ ] **Step 3: Run the evals and the full suite**
+- [x] **Step 3: Run the evals and the full suite**
 
 ```bash
 python3 scripts/evals/run_evals.py 2>&1 | tail -20
@@ -678,7 +678,7 @@ README); all four test scripts end `N passed, 0 failed`, exit 0. A failing *eval
 the prompt text is written but an agent does not actually behave by it — and it must be fixed in the
 prompt, never by weakening the eval's `expected_output`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/evals/evals.json docs/tribe/planning/idea-03-input-asymmetry/plan.md
@@ -690,18 +690,18 @@ git commit -m 'test(tribe): behavioral evals for the input-asymmetric Skinner pa
 
 ## Definition of Done
 
-- [ ] `skinner.md` supports `lens: cold` — contract hunt and `UN-AUDITABLE` suspended, no `AUDIT:`
+- [x] `skinner.md` supports `lens: cold` — contract hunt and `UN-AUDITABLE` suspended, no `AUDIT:`
       line, `COLD-LENS: N hypotheses` terminator, `0 hypotheses` honorable, self-refutation intact.
-- [ ] `warchief.md` step 6 dispatches two **asymmetric** briefs in one message, with the cold
+- [x] `warchief.md` step 6 dispatches two **asymmetric** briefs in one message, with the cold
       brief's forbidden-contents list written out.
-- [ ] Cold findings are tagged `[cold-only]`, must be dispositioned, and cannot be refuted with
+- [x] Cold findings are tagged `[cold-only]`, must be dispositioned, and cannot be refuted with
       "the contract does not require it".
-- [ ] A round PASSes only when the contract lens PASSes **and** no cold hypothesis is undispositioned
+- [x] A round PASSes only when the contract lens PASSes **and** no cold hypothesis is undispositioned
       or confirmed.
-- [ ] `test-input-asymmetry.sh` green (`33 passed, 0 failed`); `test-dual-skinner-cell.sh`,
+- [x] `test-input-asymmetry.sh` green (`34 passed, 0 failed`); `test-dual-skinner-cell.sh`,
       `test-validate-plan.sh`, `test-resume-check.sh` all green.
-- [ ] Four new evals in `evals.json`, graded passing by `run_evals.py`.
-- [ ] Idea 01's cell mechanics (concurrency, isolation, union+dedupe, both-reports-verbatim, 3-round
+- [x] Four new evals in `evals.json`, graded passing by `run_evals.py`.
+- [x] Idea 01's cell mechanics (concurrency, isolation, union+dedupe, both-reports-verbatim, 3-round
       cap, `sonnet` tier) are **unchanged**; `hunter.md` is untouched; no routing table was added.
 - [ ] PR squash-merged into the default branch with before/after prompt-text evidence attached, and
       "no CI registered" recorded explicitly (this repo has no CI workflows).

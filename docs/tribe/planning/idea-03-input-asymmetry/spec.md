@@ -183,7 +183,17 @@ Therefore, in `skinner.md`:
   `AUDIT: FAIL — UN-AUDITABLE`, and this card is dead on arrival. Likewise step 3's *"Read the
   contract fully, first"* (`skinner.md:117`) and the conformance matrix (`skinner.md:199-202`) are
   suspended: there is no contract to inventory and no conformance to matrix.
-- **Cold mode emits no `AUDIT:` line — ever.** Its report ends with a machine-judgeable line of a
+- **Cold mode emits no `AUDIT:` line for a review that ran — with one carve-out (ruling D12): a
+  contaminated dispatch.** `skinner.md`'s contamination check (`skinner.md:145-161`) runs in every
+  lens, including cold, and runs *before* lens-specific review begins; a contaminated `lens: cold`
+  dispatch is refused right there and returns `AUDIT: FAIL — CONTAMINATED: <what leaked>` — the one
+  and only `AUDIT:` line a cold dispatch may ever emit. This is not an exception to the rule so much
+  as its correct scope: the "no `AUDIT:` line" rule exists to stop the cold lens returning a verdict
+  on the *code*, and a CONTAMINATED refusal is a verdict on the *dispatch* — the review never ran.
+  idea 02's seal already makes `AUDIT: FAIL — CONTAMINATED` the single refusal token every caller
+  recognizes (`warchief.md:606` treats it as "not a verdict on the code" and does not let it consume
+  a fix-round); a second, cold-specific refusal token would fracture one concept across two tokens
+  for every future caller. Every other cold report ends with a machine-judgeable line of a
   *different shape*:
 
   ```
@@ -367,7 +377,7 @@ The change is prompt text; "before/after" is textual and behavioral, not visual.
 | Risk | Mitigation |
 |---|---|
 | **The cold lens self-destructs on `UN-AUDITABLE`.** `skinner.md:96-98` orders a Skinner with no contract to STOP and FAIL. Ship the Warchief-side change without the `skinner.md` mode switch and every cold dispatch returns an instant, meaningless FAIL. | This is the single highest-risk item and it is why the plan puts the `skinner.md` cold-mode switch in **Task 1, before** any Warchief-side dispatch change. The tripwire asserts the suspension explicitly. |
-| **A cold `AUDIT: FAIL` line is mistaken for a verdict** by an automated caller (`skinner.md:234-245` promises that line is machine-judgeable). | Cold mode is forbidden from emitting an `AUDIT:` line at all; its terminator is `COLD-LENS: N hypotheses`. Asserted by the tripwire (`hasnt AUDIT:` inside the cold-mode section) and by an eval. |
+| **A cold `AUDIT: FAIL` line is mistaken for a verdict** by an automated caller (`skinner.md:234-245` promises that line is machine-judgeable). | Cold mode is forbidden from emitting an `AUDIT:` line for a review that ran; its terminator is `COLD-LENS: N hypotheses`. The single carve-out (ruling D12) is a contaminated dispatch, which is refused before review begins and returns `AUDIT: FAIL — CONTAMINATED: <what leaked>` — a verdict on the dispatch, not the code, and the one and only `AUDIT:` line a cold dispatch may ever emit (`skinner.md:145-161`). Asserted by the tripwire and by an eval. |
 | **Goodharted noise.** "Assume the code is wrong" + no contract to bound scope ⇒ the cold lens invents nitpicks to justify itself, and the fixer thrashes. Alarm fatigue devalues every later review. | Three guards: the honorable `COLD-LENS: 0 hypotheses` path is written into the prompt *and* eval'd; `skinner.md`'s self-refutation pass (`:167-182`) still applies in full, so every hypothesis must survive a genuine refutation attempt and name a `file:line`; and only **Critical/Important** hypotheses can block a round. Idea 05 (fixer may drop unreproducible claims) is the structural relief and lands **before** this card. |
 | **The Warchief becomes the weak link** — it holds the contract, so it will be tempted to wave away cold hypotheses ("the spec doesn't ask for that") and hand back the very false-negative idea 01's both-must-PASS was buying. | The forbidden refutation is written as an explicit prohibition, an undispositioned hypothesis mechanically fails the round, and the disposition record is preserved verbatim in the report file where the Shaman reads it on escalation. This is also the sharpest thing for the future campaign's own Skinner audit to check. |
 | **The cold lens flags real bugs outside the diff's scope**, dragging fix rounds into unrelated code. | Disposition 3 ("valid but out of scope") exists exactly for this: it is recorded as a follow-up for the Shaman and does not block the round. Scope fences stay intact. |
