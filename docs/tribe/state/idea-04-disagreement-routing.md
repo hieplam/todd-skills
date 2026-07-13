@@ -422,6 +422,43 @@ adjudicates an `agreed` finding's `NOT_REPRODUCED` and the falsification artifac
 way. Extend the disambiguation prose to name **all three** escalation triggers, and guard the three-way
 distinction mechanically so a later editor cannot collapse them.
 
+## W12 — `TIEBREAK` gets a WRITE-TIME, which is what makes the per-key cap crash-safe (task 4, fix round 3)
+
+Both lenses landed on `TIEBREAK` again → class **`agreed`** → Critical. Two complementary claims:
+
+- **A (contract lens):** `TIEBREAK`'s membership in the enum row has **no mechanical guard** — delete it from
+  the row and the 87-assertion suite stays green. Every one of its 8 sibling values has a row-anchored
+  assertion; this one's assertions point at the *prose* instead.
+- **B (cold lens):** deeper — **no rule anywhere ever tells the Warchief to WRITE `TIEBREAK`.** Rung 2 reads
+  as synchronous (dispatch C → apply majority → record the *final* outcome), so the in-flight state never
+  gets persisted. A legal value that no rule produces is a trap.
+
+W10 defined what `TIEBREAK` *means* and never said **when it is written**. B is right that as it stands the
+value is unreachable.
+
+**But deleting it is the wrong fix, and the spec says why.** Spec §2.3 requires the one-tie-break-per-finding-key
+cap to survive a crash *"precisely because the count lives in a file rather than in the dead Warchief's head."*
+**`TIEBREAK` IS that record** — it is the only thing that can tell a re-dispatched Warchief "this key already
+spent its tie-break." Without a write, the cap is unenforceable across a crash and a resumed Warchief will
+happily dispatch a second tie-break on the same key.
+
+**Ruling — give `TIEBREAK` its write-time, in rung 2:**
+
+1. **Before dispatching the tie-break Skinner C, the Warchief WRITES the finding's row with
+   `routed: TIEBREAK`.** That write is what spends the key's one tie-break, and it lands *before* C is
+   dispatched precisely so a crash mid-tie-break cannot lose the fact.
+2. **When C returns, the outcome is APPENDED as a new row** (per W10's per-round append rule): `TO_FIXER`,
+   `DROPPED (tie-break, round N)`, or a rung-3 escalation.
+3. **A resumed Warchief that finds a `TIEBREAK` row for a finding key treats that key's tie-break as SPENT** —
+   it goes straight to rung 3, never dispatching a second one. This is the per-key cap made crash-safe, which
+   is what spec §2.3 asked for and never got.
+4. Guard `TIEBREAK`'s presence **in the enum row** with a row-anchored assertion, like its 8 siblings (A's
+   finding), and guard the write-time rule and the resume rule mechanically.
+
+The idempotence sentence in the ledger prose ("a resumed Warchief re-runs the round and re-derives the same
+classes") stays true and is not in conflict: **classes** are re-derivable from the diff; **how many tie-breaks
+a key has already spent** is not — that is history, and history must be written down.
+
 ## Scope fence (from the plan's Global Constraints)
 
 Touch only: `plugins/tribe/agents/warchief.md` (step 6 only),
