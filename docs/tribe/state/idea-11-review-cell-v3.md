@@ -53,6 +53,19 @@ The PR body must DISCLOSE this split plainly — never imply four green evals. A
 on either executed eval is a finding and a stop condition (plan, task 5): report it, do not weaken
 any `expected_output`.
 
+### D-owner-3 — merge strategy is REBASE & MERGE, always
+The owner ruled, mid-campaign and standing: **always use Rebase & merge**, never squash.
+
+This **overrides** `warchief.md` step 7 ("Squash-merge into the default branch once green") and the
+`verify-shipped` skill, which mechanically checks `merge strategy == squash` as the owner's own
+encoded Definition of Done. The owner outranks the playbook, so this campaign merges with
+`gh pr merge --rebase`.
+
+**Follow-up for the Shaman (do not fix here — out of this card's fence):** two shipped artifacts
+now encode a merge strategy the owner has superseded — `warchief.md` step 7's squash mandate and
+`verify-shipped`'s squash check. They must be amended to match D-owner-3, or every future campaign
+re-derives this conflict by hand. Filed, not fixed.
+
 ## Warchief adjudications (How-level, recorded at intake)
 
 1. **Plan checkboxes ARE ticked in each task commit** (`docs/tribe/planning/idea-11-review-cell-v3/plan.md`),
