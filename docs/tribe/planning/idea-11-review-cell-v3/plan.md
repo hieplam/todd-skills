@@ -60,7 +60,7 @@ definitions). Files: `plugins/tribe/agents/skinner.md` (edit),
 `plugins/tribe/scripts/tests/test-review-cell-v3.sh` (create). Do not touch warchief.md — its
 half of Delta-A/B is task 3.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `plugins/tribe/scripts/tests/test-review-cell-v3.sh` with the shared harness its siblings
 use (flattened haystacks, `has`/`hasnt`, per-section extraction — copy the harness pattern from
@@ -133,7 +133,7 @@ bash plugins/tribe/scripts/tests/test-review-cell-v3.sh
 skinner.md; the remaining 11 fail (no sub-lenses, no path-scope rule yet). Roughly
 `6 passed, 11 failed`, exit 1. Report the observed split.
 
-- [ ] **Step 2: Make it green — restructure the cold-lens section**
+- [x] **Step 2: Make it green — restructure the cold-lens section**
 
 Edit `plugins/tribe/agents/skinner.md`. Keep the `### lens: cold — the bare-diff reviewer`
 heading and every shipped rule under it (they are the shared base both sub-lenses inherit — the
@@ -176,7 +176,7 @@ before lens-specific review begins. Same mechanism, same precedence, same "consu
 accounting; nothing new is invented here.
 ```
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-review-cell-v3.sh
@@ -192,7 +192,7 @@ siblings pin. If any sibling assertion reds, restore the phrase (it is NOT on th
 supersession list — task 1 has none). Then run the D14 per-clause mutation bar on every new
 assertion (delete the guarded clause, observe that assertion red, restore).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/skinner.md plugins/tribe/scripts/tests/test-review-cell-v3.sh \
