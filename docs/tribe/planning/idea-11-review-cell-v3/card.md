@@ -92,5 +92,6 @@ wording. Shaman decides: the two-of-three `agreed` supersession, any change to L
 change to the 3-round cap. Owner (already ruled, D23): this card is funded and jumps the
 parked queue.
 
-**Status:** card only — spec + plan to be forged by a planning Warchief per the standard flow
-(validate-plan.sh-passing) before implementation.
+**Status:** spec + plan forged and committed (`spec.md`, `plan.md` in this directory; plan is
+validate-plan.sh-passing, 5 tasks). An implementation Warchief starts at Method step 4
+(isolate) — steps 2–3 are done; the spec and plan are settled law.
