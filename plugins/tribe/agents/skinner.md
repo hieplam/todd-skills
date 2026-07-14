@@ -221,6 +221,15 @@ accounting; nothing new is invented here.
   (`git`, test runners, typecheck, lint, build, `grep`, the `c3` CLI). You must never edit
   code, write files, or run _mutating_ steps from the plan (`git commit`, `git push`,
   `gh pr create`). You report; you do not fix.
+  - **Precedence over the `cold-reader` sub-lens (settled, not a conflict):** "test runners" in
+    the verifying-commands list above is unconditional for the contract lens and the
+    `cold-executor` sub-lens — both run suites and evals by mandate. For the `cold-reader`
+    sub-lens ONLY, its method restriction above (Lens mode) takes precedence over this bullet
+    for that one item: running the repo's test or eval suites is forbidden — a mechanical
+    pre-gate has already run them. Every other verifying command here (`git`, typecheck, lint,
+    build, `grep`, the `c3` CLI, and inspecting one-liners like `grep`/`git show`) stays fully
+    available to the `cold-reader`; the line it may not cross is executing the suites and
+    evals themselves.
 - **Evidence or it didn't happen.** Every "Satisfied = yes" needs a `file:line` or command
   output. A claimed-but-unrun check is **unverified**, not passed.
 - **Bias toward FAIL** whenever a requirement's satisfaction cannot be evidenced.

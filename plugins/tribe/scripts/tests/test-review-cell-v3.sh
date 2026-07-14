@@ -24,6 +24,12 @@ COLD_READER="$(awk '/^#### `lens: cold-reader`/{f=1} /^Both sub-lenses/{f=0} f' 
 # here.
 OPRULES="$(awk '/^## Operating rules/{f=1} /^## Method/{f=0} f' "$AGENTS/skinner.md" \
         | tr '\n' ' ' | tr -s ' ')"
+# The single "Read + verify only" bullet, anchored to its OWN top-level-bullet span (never the
+# whole $OPRULES span): idea-11 fix round 2 finding F8's precedence sentence lives here. A
+# decoy planted anywhere else in $OPRULES (e.g. near the contamination bullet's "cold lens"
+# mentions) must not satisfy this needle — verified by mutation, see Hunter report.
+OPRULES_VERIFY="$(awk '/^- \*\*Read \+ verify only/{f=1} /^- \*\*Evidence or it didn.t happen/{f=0} f' \
+        "$AGENTS/skinner.md" | tr '\n' ' ' | tr -s ' ')"
 pass=0; fail=0
 has()   { if echo "$2" | grep -qiE "$3"; then echo "ok: $1"; pass=$((pass+1)); \
           else echo "FAIL: $1 (missing: $3)"; fail=$((fail+1)); fi; }
@@ -41,14 +47,16 @@ has "b1: cold-reader subsection exists"      "$COLD" 'lens.{0,4}cold-reader'
 # contributors actually run) hard-errors "maximum repetition exceeds 255" on any {m,n} with n > 255,
 # which makes the assertion never executable on ANY content (verified: fails identically before and
 # after the skinner.md edit). Same fix, same reason, as test-input-asymmetry.sh's {0,200} convention.
-has "b1: executor must run things"           "$COLD" 'cold-executor.{0,200}must run'
-# idea-11 fix round 1 finding F2: these three needles are anchored to their OWN sub-lens span
-# ($COLD_EXEC / $COLD_READER), not the whole $COLD span — a relocation into the wrong sub-lens
-# now reds the assertion instead of passing invisibly (verified by mutation, see Hunter report).
+# idea-11 fix round 1 finding F2 and fix round 2 findings F6/F7: every needle below that names a
+# sub-lens rule is anchored to that sub-lens's OWN span ($COLD_EXEC / $COLD_READER), never the
+# whole shared $COLD span — a relocation into the wrong sub-lens now reds the assertion instead
+# of passing invisibly, including via a decoy planted near an earlier same-name mention elsewhere
+# in $COLD (verified by mutation, see Hunter report).
+has "b1: executor must run things"           "$COLD_EXEC" 'cold-executor.{0,200}must run'
 has "b1: executor findings cite command output" "$COLD_EXEC" 'cite.{0,80}command.{0,40}output'
 has "b1: reading with no run is not an executor finding" "$COLD_EXEC" \
     'no run behind it.{0,80}minor'
-has "b1: reader must not execute the suites" "$COLD" \
+has "b1: reader must not execute the suites" "$COLD_READER" \
     'cold-reader.{0,200}must not (execute|run).{0,60}(test|eval|suite)'
 has "b1: reader inspect-vs-execute line drawn" "$COLD_READER" \
     'inspect.{0,120}reading, not executing'
@@ -75,6 +83,16 @@ has "a: refusal reuses the shipped mechanism" "$COLD" 'audit: fail .{0,4}contami
 # lens (spec Delta-A: "the contract lens's diff stays full-range").
 has "f1: artifacts carve-out is cold-scoped; contract lens stays unconditional" "$OPRULES" \
     'unconditional for the contract lens.{0,200}cold lens only.{0,200}carved out'
+
+# idea-11 fix round 2 finding F8: the Operating-rules "you may run verifying commands (... test
+# runners ...)" bullet (line ~220) contradicted the new cold-reader sub-lens's method restriction
+# ("must not execute the repo's test or eval suites") for the same action. The precedence
+# sentence below reconciles them, in the same shape as the F1 reconciliation above: names both
+# halves (the carve-out AND what stays unconditional for the other lenses) in one needle so
+# neither half can silently drop out from under the other.
+has "f8: cold-reader carved out of running test runners; executor+contract stay unconditional" \
+    "$OPRULES_VERIFY" \
+    'unconditional for the contract lens and the.{0,20}cold-executor.{0,180}cold-reader.{0,80}takes precedence.{0,120}test or eval suites is forbidden'
 
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
