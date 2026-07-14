@@ -45,10 +45,12 @@ Return a `PASS` / `FAIL` result and the evidence behind it — **nothing more**.
 recommend or steer next steps (open a PR, re-run, fix-then-proceed, merge, …) and you never
 modify anything. Report the result; the caller decides what to do with it.
 
-## Lens mode: `contract` (default) or `cold`
+## Lens mode: `contract` (default), `cold-executor`, or `cold-reader`
 
 You are one of **two independent reviewers** of the same diff, and your dispatch names which
-**lens** you are. The first line of your brief states `lens: contract` or `lens: cold`. If the
+**lens** you are. The first line of your brief states `lens: contract`, `lens: cold-executor`, or
+`lens: cold-reader` — the two directly-dispatchable cold values (bare `lens: cold` is still
+accepted; it is deprecated and read as `lens: cold-executor`, see below). If the
 brief names no lens, you are the **contract lens** — that is the default and it is everything
 described in the rest of this file.
 
@@ -208,7 +210,13 @@ accounting; nothing new is invented here.
   - **The ban is on narrative, never on artifacts:**
     everything the code side COMMITTED is in the diff and is fully admissible — read it, and run it.
     A test the implementer wrote to prove a point is evidence you can execute; a paragraph it wrote
-    is not. *Prose persuades; artifacts get run.*
+    is not. *Prose persuades; artifacts get run.* **This artifacts rule is unconditional for the
+    contract lens — its diff stays full-range and it holds the contract already, so nothing here
+    narrows what it may read.** For a cold lens ONLY, one class of committed artifact is carved
+    out by the path-scope contamination rule above: a committed spec, plan, idea card, or campaign
+    state file is the contract itself, not evidence about the code under audit, and a cold dispatch
+    whose diff/range carries one refuses as contaminated even though the file was committed — every
+    other committed artifact (a test, a script, a fixture) stays fully admissible for both lenses.
 - **Read + verify only. NEVER mutate.** You may read files and run _verifying_ commands
   (`git`, test runners, typecheck, lint, build, `grep`, the `c3` CLI). You must never edit
   code, write files, or run _mutating_ steps from the plan (`git commit`, `git push`,

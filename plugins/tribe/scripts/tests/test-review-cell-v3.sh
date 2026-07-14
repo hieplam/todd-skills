@@ -13,6 +13,17 @@ SKIN="$(tr '\n' ' ' < "$AGENTS/skinner.md" | tr -s ' ')"
 # '## Operating rules'. Sub-lens subsections use #### so they stay inside this span.
 COLD="$(awk '/^## Lens mode/{f=1} /^## Operating rules/{f=0} f' "$AGENTS/skinner.md" \
         | tr '\n' ' ' | tr -s ' ')"
+# Sub-lens spans, each anchored to its OWN heading (never the whole cold span): idea-11 fix
+# round 1 finding F2 proved the whole-span assertions stay green even when a clause is
+# relocated into the wrong sub-lens. These extractions make relocation observable.
+COLD_EXEC="$(awk '/^#### `lens: cold-executor`/{f=1} /^#### `lens: cold-reader`/{f=0} f' \
+        "$AGENTS/skinner.md" | tr '\n' ' ' | tr -s ' ')"
+COLD_READER="$(awk '/^#### `lens: cold-reader`/{f=1} /^Both sub-lenses/{f=0} f' \
+        "$AGENTS/skinner.md" | tr '\n' ' ' | tr -s ' ')"
+# Operating-rules span only (never whole-file): idea-11 fix round 1 finding F1's carve-out lives
+# here.
+OPRULES="$(awk '/^## Operating rules/{f=1} /^## Method/{f=0} f' "$AGENTS/skinner.md" \
+        | tr '\n' ' ' | tr -s ' ')"
 pass=0; fail=0
 has()   { if echo "$2" | grep -qiE "$3"; then echo "ok: $1"; pass=$((pass+1)); \
           else echo "FAIL: $1 (missing: $3)"; fail=$((fail+1)); fi; }
@@ -31,12 +42,15 @@ has "b1: cold-reader subsection exists"      "$COLD" 'lens.{0,4}cold-reader'
 # which makes the assertion never executable on ANY content (verified: fails identically before and
 # after the skinner.md edit). Same fix, same reason, as test-input-asymmetry.sh's {0,200} convention.
 has "b1: executor must run things"           "$COLD" 'cold-executor.{0,200}must run'
-has "b1: executor findings cite command output" "$COLD" 'cite.{0,80}command.{0,40}output'
-has "b1: reading with no run is not an executor finding" "$COLD" \
+# idea-11 fix round 1 finding F2: these three needles are anchored to their OWN sub-lens span
+# ($COLD_EXEC / $COLD_READER), not the whole $COLD span — a relocation into the wrong sub-lens
+# now reds the assertion instead of passing invisibly (verified by mutation, see Hunter report).
+has "b1: executor findings cite command output" "$COLD_EXEC" 'cite.{0,80}command.{0,40}output'
+has "b1: reading with no run is not an executor finding" "$COLD_EXEC" \
     'no run behind it.{0,80}minor'
 has "b1: reader must not execute the suites" "$COLD" \
     'cold-reader.{0,200}must not (execute|run).{0,60}(test|eval|suite)'
-has "b1: reader inspect-vs-execute line drawn" "$COLD" \
+has "b1: reader inspect-vs-execute line drawn" "$COLD_READER" \
     'inspect.{0,120}reading, not executing'
 has "b1: bare cold deprecation ruling"       "$COLD" \
     'lens: cold.{0,80}(read|treated) as.{0,20}cold-executor'
@@ -52,6 +66,15 @@ has "base: cold-lens terminator survives"    "$COLD" 'cold-lens: n hypotheses'
 has "a: contract-bearing diff is contamination" "$COLD" \
     '(diff|range).{0,120}(spec|plan|idea card|state file).{0,160}contaminat'
 has "a: refusal reuses the shipped mechanism" "$COLD" 'audit: fail .{0,4}contaminated'
+
+# idea-11 fix round 1 finding F1: the Operating-rules "ban is on narrative, never on artifacts"
+# rule (line ~210) contradicted the new path-scope contamination rule (Delta-A above) for the
+# same case — a committed spec/plan/idea-card/state file in a cold diff. The carve-out below
+# stays COLD-SCOPED: the contract lens's own artifacts rule is asserted unconditional in the
+# same clause, so this assertion also guards that the carve-out never widens onto the contract
+# lens (spec Delta-A: "the contract lens's diff stays full-range").
+has "f1: artifacts carve-out is cold-scoped; contract lens stays unconditional" "$OPRULES" \
+    'unconditional for the contract lens.{0,200}cold lens only.{0,200}carved out'
 
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
