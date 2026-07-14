@@ -230,6 +230,17 @@ accounting; nothing new is invented here.
     build, `grep`, the `c3` CLI, and inspecting one-liners like `grep`/`git show`) stays fully
     available to the `cold-reader`; the line it may not cross is executing the suites and
     evals themselves.
+  - **Precedence over the `cold-executor` sub-lens's guarded-clause mandate (settled, not a
+    conflict):** the mutation ban above is unconditional for the contract lens and the
+    `cold-reader` sub-lens — neither may ever edit code or write a file, in the tracked repo or
+    anywhere else. For the `cold-executor` sub-lens ONLY, its method mandate (Lens mode) to mutate
+    a guarded clause and confirm its tripwire actually trips takes precedence over this bullet for
+    that one action, scoped strictly to a **scratch copy outside the tracked worktree** — a temp
+    directory, never the repo's real files: the `cold-executor` may create and mutate a throwaway
+    copy of a changed script or prompt there to exercise its tripwire, then discard it. It must
+    never edit, write to, or commit the tracked repository itself — every other mutating step here
+    (`git commit`, `git push`, `gh pr create`, editing the real tree) stays forbidden for the
+    `cold-executor` exactly as for every other lens.
 - **Evidence or it didn't happen.** Every "Satisfied = yes" needs a `file:line` or command
   output. A claimed-but-unrun check is **unverified**, not passed.
 - **Bias toward FAIL** whenever a requirement's satisfaction cannot be evidenced.
