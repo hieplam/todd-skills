@@ -17,7 +17,7 @@ section; the constraints below are the union of those sections, verified pairwis
 | 08 | integrate-wave-script — integrate-wave.sh replaces step-5 prose | 8 | `idea-08-integrate-wave-script/` |
 | 09 | ephemeral-warchief — intentional HANDOFF exit per wave | 9 | `idea-09-ephemeral-warchief/` |
 | 10 | meta-loop-tripwires — findings ledger + self-minted tripwire rules | 8 | `idea-10-meta-loop-tripwires/` |
-| 11 | review-cell-v3 — path-scoped cold diff, cold executor + cold reader, mechanical pre-gate, measured reviewers | 4 (card only — spec/plan to forge) | `idea-11-review-cell-v3/` |
+| 11 | review-cell-v3 — path-scoped cold diff, cold executor + cold reader, mechanical pre-gate, measured reviewers | 5 | `idea-11-review-cell-v3/` |
 
 ## Implementation-campaign sequencing constraints (binding, from the specs)
 
@@ -61,7 +61,7 @@ a time, each in its own worktree branched from current master.
 | 01 | SHIPPED — PR #29 (b1f508a), verify-shipped PASS, 130/130 assertions + 12/12 evals green |
 | 03 | SHIPPED — PR #30 (d21724c), verify-shipped PASS, 175/175 assertions + 16 evals green; suite hardened 34→46 per-clause-mutation-proved |
 | 04 | SHIPPED — PR #31 (1c0af4c), verify-shipped PASS, 358/358 assertions across 7 suites + 20 evals green on master |
-| 11 | FUNDED — next up per D23 (owner); card committed, spec/plan to be forged before implementation |
+| 11 | FUNDED — next up per D23 (owner); card + spec + plan committed (plan validate-plan.sh-passing, 5 tasks); implementation Warchief starts at step 4 |
 | 06, 10, 07, 08, 09 | PARKED per D21 (owner); resume order re-set by D23: **11 → 06 → 10 → 07 → 08 → 09** |
 
 ### Decision Log (implementation campaign)
