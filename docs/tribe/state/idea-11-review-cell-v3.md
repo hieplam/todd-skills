@@ -9,7 +9,8 @@ plan: docs/tribe/planning/idea-11-review-cell-v3/plan.md
 ## Milestones
 - [x] spec committed (on master, planning campaign — db87488)
 - [x] plan committed (on master, planning campaign — validate-plan.sh verdict: pass, 5 tasks, 7/7 checks)
-- [ ] wave 1 integrated (tasks 1-5; strictly serial, single worktree)
+- [x] task 1 shipped (skinner.md sub-lenses + path-scope rule; 3 fix rounds, 6 Skinner reports)
+- [ ] tasks 2-5 (pre-gate.sh, warchief.md 3-lens law, ledger columns, evals) — NOT BUILT
 
 ## Campaign type
 
@@ -84,3 +85,26 @@ re-derives this conflict by hand. Filed, not fixed.
 ## Tie-breaks spent
 
 (none yet)
+
+## Open debt — must be paid BEFORE task 3 lands
+
+**F16 (Important, unfixed):** `skinner.md` still says "two independent reviewers" / "the other
+reviewer" (singular) in 4 places, including the anti-collusion rule. This is TRUE today — the
+shipped cell is still two Skinners, because warchief.md's three-lens dispatch is task 3 and task 3
+is not built. It becomes a **seal defect the moment task 3 lands**: a Skinner reading "you will
+never be told what THE OTHER reviewer found" has textual grounds to treat a THIRD report as not the
+forbidden peer. Found by the contract lens, round 3. Fix it in task 1's file as the first act of
+task 3, or the three-lens cell ships with a hole in its isolation invariant.
+
+## Follow-ups filed for the Shaman (out of this card's fence)
+
+1. **D14 is still too weak** (owner-ruled: file, do not fix here). D14 was itself minted to close a
+   hollow-assertion hole (whole-file revert → per-clause delete). Its delete-only bar let 7 more
+   vacuous assertions through this campaign, caught only by RELOCATION and DECOY mutations. Every
+   assertion in the repo's 7 shipped suites (358 total) was certified under the weaker bar and has
+   never been tested at the stronger strengths. Nobody knows how many are dead.
+2. **warchief.md step 7 + verify-shipped mandate squash-merge**, which D-owner-3 supersedes.
+3. **A Skinner can finish without writing its report file.** Happened twice (round-2 cold, round-3
+   contract). The Warchief has no mechanical way to tell "no findings" from "never reported". The
+   Skinner brief must make the report file a precondition of finishing, and a missing report must
+   be treated as `un-auditable` (already a round failure under Law 4), never as silence.
