@@ -303,5 +303,26 @@ has "a: unscoped range is a forbidden channel" "$STEP6" \
 has "a: contract lens diff stays full-range"   "$STEP6" \
     'contract lens.s diff stays full-range'
 
+# --- Task 3b (Delta-C, law half): the pre-gate step-6.0 law --------------------------------
+# Polarity self-check (D14, applied before commit, not after a Skinner finding — see Hunter
+# report): the plan's own draft needles for "a: pre-gate runs before any skinner", "a: red
+# pre-gate is not an audit round" and "a: contract brief carries the report" used wide
+# co-occurrence gaps (.{0,60}/.{0,160}/.{0,80}) that a natural opposite-meaning rewrite still
+# satisfies (e.g. "the pre-gate need not run before dispatching any Skinner" still matches
+# 'pre-gate.{0,60}before dispatching any skinner'; "...(path or content), which is never treated
+# as settled mechanical fact" still matches the given contract-brief needle). Tightened to a
+# near-zero-gap quote of the load-bearing phrase itself, same technique as fix round F4 above, so
+# an inserted qualifier breaks the match (verified by mutation, see Hunter report). The "cold
+# brief does not carry it" and "mandatory full-sweep clause is retired" needles below are used
+# as originally drafted — both already anchor a specific verb-negation pair / a literal
+# zero-gap phrase and survived the same polarity check unchanged.
+has "c: pre-gate runs before any skinner"      "$STEP6" \
+    'pre-gate\.sh.{0,10}against the range under audit before dispatching any skinner'
+has "c: red pre-gate is not an audit round"    "$STEP6" 'unfinished work, not an audit round'
+has "c: contract brief carries the report"     "$STEP6" \
+    'contract lens.s brief carries the pre-gate.s report \(path or content\) as .{0,6}settled mechanical fact'
+has "c: cold brief does not carry it"          "$STEP6" 'cold lens.s brief does.{0,10}not.{0,10}carry it'
+has "c: the mandatory full-sweep clause is retired" "$STEP6" 'stop mandating full-suite re-runs'
+
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

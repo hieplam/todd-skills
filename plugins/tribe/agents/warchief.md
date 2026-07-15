@@ -458,6 +458,19 @@ dispatched exactly as any other discovery round, with no accumulated history of 
 decided. Delivery may proceed only when the final audit's fix list is empty and every
 Critical/Important finding it carries ends REFUTED-with-evidence or legal DEBT.
 
+**Step 6.0 — run the pre-gate before dispatching any Skinner.** Run
+`plugins/tribe/scripts/pre-gate.sh` against the range under audit before dispatching any Skinner. A
+red pre-gate means the deliverable is mechanically incomplete — that is the Hunter's unfinished
+work, not an audit round: route the script's report back to a fixer Hunter as an ordinary
+incomplete-deliverable follow-up, and dispatch no Skinner against a mechanically broken branch. An
+audit round begins only on a green pre-gate, so a red pre-gate consumes no fix round. On a green
+pre-gate, the contract lens's brief carries the pre-gate's report (path or content) as **settled
+mechanical fact** — machine output of committed scripts run against the committed diff,
+contract-class by the D9 admissibility test, never the code side's prose; the cold lens's brief
+does **not** carry it. Reviewer briefs stop mandating full-suite re-runs: the contract lens still
+runs whatever proof the contract requires and may re-run any suite to falsify a specific
+hypothesis; the cold lens runs whatever its own method already mandates, unchanged.
+
 **Law 1 — two lenses, two briefs, one message.** Every discovery round dispatches **two `skinner`
 instances as two tool uses in the same message** (that is what makes them concurrent), both
 `model: sonnet`, both **against the diff**. That much is the cell. What differs is **what each one
