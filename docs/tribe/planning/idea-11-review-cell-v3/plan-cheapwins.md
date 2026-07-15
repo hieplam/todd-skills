@@ -284,7 +284,7 @@ Skinner-B paragraph + forbidden-channel table only; do NOT touch the "two lenses
 message" sentence or the dispatch-count), `test-review-cell-v3.sh` (new section + new `WAR`/`STEP6`
 extraction variables).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Read `test-review-cell-v3.sh` first. Add these two extraction variables near the top, right after
 the existing `COLD_PATHSCOPE=` block and before `pass=0; fail=0`:
@@ -310,7 +310,7 @@ has "a: contract lens diff stays full-range"   "$STEP6" 'contract lens.{0,60}sta
 Run it. **Expected RED:** 4 new assertions fail (warchief.md has no path-scope law yet). Tally:
 `25 passed, 4 failed`.
 
-- [ ] **Step 2: Make it green**
+- [x] **Step 2: Make it green**
 
 Edit `plugins/tribe/agents/warchief.md`. Add a new row to the "Forbidden in the cold brief" table
 (the row list ending `| the other Skinner's findings, verdict, report path, or existence | Law 2,
@@ -333,7 +333,7 @@ effectively as putting it in the brief would (the forbidden-channel table above 
 only blind the conformance check, never protect anything.
 ```
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-review-cell-v3.sh
@@ -348,7 +348,7 @@ content inside Law 1's existing paragraph and table; it does not delete or rewor
 Global Constraints' preservation list names. If any sibling reds, that phrase was touched
 unintentionally — restore it. Run D14 mutation bar on the 4 new assertions.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-review-cell-v3.sh \

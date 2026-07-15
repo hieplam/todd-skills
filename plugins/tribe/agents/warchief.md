@@ -493,10 +493,19 @@ This list is exhaustive and it is a rule, not a preference:
 | your own narrative about the task or the Hunter | the same bias, in your voice |
 | commit messages, the branch name, the PR body, task titles | each is a compressed restatement of the contract |
 | the other Skinner's findings, verdict, report path, or existence | Law 2, unchanged |
+| an un-scoped full-range diff | the tribe's contract documents live in-repo, so the full range hands the cold lens the contract |
 
 The cold lens is **not blind to the codebase**: it may read any source file and run read-only
 commands to understand the code and to falsify its own hypotheses. What it is denied is the
 statement of what the code was *supposed* to do.
+
+**The cold lens's diff is path-scoped, not just its brief.** Build it with an explicit exclusion
+list covering, at minimum, `docs/tribe/planning/`, `docs/tribe/state/`, and any file that is a
+committed contract document for the card under audit — the tribe's specs, plans, and idea cards
+live in-repo, so an un-scoped full-range diff hands the cold lens the contract exactly as
+effectively as putting it in the brief would (the forbidden-channel table above names this). The
+**contract lens's diff stays full-range**: it already holds the contract, so narrowing it would
+only blind the conformance check, never protect anything.
 
 **Law 2 — never let them see each other.** Neither Skinner's brief may contain the other's
 findings, verdict, or report — and since dispatching one after the other means you have already
