@@ -206,6 +206,78 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
     echo "FAIL: c: fence violation exits 1"; fail=$((fail+1))
     echo "FAIL: c: violation named in the report"; fail=$((fail+1))
   fi
+  # Self-test 3 (F1 fix): an unresolvable --range is a setup error (exit 2), never a silent
+  # zero-iteration pass; a VALID but EMPTY range must stay a legitimate pass (exit 0). Uses an
+  # isolated throwaway repo so the assertion never depends on this repo's real commit history.
+  F1REPO="$TMPD/f1repo"
+  git init -q "$F1REPO"
+  git -C "$F1REPO" -c user.email=t@t.com -c user.name=t commit -q --allow-empty -m init
+  if [ -x "$GATE" ]; then
+    PREGATE_INNER=1 "$GATE" --repo "$F1REPO" --range 'nonexistent-ref-xyz..HEAD' --tests-dir "$HERE" \
+      --report "$TMPD/f1-bad.md" >/dev/null 2>"$TMPD/f1-bad.err"
+    F1BADCODE=$?
+    [ "$F1BADCODE" -eq 2 ] && grep -qi 'unresolvable range' "$TMPD/f1-bad.err" \
+      && { echo "ok: f1: unresolvable range is a setup error (exit 2)"; pass=$((pass+1)); } \
+      || { echo "FAIL: f1: unresolvable range is a setup error (exit 2)"; fail=$((fail+1)); }
+
+    PREGATE_INNER=1 "$GATE" --repo "$F1REPO" --range 'HEAD..HEAD' --tests-dir "$HERE" \
+      --report "$TMPD/f1-empty.md" >/dev/null 2>&1
+    [ $? -eq 0 ] && { echo "ok: f1: valid empty range still exits 0"; pass=$((pass+1)); } \
+                 || { echo "FAIL: f1: valid empty range still exits 0"; fail=$((fail+1)); }
+  else
+    echo "FAIL: f1: unresolvable range is a setup error (exit 2)"; fail=$((fail+1))
+    echo "FAIL: f1: valid empty range still exits 0"; fail=$((fail+1))
+  fi
+
+  # Self-test 4 (F2 fix): a fence glob's lone `*` matches within ONE path segment only — it must
+  # NOT cross a directory boundary. `plugins/tribe/scripts/*.sh` must allow a top-level file but
+  # flag a same-named-extension file nested one level deeper as a violation.
+  F2REPO="$TMPD/f2repo"
+  git init -q "$F2REPO"
+  git -C "$F2REPO" -c user.email=t@t.com -c user.name=t commit -q --allow-empty -m base
+  mkdir -p "$F2REPO/plugins/tribe/scripts/tests"
+  echo x > "$F2REPO/plugins/tribe/scripts/goodfile.sh"
+  echo y > "$F2REPO/plugins/tribe/scripts/tests/nested.sh"
+  ( cd "$F2REPO" && git add -A \
+    && git -c user.email=t@t.com -c user.name=t commit -q -m changes --trailer "Tribe-Card: x" )
+  F2FENCE="$TMPD/f2fence.globs"; printf 'plugins/tribe/scripts/*.sh\n' > "$F2FENCE"
+  if [ -x "$GATE" ]; then
+    PREGATE_INNER=1 "$GATE" --repo "$F2REPO" --range 'HEAD~1..HEAD' --tests-dir "$HERE" \
+      --report "$TMPD/f2.md" --fence "$F2FENCE" >/dev/null 2>&1
+    F2CODE=$?
+    grep -q 'plugins/tribe/scripts/goodfile.sh — in fence' "$TMPD/f2.md" \
+      && grep -q 'plugins/tribe/scripts/tests/nested.sh — FENCE VIOLATION' "$TMPD/f2.md" \
+      && [ "$F2CODE" -eq 1 ] \
+      && { echo "ok: f2: single-star fence glob does not cross a directory boundary"; pass=$((pass+1)); } \
+      || { echo "FAIL: f2: single-star fence glob does not cross a directory boundary"; fail=$((fail+1)); }
+  else
+    echo "FAIL: f2: single-star fence glob does not cross a directory boundary"; fail=$((fail+1))
+  fi
+
+  # Self-test 5 (F3 fix): a fence FILE whose last glob line lacks a trailing newline must still
+  # apply that last glob — a bare `read` returning non-zero on the unterminated final line must
+  # not silently drop it and false-flag a legitimate file as a violation.
+  F3REPO="$TMPD/f3repo"
+  git init -q "$F3REPO"
+  git -C "$F3REPO" -c user.email=t@t.com -c user.name=t commit -q --allow-empty -m base
+  mkdir -p "$F3REPO/docs" "$F3REPO/plugins/tribe/scripts"
+  echo x > "$F3REPO/docs/placeholder.txt"
+  echo y > "$F3REPO/plugins/tribe/scripts/lastglobfile.sh"
+  ( cd "$F3REPO" && git add -A \
+    && git -c user.email=t@t.com -c user.name=t commit -q -m changes --trailer "Tribe-Card: x" )
+  F3FENCE="$TMPD/f3fence.globs"
+  printf 'docs/**\nplugins/tribe/scripts/*.sh' > "$F3FENCE"   # deliberately NO trailing newline
+  if [ -x "$GATE" ]; then
+    PREGATE_INNER=1 "$GATE" --repo "$F3REPO" --range 'HEAD~1..HEAD' --tests-dir "$HERE" \
+      --report "$TMPD/f3.md" --fence "$F3FENCE" >/dev/null 2>&1
+    F3CODE=$?
+    grep -q 'plugins/tribe/scripts/lastglobfile.sh — in fence' "$TMPD/f3.md" && [ "$F3CODE" -eq 0 ] \
+      && { echo "ok: f3: fence file's unterminated last line still applies its glob"; pass=$((pass+1)); } \
+      || { echo "FAIL: f3: fence file's unterminated last line still applies its glob"; fail=$((fail+1)); }
+  else
+    echo "FAIL: f3: fence file's unterminated last line still applies its glob"; fail=$((fail+1))
+  fi
+
   rm -rf "$TMPD"
 fi
 
