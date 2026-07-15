@@ -72,7 +72,7 @@ error): `test-review-cell-v3.sh` 20/0, `test-input-asymmetry.sh` 47/0, `test-dua
 `plugins/tribe/scripts/pre-gate.sh` (create), `plugins/tribe/scripts/tests/test-review-cell-v3.sh`
 (insert new section immediately before the file's final tally block).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Read `plugins/tribe/scripts/tests/test-review-cell-v3.sh` first. Insert the block below
 immediately **before** its last two lines (`echo; echo "$pass passed, $fail failed"` /
@@ -130,7 +130,7 @@ Run it: `bash plugins/tribe/scripts/tests/test-review-cell-v3.sh`
 **Expected RED:** the `pre-gate.sh exists` check and both self-tests fail (script does not exist
 yet) — 5 new assertions fail. Tally: `20 passed, 5 failed`. Report the observed split if different.
 
-- [ ] **Step 2: Make it green — write the script**
+- [x] **Step 2: Make it green — write the script**
 
 Create `plugins/tribe/scripts/pre-gate.sh`, `chmod +x`. Stateless: every input is a CLI arg,
 nothing repo-specific baked in. Use this reference implementation as written unless a defect is
@@ -243,7 +243,7 @@ Note vs. the original card-era draft: the inner `bash "$t"` sweep loop now also 
 `PREGATE_INNER=1` to every suite it runs — required so that when the sweep reaches
 `test-review-cell-v3.sh` itself, that inner run skips its own self-test block (see Step 1's note).
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 chmod +x plugins/tribe/scripts/pre-gate.sh
@@ -261,7 +261,7 @@ assertions (delete the guarded behavior in `pre-gate.sh` — e.g. comment out th
 change `[ "$overall" = pass ]` — run the suite, confirm only the intended assertion(s) go red,
 restore). Hand-verify twice: missing required arg exits 2; unknown flag exits 2.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/scripts/pre-gate.sh plugins/tribe/scripts/tests/test-review-cell-v3.sh \
