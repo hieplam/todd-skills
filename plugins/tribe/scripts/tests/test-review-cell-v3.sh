@@ -57,6 +57,11 @@ OPRULES_MUTATE="$(awk '/^  - \*\*Precedence over the `cold-executor`/{f=1} \
 # elsewhere in $OPRULES (verified by mutation, see Hunter report).
 ARTIFACTS_BULLET="$(awk '/^  - \*\*The ban is on narrative/{f=1} /^- \*\*Read \+ verify only/{f=0} f' \
         "$AGENTS/skinner.md" | tr '\n' ' ' | tr -s ' ')"
+# warchief.md step 6, whole span (task 2 of this wave onward reads from here). $AGENTS is
+# already "$HERE/../../agents" (plugins/tribe/agents), same base $SKIN already reads
+# "$AGENTS/skinner.md" from, two lines above.
+WAR="$(tr '\n' ' ' < "$AGENTS/warchief.md" | tr -s ' ')"
+STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$AGENTS/warchief.md" | tr '\n' ' ' | tr -s ' ')"
 pass=0; fail=0
 has()   { if echo "$2" | grep -qiE "$3"; then echo "ok: $1"; pass=$((pass+1)); \
           else echo "FAIL: $1 (missing: $3)"; fail=$((fail+1)); fi; }
@@ -280,6 +285,12 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
 
   rm -rf "$TMPD"
 fi
+
+# --- Task 3a (Delta-A, warchief half): path-scoped cold diff ------------------------------
+has "a: cold diff is path-scoped"              "$STEP6" 'path-scoped'
+has "a: planning and state dirs excluded"      "$STEP6" 'docs/tribe/planning.{0,40}docs/tribe/state'
+has "a: unscoped range is a forbidden channel" "$STEP6" 'un-scoped full-range diff'
+has "a: contract lens diff stays full-range"   "$STEP6" 'contract lens.{0,60}stays full-range'
 
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
