@@ -29,10 +29,10 @@ Shaman  ──(vision: what/why)──▶  Warchief
               ▼ (throughout dev, many times)               ▼ (once, at the end)
            Tracker                                      Skinner
    "does this diff follow the rules?"          "is the work ACTUALLY done?"
-        advisory                                    authoritative
+        advisory                                 findings (Warchief adjudicates)
               └─────────────────────┬─────────────────────┘
                                     ▼
-                          Warchief opens the PR, swings the hammer ──▶ merge
+                          Warchief adjudicates findings, opens the PR, swings the hammer ──▶ merge
                                     │
                           (reports back up) ──▶ Shaman
 ```
@@ -87,11 +87,11 @@ Shaman  ──(vision: what/why)──▶  Warchief
 
 **Answers:** *Is the work that claims to be done actually done?*
 
-**What it actually does:** The **heavy, run-once-at-the-end** gate — before declaring "done" or before merging. The Skinner reconstructs the **requirement contract** (from spec/plan → Jira ticket via `ask-copilot` → PR description), then **RUNS real proof** to verify the implementation against that contract, and **self-refutes its own findings** before ruling. Its `PASS`/`FAIL` verdict is **authoritative — a `FAIL` must be fixed, never argued away.** That authority is **at the **verdict** level**: an individual **finding** underneath it is a *falsifiable hypothesis*, not a ruling — the fixer Hunter must **reproduce a finding before it may fix it**, and reports `NOT_REPRODUCED` with evidence when it cannot (see the Hunter's "Fixer mode"). The verdict is the referee; a finding is the claim it referees.
+**What it actually does:** The **heavy, run-once-at-the-end** gate — before declaring "done" or before merging. The Skinner reconstructs the **requirement contract** (from spec/plan → Jira ticket via `ask-copilot` → PR description), then **RUNS real proof** to verify the implementation against that contract, and **self-refutes its own findings** before reporting them. No Skinner lens holds a verdict: the contract lens reports findings ending `CONTRACT-LENS: N findings`, and its cold-diff partner reports hypotheses ending `COLD-LENS: N hypotheses`. **The Warchief holds the adjudication**, at the **disposition** level: every Critical/Important finding gets exactly one recorded disposition — `CONFIRMED` (routes to a fixer Hunter), `REFUTED` (only with evidence: a `file:line`, command output, or for a `[contract-only]` finding a verbatim contract citation), or `DEBT` (a recorded follow-up, forbidden for Critical findings). Even `CONFIRMED` is a **routing act, not proof** — an individual **finding** is a *falsifiable hypothesis* until the fixer Hunter **reproduces it**, and reports `NOT_REPRODUCED` with evidence when it cannot (see the Hunter's "Fixer mode"). The Warchief's adjudication is the referee; a finding is the claim it referees.
 
 **Ownership:** The Skinner is the **single source of truth** for *done-ness*, and enforces only the done-gating governance. It inspects the **product / the kill** — whether the work is *actually* finished and correct.
 
-**Why the name Skinner:** The one who skins/guts the kill has to **cut it open to actually know** whether the meat is good, whether it's the right animal — matching "you have to RUN the proof to know, not eyeball it." And the result is undeniable: bad meat is bad meat — matching the authoritative `PASS/FAIL`.
+**Why the name Skinner:** The one who skins/guts the kill has to **cut it open to actually know** whether the meat is good, whether it's the right animal — matching "you have to RUN the proof to know, not eyeball it." And the result is undeniable: bad meat is bad meat — the findings are undeniable because they are **RUN**, not argued. What happens next — fix it, refute it, or carry it as debt — is the Warchief's call, not the Skinner's.
 
 ---
 
@@ -106,14 +106,14 @@ These two review agents must **never have their roles merged**. The orchestrator
 | When it runs | **During dev**, before each commit/PR | **Once, at the end**, before merge |
 | Frequency | Often (cheap recurring gate) | Once (expensive final gate) |
 | How it works | Reads rules + inspects diff | **RUNS proof** + self-refutes |
-| Verdict | **Advisory** (BLOCK / APPROVE-W-COMMENTS / APPROVE) | **Authoritative** (PASS / FAIL) |
-| Weight | Advisory — can have comments and still proceed | FAIL **must be fixed, never argued** |
+| Verdict | **Advisory** (BLOCK / APPROVE-W-COMMENTS / APPROVE) | **Findings** — no lens rules; the Warchief adjudicates (CONFIRMED / REFUTED / DEBT) |
+| Weight | Advisory — can have comments and still proceed | Evidence-backed — a CONFIRMED finding **must be fixed and verified, never silently dropped** |
 
 > A normal change should **pass through the Tracker many times during dev**, then **pass through the Skinner exactly once at the end** before the word "done" is spoken.
 
-This split is **encoded right into the metaphor**: *a tracker naturally walks the whole trail* (recurring), while *a skinner naturally works only once after the hunt is over* (one-time, final). You don't need to read the docs to guess which one runs often and which one runs at the gate.
+This split is **encoded right into the metaphor**: *a tracker naturally walks the whole trail* (recurring), while *a skinner naturally works only once after the hunt is over* (one-time, final). You don't need to read the docs to guess which one runs often and which one runs at the gate. Both gates are **advisory / findings-based** in the same sense — neither rules on its own; what differs is **scope**: the Tracker checks the diff against the rules, the Skinner checks the implementation against the full requirement contract, by running proof.
 
-**Boundary with the Warchief:** The Skinner only **rules** on whether the kill is good/bad (gates done-ness); it does **not** swing the merge hammer — merging is always the Warchief's authority. The Skinner issues an authoritative verdict for the Warchief to act on, and the two don't overlap.
+**Boundary with the Warchief:** The Skinner never rules on whether the kill is good or bad — it reports evidence-backed findings; it does **not** swing the merge hammer — merging is always the Warchief's authority. **The Warchief holds the adjudication** (CONFIRMED / REFUTED / DEBT) and acts on it, and the two don't overlap.
 
 ---
 
@@ -125,7 +125,7 @@ This split is **encoded right into the metaphor**: *a tracker naturally walks th
 | 🪓 Warchief | Leader / orchestrator | How? | Spec, dispatch, open PR, **merge** |
 | 🏹 Hunter | Worker / implementer | (execution) | Code, commit, report |
 | 👣 Tracker | code-reviewer | Does the diff follow rules? | Advisory (BLOCK/APPROVE) |
-| 🔪 Skinner | adversarial-reviewer | Is the work actually done? | **Authoritative** (PASS/FAIL) |
+| 🔪 Skinner | adversarial-reviewer | Is the work actually done? | Evidence-backed **findings** — Warchief adjudicates (CONFIRMED/REFUTED/DEBT) |
 
 ---
 

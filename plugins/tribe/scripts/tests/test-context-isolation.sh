@@ -43,8 +43,12 @@ has "T3a warchief: diff is the only code-side channel" "$WARCHIEF" "ONLY channel
 has "T3b warchief: narrative banned, artifacts are not" "$WARCHIEF" "never on artifacts inside the diff"
 has "T3c warchief: prose vs artifacts maxim"            "$WARCHIEF" "Prose persuades; artifacts get run"
 
-# --- T4: every audit starts cold, including re-audits ---------------------------
-has "T4a warchief: fresh Skinner per fix-round"        "$WARCHIEF" "Each fix-round gets a FRESH Skinner"
+# --- T4: every DISCOVERY round starts cold (idea-11 task-1: fix rounds no longer re-discover) ---
+# REPOINTED: fix rounds no longer dispatch a fresh dual-skinner pair by default (targeted
+# verification replaces per-round re-discovery — see test-dual-skinner-cell.sh for that new
+# assertion). What survives here is that every DISCOVERY round (first audit, the
+# beyond-named-locations exception, the final whole-branch audit) still starts cold.
+has "T4a warchief: every discovery round starts cold"  "$WARCHIEF" "Every DISCOVERY round starts cold"
 has "T4b warchief: no prior findings carried in"       "$WARCHIEF" "no previous findings"
 has "T4c warchief: final audit carries no history"     "$WARCHIEF" "no accumulated per-task audit history"
 

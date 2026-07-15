@@ -134,8 +134,11 @@ has 'agreed goes straight into the fixer brief' "$STEP6" \
 # deleting either clause alone reddens this assertion (W5 bar #3). This also disambiguates
 # from the Warchief's own "you adjudicate any finding that conflicts with what the plan
 # mandated" text elsewhere in step 6, which is a different subject doing the adjudicating.
-has 'single is routed to the fixer, which adjudicates' "$STEP6" \
-    '`single`[[:space:]]*\|[^|]*fixer.s brief[^|]*fixer adjudicates it'
+# REPOINTED (idea-11 task-1, warchief rewrite): the `single` row no longer routes to "the fixer,
+# which adjudicates" — NOT_REPRODUCED adjudication moved to the Warchief for every class. The row
+# now reads "Gets your disposition first ... goes to the fixer's brief".
+has 'single gets the Warchiefs disposition first, then CONFIRMED goes to the fixer' "$STEP6" \
+    '`single`[[:space:]]*\|[^|]*your disposition first[^|]*goes to the fixer.s brief'
 
 has 'single findings are not pre-filtered by the Warchief' "$STEP6" \
     '`single`[[:space:]]*\|[^|]*do not pre-filter'
@@ -163,24 +166,17 @@ has 'reproduce-first still applies to an agreed finding' "$STEP6" \
 
 # "including an `agreed` one" is likewise a literal, zero-gap anchor for the other conjunct —
 # that `agreed` is explicitly named as included, not an accidental omission.
+# REPOINTED (idea-11 task-1): idea-05's per-round-escalation text is gone — NOT_REPRODUCED is now
+# adjudicated immediately for EVERY class alike (no agreed-only carve-out), and the per-round
+# re-audit Skinner it used to wait for no longer exists. Anchored on the new sentence's own tokens.
 has 'reproduce-first explicitly names agreed as included, not exempt' "$STEP6" \
-    'including an `agreed` one'
+    '`agreed` and `single` alike'
 
-# The NOT_REPRODUCED/agreed trigger needs a short bridge (the two tokens are not literally
-# adjacent), but the bridge is now bounded generously (5x the actual ~9-char gap) instead of the
-# old `.{0,10}` that a mere "is reported" insertion could already overflow. Word order
-# (`NOT_REPRODUCED` before `agreed`) keeps this unique: the only other co-occurrence in step 6
-# reverses the order ("For an `agreed` finding ... `NOT_REPRODUCED` case"), which cannot satisfy
-# this pattern.
-has 'NOT_REPRODUCED on an agreed finding escalates immediately' "$STEP6" \
-    '`NOT_REPRODUCED`.{0,50}for an `agreed` finding'
+has 'NOT_REPRODUCED is adjudicated immediately, not deferred to a later round' "$STEP6" \
+    '`NOT_REPRODUCED`[[:space:]]*is adjudicated immediately'
 
-# "escalates to you immediately for adjudication" is its own literal, zero-gap anchor — it no
-# longer needs to bridge all the way back to the NOT_REPRODUCED/agreed trigger (that was the
-# `.{0,200}` span that a longer, still meaning-preserving restatement of the reasoning in between
-# could overflow). This phrase is unique to this sentence.
-has 'a NOT_REPRODUCED, agreed finding escalates to the Warchief immediately, not next round' "$STEP6" \
-    'escalates to you immediately for adjudication'
+has 'no per-round re-audit Skinner is waited for any more' "$STEP6" \
+    'there is no longer a per-round re-audit Skinner to wait for'
 
 # F9/F11 — Law 3's dispositions vs the single row's "do not pre-filter" must be reconciled
 # explicitly, AND the reconciliation must be scoped to the `[cold-only]` half only — a
@@ -192,20 +188,25 @@ has 'a NOT_REPRODUCED, agreed finding escalates to the Warchief immediately, not
 # coined by this clause and appears nowhere else in step 6 (confirmed against the pre-fix file), so
 # deleting only this clause reddens only these five assertions.
 
-has 'pre-filter is scoped to cold-only, never to contract-only' "$STEP6" \
-    'ONLY permitted pre-filter on a `single` finding.s `\[cold-only\]` half.{0,40}never on its `\[contract-only\]` half'
+# REPOINTED (idea-11 task-1): no lens holds a verdict any more, so the old cold-only/contract-only
+# split pre-filter is gone — Law 3's three dispositions now govern every finding uniformly,
+# `single` included, with no separate pre-filter step. A `[contract-only]` finding is carried by
+# the contract lens's conformance evidence (not a verdict) and is never silently dropped; REFUTED
+# needs a contract citation or code evidence either way.
+has 'there is no separate pre-filter; Law 3s three dispositions govern every finding, single included' "$STEP6" \
+    'Law 3.s three dispositions are the adjudication for every finding, `single` included.{0,40}no separate pre-filter to apply'
 
-has 'cold-only finding is a hypothesis and gets an evidence-bearing disposition' "$STEP6" \
-    '`\[cold-only\]` finding is a hypothesis.{0,50}exactly one of Law 3.s three evidence-bearing dispositions'
+has 'cold-only finding is a hypothesis and any REFUTED disposition needs evidence about the code' "$STEP6" \
+    'For a `\[cold-only\]` hypothesis.{0,40}remains FORBIDDEN as a REFUTED disposition.{0,40}a cold hypothesis is a claim about correctness, not conformance'
 
-has 'contract-only finding is not a hypothesis; carried by the contract lens own verdict' "$STEP6" \
-    '`\[contract-only\]` finding is not a hypothesis.{0,40}carried by the contract lens.s own verdict'
+has 'contract-only finding is carried by the contract lens conformance evidence, not a verdict, never silently dropped' "$STEP6" \
+    '`\[contract-only\]` finding is carried by the contract lens.s own conformance evidence.{0,60}not a verdict.{0,40}never silently dropped'
 
-has 'contract-only finding is never pre-filtered by the Warchief and goes to the fixer' "$STEP6" \
-    'never pre-filtered by the Warchief.{0,40}goes straight to the fixer'
+has 'contract-only finding receives a disposition exactly like every other finding; REFUTED needs a contract citation or code evidence' "$STEP6" \
+    'It receives a disposition exactly like every other finding.{0,40}REFUTED requires either a contract citation or code evidence.{0,40}never evidence-free doubt'
 
-has 'do not pre-filter forbids the evidence-free drop, scoped to cold-only' "$STEP6" \
-    'do not pre-filter.{0,40}forbids.{0,40}`\[cold-only\]` half.{0,40}evidence-free drop'
+has 'do not pre-filter forbids the evidence-free drop, across every finding not just cold-only' "$STEP6" \
+    'do not pre-filter.{0,20}forbids is the evidence-free drop.{0,40}discarding a finding because you doubt it, with nothing to show for the doubt'
 
 # F8 — the agreed/single NOT_REPRODUCED supersession must be said out loud, not just implied.
 # F14 recut: the original single assertion bridged FOUR anchors with a `.{0,250}` span ending in
@@ -219,15 +220,19 @@ has 'do not pre-filter forbids the evidence-free drop, scoped to cold-only' "$ST
 # First conjunct: the `agreed` clause explicitly does NOT wait on the ledger rule below. No
 # bridge to `single` is needed for this half — "does not wait on the ledger-adjudication rule
 # below" is itself unique in step 6.
-has 'agreed does not wait on the ledger rule below; single is governed by it unchanged' "$STEP6" \
-    'does not wait on the ledger-adjudication rule below'
+# REPOINTED (idea-11 task-1): the agreed-waits/single-doesn't-wait split is gone (both are
+# adjudicated immediately now — see the block above). What survives is the RATIONALE for immediate
+# adjudication, and where the old per-round ledger-adjudication machinery now lives (final
+# whole-branch audit only).
+has 'reproduce-first rationale: two reviewers hallucinating in the same direction is still a hallucination' "$STEP6" \
+    'Two reviewers hallucinating in the same direction is still a hallucination, and fixing blind is the harm'
 
 # Second conjunct: the `single` clause explicitly says that same ledger rule governs it
 # unchanged. D17: the bridge is `.{0,40}` (>=30 headroom over the ~1-char actual gap between
 # "below" and "governs"), replacing the earlier `.{0,15}` that was under the 30-char floor and
 # could still be overflowed by an insertion like "still, only".
-has 'single finding: the ledger-adjudication rule below governs it unchanged' "$STEP6" \
-    'ledger-adjudication rule below.{0,40}governs unchanged'
+has 'a DROPPED falsified finding can only be reopened at the final whole-branch audit' "$STEP6" \
+    'The one place a `DROPPED \(falsified\)` finding can still be reopened is.{0,10}the final whole-branch audit'
 
 # --- Item 1 (F13/D16): what the agreed/NOT_REPRODUCED adjudication DOES -----------------------
 # The plan's mandated text says a `NOT_REPRODUCED` on an `agreed` finding "escalates to you
@@ -265,8 +270,12 @@ has 'agreed adjudication is a review act: it consumes no fix round' "$STEP6" \
 # "finding's own") cannot break this — the most sensitive edit in the campaign gets the same
 # >=30-headroom treatment as everything else.
 
-has 'ledger-adjudication rule points to the agreed carve-out: it governs single, not agreed' "$STEP6" \
-    'governs a `single` finding.s.{0,40}`NOT_REPRODUCED`.{0,60}`agreed` finding.s.{0,40}`NOT_REPRODUCED`.{0,40}adjudicated immediately.{0,40}per the routing table above'
+# REPOINTED (idea-11 task-1): D16's agreed-only carve-out pointer is gone along with the
+# agreed/single wait distinction it pointed at. What replaces it: the old wait-for-the-next-Skinner
+# ledger-adjudication machinery (falls/stands/standoff) is retired from the per-round path
+# entirely and survives only at the final whole-branch audit.
+has 'the old wait-for-the-next-Skinner ledger-adjudication rule survives only at the final whole-branch audit' "$STEP6" \
+    'the old wait-for-the-next-Skinner ledger-adjudication rule.{0,20}\(falls / stands / standoff\).{0,20}survives in exactly that one place'
 
 # --- Task 3: the conflict ladder --------------------------------------------
 # Three rungs, strictly ordered, bounded so they can never grind (spec §2.3). Every bridge
@@ -523,8 +532,11 @@ has 'TIEBREAK resolves onward to TO_FIXER, DROPPED tie-break round N, or a rung-
 has 'ESCALATED spec ambiguity is defined as rung 3s contract-underdetermined outcome' "$STEP6" \
     '`ESCALATED \(spec ambiguity\)` is rung 3.{0,40}outcome: no citation settles the dispute and no majority exists.{0,40}contract itself is underdetermined'
 
-has 'ESCALATED standoff is defined as the ledger-adjudication rules own outcome' "$STEP6" \
-    '`ESCALATED \(standoff\)` is the ledger-adjudication rule.{0,40}outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding unchanged'
+# REPOINTED (idea-11 task-1): standoff no longer fires off a per-round NOT_REPRODUCED re-raise —
+# it fires off the final whole-branch audit's fresh Skinner re-raising a previously-falsified
+# finding unchanged.
+has 'ESCALATED standoff is defined as the final whole-branch audits ledger-adjudication rule outcome' "$STEP6" \
+    '`ESCALATED \(standoff\)` is the final whole-branch audit.s ledger-adjudication rule.s outcome below.{0,60}fresh Skinner re-raises a previously-`DROPPED \(falsified\)` finding unchanged'
 
 has 'ESCALATED standoff is an evidence deadlock, never a contract ambiguity' "$STEP6" \
     'evidence.{0,40}deadlock.{0,40}never a.{0,40}contract ambiguity'
@@ -545,7 +557,7 @@ has 'DROPPED falsified is an agreed findings NOT_REPRODUCED adjudicated UPHELD, 
 
 has 'DROPPED falsified round N is a single findings NOT_REPRODUCED the next Skinner does not re-raise' \
     "$STEP6" \
-    'does not re-raise.{0,40}falls as `DROPPED \(falsified, round N\)`'
+    'The Skinner does not re-raise it.{0,40}the finding stays fallen.{0,40}Record `DROPPED \(falsified, round N\)`'
 
 # F19: the ledger is per finding PER ROUND — appended, never overwritten. Each conjunct of the
 # rule is its own assertion so deleting any one clause alone reddens only its own guard.
@@ -582,9 +594,11 @@ has 'append-only holds even though falsified outcomes are only known after the f
 # no-fixer-round accounting as the other two "no fixer round"/"no majority" outcomes already
 # guarded above). Split into short, per-clause-anchored assertions (W5 bar #2/#3) rather than one
 # long bridge, each on phrasing unique to this new sentence.
-has 'ESCALATED inconclusive artifact is defined as the agreed-adjudication rules own outcome' \
+# REPOINTED (idea-11 task-1): D16's rule is no longer named "agreed-adjudication" — it is the
+# immediate-adjudication rule (it now fires for every class, not just `agreed`).
+has 'ESCALATED inconclusive artifact is defined as the immediate-adjudication rules own outcome' \
     "$STEP6" \
-    '`ESCALATED \(inconclusive artifact\)` is the agreed-adjudication rule.{0,40}own outcome above'
+    '`ESCALATED \(inconclusive artifact\)` is the immediate-adjudication rule.s own outcome above'
 
 has 'ESCALATED inconclusive artifact fires when the artifact does not let the Warchief tell either way' \
     "$STEP6" \
@@ -592,13 +606,15 @@ has 'ESCALATED inconclusive artifact fires when the artifact does not let the Wa
 
 # Distinguishes it from `ESCALATED (standoff)`: no Skinner ever re-raises anything on the `agreed`
 # immediate-adjudication path, because D16's design resolves the finding before the next re-audit.
-has 'ESCALATED inconclusive artifact is never a standoff: no Skinner ever re-raises on the agreed path' \
+# Note: "immediate-adjudication" is hyphen-wrapped mid-word in the source (`immediate-\nadjudication`),
+# so flat()'s newline->space join leaves a space after the hyphen; bridge it rather than a bare literal.
+has 'ESCALATED inconclusive artifact is never a standoff: no Skinner ever re-raises on the immediate-adjudication path' \
     "$STEP6" \
-    'never.{0,40}`ESCALATED \(standoff\)`.{0,60}no Skinner ever re-raises anything on the `agreed`.{0,40}immediate-adjudication path'
+    'never.{0,10}`ESCALATED \(standoff\)`.{0,60}no Skinner ever re-raises anything on the immediate-.{0,3}adjudication path'
 
-has 'ESCALATED inconclusive artifact standoff-exclusion is because D16 resolves before the next re-audit' \
+has 'ESCALATED inconclusive artifact standoff-exclusion is because the finding resolves before any Skinner runs again' \
     "$STEP6" \
-    "D16.s design resolves the finding before the next re-audit.{0,50}nothing to re-raise"
+    "the finding is resolved before any Skinner runs again.{0,40}nothing to re-raise"
 
 # Distinguishes it from `ESCALATED (spec ambiguity)`: the contract itself is not in question here
 # -- only the artifact is inconclusive, not the text the two reviewers read.

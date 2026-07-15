@@ -82,8 +82,11 @@ has "cold: Method step 1 carves out the cold lens"           "$SKINNER_ALL" 'con
 # on exactly a contaminated COLD dispatch. An explicit precedence sentence must settle it — checked
 # against the WHOLE file because the carve-out spans both the Lens-mode section and Operating rules,
 # which sit outside the $LENS window (Operating rules starts AFTER "## Lens mode" ends).
-has "H1: contaminated refusal is declared to win over cold mode's no-AUDIT rule" \
-  "$SKINNER_ALL" 'precedence over cold mode.?s no-.?AUDIT:.? rule|one and only .?AUDIT:.? line a .?lens: cold.? dispatch may ever emit'
+# REPOINTED (idea-11 task-1): the precedence rule now covers EVERY lens, not just cold — it says
+# "Precedence over every lens's no-AUDIT: rule" and names the contamination refusal as the one and
+# only AUDIT: line ANY lens may ever emit.
+has "H1: contaminated refusal is declared to win over every lens's no-AUDIT rule" \
+  "$SKINNER_ALL" 'precedence over every lens.?s no-.?AUDIT:.? rule|the one and only .?AUDIT:.? line ANY lens may ever emit'
 
 # --- Task 2 — warchief.md step 6, Delta-Law 1: two lenses, two briefs ----------------------
 STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$WARCHIEF" | flat)"
@@ -106,14 +109,29 @@ has   "law1: the cold lens may still read the codebase"       "$STEP6" 'not blin
 # this repo's contributors actually run) rejects any {m,n} with n > 255 ("maximum repetition
 # exceeds 255"), so a wider bound would make the assertion never executable, on any content.
 has   "law3: three-tag vocabulary"                             "$STEP6" '\[both\].{0,200}\[contract-only\].{0,200}\[cold-only\]'
-has   "law3: cold findings are hypotheses"                     "$STEP6" 'cold findings are hypotheses'
-has   "law3: every cold hypothesis gets a recorded disposition" "$STEP6" 'recorded.{0,10}disposition, written into your report file'
-has   "law3: the three dispositions are named"                 "$STEP6" 'confirmed.{0,200}refuted.{0,200}(out of scope|follow-up)'
+# REPOINTED (idea-11 task-1): "cold findings are hypotheses" now lives in Law 1's own dispatch
+# description (Skinner B holds the cold lens and returns hypotheses only), not a separate Law 3
+# sentence.
+has   "law3: cold findings are hypotheses"                     "$STEP6" 'cold lens.{0,20}returns hypotheses only'
+# REPOINTED: the disposition is now recorded into "the disposition ledger in your report file",
+# not just "your report file" bare, and it covers every merged finding (cold hypotheses included),
+# not a cold-only carve-out.
+has   "law3: every merged finding, cold hypotheses included, gets a recorded disposition" "$STEP6" \
+    'recorded disposition, written into the disposition ledger in your report file'
+# REPOINTED: CONFIRMED/REFUTED/DEBT replaced the old two-value vocabulary. The gap between the
+# first REFUTED and DEBT exceeds BSD grep's 255-char repetition ceiling, so this is anchored on the
+# second, closer "evidence-free REFUTED" occurrence instead (same file convention as
+# test-disagreement-routing.sh's D17 bridge-sizing rule).
+has   "law3: CONFIRMED and REFUTED are named"                  "$STEP6" 'confirmed.{0,150}refuted'
+has   "law3: DEBT is the third named disposition"              "$STEP6" 'evidence-free refuted.{0,80}debt'
 has   "law3: refuting needs evidence about the CODE"           "$STEP6" 'evidence that the code is correct|evidence about the code'
 has   "law3: the contract-does-not-require-it refutation is forbidden" "$STEP6" 'contract does not require'
 has   "law3: an undispositioned hypothesis fails the round"    "$STEP6" 'undispositioned|silence is not a disposition'
-has   "law4: only the contract lens holds the verdict"         "$STEP6" 'only the contract lens'
-has   "law4: the round-PASS rule is stated"                    "$STEP6" 'round passes if and only if'
+# REPOINTED (idea-11 task-1): the contract lens no longer holds any verdict either — Law 4's title
+# is now "the adjudication: no lens holds a verdict; you do", and the audit-close condition
+# replaces the old both-must-PASS rule with a three-part CLOSES-iff test the Warchief evaluates.
+has   "law4: no lens holds a verdict, not even the contract lens"  "$STEP6" 'no lens holds a verdict.{0,10}you do'
+has   "law4: the audit-close condition is stated in full"      "$STEP6" 'audit CLOSES if and only if all three hold'
 hasnt "law4: the both-must-PASS rule is gone"                  "$STEP6" 'pass needs both|passes only if both skinners'
 has   "law4: the 3-round cap is untouched"                     "$STEP6" '3-round fix cap|3 fix-rounds'
 
