@@ -287,10 +287,21 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
 fi
 
 # --- Task 3a (Delta-A, warchief half): path-scoped cold diff ------------------------------
-has "a: cold diff is path-scoped"              "$STEP6" 'path-scoped'
-has "a: planning and state dirs excluded"      "$STEP6" 'docs/tribe/planning.{0,40}docs/tribe/state'
-has "a: unscoped range is a forbidden channel" "$STEP6" 'un-scoped full-range diff'
-has "a: contract lens diff stays full-range"   "$STEP6" 'contract lens.{0,60}stays full-range'
+# idea-11 review-cell-v3 fix round 1 finding F4: all four needles below used to be bare
+# keyword/proximity co-occurrence with no polarity guard, so each was satisfiable by prose
+# asserting the exact OPPOSITE of the rule it locks in (e.g. "contract lens's diff never stays
+# full-range" still matched 'contract lens.{0,60}stays full-range'). Tightened to require a
+# contiguous (or near-contiguous, small-gap) match of the load-bearing phrase itself, so a
+# negation word or clause inserted into the gap pushes the match past the bound and reds the
+# assertion (verified by mutation, see Hunter report).
+has "a: cold diff is path-scoped"              "$STEP6" \
+    'cold lens.s diff is path-scoped, not just its brief'
+has "a: planning and state dirs excluded"      "$STEP6" \
+    'covering, at minimum,.{0,10}docs/tribe/planning.{0,40}docs/tribe/state'
+has "a: unscoped range is a forbidden channel" "$STEP6" \
+    'un-scoped full-range diff.{0,80}(range|diff) hands the cold lens the contract'
+has "a: contract lens diff stays full-range"   "$STEP6" \
+    'contract lens.s diff stays full-range'
 
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
