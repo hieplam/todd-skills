@@ -57,14 +57,15 @@ has   "law3: agreement tag for both-flagged findings" "$STEP6" '\[both\]'
 # test-input-asymmetry.sh:108 ('\[both\].{0,200}\[contract-only\].{0,200}\[cold-only\]').
 has   "law3: both reports preserved verbatim"        "$STEP6" 'both reports verbatim'
 
-# Law 4 — PASS requires BOTH; the 3-round cap survives; escalation carries both reports.
-# SUPERSEDED by idea 03: the cold lens holds no verdict, so unanimity is not the rule any more.
-# The safety property it protected is preserved by the disposition rule (no cold hypothesis may be
-# silently dropped). Asserted in full by test-input-asymmetry.sh.
-has   "law4: only the contract lens holds the verdict (idea 03)" "$STEP6" 'only the contract lens'
+# Law 4 — REWRITTEN (idea-11 task-1): no lens holds a verdict any more, not even the contract
+# lens — the Warchief adjudicates every Critical/Important finding itself (CONFIRMED/REFUTED/DEBT).
+# The 3-round cap and escalation-with-both-reports survive, worded around the new disposition
+# ledger instead of a "round-3 fail report".
+has   "law4: no lens holds a verdict; the Warchief adjudicates" "$STEP6" 'no lens holds a verdict.{0,10}you do'
 has   "law4: un-auditable from either is a fail"     "$STEP6" 'un-auditable'
-has   "law4: the 3-round fix cap is unchanged"       "$STEP6" 'cap fix-rounds at 3'
-has   "law4: escalation attaches both reports"       "$STEP6" 'both round-3 fail reports'
+has   "law4: the 3-round fix cap is unchanged"       "$STEP6" 'cap fix rounds at 3'
+has   "law4: escalation attaches both reports and the disposition ledger" "$STEP6" \
+    'both lenses.{0,5}reports.{0,40}full disposition ledger.{0,20}attached verbatim'
 
 # Skinner-side reciprocal invariant — it must know it is one of two, and refuse the peer's findings.
 SKIN="$(flat <"$SKINNER")"
@@ -77,13 +78,35 @@ WAR="$(flat <"$WARCHIEF")"
 has   "consistency: frontmatter description audits with two Skinners" "$WAR" 'audits every deliverable with \*\*two independent skinners\*\*'
 has   "consistency: header line audits with two Skinners"   "$WAR" 'you audit the result with \*\*two independent skinners\*\*'
 has   "consistency: anti-goal 4 audits with two Skinners"   "$WAR" 'audited by \*\*two independent skinners\*\*'
-has   "consistency: anti-goal 4 escalates with both reports" "$WAR" 'both skinners.{0,3} last fail reports'
+# REPOINTED (idea-11 task-1): "both skinners' ... fail reports" language is gone — escalation now
+# carries "both lenses' reports" plus the disposition ledger, and the final report cites the
+# adjudicated disposition (CONFIRMED/REFUTED/DEBT counts), not a pass/fail verdict from the pair.
+has   "consistency: anti-goal 4 escalates with both reports" "$WAR" 'both lenses.{1,3}reports and the disposition ledger attached verbatim'
 has   "consistency: dispatch contract names the Skinner pair" "$WAR" 'audit its diff with the \*\*skinner\*\* pair'
-has   "consistency: wave-failure text carries both reports" "$WAR" 'both skinners.{0,3} round-3 fail'
+has   "consistency: wave-failure text carries both reports" "$WAR" 'with both lenses.{1,3}reports and the disposition ledger attached verbatim, per step 6'
 has   "consistency: step 5 model note names the Skinner pair" "$WAR" 'stays on the \*\*skinner\*\* pair'
-has   "consistency: final report cites both Skinners"       "$WAR" 'audited pass against the spec by both skinners'
+has   "consistency: final report cites the disposition outcome, not a pass/fail verdict" "$WAR" 'audit closed: 5 findings.{0,10}3 fixed, 1 refuted with'
 hasnt "consistency: no lone-Skinner audit claim survives"   "$WAR" 'spec by the skinner'
 hasnt "consistency: no lone-Skinner escalation survives"    "$WAR" 'attach the skinner'
+
+# --- New load-bearing law (idea-11 task-1): no lens holds a verdict; the Warchief adjudicates ----
+SKIN2="$(flat <"$SKINNER")"
+
+# (a) the contract lens's terminator exists in skinner.md — it reports findings, never a verdict.
+has "skinner: contract lens ends with a CONTRACT-LENS terminator" "$SKIN2" 'CONTRACT-LENS: N findings'
+
+# (b) warchief step 6 states the three-part audit-close condition in full: every conjunct checked.
+has "law4: audit closes iff all three hold — dispositions, no unfixed CONFIRMED, green proof" "$STEP6" \
+    'audit CLOSES if and only if all three hold.{0,80}every Critical/Important merged finding has a recorded disposition.{0,80}no CONFIRMED finding remains unfixed-and-unverified.{0,80}the proof runs green in your own hands'
+
+# (c) DEBT is forbidden for Critical findings — the mechanical floor Law 3 gives the disposition.
+has "law3: DEBT is forbidden for Critical findings" "$STEP6" \
+    'DEBT is FORBIDDEN for.{0,20}any Critical finding'
+
+# (d) a fix round does not, by default, dispatch a fresh dual-skinner pair — targeted verification
+# replaces per-round re-discovery.
+has "law2: a fix round does not by default dispatch a fresh dual-skinner pair" "$STEP6" \
+    'Targeted verification replaces per-round re-discovery.{0,20}A FIX round does not, by default,.{0,10}dispatch a fresh dual-skinner pair'
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

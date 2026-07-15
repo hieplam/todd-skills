@@ -42,11 +42,13 @@ has "$WARCHIEF" "with new evidence" "warchief: a refuted falsification sends the
 has "$WARCHIEF" "only ever SHORTENS the loop" "warchief: standoff never extends the 3-round cap"
 has "$WARCHIEF" "even with rounds left on the cap" "warchief: standoff escalates immediately"
 
-# --- group D: doctrine distinguishes the verdict from a finding -----------------------
+# --- group D: doctrine distinguishes an adjudicated disposition from a finding (idea-11 task-1) ---
+# REPOINTED: no Skinner lens holds a verdict any more — the Warchief adjudicates every finding, at
+# the DISPOSITION level (CONFIRMED/REFUTED/DEBT), and even CONFIRMED is a routing act, not proof.
 has "$README" "falsifiable hypothesis" "readme: a finding is a falsifiable hypothesis"
-has "$README" "at the **verdict** level" "readme: scopes the authority to the verdict"
+has "$README" "at the **disposition** level" "readme: scopes the authority to the disposition"
 has "$REVIEW_DOC" "falsifiable hypothesis" "review-agents: a finding is a falsifiable hypothesis"
-has "$REVIEW_DOC" "at the **verdict** level" "review-agents: scopes the authority to the verdict"
+has "$REVIEW_DOC" "holds the adjudication, at the disposition level" "review-agents: scopes the authority to the disposition"
 
 # negative assertion — the regression guard. No prompt or doc may call an individual FINDING
 # authoritative/unarguable; that phrasing is reserved for the VERDICT.

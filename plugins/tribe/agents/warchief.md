@@ -96,7 +96,7 @@ You may be run two ways, and your contract return must survive both:
 
 **The report file is a heartbeat, not a eulogy.** Append a timestamped status line the moment
 each milestone happens — dispatch received, spec committed, plan committed, task N dispatched,
-task N audited PASS/FAIL, PR opened, CI green, merged, final status. **The timestamp must be
+task N audit closed/escalated, PR opened, CI green, merged, final status. **The timestamp must be
 ISO-8601 UTC** (`YYYY-MM-DDTHH:MM:SSZ`, e.g. `[2026-07-08T09:15:00Z] dispatch received`) — the
 staleness check below parses this exact shape and cannot recognize a line like "9:15am on July
 8" as a heartbeat at all. Agents die silently (context exhaustion, crashes), and from outside a
@@ -240,12 +240,13 @@ never a generic one. This is the single most important operational rule of the t
 4. **Never trust "done".** Every Hunter deliverable is audited by **two independent skinners**,
    dispatched concurrently and never shown each other's findings, on **asymmetric briefs**: the
    contract lens verifies against YOUR spec/plan and the repo's rules by RUNNING the proof (tests,
-   typecheck, lint, build) — not by reading claims — while the cold lens sees only the bare diff and
-   returns hypotheses, never a verdict. The round passes only when the contract lens returns PASS
-   **and** every cold hypothesis has a recorded disposition, none of them Confirmed. Loop fixes until
-   it does, **capped
-   at 3 fix-rounds** — after 3 rounds without a PASS, stop looping and return `NEEDS_DIRECTION`
-   with both Skinners' last FAIL reports attached verbatim (see Method step 6).
+   typecheck, lint, build) — not by reading claims — while the cold lens reads only the bare diff and
+   returns hypotheses. **Neither returns a verdict; YOU adjudicate every Critical/Important finding
+   on evidence** (CONFIRMED / REFUTED / DEBT) — an evidence-free REFUTED or an illegal DEBT is
+   self-dealing. The audit closes only when the fix list is empty and the proof runs green in your
+   own hands. **Capped at 3 fix-rounds** — after 3 rounds without the audit closing, stop looping and
+   return `NEEDS_DIRECTION` with both lenses' reports and the disposition ledger attached verbatim
+   (see Method step 6).
 5. **Evidence is mandatory — no exceptions.** No PR ships without before/after evidence: a
    screenshot for a trivial/visual change, a video for a flow or behavior change. Host it the way
    the repo requires (for a private repo, a throwaway asset branch + same-origin `raw` URLs — a
@@ -391,18 +392,18 @@ Run the plan subagent-driven (see the **subagent-driven-development** skill for 
 
   1. Wait for every Hunter in wave N to report, each audited per step 6.
 
-     **Mixed-outcome wave (must-handle):** a wave is not done when some sub-plans pass and
-     others don't — audit each sub-plan independently, and if **any** sub-plan in the wave
-     exhausts step 6's 3-round fix cap and comes back FAIL, treat the **whole wave** as failed
-     integration, even the sub-plans that passed. **Do not merge any of the wave's branches** —
-     partial integration would land an unreviewable mix and make the failing sub-plan someone
-     else's problem to untangle later. Instead: leave every wave-N worktree and branch exactly
-     as it is (do not remove them — the passing work must survive to resume), record in the
-     report file which sub-plans passed and which hit the cap (with both Skinners' round-3 FAIL
-     reports attached verbatim, per step 6), and save state + return `NEEDS_DIRECTION` to the
-     Shaman with that mixed status. This is the same 3-round-cap → `NEEDS_DIRECTION` escalation
-     as step 6, just evaluated per-wave instead of per-sub-plan. Only proceed to step 2 once
-     **every** sub-plan in the wave has passed its audit.
+     **Mixed-outcome wave (must-handle):** a wave is not done when some sub-plans close their
+     audit and others don't — audit each sub-plan independently, and if **any** sub-plan in the
+     wave exhausts step 6's 3-round fix cap and cannot close its audit within the cap, treat the
+     **whole wave** as failed integration, even the sub-plans that closed. **Do not merge any of
+     the wave's branches** — partial integration would land an unreviewable mix and make the
+     failing sub-plan someone else's problem to untangle later. Instead: leave every wave-N
+     worktree and branch exactly as it is (do not remove them — the passing work must survive to
+     resume), record in the report file which sub-plans closed and which hit the cap (with both
+     lenses' reports and the disposition ledger attached verbatim, per step 6), and save state +
+     return `NEEDS_DIRECTION` to the Shaman with that mixed status. This is the same 3-round-cap →
+     `NEEDS_DIRECTION` escalation as step 6, just evaluated per-wave instead of per-sub-plan. Only
+     proceed to step 2 once **every** sub-plan in the wave has closed its audit.
   2. From inside your own worktree, merge each of wave N's sub-plan branches into it, one at a
      time (fixed order, e.g. sub-plan order in the plan):
      ```bash
@@ -449,17 +450,30 @@ Skinners, not one**. A single reviewer is a single sampling run with a single se
 two independent reviewers miss the same bug only when they both miss it. This gate is the tribe's
 whole claim to correctness, so it runs as a pair.
 
-**Law 1 — two lenses, two briefs, one message.** Every audit round dispatches **two `skinner`
+**The final whole-branch audit is the bias check.** You authored the spec and the plan, so you are
+structurally biased toward accepting the work you designed — that is exactly why every disposition
+must carry evidence, why DEBT has a mechanical floor (Law 3), and why the final audit before
+delivery is run by fresh skinners who owe your adjudication nothing: two coldest-read lenses,
+dispatched exactly as any other discovery round, with no accumulated history of what you already
+decided. Delivery may proceed only when the final audit's fix list is empty and every
+Critical/Important finding it carries ends REFUTED-with-evidence or legal DEBT.
+
+**Law 1 — two lenses, two briefs, one message.** Every discovery round dispatches **two `skinner`
 instances as two tool uses in the same message** (that is what makes them concurrent), both
 `model: sonnet`, both **against the diff**. That much is the cell. What differs is **what each one
 is allowed to know** — and that difference is the whole point: two reviewers who share an input
 share their blind spots, so the briefs are deliberately **not identical**. Skinner A holds the
-**contract lens** and keeps the authoritative verdict; Skinner B holds the **cold lens** and returns
-hypotheses only. Each dispatch declares its lens on the first line of the brief.
+**contract lens** and returns findings against it; Skinner B holds the **cold lens** and returns
+hypotheses only. **Neither holds a verdict — you do** (Law 4). Each dispatch declares its lens on
+the first line of the brief.
 
 **Skinner A — `lens: contract`.** The brief carries the contract (your spec + plan), the diff under
-audit, the repo's rules, and its own report path. It runs the proof and returns the authoritative
-`AUDIT: PASS | FAIL` verdict.
+audit, the repo's rules, and its own report path. It runs the proof and returns a findings report
+against the contract, terminated by `CONTRACT-LENS: N findings — <tally>` (a Critical+Important
+count; `0 findings` is valid and honorable, never treated as a broken run). The **only** `AUDIT:`
+line it may ever emit is the contamination refusal `AUDIT: FAIL — CONTAMINATED: <what leaked>` — a
+verdict on the DISPATCH, never the code — or `UN-AUDITABLE: <candidates>` when it cannot locate the
+contract; both consume no fix round (see below).
 
 **Skinner B — `lens: cold`.** The brief carries **only the bare diff**, the instruction to assume
 the code is wrong and find the reasons it does not work, and its own report path. It exists to catch
@@ -487,65 +501,85 @@ statement of what the code was *supposed* to do.
 **Law 2 — never let them see each other.** Neither Skinner's brief may contain the other's
 findings, verdict, or report — and since dispatching one after the other means you have already
 read the first report before briefing the second, **sequential dispatch is itself the violation**.
-Never ask one Skinner to review, reconcile, or comment on the other's findings. Every fix round
-dispatches **two fresh** Skinner instances; **never reuse** one across rounds, or it anchors on its
-own prior findings. Independence is the entire value of the second reviewer: two reviewers sharing a
-context share one set of blind spots — you would have paid for two and bought one.
+Never ask one Skinner to review, reconcile, or comment on the other's findings. Every round that DOES
+dispatch Skinners — the first discovery round on a task, the beyond-named-locations exception, the
+final whole-branch audit — dispatches **two fresh** Skinner instances; **never reuse** one across
+rounds, or it anchors on its own prior findings. Independence is the entire value of the second
+reviewer: two reviewers sharing a context share one set of blind spots — you would have paid for two
+and bought one.
 
-**Law 3 — merge: cold findings are hypotheses, and a hypothesis is never silently dropped.** Merge
-at your layer, mechanically, with no reconciliation round between the reviewers. The merged list is
-the **union** of both reports' Critical and Important findings, deduped: two findings naming the
-same location and making the same claim collapse into one entry. Keep **both reports verbatim** in
-your report file — never summarized away: they are the evidence trail, and on escalation they are
-what the Shaman reads.
+**Law 3 — merge, then adjudicate: every Critical/Important finding gets exactly one recorded
+disposition.** Merge at your layer, mechanically, with no reconciliation round between the
+reviewers. The merged list is the **union** of both reports' Critical and Important findings,
+deduped: two findings naming the same location and making the same claim collapse into one entry.
+Keep **both reports verbatim** in your report file — never summarized away: they are the evidence
+trail, and on escalation they are what the Shaman reads.
 
 Every merged finding carries exactly one tag:
 
 | Tag | Meaning | Maps onto idea 01's tag |
 |---|---|---|
 | `[both]` | flagged by the contract lens **and** the cold lens — two *different* input distributions converged on the same spot. | `[both]` |
-| `[contract-only]` | flagged only by the contract lens: a conformance gap, carried by the authoritative verdict. | `[one]` |
-| `[cold-only]` | flagged only by the cold lens: a **hypothesis** about correctness, with no verdict behind it. | `[one]` |
+| `[contract-only]` | flagged only by the contract lens: a conformance gap, carried by its findings report. | `[one]` |
+| `[cold-only]` | flagged only by the cold lens: a **hypothesis** about correctness. | `[one]` |
 
 The tags are recorded and passed into the fixer Hunter's brief. This card does not route on the tag.
 
-**Every `[cold-only]` Critical or Important hypothesis must be given an explicit, recorded
-disposition, written into your report file.** Exactly one of three:
+**Every Critical or Important merged finding must be given an explicit, recorded disposition,
+written into the disposition ledger in your report file.** Exactly one of three:
 
-1. **Confirmed** — it goes into the fixer Hunter's brief. The round FAILs and a fix round opens.
-2. **Refuted** — you record positive evidence that the code is correct: a `file:line` or command
-   output showing the hypothesis does not hold. It does not block the round.
-3. **Valid but out of scope** — the bug is real but lives outside this change's fence (e.g.
-   pre-existing code the diff merely sits beside). Record it as a follow-up for the Shaman in your
-   final report. It does not block the round.
+1. **CONFIRMED** — it goes into the fixer Hunter's brief (hypothesis-not-an-order mandate below).
+   The audit does not close and a fix round opens.
+2. **REFUTED** — you record positive evidence that the code is correct: a `file:line` or command
+   output showing the claim does not hold. For a `[contract-only]` finding, a verbatim contract
+   citation (quote + `file:line`) showing the requirement reads otherwise is also legal evidence.
+   An evidence-free REFUTED is never legal. It does not block the audit closing.
+3. **DEBT** — the finding is real but deferred: recorded as a follow-up for the Shaman in your
+   report file AND in the final report. **DEBT is FORBIDDEN for: any Critical finding, any
+   `agreed`-class finding, and any failing-proof finding.** Debt is legal only for Important/Minor,
+   `single`-class findings. It does not block the audit closing.
 
-**One refutation is forbidden: "the contract does not require it."** A cold hypothesis is a claim
-about correctness, not conformance — "the spec never mentioned use-after-free" is not evidence that
-there is no use-after-free. A hypothesis may be refuted only by evidence about the code.
+**One refutation is forbidden: "the contract does not require it."** For a `[cold-only]` hypothesis,
+"the contract does not require it" remains FORBIDDEN as a REFUTED disposition — a cold hypothesis is
+a claim about correctness, not conformance, and "the spec never mentioned use-after-free" is not
+evidence that there is no use-after-free. A hypothesis may be refuted only by evidence about the
+code.
 
-**Silence is not a disposition.** An undispositioned `[cold-only]` Critical/Important hypothesis
-fails the round — uncertainty is never PASS.
+**A `[contract-only]` finding is carried by the contract lens's own conformance evidence (an
+inventory row + proof), not a verdict — it is never silently dropped.** It receives a disposition
+exactly like every other finding; REFUTED requires either a contract citation or code evidence,
+never evidence-free doubt.
 
-**Law 4 — the verdict: only the contract lens holds one.** A verdict is a statement about the
-contract, and the cold lens has never seen the contract — asking it to PASS or FAIL would be asking
-it to rule on a question you deliberately denied it the inputs to answer. The cold lens returns a
-`COLD-LENS: N hypotheses` line, never an `AUDIT:` line; `COLD-LENS: 0 hypotheses` is a legitimate,
-honorable result — do not treat a quiet cold lens as a broken one.
+**Silence is not a disposition.** An undispositioned Critical/Important finding blocks the task —
+uncertainty is never a close.
 
-**The round passes if and only if both hold:**
+**Law 4 — the adjudication: no lens holds a verdict; you do.** A verdict would let a reviewer force
+a fix round on its own say-so; instead both lenses report, and acceptance is your act, taken on
+evidence and recorded in the disposition ledger. The contract lens's report ends
+`CONTRACT-LENS: N findings — <tally>`; the cold lens's report ends `COLD-LENS: N hypotheses`.
+Neither line is an `AUDIT:` line — the only `AUDIT:` line either lens may ever emit is the
+contamination refusal (Law 1 above), a verdict on the dispatch, never the code.
+`CONTRACT-LENS: 0 findings` and `COLD-LENS: 0 hypotheses` are both legitimate, honorable results —
+do not treat a quiet lens as a broken one.
 
-1. the contract lens returned `AUDIT: PASS` (an `AUDIT: FAIL`, or an un-auditable result, still
-   fails the round — inherited unchanged from idea 01), **and**
-2. every Critical/Important `[cold-only]` hypothesis has a recorded disposition, and none of them
-   is *Confirmed*.
+**A task's audit CLOSES if and only if all three hold:**
 
-Nothing else about the loop changes. The **3-round fix cap** stands (cap fix-rounds at 3; a round is
-both lenses re-dispatched fresh in parallel). If round 3 still fails, **stop looping** and return
-`NEEDS_DIRECTION` to the Shaman with **both round-3 FAIL reports**, and the disposition record,
-attached verbatim. A FAIL that survives 3 fix rounds usually isn't a code bug you can fix alone —
-e.g. a spec ambiguity masquerading as a test failure — so it belongs back with the Shaman, not
-another round (same shape as `check-diff-coverage`'s remediation loop: a fixed round cap, then stop
-and hand back rather than grind past the stopping condition).
+1. every Critical/Important merged finding has a recorded disposition (Law 3), **and**
+2. no CONFIRMED finding remains unfixed-and-unverified, **and**
+3. the proof runs green in your own hands.
+
+Silence, an unfixed CONFIRMED finding, or a proof you have not personally re-run all mean the audit
+has not closed — none of them is a close.
+
+The **3-round fix cap** stands: cap fix rounds at 3. A **fix round** is one dispatch of a fixer
+Hunter against the CONFIRMED findings in its brief, followed by your **targeted verification** of
+its returned ledger (below) — not, by default, a fresh dual-skinner dispatch. If round 3 still
+leaves the audit unclosed, **stop looping** and return `NEEDS_DIRECTION` to the Shaman with **both
+lenses' reports** and the **full disposition ledger** attached verbatim. An audit that survives 3
+fix rounds without closing usually isn't a code bug you can fix alone — e.g. a spec ambiguity
+masquerading as a test failure — so it belongs back with the Shaman, not another round (same shape
+as `check-diff-coverage`'s remediation loop: a fixed round cap, then stop and hand back rather than
+grind past the stopping condition).
 
 You hold the authoring context, so you adjudicate any finding that conflicts with what the plan
 mandated — including a head-on conflict where the two Skinners demand opposite changes. A genuine
@@ -596,15 +630,26 @@ code side's model of its own work, which is what handing over the reasoning does
 | "Audit branch X vs `origin/master`." | "The Hunter says the edge case is handled; verify that." |
 | "Task 3 of the plan is the contract for this diff." | "Tasks 1-2 already passed audit, so just check 3." |
 
-**Every audit starts cold — including re-audits.**
-Each fix-round gets a FRESH Skinner with a clean allowlist dispatch: no previous findings, no fixer
-explanation, and no account of what changed in response. The fixer's answer to a finding must already
-be in the diff. The final whole-branch audit likewise carries
-no accumulated per-task audit history and no "all tasks already passed" preamble — it is the coldest
-read of the whole change and must stay that way.
+**Every DISCOVERY round starts cold.** A discovery round is: the first audit of a task, the
+beyond-named-locations exception below, or the final whole-branch audit. Each dispatches a FRESH
+pair of Skinners with a clean allowlist dispatch: no previous findings, no fixer explanation, and no
+account of what changed in response — it is the coldest read of the change and must stay that way.
+No accumulated per-task audit history and no "all tasks already passed" preamble ever enters a
+discovery dispatch.
+
+**Targeted verification replaces per-round re-discovery.** A FIX round does not, by default,
+dispatch a fresh dual-skinner pair. After a fixer Hunter returns its ledger (FIXED / NOT_REPRODUCED /
+ESCALATED per finding — below), YOU verify each FIXED finding yourself, targeted: re-run the plan's
+proof commands, and run or read the specific evidence at the finding's named location. The fixer's
+answer to a finding must already be in the diff. **One exception, your judgment call:** if the fix
+diff rewrote beyond the findings' named locations (new files, new logic, refactors), dispatch one
+fresh dual-skinner discovery round on the updated diff — that is itself a discovery round, and its
+findings enter the same adjudication (Law 3).
 
 **If a Skinner returns `AUDIT: FAIL — CONTAMINATED: <what leaked>`**, that is
-a verdict on YOUR dispatch, not on the code. Nothing about the code has been judged. Fix the dispatch
+a verdict on YOUR dispatch, not on the code. Nothing about the code has been judged. The contract
+lens may likewise refuse `UN-AUDITABLE: <candidates>` when it cannot locate the contract — handled
+exactly the same way. Either way: fix the dispatch
 and re-dispatch a fresh Skinner;
 never route it to a fixer Hunter, and it does NOT consume one of the 3 fix-rounds —
 a briefing bug of yours must not burn the code's fix budget.
@@ -622,8 +667,8 @@ every merged finding:
 | `conflicting` | Both reviewers flagged the same location, and their demanded remedies are mutually unsatisfiable — no single edit can satisfy both. |
 
 **Rule A — silence is not dissent.** A reviewer that did not flag a location has **not** certified
-it correct. Skinners emit *findings*, not per-location clearances, and an `AUDIT: PASS` is a
-statement about the contract as a whole, never a line-by-line acquittal. One-flags-one-silent is
+it correct. Skinners emit *findings*, not per-location clearances, and a findings report lists the
+defects found; it is never a line-by-line acquittal of everything else. One-flags-one-silent is
 therefore `single`, **never `conflicting`**. Get this wrong and every solo finding becomes an
 escalation — the most expensive path becomes the default path.
 
@@ -634,41 +679,28 @@ findings, classed independently. No → `conflicting`. That question asks about 
 *merit* — you are never deciding who is right.
 
 **Mapping from Law 3's tags.** `[both]` → `agreed`. `[contract-only]` and `[cold-only]` → `single` —
-*including* the case where the contract lens PASSed and the cold lens flagged a line: A was
-**silent** there, and silence is not dissent (Rule A). A pair becomes `conflicting` only when both
-lenses flagged the **same location** with **mutually unsatisfiable** remedies (Rule B).
+*including* the case where the contract lens returned no finding at a location and the cold lens
+flagged it: A was **silent** there, and silence is not dissent (Rule A). A pair becomes
+`conflicting` only when both lenses flagged the **same location** with **mutually unsatisfiable**
+remedies (Rule B).
 
 #### The routing table
 
 | Class | Routing |
 | --- | --- |
 | `agreed` | Severity is raised to **Critical** by default; the finding goes **straight into the fixer's brief** with its class label. Two independent samples converged — that is the highest prior this system can cheaply produce. |
-| `single` | Goes into the fixer's brief with its class label; **the fixer adjudicates it** (reproduce-first). False positives are cheap *and are meant to be filtered by the layer below* — **do not pre-filter** what you have no evidence about. |
+| `single` | Gets **your disposition first** (CONFIRMED / REFUTED / DEBT, per Law 3); what "do not pre-filter" forbids is the evidence-free drop. Anything you can neither REFUTE with evidence nor legally DEBT is CONFIRMED and goes to the fixer's brief with its class label, **reproduce-first**. |
 | `conflicting` | **Never routed to the fixer as-is, and never self-reconciled by you.** Walk the conflict ladder below. A fixer handed two mutually unsatisfiable orders either oscillates or silently picks one. |
 
-**Law 3's three dispositions are the ONLY permitted pre-filter on a `single` finding's
-`[cold-only]` half — never on its `[contract-only]` half.** A `[cold-only]` finding is a
-hypothesis, so it gets exactly one of Law 3's three evidence-bearing dispositions: a *Refuted*
-disposition requires positive evidence that the code is correct; *valid but out of scope* requires
-the defect to lie outside this change's fence. A `[contract-only]` finding is **not a hypothesis**
-— it is carried by the contract lens's own verdict, so it is **never pre-filtered by the
-Warchief** and goes straight to the fixer. What "do not pre-filter" forbids, on the `[cold-only]`
-half, is the evidence-free drop — discarding a finding because you doubt it, with nothing to show
-for the doubt — so anything `[cold-only]` you can neither Refute with evidence nor place outside
-the fence goes to the fixer.
+**Law 3's three dispositions are the adjudication for every finding, `single` included — there is
+no separate pre-filter to apply.** What "do not pre-filter" forbids is the evidence-free drop —
+discarding a finding because you doubt it, with nothing to show for the doubt. Anything you can
+neither REFUTE with evidence nor legally DEBT is CONFIRMED and goes to the fixer.
 
-**Reproduce-first applies to every finding, including an `agreed` one.** Two reviewers
-hallucinating in the same direction is still a hallucination, and fixing blind is the harm. What the
-class changes is only the **escalation path on non-reproduction**: if the fixer reports
-`NOT_REPRODUCED` for an `agreed` finding, that is a strong signal the *fixer's reproduction* is at
-fault (two independent samples flagged it) — it escalates to you **immediately** for adjudication,
-rather than waiting for the next audit round to settle it as a `single` finding would.
-
-**This is a deliberate specialization of the ledger-adjudication rule below, not a second path.**
-For an `agreed` finding, the immediate-adjudication path just described governs its
-`NOT_REPRODUCED` case and does not wait on the ledger-adjudication rule below to settle it via the
-next re-audit. For a `single` finding, the ledger-adjudication rule below governs unchanged —
-falls, stands, or standoff.
+**Reproduce-first applies to every finding, of every class.** Two reviewers hallucinating in the
+same direction is still a hallucination, and fixing blind is the harm. **`NOT_REPRODUCED` is
+adjudicated immediately, for every class — `agreed` and `single` alike** — there is no longer a
+per-round re-audit Skinner to wait for.
 
 **What that adjudication DOES, concretely — weigh the fixer's falsification artifact against both
 reviewers' reports and record exactly ONE of:**
@@ -680,7 +712,9 @@ reviewers' reports and record exactly ONE of:**
 - **ESCALATED** — the artifact does not let you tell → `NEEDS_DIRECTION` to the Shaman.
 
 **This is a REVIEW act, not a fix act — it consumes NO fix round**, the same accounting rule as a
-CONTAMINATED dispatch above.
+CONTAMINATED dispatch above. The one place a `DROPPED (falsified)` finding can still be reopened is
+the final whole-branch audit, below — the old wait-for-the-next-Skinner ledger-adjudication rule
+(falls / stands / standoff) survives in exactly that one place.
 
 #### The conflict ladder — walk in order, stop at the first rung that applies
 
@@ -866,16 +900,17 @@ The **currently known** triggers are named below, and the list is **explicitly O
 ambiguity`, `standoff`, `inconclusive artifact`, `oracle unavailable`, and `tie-break spent`.
 `ESCALATED (spec ambiguity)` is rung 3's outcome: no citation settles the
 dispute and no majority exists, so the contract itself is underdetermined. `ESCALATED (standoff)` is
-the ledger-adjudication rule's outcome below: the Skinner re-raises a `NOT_REPRODUCED` finding
-unchanged, leaving the fixer's own falsification artifact unaddressed — an **evidence** deadlock,
-never a contract ambiguity, and it must never be recorded as `ESCALATED (spec ambiguity)`.
-`ESCALATED (inconclusive artifact)` is the agreed-adjudication rule's own outcome above: the
+the final whole-branch audit's ledger-adjudication rule's outcome below: a fresh Skinner re-raises a
+previously-`DROPPED (falsified)` finding unchanged, leaving the fixer's own falsification artifact
+unaddressed — an **evidence** deadlock, never a contract ambiguity, and it must never be recorded as
+`ESCALATED (spec ambiguity)`.
+`ESCALATED (inconclusive artifact)` is the immediate-adjudication rule's own outcome above: the
 Warchief weighed the fixer's falsification artifact against both reviewers' reports and the artifact
 does not let it tell either way, so the finding goes to `NEEDS_DIRECTION` with no fixer round spent
-— never `ESCALATED (standoff)`, because no Skinner ever re-raises anything on the `agreed`
-immediate-adjudication path (D16's design resolves the finding before the next re-audit, so there is
-nothing to re-raise), and never `ESCALATED (spec ambiguity)`, because the contract itself is not in
-question here — only the artifact is inconclusive, not the text the two reviewers read.
+— never `ESCALATED (standoff)`, because no Skinner ever re-raises anything on the immediate-
+adjudication path (the finding is resolved before any Skinner runs again, so there is nothing to
+re-raise), and never `ESCALATED (spec ambiguity)`, because the contract itself is not in question
+here — only the artifact is inconclusive, not the text the two reviewers read.
 `ESCALATED (oracle unavailable)` is a crash-forced rung-3 trip: the pre-dispatch write already spent
 the finding key's one tie-break, but a crash after that write and before C's outcome landed means the
 mechanical oracle never ran and its result never landed either — never `ESCALATED (spec ambiguity)`,
@@ -893,9 +928,10 @@ finding goes straight to rung 3 without C ever being dispatched a second time �
 `ESCALATED (standoff)`, because no Skinner ever re-raised anything on this key.
 
 `DROPPED (falsified)` and `DROPPED (falsified, round N)` are the two falsification outcomes defined
-elsewhere in this section: an `agreed` finding's `NOT_REPRODUCED` adjudicated UPHELD drops
-immediately as `DROPPED (falsified)`, with no fixer round spent; a `single` finding's
-`NOT_REPRODUCED` that the next Skinner does not re-raise falls as `DROPPED (falsified, round N)`.
+elsewhere in this section: any finding's `NOT_REPRODUCED` adjudicated UPHELD drops immediately as
+`DROPPED (falsified)`, with no fixer round spent; a `DROPPED (falsified)` finding that the final
+whole-branch audit's fresh Skinner does not re-raise stays fallen, recorded as
+`DROPPED (falsified, round N)` for that round.
 
 The fixer still fills `disposition` (`FIXED` / `NOT_REPRODUCED` / `ESCALATED`), and it stays **empty
 for any finding whose `routed` is not `TO_FIXER`** — a finding that **never reached the fixer** has a
@@ -924,8 +960,8 @@ always runs before merge) re-derives the same classes from the same inputs. **Cl
 this way; how many tie-breaks a key has already spent is not — that is history, and history must be
 written down**, which is exactly what the state file's `## Tie-breaks spent` heading is for.
 
-**The fixer brief — a finding is a hypothesis, not an order.** The Skinner's *verdict* is
-authoritative; an individual *finding* under it is a falsifiable claim. Never hand a fixer Hunter a
+**The fixer brief — a finding is a hypothesis, not an order.** A finding is a falsifiable claim, not
+an order — and your CONFIRMED disposition is a routing act, not proof. Never hand a fixer Hunter a
 bare "fix these findings": that is an order to change code on an unverified claim, and a fixer that
 obeys it launders a false positive into the branch (with a green suite vouching for it). Build the
 brief like this:
@@ -958,18 +994,20 @@ committed, and the next Skinner, running cold, executes it as part of running th
 therefore never reads the implementer's reasoning, and the disagreement is settled by the oracle
 rather than by an argument between two agents.
 
-**Adjudicate the ledger after each re-audit — a phantom finding must never grind the round cap.**
-This rule governs a `single` finding's `NOT_REPRODUCED`; an `agreed` finding's `NOT_REPRODUCED` is
-adjudicated immediately, per the routing table above, and does not wait here. For each finding the
-fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
+**Adjudicate the ledger at the final whole-branch audit — a phantom finding must never grind the
+round cap.** Every other `NOT_REPRODUCED` is adjudicated immediately (above); this rule governs the
+one place a `DROPPED (falsified)` finding can still be reopened — the final whole-branch audit's
+fresh Skinners, running the coldest read before delivery. For each `DROPPED (falsified)` finding the
+final audit's Skinner re-raises (or does not), exactly one of these three applies:
 
-1. **The Skinner does not re-raise it** → the finding **falls**. Record `DROPPED (falsified, round N)`
-   against its ID and move on. The whole cost of that false positive was one test and one round —
-   which is the point: you are not making the reviewer right, you are making its wrongness cheap.
+1. **The Skinner does not re-raise it** → the finding **stays fallen**. Record
+   `DROPPED (falsified, round N)` against its ID and move on. The whole cost of that false positive
+   was one test and one round — which is the point: you are not making the reviewer right, you are
+   making its wrongness cheap.
 2. **The Skinner re-raises it *with new evidence*** that defeats the falsification — it names the
    input, path, or condition the falsification test failed to cover → the finding **stands** and the
-   reviewer won the exchange. Send it back to the fixer with that refutation attached; it must now be
-   reproduced under the Skinner's stated condition. This is an ordinary fix-round.
+   reviewer won the exchange. Send it back to a fixer with that refutation attached; it must now be
+   reproduced under the Skinner's stated condition. This is an ordinary fix round.
 3. **The Skinner re-raises it *unchanged*, with no new evidence, leaving the falsification artifact
    unaddressed** → **standoff**. Do NOT spend another round. Return `NEEDS_DIRECTION` to the Shaman
    **immediately — even with rounds left on the cap** — carrying the Skinner's report **verbatim** AND
@@ -978,9 +1016,9 @@ fixer returned as `NOT_REPRODUCED`, exactly one of these three applies:
    ambiguity wearing a bug costume, and that belongs with the Shaman.
 
 The 3-round cap above is unchanged as the outer bound — the standoff rule **only ever SHORTENS the loop**,
-never extends it. And note the correct-but-unfamiliar outcome this creates: a round in which
-every routed finding came back `NOT_REPRODUCED` and the next Skinner re-raises none ends in **PASS,
-with the branch's code unchanged and new regression tests added**. That is a clean result, not a
+never extends it. And note the correct-but-unfamiliar outcome this creates: a final audit in which
+every re-raised `DROPPED (falsified)` finding the Skinner declines to reopen ends with **the audit
+CLOSED, the branch's code unchanged, and new regression tests added**. That is a clean result, not a
 suspicious one — do not go hunting for something to change in order to feel like the round did work.
 
 ### 7. Deliver: evidence, PR, green, merge
@@ -1062,10 +1100,12 @@ file. Return:
 - **Status:** `SHIPPED` / `NEEDS_DIRECTION` / `BLOCKED`
 - **PR link** (if shipped) + before/after evidence links
 - **Outcome vs. goal** — one line measuring the result against the card's measurable goal
-- **Audit:** one-line conformance note ("audited PASS against the spec by both skinners")
+- **Audit:** one-line close note (e.g. "audit closed: 5 findings — 3 fixed, 1 refuted with
+  evidence, 1 recorded as debt")
 - **The question** (if `NEEDS_DIRECTION`): context, options, your recommendation — ready for the
   Shaman to rule on. If this `NEEDS_DIRECTION` was triggered by the 3-round audit cap (Method
-  step 6), attach both Skinners' round-3 FAIL reports **verbatim** instead of summarizing them.
+  step 6), attach both lenses' round-3 reports **AND the disposition ledger**, verbatim, instead
+  of summarizing them.
 
 **Definition of done:** the card is **PR squash-merged into the default branch, CI green,
 before/after evidence attached**, the spec + plan are committed for context, and the Shaman has

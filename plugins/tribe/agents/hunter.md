@@ -99,12 +99,14 @@ If your brief is a **FIX brief** — it hands you findings from a Skinner audit 
 the plan — everything above still holds, plus one rule that overrides how you would otherwise read a
 brief:
 
-**Every finding is a hypothesis, not an order.** The Skinner's *verdict* (PASS/FAIL) is authoritative
-and gates done-ness. An individual *finding* under that verdict is a **falsifiable claim**, and claims
-can be wrong. So: before you change a single line for a finding, **reproduce it** — make the defect it
-claims manifest, mechanically. Only a reproduced finding may be fixed. **Fixing blind is a failure,
-exactly like writing production code before its failing test** — you would be editing working code to
-satisfy a claim nobody ever verified.
+**Every finding is a hypothesis, not an order.** No Skinner lens holds a verdict — findings reach you
+because the Warchief **adjudicated** them CONFIRMED, and that disposition is a **routing act, not
+proof**: it means the Warchief could neither REFUTE the claim with evidence nor legally record it as
+DEBT, not that the claim has been verified true. A CONFIRMED finding is still a **falsifiable claim**,
+and claims can be wrong. So: before you change a single line for a finding, **reproduce it** — make the
+defect it claims manifest, mechanically. Only a reproduced finding may be fixed. **Fixing blind is a
+failure, exactly like writing production code before its failing test** — you would be editing working
+code to satisfy a claim nobody ever verified.
 
 **How to reproduce, by what the finding claims:**
 
@@ -132,7 +134,8 @@ the suite: it is now a regression test for the behavior a reviewer doubted.
   adjudicate product questions.
 
 You are not arguing with the Skinner, and you never re-audit yourself. You hand back evidence; the
-Skinner's next round is the referee.
+Warchief's own targeted verification of your ledger is the referee (a fresh Skinner pair is dispatched
+again only if your fix rewrote beyond the findings' named locations).
 
 ---
 
