@@ -469,7 +469,13 @@ mechanical fact** — machine output of committed scripts run against the commit
 contract-class by the D9 admissibility test, never the code side's prose; the cold lens's brief
 does **not** carry it. Reviewer briefs stop mandating full-suite re-runs: the contract lens still
 runs whatever proof the contract requires and may re-run any suite to falsify a specific
-hypothesis; the cold lens runs whatever its own method already mandates, unchanged.
+hypothesis; the cold lens runs whatever its own method already mandates, unchanged. To make that
+retirement actually true rather than merely silent, the contract lens's brief explicitly states
+that the pre-gate's report already satisfies Method step 5's suite-verification requirement for
+every suite the pre-gate ran, so the contract lens's own Method is honored without re-executing
+them — it still independently runs any check the pre-gate did not cover (`tsc`, lint, `c3 check`,
+and any suite outside the pre-gate's range) and may still re-run a specific suite to falsify a
+hypothesis.
 
 **Law 1 — two lenses, two briefs, one message.** Every discovery round dispatches **two `skinner`
 instances as two tool uses in the same message** (that is what makes them concurrent), both
@@ -614,7 +620,9 @@ A Skinner dispatch may contain ONLY these four things:
 1. **The contract** — the spec and/or plan (paths or content), authored before the code existed.
 2. **The diff** — the change under audit, in full, identified mechanically (a git range, a PR
    number, or file paths).
-3. **The repo's rules** — `CLAUDE.md`, `.claude/rules/`, C3 docs, and the like.
+3. **The repo's rules** — `CLAUDE.md`, `.claude/rules/`, C3 docs, and the like — for the contract
+   lens only, this also admits a green pre-gate's own report (Step 6.0), machine output of
+   committed scripts, contract-class by the same reasoning.
 4. **Mechanical scope** — which change to audit and where: the git range / PR number / worktree
    path, the base branch, and the report-file path for the Skinner's OWN output.
 

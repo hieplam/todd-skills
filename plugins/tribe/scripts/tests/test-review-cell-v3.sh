@@ -316,13 +316,53 @@ has "a: contract lens diff stays full-range"   "$STEP6" \
 # brief does not carry it" and "mandatory full-sweep clause is retired" needles below are used
 # as originally drafted — both already anchor a specific verb-negation pair / a literal
 # zero-gap phrase and survived the same polarity check unchanged.
+#
+# idea-11 review-cell-v3 fix round 2 finding F6: despite the note above, 4 of these 5 needles
+# were STILL polarity-blind — their remaining wide gaps (`.{0,10}` before "against the range...",
+# `.{0,6}` before "settled", `.{0,10}` twice around "not", and no anchor at all before "stop
+# mandating") each had room for an inserted negation/duplication to slip through undetected (e.g.
+# "do not run pre-gate.sh against the range..." still matched the old pre-gate-runs needle; "as
+# NOT settled mechanical fact" still matched the old contract-brief needle; "does not fail to
+# carry it" still matched the old cold-brief needle; "briefs never stop mandating..." still
+# matched the old full-sweep needle — all four reproduced, see Hunter report). Re-tightened to
+# near-literal, near-zero-gap quotes of the load-bearing phrase (including the markdown `**bold**`
+# markers the real text actually uses around "not"/"settled", so a negation has no legal gap left
+# to sit in), verified against the four reproductions above (now NOMATCH) plus one further
+# mutation per needle (a qualifier inserted after the command path; "as never **settled**"; "does
+# **not always** carry it"; "briefs no longer stop mandating..." — all four also NOMATCH; see
+# Hunter report), and against the real unmutated warchief.md text (still MATCH).
 has "c: pre-gate runs before any skinner"      "$STEP6" \
-    'pre-gate\.sh.{0,10}against the range under audit before dispatching any skinner'
+    'run .plugins/tribe/scripts/pre-gate\.sh. against the range under audit before dispatching any skinner'
 has "c: red pre-gate is not an audit round"    "$STEP6" 'unfinished work, not an audit round'
 has "c: contract brief carries the report"     "$STEP6" \
-    'contract lens.s brief carries the pre-gate.s report \(path or content\) as .{0,6}settled mechanical fact'
-has "c: cold brief does not carry it"          "$STEP6" 'cold lens.s brief does.{0,10}not.{0,10}carry it'
-has "c: the mandatory full-sweep clause is retired" "$STEP6" 'stop mandating full-suite re-runs'
+    "contract lens.s brief carries the pre-gate.s report \\(path or content\\) as \\*\\*settled mechanical fact"
+has "c: cold brief does not carry it"          "$STEP6" "cold lens.s brief does \\*\\*not\\*\\* carry it"
+has "c: the mandatory full-sweep clause is retired" "$STEP6" \
+    'reviewer briefs stop mandating full-suite re-runs'
+
+# idea-11 review-cell-v3 fix round 2 finding F5: step 6.0 says the contract lens's brief carries
+# the pre-gate's report, but the Dispatch-content checklist's 4 categories (below, UNCHANGED
+# structure/count) named no category it fits under, and no sentence anywhere reconciled the two —
+# a dispatch following the checklist literally could not legally carry what step 6.0 mandates.
+# Fixed by extending category 3 ("The repo's rules") with a clause admitting the pre-gate's report
+# for the contract lens specifically, keeping the 4-category/"never more" ceiling intact (see
+# Hunter report for the D14 mutation: deleting only this clause reds this needle alone, restoring
+# it goes green again).
+has "c: checklist admits pre-gate report for contract lens" "$STEP6" \
+    "repo.s rules.{0,10}CLAUDE\\.md.{0,120}for the contract.{0,10}lens only, this also admits a green pre-gate.s own report"
+
+# idea-11 review-cell-v3 fix round 2 finding F7: "Reviewer briefs stop mandating full-suite
+# re-runs" only stopped the WARCHIEF's brief from saying "re-run everything" — skinner.md's own
+# Method step 5 ("Execute the plan's exact per-task verification commands...") is untouched and
+# unconditional, so a contract lens still following its own Method literally re-runs this
+# campaign's full sibling-suite sweep every round regardless of what the brief omits. Fixed by
+# adding one sentence to step 6.0 that tells the contract lens's brief to explicitly state the
+# pre-gate's report already satisfies Method step 5 for the suites it ran, so the retirement is
+# actually true instead of merely silent (D14 + polarity check: negating "already satisfies" to
+# "does not already satisfy" or "never explicitly states" both fail this needle, see Hunter
+# report).
+has "c: contract brief states pre-gate satisfies method step 5" "$STEP6" \
+    "the contract lens.s brief explicitly states.{0,20}that the pre-gate.s report already satisfies Method step 5.s suite-verification requirement"
 
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
