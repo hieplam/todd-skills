@@ -1,10 +1,10 @@
 # tribe-state: idea-11-review-cell-v3
 roadmap: bun-rust-migrate-ideas.md
-worktree: /Users/todd.lam/WORK/_TestScripts/todd-skills-idea-11
-branch: feat/idea-11-review-cell-v3
-report: /private/tmp/claude-503/-Users-todd-lam-WORK--TestScripts-todd-skills/65033311-dbff-4781-b902-7a87cb36f0d0/scratchpad/reports/impl-idea-11.md
-base-sha: db87488aca2013ee8ae18d6f0b44319bc4d3d5b8
-plan: docs/tribe/planning/idea-11-review-cell-v3/plan.md
+worktree: /Users/todd.lam/WORK/_TestScripts/todd-skills
+branch: feat/advisory-skinner-review-cell
+report: /private/tmp/claude-503/-Users-todd-lam-WORK--TestScripts-todd-skills/11f4a41d-b818-420a-aa99-17c8545e6fae/scratchpad/reports/impl-idea-11-cheapwins.md
+base-sha: f6a591d
+plan: docs/tribe/planning/idea-11-review-cell-v3/plan-cheapwins.md
 
 ## Milestones
 - [x] spec committed (on master, planning campaign — db87488)
@@ -16,6 +16,28 @@ plan: docs/tribe/planning/idea-11-review-cell-v3/plan.md
       3b (pre-gate step-6.0 law), 4 (ledger lens/yield columns), evals 1-3 — READY TO BUILD
 - [ ] deferred wave: task 3c (three-lens expansion), eval 4 — RATIFIED but sequenced last
       (after the cheap wins ship + one data campaign — Decision 1)
+
+## STALE side-branches found at intake (2026-07-15, this dispatch) — NOT used
+
+`resume-check.sh` surfaced two other worktrees carrying commits tagged `Tribe-Card:
+idea-11-review-cell-v3`, both built against the OLD pre-rescope plan.md (unsplit Task 3 = full
+three-lens Law-1 rewrite) — i.e. they already built the deferred/forbidden Task 3c scope and, in
+one case, prematurely retired F16. Neither is a valid resume target for the current rescoped card
+and neither is read from, merged, or continued by this dispatch:
+
+- `/Users/todd.lam/WORK/_TestScripts/todd-skills-idea-11` @ `feat/idea-11-task-2` — built the old
+  plan's tasks 2-5 wholesale (pre-gate.sh, the UNSPLIT three-lens Law 1 rewrite, ledger cols, and
+  all 4 evals incl. the cold+cold `agreed` eval). `resume-check.sh` reports
+  `last_completed_task=5`, `next_action: RESUME_DELIVERY`. **Not this card's current scope.**
+- `/Users/todd.lam/WORK/_TestScripts/todd-skills-idea-11-r4` @ `feat/idea-11-review-cell-v3-r4` —
+  a "task-1 fix round 4" that pays off F16 outright (retires the "two independent reviewers"
+  language). `resume-check.sh` reports `last_completed_task=1`, `next_action: CONTINUE task 2`.
+  Premature: D3 keeps F16 open until 3c ships, which is out of scope this wave.
+
+This dispatch builds fresh, directly on `feat/advisory-skinner-review-cell` in the main worktree
+(constraint 1 of the dispatch brief), re-deriving tasks 2/3a/3b/4/5(1-3) against the CURRENT 2-lens
+advisory-law text in a new plan (`plan-cheapwins.md`), per RESCOPE.md. Both stale branches are left
+untouched on disk (not deleted).
 
 ## Predecessor law change (new baseline)
 
