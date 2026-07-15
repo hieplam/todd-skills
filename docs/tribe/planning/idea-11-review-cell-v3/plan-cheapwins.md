@@ -367,7 +367,7 @@ git log -1 --format='%(trailers)'
 **Contract:** `spec-cheapwins.md` Task 3b. Files: `plugins/tribe/agents/warchief.md` (edit — insert
 a step-6.0 preamble; do not touch Law 1/2/3/4 text), `test-review-cell-v3.sh` (new section).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Insert immediately before the final tally block:
 
@@ -383,7 +383,7 @@ has "c: the mandatory full-sweep clause is retired" "$STEP6" 'stop mandating ful
 
 Run it. **Expected RED:** 5 new assertions fail. Tally: `29 passed, 5 failed`.
 
-- [ ] **Step 2: Make it green**
+- [x] **Step 2: Make it green**
 
 Edit `plugins/tribe/agents/warchief.md`. Insert this new paragraph after "...Delivery may proceed
 only when the final audit's fix list is empty and every Critical/Important finding it carries ends
@@ -404,7 +404,7 @@ runs whatever proof the contract requires and may re-run any suite to falsify a 
 hypothesis; the cold lens runs whatever its own method already mandates, unchanged.
 ```
 
-- [ ] **Step 3: Verify green + regression**
+- [x] **Step 3: Verify green + regression**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-review-cell-v3.sh
@@ -417,7 +417,7 @@ done
 **Expected GREEN:** `34 passed, 0 failed`. All seven siblings green at baseline. D14 mutation bar
 on the 5 new assertions.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/scripts/tests/test-review-cell-v3.sh \
