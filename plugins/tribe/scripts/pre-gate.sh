@@ -27,6 +27,11 @@ done
 [ -d "$REPO/.git" ] || git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 \
   || DIE "not a git repo: $REPO"
 [ -d "$TESTS_DIR" ] || DIE "tests dir not found: $TESTS_DIR"
+# F1 fix: an unresolvable range (typo'd ref) must be a setup error, not a silent zero-iteration
+# pass. `git rev-list` exits non-zero and prints `fatal:` for an unresolvable ref; a VALID but
+# EMPTY range (e.g. HEAD..HEAD) exits 0 with no output and must stay a legitimate pass below —
+# only the unresolvable case is caught here.
+git -C "$REPO" rev-list "$RANGE" >/dev/null 2>&1 || DIE "invalid or unresolvable range: $RANGE"
 
 overall=pass
 suites_json=""
@@ -81,9 +86,28 @@ if [ -n "$FENCE" ]; then
   { echo; echo "## Scope fence"; } >> "$REPORT"
   while IFS= read -r f; do
     allowed=no
-    while IFS= read -r glob; do
+    # F3 fix: `|| [ -n "$glob" ]` also processes the fence file's last glob when that file lacks
+    # a trailing newline (plain `read` returns non-zero on the final unterminated line, which
+    # would otherwise silently drop it from every match below and false-flag legitimate files).
+    while IFS= read -r glob || [ -n "$glob" ]; do
       [ -n "$glob" ] || continue
-      case "$f" in $glob) allowed=yes ;; esac
+      # F2 fix: a lone `*` in a fence glob matches within ONE path segment only (gitignore-style
+      # intuition — `plugins/tribe/scripts/*.sh` means "this directory only"); only a literal
+      # trailing `/**` crosses directory boundaries (that case is handled by the second match
+      # below, unchanged). Enforced structurally: split both the file and the glob on `/`,
+      # require the same segment count, then match segment-by-segment — a lone `*` inside a
+      # single segment has no `/` inside it to cross.
+      if [ "${glob%/\*\*}" = "$glob" ]; then
+        IFS=/ read -r -a fseg <<< "$f"
+        IFS=/ read -r -a gseg <<< "$glob"
+        if [ "${#fseg[@]}" -eq "${#gseg[@]}" ]; then
+          seg_ok=yes
+          for i in "${!gseg[@]}"; do
+            case "${fseg[$i]}" in ${gseg[$i]}) : ;; *) seg_ok=no; break ;; esac
+          done
+          [ "$seg_ok" = yes ] && allowed=yes
+        fi
+      fi
       case "$f" in ${glob%/\*\*}/*) allowed=yes ;; esac
     done < "$FENCE"
     if [ "$allowed" = yes ]; then
