@@ -171,5 +171,43 @@ has "f11: cold-executor mutation carve-out is scratch-scoped; contract+reader st
     "$OPRULES_MUTATE" \
     'unconditional for the contract lens and the.{0,20}cold-reader.{0,140}cold-executor.{0,140}takes precedence.{0,100}scratch copy outside the tracked worktree'
 
+# --- Task 2 (Delta-C): the pre-gate script exists and behaves -----------------------------
+GATE="$HERE/../pre-gate.sh"
+if [ -x "$GATE" ]; then echo "ok: c: pre-gate.sh exists and is executable"; pass=$((pass+1)); \
+else echo "FAIL: c: pre-gate.sh exists and is executable"; fail=$((fail+1)); fi
+
+if [ "${PREGATE_INNER:-0}" != "1" ]; then
+  # Self-test 1 (pass case): sweep this repo's own suites over a 1-commit range, no fence.
+  TMPD="$(mktemp -d)"; REPORT="$TMPD/pregate-report.md"
+  if [ -x "$GATE" ] && OUT="$(PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." \
+        --range 'HEAD~1..HEAD' --tests-dir "$HERE" --report "$REPORT" 2>/dev/null)"; then
+    echo "$OUT" | grep -q '"verdict": *"pass"' \
+      && { echo "ok: c: self-test pass case verdict"; pass=$((pass+1)); } \
+      || { echo "FAIL: c: self-test pass case verdict"; fail=$((fail+1)); }
+    grep -q 'test-review-cell-v3' "$REPORT" \
+      && { echo "ok: c: report names every suite it ran"; pass=$((pass+1)); } \
+      || { echo "FAIL: c: report names every suite it ran"; fail=$((fail+1)); }
+  else
+    echo "FAIL: c: self-test pass case verdict"; fail=$((fail+1))
+    echo "FAIL: c: report names every suite it ran"; fail=$((fail+1))
+  fi
+
+  # Self-test 2 (red case): a fence that allows nothing must flag every changed file, exit 1.
+  FENCE="$TMPD/fence.globs"; echo 'docs/never-matches-anything/**' > "$FENCE"
+  if [ -x "$GATE" ]; then
+    PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." --range 'HEAD~1..HEAD' --tests-dir "$HERE" \
+            --report "$TMPD/red.md" --fence "$FENCE" >/dev/null 2>&1
+    [ $? -eq 1 ] && { echo "ok: c: fence violation exits 1"; pass=$((pass+1)); } \
+                 || { echo "FAIL: c: fence violation exits 1"; fail=$((fail+1)); }
+    grep -qi 'fence' "$TMPD/red.md" \
+      && { echo "ok: c: violation named in the report"; pass=$((pass+1)); } \
+      || { echo "FAIL: c: violation named in the report"; fail=$((fail+1)); }
+  else
+    echo "FAIL: c: fence violation exits 1"; fail=$((fail+1))
+    echo "FAIL: c: violation named in the report"; fail=$((fail+1))
+  fi
+  rm -rf "$TMPD"
+fi
+
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
