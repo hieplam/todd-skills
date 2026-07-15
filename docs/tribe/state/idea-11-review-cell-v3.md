@@ -10,7 +10,28 @@ plan: docs/tribe/planning/idea-11-review-cell-v3/plan.md
 - [x] spec committed (on master, planning campaign — db87488)
 - [x] plan committed (on master, planning campaign — validate-plan.sh verdict: pass, 5 tasks, 7/7 checks)
 - [x] task 1 shipped (skinner.md sub-lenses + path-scope rule; 3 fix rounds, 6 Skinner reports)
-- [ ] tasks 2-5 (pre-gate.sh, warchief.md 3-lens law, ledger columns, evals) — NOT BUILT
+- [x] RESCOPED against the advisory-Skinner law (2026-07-15): see RESCOPE.md; card.md is now the
+      rescoped v2 (original preserved as card-v1-original.md)
+- [ ] cheap-wins wave: task 2 (pre-gate.sh), 3a (path-scoped cold diff, warchief half),
+      3b (pre-gate step-6.0 law), 4 (ledger lens/yield columns), evals 1-3 — READY TO BUILD
+- [ ] deferred wave: task 3c (three-lens expansion), eval 4 — RATIFIED but sequenced last
+      (after the cheap wins ship + one data campaign — Decision 1)
+
+## Predecessor law change (new baseline)
+
+The advisory-Skinner rewrite of skinner.md + warchief.md landed on branch
+`feat/advisory-skinner-review-cell` (commit db87c57): no lens holds a verdict, the Warchief
+adjudicates every finding (CONFIRMED/REFUTED/DEBT), targeted verification replaces per-fix-round
+re-discovery. This card is now a delta on THAT baseline, not the verdict-model one the original
+plan.md targeted. Original plan.md tasks 2-5 were written against the old law — see RESCOPE.md for
+per-piece deltas before re-planning.
+
+## Owner ruling (2026-07-15)
+
+- **D1 — build task 3c, sequenced last** (not this campaign). Cheap wins first, one data campaign,
+  then the three-lens expansion.
+- **D2 — two-of-three `agreed` supersession ratified**, scoped to task 3c's eventual build.
+- **D3 — F16 stays open debt**, paid as task 3c's first act (not retired).
 
 ## Campaign type
 
