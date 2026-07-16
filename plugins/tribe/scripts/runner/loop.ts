@@ -39,7 +39,11 @@ export type CardPhase =
   | { kind: 'verify_only'; pr: number }
   | { kind: 'resume'; sessionId: string; reason: 'pr_open' | 'branch_no_pr'; pr?: number }
   | { kind: 'revert_and_redo' }
-  | { kind: 'fresh' }
+  // F8: `digest` is present exactly when there IS a trace worth telling the executor about
+  // (an open PR with no recorded sessionId) but nothing is resumable — the genuine
+  // "no trace at all" case (see `card.branch === null` below) leaves it undefined, so a
+  // fresh session there stays a plain blind fresh, unchanged.
+  | { kind: 'fresh'; digest?: string }
   | { kind: 'escalation_pending'; escalationPath: string };
 
 export interface DerivePhaseConfig {
@@ -163,10 +167,21 @@ export async function deriveCardPhase(
     if (card.sessionId) {
       return { kind: 'resume', sessionId: card.sessionId, reason: 'pr_open', pr: pr.number };
     }
-    // An open PR with no recorded sessionId: nothing to resume, and D4's fallback for a
-    // *failed resume attempt* doesn't apply either (no attempt was ever made) — go straight
-    // to fresh, same as "no trace".
-    return { kind: 'fresh' };
+    // F8: an open PR with no recorded sessionId has nothing to resume — but there IS a trace
+    // (an open PR on GitHub), so this is NOT "same as no trace". A blind `{ kind: 'fresh' }`
+    // here spawns an executor with no idea the PR exists; it rebuilds the card and opens a
+    // SECOND PR (violates acceptance #3: no duplicate PRs on resume). Reuse the same
+    // `buildStateDigest` the resume-failure fallback already uses, so the fresh session is
+    // told the PR number and instructed to continue it, not duplicate it.
+    const reason =
+      pr.number !== undefined
+        ? `no sessionId was ever recorded for this card, but PR #${pr.number} is already OPEN ` +
+          `on GitHub for branch "${card.branch}" — do not open a second PR; inspect and ` +
+          'continue the existing one.'
+        : `no sessionId was ever recorded for this card, and an OPEN PR was found for branch ` +
+          `"${card.branch}" (its number could not be read) — do not open a second PR; inspect ` +
+          'and continue the existing one.';
+    return { kind: 'fresh', digest: buildStateDigest(cardId, card, reason) };
   }
 
   const exists = await branchOrWorktreeExists(card.branch, config.repoRoot, io);
@@ -649,7 +664,9 @@ async function performRevertAndRedo(card: Card, resolved: ResolvedConfig, io: Lo
  * a `resume` phase attempts `runSession({resume: sessionId})`; if (and only if) that surfaces
  * a typed `error` outcome (a failed resume attempt: no transcript, SDK error — never on
  * `timeout`, which means the prior session may still be running), it falls back to a fresh
- * session carrying a state digest. `fresh`/`revert_and_redo` phases just spawn fresh. */
+ * session carrying a state digest. `revert_and_redo` and a blind `fresh` (no digest) just spawn
+ * fresh with the plain brief; a `fresh` phase carrying a digest (F8: open PR, no sessionId)
+ * spawns fresh too, but with that digest prepended — never blind. */
 async function runCardSession(
   cardId: string,
   phase: CardPhase,
@@ -682,7 +699,13 @@ async function runCardSession(
     return runSession({ brief }, sessionConfig, freshIO);
   }
 
-  const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), resolved.answersContent);
+  // F8: a `fresh` phase carrying a digest (open PR, no sessionId — see `deriveCardPhase`) must
+  // not spawn blind either; compose it the same way the resume-failure fallback above does.
+  const answersContent =
+    phase.kind === 'fresh' && phase.digest
+      ? `${phase.digest}\n\n---\n\n${resolved.answersContent}`
+      : resolved.answersContent;
+  const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent);
   const freshIO = buildSessionIOForCard(card, state, resolved, io);
   return runSession({ brief }, sessionConfig, freshIO);
 }

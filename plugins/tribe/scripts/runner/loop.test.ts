@@ -128,10 +128,27 @@ describe('deriveCardPhase — §D4 reality table', () => {
     expect(phase).toEqual({ kind: 'resume', sessionId: 'sess-1', reason: 'pr_open', pr: 7 });
   });
 
-  test('PR open, no sessionId recorded -> fresh (nothing to attempt)', async () => {
+  test('PR open, no sessionId recorded -> fresh WITH a digest naming the open PR (F8, not blind)', async () => {
+    // F8: there IS a trace here (an open PR on GitHub) even though nothing is resumable —
+    // a blind `{ kind: 'fresh' }` (no digest) would spawn an executor that doesn't know the
+    // PR exists and would rebuild the card, opening a SECOND PR. The fix must carry a digest
+    // naming PR #7 so the executor is told to continue it instead.
     const io = ioWith({ prView: ok(JSON.stringify({ number: 7, state: 'OPEN' })) });
     const phase = await deriveCardPhase('C1', fixtureCard({ sessionId: null }), baseConfig, io);
+    expect(phase.kind).toBe('fresh');
+    if (phase.kind === 'fresh') {
+      expect(phase.digest).toBeDefined();
+      expect(phase.digest).toContain('7');
+    }
+  });
+
+  test('genuine no-trace (card.branch null) still yields a plain blind fresh — no bogus digest', async () => {
+    const io = ioWith({});
+    const phase = await deriveCardPhase('C1', fixtureCard({ branch: null }), baseConfig, io);
     expect(phase).toEqual({ kind: 'fresh' });
+    if (phase.kind === 'fresh') {
+      expect(phase.digest).toBeUndefined();
+    }
   });
 
   test('branch/worktree exist (worktree present), sessionId recorded -> resume with reason branch_no_pr', async () => {
@@ -597,6 +614,53 @@ describe('runLoop — resume-probe failure -> fresh-with-digest', () => {
     // First attempt is the resume continuation prompt (short); second is a FULL fresh brief
     // carrying the crash-recovery digest (never the raw continuation prompt).
     expect(spawnBriefs[1]).toContain('Crash-recovery digest for C1');
+    expect(result.processed).toEqual([
+      { kind: 'shipped', cardId: 'C1', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+    ]);
+  });
+});
+
+describe('runLoop — F8: open PR with no sessionId spawns fresh WITH a digest, never blind', () => {
+  test('a single session is spawned, briefed with the open PR number — no duplicate PR is possible', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', sessionId: null }) },
+    });
+    const { io, spawnBriefs } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: 'ANSWERS-CONTENT',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view') return ok(JSON.stringify({ number: 9, state: 'OPEN' }));
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'ab00001' }));
+          if (cmd[0] === 'git' && cmd[1] === 'rev-list') return ok('ab00001 p1 p2');
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'diff') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'fetch') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'checkout') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'add') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'commit') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'push') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'create') return ok('https://example.invalid/o/r/pull/906\n');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'merge') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'pull') return ok('');
+          return null;
+        },
+      ],
+      spawnQueue: [() => messages(shippedMessages(9, 'ab00001', 'sess-new-c1'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    // Exactly ONE session is spawned for this card — the fix must not itself introduce a
+    // resume attempt; it is the fresh session's own brief that must carry the digest.
+    expect(spawnBriefs).toHaveLength(1);
+    expect(spawnBriefs[0]).toContain('Crash-recovery digest for C1');
+    // The executor is NOT spawned blind: the brief names the open PR's number, so it inspects
+    // and continues PR #9 instead of rebuilding the card and opening a second one (F8).
+    expect(spawnBriefs[0]).toContain('9');
     expect(result.processed).toEqual([
       { kind: 'shipped', cardId: 'C1', commitResult: expect.objectContaining({ outcome: 'merged' }) },
     ]);
