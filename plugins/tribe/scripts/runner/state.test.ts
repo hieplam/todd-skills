@@ -4,6 +4,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
   CURRENT_STATE_VERSION,
+  CircularDependencyError,
+  UndefinedDependencyCardError,
   UndefinedSequenceCardError,
   UnsupportedStateVersionError,
   loadState,
@@ -11,7 +13,7 @@ import {
   serializeState,
   nextCard,
 } from './state.ts';
-import type { CampaignState, StateIO } from './types.ts';
+import type { Card, CampaignState, StateIO } from './types.ts';
 
 function fixtureState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -67,6 +69,29 @@ function io(existingPaths: string[], repoRoot = '/repo'): StateIO {
     repoRoot,
     fileExists: (resolvedPath: string) => existing.has(resolvedPath),
   };
+}
+
+/** A minimal, fully-formed card (all D2 fields present) for tests that only care about
+ * `status`/`dependsOn` — avoids repeating every nullable field at every call site. */
+function cardFixture(overrides: Partial<Card> = {}): Card {
+  return {
+    status: 'staged',
+    spec: 'docs/superpowers/specs/2026-01-01-x-spec.md',
+    plan: 'docs/superpowers/plans/2026-01-01-x-plan.md',
+    branch: null,
+    baseSha: null,
+    pr: null,
+    mergeSha: null,
+    sessionId: null,
+    updatedAt: null,
+    ...overrides,
+  };
+}
+
+/** An `io` that reports every card's recorded spec/plan as present on disk, so `nextCard`
+ * tests below exercise only the dependsOn/blocked logic, never the PLANNING_NEEDED path. */
+function allFilesExistIo(repoRoot = '/repo'): StateIO {
+  return { repoRoot, fileExists: () => true };
 }
 
 describe('parseState / serializeState round-trip', () => {
@@ -220,5 +245,276 @@ describe('nextCard', () => {
     ) as CampaignState;
 
     expect(nextCard(allShipped, io([]))).toEqual({ kind: 'done' });
+  });
+});
+
+describe('dependsOn / blocked / autoAnswerRounds — schema (Task 1)', () => {
+  test('accepts an optional dependsOn array and autoAnswerRounds on a card, and the new `blocked` status', () => {
+    const raw = fixtureState({
+      cards: {
+        ...(fixtureState().cards as Record<string, unknown>),
+        C2: { ...cardFixture({ status: 'blocked' }), dependsOn: ['C1'], autoAnswerRounds: 1 },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    expect(state.cards.C2?.status).toBe('blocked');
+    expect(state.cards.C2?.dependsOn).toEqual(['C1']);
+    expect(state.cards.C2?.autoAnswerRounds).toBe(1);
+  });
+
+  test('rejects a dependsOn entry naming a card id absent from cards', () => {
+    const raw = fixtureState({
+      cards: {
+        ...(fixtureState().cards as Record<string, unknown>),
+        C2: { ...cardFixture(), dependsOn: ['does-not-exist'] },
+      },
+    });
+    expect(() => parseState(raw)).toThrow(UndefinedDependencyCardError);
+  });
+
+  test('rejects a direct self-dependency as a circular dependency', () => {
+    const raw = fixtureState({
+      cards: {
+        ...(fixtureState().cards as Record<string, unknown>),
+        C2: { ...cardFixture(), dependsOn: ['C2'] },
+      },
+    });
+    expect(() => parseState(raw)).toThrow(CircularDependencyError);
+  });
+
+  test('rejects a transitive cycle (A -> B -> A), naming the cycle path', () => {
+    const raw = fixtureState({
+      cards: {
+        C1: { ...cardFixture(), dependsOn: ['C2'] },
+        C2: { ...cardFixture(), dependsOn: ['C1'] },
+        C3: cardFixture(),
+      },
+    });
+    let caught: unknown;
+    try {
+      parseState(raw);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(CircularDependencyError);
+    expect((caught as CircularDependencyError).path).toEqual(['C1', 'C2', 'C1']);
+  });
+
+  test('a pre-existing v1 state file with none of the new fields round-trips byte-identical', async () => {
+    // No card anywhere declares dependsOn/autoAnswerRounds, and no status is "blocked" — this
+    // is exactly what an old (pre-Task-1) campaign-state.json looks like on disk.
+    const raw = fixtureState();
+    const originalBytes = `${JSON.stringify(raw, null, 2)}\n`;
+
+    const loaded = await loadState(() => originalBytes);
+    expect(loaded.cards.C2?.dependsOn).toBeUndefined();
+    expect(loaded.cards.C2?.autoAnswerRounds).toBeUndefined();
+
+    const serialized = serializeState(loaded);
+    expect(serialized).toBe(originalBytes);
+  });
+});
+
+describe('nextCard — progressable rule (dependsOn / blocked, spec §O4/W6, Task 1)', () => {
+  test('no dependsOn on a card ⇒ independent, unchanged behavior', () => {
+    const raw = fixtureState({
+      sequence: ['A'],
+      cards: { A: cardFixture() },
+    });
+    const state = parseState(raw) as CampaignState;
+    expect(nextCard(state, allFilesExistIo())).toEqual({ kind: 'card', cardId: 'A', card: state.cards.A });
+  });
+
+  test('an empty dependsOn array behaves the same as no dependsOn ⇒ independent', () => {
+    const raw = fixtureState({
+      sequence: ['A'],
+      cards: { A: { ...cardFixture(), dependsOn: [] } },
+    });
+    const state = parseState(raw) as CampaignState;
+    expect(nextCard(state, allFilesExistIo())).toEqual({ kind: 'card', cardId: 'A', card: state.cards.A });
+  });
+
+  test('a merely-unshipped-but-healthy dependency (staged) skips the dependent WITHOUT marking it blocked', () => {
+    const raw = fixtureState({
+      sequence: ['B', 'A'],
+      cards: {
+        A: cardFixture({ status: 'staged' }),
+        B: { ...cardFixture(), dependsOn: ['A'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    // B is skipped (A hasn't shipped yet); A is the progressable card. B's own status must be
+    // left completely alone — it may still ship later THIS SAME pass once A ships.
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'card', cardId: 'A', card: state.cards.A });
+    expect(state.cards.B?.status).toBe('staged');
+  });
+
+  test('a running (not yet shipped) dependency also merely skips the dependent, not blocks it', () => {
+    // A is deliberately NOT in `sequence` (it's mid-flight, being resumed elsewhere) — this
+    // isolates "B's only unmet dependency is running" from "A itself is also a candidate".
+    const raw = fixtureState({
+      sequence: ['B'],
+      cards: {
+        A: cardFixture({ status: 'running' }),
+        B: { ...cardFixture(), dependsOn: ['A'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'done' });
+    expect(state.cards.B?.status).toBe('staged');
+  });
+
+  test('an escalated dependency marks the dependent blocked (W6) — the dependent never starts', () => {
+    const raw = fixtureState({
+      sequence: ['B', 'A'],
+      cards: {
+        A: cardFixture({ status: 'escalated' }),
+        B: { ...cardFixture(), dependsOn: ['A'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'done' }); // A is escalated+excluded, B is blocked: nothing progressable
+    expect(state.cards.B?.status).toBe('blocked');
+  });
+
+  test('an already-blocked dependency also blocks its dependent (direct block propagation)', () => {
+    const raw = fixtureState({
+      sequence: ['C', 'B', 'A'],
+      cards: {
+        A: cardFixture({ status: 'escalated' }),
+        B: { ...cardFixture({ status: 'blocked' }), dependsOn: ['A'] },
+        C: { ...cardFixture(), dependsOn: ['B'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'done' });
+    expect(state.cards.B?.status).toBe('blocked');
+    expect(state.cards.C?.status).toBe('blocked');
+  });
+
+  test('unblocks when re-evaluated after the dependency has since shipped (blocked is recomputed, never trusted from disk)', () => {
+    const raw = fixtureState({
+      sequence: ['B', 'A'],
+      cards: {
+        A: cardFixture({ status: 'shipped' }),
+        // B's status is stale 'blocked' from a previous run, but A has since shipped.
+        B: { ...cardFixture({ status: 'blocked' }), dependsOn: ['A'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'card', cardId: 'B', card: state.cards.B });
+  });
+
+  // Warchief audit fix (task-1 reopened): `nextCard` was SETTING `blocked` but never
+  // CLEARING a stale one for a card the sequence walk's early return never reaches — the
+  // stored status disagreed with the derived truth, and that wrong status is exactly what
+  // gets persisted and what Task 3's report would render. These two tests assert the
+  // `.status` field directly (not merely object-reference equality via `state.cards.X`,
+  // which the test above doesn't actually prove anything about the VALUE of `.status`).
+  test('reconciles a stale blocked status back to staged once its dependency has shipped, even when an earlier card in sequence makes nextCard return before ever visiting it (Warchief audit probe)', () => {
+    const raw = fixtureState({
+      sequence: ['C', 'B'],
+      cards: {
+        A: cardFixture({ status: 'shipped' }),
+        B: { ...cardFixture({ status: 'blocked' }), dependsOn: ['A'] },
+        C: cardFixture({ status: 'staged' }), // independent; nextCard returns C immediately
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+
+    expect(result).toEqual({ kind: 'card', cardId: 'C', card: state.cards.C });
+    // The defect: B is never visited by the sequence walk (C is returned first), but its
+    // dependency A has shipped — B must no longer read `blocked` once reality has moved on.
+    expect(state.cards.B?.status).toBe('staged');
+
+    // And the corrected status must actually be what gets persisted, not just what's held
+    // in memory — the report (Task 3) reads the state file, not this in-memory object.
+    const serialized = serializeState(state);
+    expect(JSON.parse(serialized).cards.B.status).toBe('staged');
+  });
+
+  test('reconciliation is TOTAL, not walk-order dependent: a card that newly becomes blocked is marked even when an earlier independent card makes nextCard return before the walk ever reaches it', () => {
+    const raw = fixtureState({
+      sequence: ['D', 'X', 'Y'],
+      cards: {
+        D: cardFixture({ status: 'staged' }), // independent; nextCard returns D immediately
+        X: { ...cardFixture({ status: 'staged' }), dependsOn: ['Y'] },
+        Y: cardFixture({ status: 'escalated' }),
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+
+    expect(result).toEqual({ kind: 'card', cardId: 'D', card: state.cards.D });
+    // X is never visited by the sequence walk (D is returned first), but its dependency Y is
+    // escalated — X must be marked blocked regardless, so Task 3's report is coherent.
+    expect(state.cards.X?.status).toBe('blocked');
+  });
+
+  test('a dependency with two deps, one shipped one merely staged, still only skips (not blocks)', () => {
+    const raw = fixtureState({
+      sequence: ['C', 'A', 'B'],
+      cards: {
+        A: cardFixture({ status: 'shipped' }),
+        B: cardFixture({ status: 'staged' }),
+        C: { ...cardFixture(), dependsOn: ['A', 'B'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'card', cardId: 'B', card: state.cards.B });
+    expect(state.cards.C?.status).toBe('staged');
+  });
+
+  test('a dependency with two deps, one shipped one escalated, gets blocked', () => {
+    const raw = fixtureState({
+      sequence: ['C', 'A', 'B'],
+      cards: {
+        A: cardFixture({ status: 'shipped' }),
+        B: cardFixture({ status: 'escalated' }),
+        C: { ...cardFixture(), dependsOn: ['A', 'B'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'done' });
+    expect(state.cards.C?.status).toBe('blocked');
+  });
+
+  test('transitive blocked cascade computes to a fixpoint REGARDLESS of sequence order: A escalated -> B blocked -> C blocked, sequence deliberately worst-case [C, B, A]', () => {
+    const raw = fixtureState({
+      sequence: ['C', 'B', 'A'],
+      cards: {
+        A: cardFixture({ status: 'escalated' }),
+        B: { ...cardFixture(), dependsOn: ['A'] },
+        C: { ...cardFixture(), dependsOn: ['B'] },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'done' });
+    expect(state.cards.B?.status).toBe('blocked');
+    expect(state.cards.C?.status).toBe('blocked');
+  });
+
+  test('an independent card (no dependsOn) still ships amid an unrelated blocked cascade', () => {
+    const raw = fixtureState({
+      sequence: ['C', 'B', 'A', 'D'],
+      cards: {
+        A: cardFixture({ status: 'escalated' }),
+        B: { ...cardFixture(), dependsOn: ['A'] },
+        C: { ...cardFixture(), dependsOn: ['B'] },
+        D: cardFixture(), // no dependsOn: independent, unaffected by the A/B/C chain
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const result = nextCard(state, allFilesExistIo());
+    expect(result).toEqual({ kind: 'card', cardId: 'D', card: state.cards.D });
   });
 });
