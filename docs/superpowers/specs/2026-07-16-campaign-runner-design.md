@@ -2,8 +2,9 @@
 
 Owner directives (2026-07-16): move the campaign's outer loop out of a long-lived LLM session
 into a deterministic script; **the runner is tribe machinery and lives in this plugin**
-(`plugins/tribe/runner/`), not in the target project. Authored by the Shaman; the owner
-implements this in a following session in this repo.
+(`plugins/tribe/scripts/runner/` — under `scripts/`, per `ref-plugin-layout`: repo-invoked,
+not installed), not in the target project. Authored by the Shaman; the owner implements this
+in a following session in this repo.
 
 > **Full rationale & lessons-learnt:**
 > [`2026-07-16-campaign-runner-context.md`](2026-07-16-campaign-runner-context.md) — the
@@ -37,7 +38,7 @@ STAGE A — PLANNING (human + Fable, interactive, BEFORE the runner)
   Owner rulings (E-items, policy) happen here, recorded in the target repo's ROADMAP §8.
 
 STAGE B — EXECUTION (Claude Agent SDK script, headless, 0 tokens for the loop)
-  bun plugins/tribe/runner/run.ts --repo <target repo> --state <state.json path> [...]
+  bun plugins/tribe/scripts/runner/run.ts --repo <target repo> --state <state.json path> [...]
   loop: next staged card → ONE fresh executor session → script-verified SHIPPED
         → state updated on the target repo's master → next card
   Any gap/question → write escalation file, EXIT. Human answers, re-runs.

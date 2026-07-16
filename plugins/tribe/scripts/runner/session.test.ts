@@ -5,6 +5,8 @@
 // `io.spawnSession` seam. Fixtures are neutral (no repo names, no campaign values, no
 // model names baked in) — the stateless-capability wall.
 import { describe, expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   TRIBE_PLUGIN_DIR,
   runSession,
@@ -86,6 +88,14 @@ describe('runSession — §D1 option set (regression guard against SDK drift)', 
   test('TRIBE_PLUGIN_DIR is derived from the module location, never a hardcoded absolute path', () => {
     expect(TRIBE_PLUGIN_DIR).not.toContain('ai-dict');
     expect(TRIBE_PLUGIN_DIR.endsWith('runner')).toBe(false);
+  });
+
+  test('TRIBE_PLUGIN_DIR resolves on disk to the real plugins/tribe directory (not counted by eye)', () => {
+    // The runner lives at plugins/tribe/scripts/runner/ — two levels below plugins/tribe.
+    // Prove the resolved path is that exact directory by checking a file that only exists
+    // there, not by asserting a string suffix alone.
+    expect(TRIBE_PLUGIN_DIR.endsWith(join('plugins', 'tribe'))).toBe(true);
+    expect(existsSync(join(TRIBE_PLUGIN_DIR, '.claude-plugin', 'plugin.json'))).toBe(true);
   });
 
   test('passes options.resume when a resume input is given', async () => {

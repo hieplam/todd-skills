@@ -6,11 +6,11 @@
 > WHY (measured context costs, lessons, rejected alternatives, corrected SDK facts) lives in
 > `docs/superpowers/specs/2026-07-16-campaign-runner-context.md` — read it first if you are
 > tempted to change the architecture. The runner is a **stateless capability of the tribe
-> plugin** (`plugins/tribe/runner/`): no repo, path, model, or campaign value is hardcoded —
+> plugin** (`plugins/tribe/scripts/runner/`): no repo, path, model, or campaign value is hardcoded —
 > everything environment-specific arrives as a CLI input (spec §2 table). The tribe change is
 > governed by this repo's C3 (`c3-215-tribe`) — record it as a change-unit, CLI-only.
 
-**Goal:** `bun plugins/tribe/runner/run.ts --repo <target> --state <path> [...]` executes
+**Goal:** `bun plugins/tribe/scripts/runner/run.ts --repo <target> --state <path> [...]` executes
 staged roadmap cards sequentially — one fresh Agent-SDK executor session per card,
 script-verified SHIPPED, state committed to the target repo's master — resumable after any
 crash/stop, escalating to the human instead of deciding.
@@ -31,13 +31,13 @@ no Co-Authored-By, no attribution footer.
   `maxTurns`, `abortController`, `executable: 'bun'`.
 - State schema versioned (`"v": 1`); reader rejects unknown major versions.
 - This repo has NO root package.json — the runner gets a **plugin-local** one
-  (`plugins/tribe/runner/package.json`); tests run with **`bun test`** (built-in, no vitest
+  (`plugins/tribe/scripts/runner/package.json`); tests run with **`bun test`** (built-in, no vitest
   dependency to scaffold).
 
 ### Task 1: Scaffold + dependency
 
-Files: `plugins/tribe/runner/{run.ts,loop.ts,state.ts,verify.ts,github.ts,session.ts,brief.ts,types.ts}`
-(empty exports), `plugins/tribe/runner/package.json` (`@anthropic-ai/claude-agent-sdk` +
+Files: `plugins/tribe/scripts/runner/{run.ts,loop.ts,state.ts,verify.ts,github.ts,session.ts,brief.ts,types.ts}`
+(empty exports), `plugins/tribe/scripts/runner/package.json` (`@anthropic-ai/claude-agent-sdk` +
 `zod` dependencies; `"test": "bun test"`), `tsconfig.json`. Gate: `bun install`,
 `bun test` (empty suite passes), `bunx tsc --noEmit`. Commit (1/7).
 
@@ -118,11 +118,11 @@ exception, non-advisory red → returns `escalate`, commit-failure path returns
 
 ### Task 7: Docs + smoke
 
-- `plugins/tribe/runner/README.md` (inputs table from spec §2, how to run, resume semantics,
+- `plugins/tribe/scripts/runner/README.md` (inputs table from spec §2, how to run, resume semantics,
   escalation/answers workflow, STOP + lock files); tribe plugin `README.md` gains a runner
   section; C3 change-unit recorded for `c3-215-tribe` (CLI-only).
 - Smoke (requires the ai-dict seed PR from Task 2's note to have landed):
-  `bun plugins/tribe/runner/run.ts --repo <ai-dict> --state docs/superpowers/campaign/campaign-state.json --dry-run`
+  `bun plugins/tribe/scripts/runner/run.ts --repo <ai-dict> --state docs/superpowers/campaign/campaign-state.json --dry-run`
   (expects: next = B3, phase = fresh). Then the first REAL run with `--cards B3
   --max-cards 1` — B3 ships through the runner end-to-end (this is the acceptance test; a
   human watches the first run).
@@ -139,6 +139,6 @@ exception, non-advisory red → returns `escalate`, commit-failure path returns
 4. A forced `NEEDS_DIRECTION` (temporarily corrupt a plan step) produces an escalation file
    and a clean exit — and an answers.md entry + re-run completes the card.
 5. The loop process itself consumed 0 LLM tokens (only spawned sessions did).
-6. Nothing ai-dict-specific appears in `plugins/tribe/runner/` source — every campaign value
+6. Nothing ai-dict-specific appears in `plugins/tribe/scripts/runner/` source — every campaign value
    flows through the CLI inputs (grep-clean for repo names/paths; the stateless-capability
    wall).
