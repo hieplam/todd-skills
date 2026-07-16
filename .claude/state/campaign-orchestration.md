@@ -44,7 +44,7 @@ prefix. Repo trailers `Tribe-Card:` / `Tribe-Task: N/M` are real convention — 
 | 3 | `report.ts` — report contract (§O5) | ✅ shipped `f05a387` + **W-F5 fix `5511492`** — audited: 172 tests, tsc clean; **report contract proven END-TO-END against the real CLI** (see below) | `reports/orch-task-3.md`, `orch-task-3-fix.md` |
 | 4 | `orchestrate-campaign` skill (§O1/O3/O6) | 🔄 in flight (hunter-orch-4) | `reports/orch-task-4.md` |
 | 5 | Docs — runner README schema + shaman/warchief awareness | ✅ shipped `1733ce5` — audited: **F12 proven closed** (README's own example → runnable campaign, live); **W-F1 fixed** + honest correction note; both code citations verified accurate; docs-only scope confirmed (172 tests unchanged) | `reports/orch-task-5.md` |
-| 6 | C3 change-unit + final gates | ⬜ not started (last) | `reports/orch-task-6.md` |
+| 6 | C3 change-unit + final gates | ✅ Warchief-authored `3730b5e` — **two** units applied (`c3-215` ok:true); all final wall gates green; W5 not triggered (this effort changed no gh/git string) | ADRs are the record |
 
 Sequencing: 1 → 2 → 3 → (4 ∥ 5) → 6.
 
@@ -67,9 +67,12 @@ Sequencing: 1 → 2 → 3 → (4 ∥ 5) → 6.
 
 ## Next action
 
-Task 1 ✅ closed (`38f4232`, 134 tests green). Task 2 dispatched (hunter-orch-2) with the W-F2
-infinite-loop ruling in its brief. Then 3 → (4 ∥ 5) → 6, auditing each deliverable before
-accepting.
+**All 6 tasks shipped and audited.** PR open; awaiting CI + the owner's **regular merge**
+(2 parents, never squash). After merge: `verify-shipped` the PR, then commit a snapshot of this
+STATE to the repo's docs home per the global resume protocol.
+
+**The one thing NOT done, by owner directive, and it must not be quietly closed:** the live-smoke
+acceptance (#1–#3) is **BLOCKED-pending-repo**. See "Known-carried gaps" below.
 
 **Audit protocol that is EARNING its cost — keep doing this:** every Hunter claim is verified
 against the repo, and every load-bearing behavior is **probed against the real module/CLI**, not
