@@ -27,13 +27,18 @@ export interface VerifyIO {
 }
 
 /** Everything verify.ts needs from campaign config — deliberately a narrow, LOCAL type
- * (not `CampaignState`; Task 3 must not touch `types.ts`). `schemaLockPaths` is campaign
- * config carried by the caller from `CampaignState.schemaLockPaths` — never hardcoded
+ * (not `CampaignState`). `schemaLockPaths`/`docsOnlyPaths` are campaign config carried by the
+ * caller from `CampaignState.schemaLockPaths`/`CampaignState.docsOnlyPaths` — never hardcoded
  * here (stateless-capability wall). */
 export interface VerifyConfig {
   /** Target repo root; `cwd` for every `exec` call (an input, per spec §2). */
   repoRoot: string;
   schemaLockPaths: string[];
+  /** Path prefixes that count as "docs-only" for the D6 flake waiver — campaign config
+   * carried by the caller from `CampaignState.docsOnlyPaths`, never hardcoded here
+   * (stateless-capability wall). An EMPTY list fails closed: nothing counts as docs-only, so
+   * a code diff never auto-waives (see `isDocsOnlyDiff`). */
+  docsOnlyPaths: string[];
 }
 
 /** The D3 six points, each independently reported (never short-circuited) so a failed
@@ -92,19 +97,24 @@ async function checkMerged(
       point: {
         id: 'merged',
         passed: false,
-        detail: 'card.pr is not set; cannot query gh api pulls/<pr>',
+        detail: 'card.pr is not set; cannot query gh api repos/{owner}/{repo}/pulls/<pr>',
       },
       mergeSha: null,
     };
   }
 
-  const result = await run(io, config.repoRoot, ['gh', 'api', `pulls/${card.pr}`]);
+  // F4: `gh api pulls/<pr>` resolves against the API ROOT, not the current repo, and 404s
+  // (verified against the real CLI). `{owner}`/`{repo}` are gh's OWN literal placeholders —
+  // gh substitutes them from the repo in `cwd` itself; passed through literally here, never
+  // interpolated with a repo name (that would violate the stateless-capability wall).
+  const apiPath = `repos/{owner}/{repo}/pulls/${card.pr}`;
+  const result = await run(io, config.repoRoot, ['gh', 'api', apiPath]);
   if (result.exitCode !== 0) {
     return {
       point: {
         id: 'merged',
         passed: false,
-        detail: `gh api pulls/${card.pr} failed (exit ${result.exitCode}): ${result.stderr || result.stdout}`,
+        detail: `gh api ${apiPath} failed (exit ${result.exitCode}): ${result.stderr || result.stdout}`,
       },
       mergeSha: null,
     };
@@ -118,7 +128,7 @@ async function checkMerged(
       point: {
         id: 'merged',
         passed: false,
-        detail: `gh api pulls/${card.pr} returned non-JSON output`,
+        detail: `gh api ${apiPath} returned non-JSON output`,
       },
       mergeSha: null,
     };
@@ -132,7 +142,7 @@ async function checkMerged(
       passed: merged,
       detail: merged
         ? `PR #${card.pr} is merged (merge_commit_sha=${mergeSha ?? 'unknown'})`
-        : `PR #${card.pr} is not merged (gh api pulls/${card.pr} reported merged=${String(parsed.merged)})`,
+        : `PR #${card.pr} is not merged (gh api ${apiPath} reported merged=${String(parsed.merged)})`,
     },
     mergeSha,
   };
@@ -211,8 +221,15 @@ function isSonar504Signature(check: PrCheck): boolean {
   return /sonarcloud/i.test(check.name) && /504/.test(check.description ?? '');
 }
 
+/** F1: the docs-only path set is campaign config (`config.docsOnlyPaths`), never a hardcoded
+ * `docs/` prefix — that would bake the TARGET repo's directory layout into a capability that
+ * must work against ANY repo (stateless-capability wall). An EMPTY `docsOnlyPaths` fails
+ * closed: nothing counts as docs-only, so a code diff never auto-waives — the opposite
+ * default (empty ⇒ everything docs-only) would auto-waive every code diff, which D6 forbids
+ * absolutely. */
 async function isDocsOnlyDiff(baseSha: string | null, config: VerifyConfig, io: VerifyIO): Promise<boolean> {
   if (!baseSha) return false;
+  if (config.docsOnlyPaths.length === 0) return false;
   const result = await run(io, config.repoRoot, [
     'git',
     'diff',
@@ -224,7 +241,7 @@ async function isDocsOnlyDiff(baseSha: string | null, config: VerifyConfig, io: 
     .split('\n')
     .map((f) => f.trim())
     .filter(Boolean);
-  return files.length > 0 && files.every((f) => f.startsWith('docs/'));
+  return files.length > 0 && files.every((f) => config.docsOnlyPaths.some((prefix) => f.startsWith(prefix)));
 }
 
 async function checkChecksGreen(card: Card, config: VerifyConfig, io: VerifyIO): Promise<VerifyPointResult> {
@@ -255,7 +272,11 @@ async function checkChecksGreen(card: Card, config: VerifyConfig, io: VerifyIO):
     return { id: 'checksGreen', passed: false, detail: `gh pr checks ${card.pr} returned non-JSON output` };
   }
 
-  const failing = checks.filter((c) => c.bucket !== 'pass');
+  // F2: align with github.ts's `isNotPassing` — gh's `skipping` bucket (a routine
+  // path-filtered check) is non-blocking, not a failure. Two modules disagreeing on this same
+  // gh vocabulary would make verify.ts escalate healthy cards that github.ts would happily
+  // merge.
+  const failing = checks.filter((c) => c.bucket !== 'pass' && c.bucket !== 'skipping');
   if (failing.length === 0) {
     return { id: 'checksGreen', passed: true, detail: `all ${checks.length} check(s) concluded success` };
   }
