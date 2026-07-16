@@ -10,15 +10,29 @@ import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import {
+  EXIT_LOCKED,
   runLoop,
+  stateDirOf,
   type ExecResult,
   type LockInfo,
   type LoopIO,
+  type LoopResult,
   type PendingCommit,
   type RunLoopConfig,
 } from './loop.ts';
+import { loadState } from './state.ts';
 import { sdkSpawnSession } from './session.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
+import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from './report.ts';
+
+/** run.ts's own exit code for "an unhandled exception surfaced after `runLoop` was entered"
+ * (Task 3 design note: "any error after the state was loadable" is a real, distinct exit path
+ * from `EXIT_LOCKED`/`EXIT_ESCALATED`/`EXIT_SESSION_INCOMPLETE`, none of which fit it). Lives
+ * here, not in loop.ts/report.ts, because it is purely a process-exit-code concern of this
+ * file's own `main()` wiring — `report.ts`'s `run.reason` ('error') is the artifact that
+ * actually carries the meaning; this numeric code is only ever a hint (§O3: "the exit code is
+ * a hint, the report is the truth"). */
+const EXIT_ERROR = 4;
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 
@@ -208,29 +222,89 @@ function buildRealIo(config: RunLoopConfig): LoopIO {
   };
 }
 
+/** Task 3 wiring: reloads whatever state is on disk right now and writes the report through
+ * it — the ONLY call site of `writeReport` in this file (the "single finally-style seam" the
+ * brief asks for; every exit path in `main()` below funnels through this one call before its
+ * own `process.exit`). Swallows a `loadState` failure deliberately: per the brief's design note
+ * 1, if state was never loadable at all (e.g. a fresh campaign whose state file doesn't exist
+ * yet, or an argument error that never got this far), there is nothing truthful to report —
+ * this is a best-effort artifact, never a reason to crash the process over. Every OTHER failure
+ * inside `writeReport`/`buildCampaignReport` is already handled internally there (the
+ * escalation-file digest read degrades to an honest fallback string); this catch is only the
+ * outermost safety net for "state itself never loaded". */
+async function tryWriteReport(config: RunLoopConfig, io: LoopIO, run: ReportRunInfo): Promise<void> {
+  try {
+    const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
+    await writeReport(
+      state,
+      run,
+      stateDirOf(config),
+      { repoRoot: config.repoRoot, escalationsDir: config.escalationsDir },
+      io,
+    );
+  } catch {
+    // See the doc comment above: no truthful report to write.
+  }
+}
+
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
   if ('error' in parsed) {
     console.error(`campaign runner: ${parsed.error}`);
-    process.exit(1); // argument errors always exit 1
+    process.exit(1); // argument errors always exit 1 — state was never loadable, no report.
     return;
   }
 
   const io = buildRealIo(parsed.config);
-  const result = await runLoop(parsed.config, io);
+  const startedAt = new Date().toISOString();
 
+  let result: LoopResult | undefined;
+  let thrown: unknown;
+  try {
+    result = await runLoop(parsed.config, io);
+  } catch (err) {
+    thrown = err;
+  }
+
+  const endedAt = new Date().toISOString();
+  const exitCode = thrown ? EXIT_ERROR : (result as LoopResult).exitCode;
+
+  // Task 3 (spec §O5): the single finally-style seam. `shouldWriteReport`/`deriveExitReason`
+  // (report.ts, fully unit-tested there) hold the only two decisions made here — this file
+  // never re-derives report-shaping logic (design note 3) — so every exit path below (done,
+  // escalations pending, STOP, session-incomplete, or this unhandled-error path) writes a
+  // report through the one call, except `--dry-run` (zero side effects by construction) and
+  // `EXIT_LOCKED` (a refused process must never clobber the live one's report).
+  if (shouldWriteReport({ dryRun: parsed.config.dryRun, exitCode })) {
+    await tryWriteReport(parsed.config, io, {
+      startedAt,
+      endedAt,
+      exitCode,
+      reason: deriveExitReason({ threw: Boolean(thrown), exitCode, hasMessage: Boolean(result?.message) }),
+    });
+  }
+
+  if (thrown) {
+    console.error(
+      `campaign runner: unexpected error: ${thrown instanceof Error ? thrown.message : String(thrown)}`,
+    );
+    process.exit(EXIT_ERROR);
+    return;
+  }
+
+  const finalResult = result as LoopResult;
   if (parsed.config.dryRun) {
-    console.log(JSON.stringify(result.dryRunPlan, null, 2));
+    console.log(JSON.stringify(finalResult.dryRunPlan, null, 2));
   } else {
-    for (const outcome of result.processed) {
+    for (const outcome of finalResult.processed) {
       console.log(`[${outcome.cardId}] ${outcome.kind}`);
     }
-    if (result.message) {
-      console.log(result.message);
+    if (finalResult.message) {
+      console.log(finalResult.message);
     }
   }
 
-  process.exit(result.exitCode);
+  process.exit(finalResult.exitCode);
 }
 
 if (import.meta.main) {
