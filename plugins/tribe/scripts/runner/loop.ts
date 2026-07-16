@@ -973,6 +973,17 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
       // `filteredNextCard`/`nextCard`'s own blocked-cascade reconciliation (W6).
     }
 
+    // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
+    // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable
+    // card) — that tick never reaches `actOnCard`/`escalateCard`/`shipCard`, so the mutation
+    // would otherwise never be flushed via `persistLocalState`, and the file on disk would keep
+    // reporting that card's stale pre-reconciliation status (e.g. `staged`) forever, even though
+    // it is genuinely blocked behind an unanswered escalation. One `persistLocalState` call
+    // here, on every normal (non-dry-run, non-locked) return, closes that gap for good — state
+    // was definitely loaded and may have been mutated by this point, and `serializeState`'s
+    // byte-identical round-trip means a pass with no reconciliation to flush just rewrites the
+    // same bytes (harmless, no spurious diff).
+    persistLocalState(state, resolved, io);
     return { exitCode: computeExitCode(processed), processed };
   } finally {
     releaseLock(io);

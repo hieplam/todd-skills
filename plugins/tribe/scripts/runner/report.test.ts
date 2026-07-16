@@ -594,3 +594,109 @@ describe('writeReport — reflects persisted state even when the state-commit PR
     expect(report.cards.C1).toEqual({ outcome: 'shipped', pr: 41, mergeSha: 'deadbee' });
   });
 });
+
+// ===========================================================================================
+// W-F5: the owner-visible half of the bug — a card blocked by the LAST tick's reconciliation
+// must reach the report as "blocked", never "not_reached".
+// ===========================================================================================
+
+describe('writeReport — W-F5: last-tick blocked reconciliation reaches the report as blocked, not not_reached', () => {
+  test('A (missing spec/plan) escalates via PLANNING_NEEDED on the only tick; B (dependsOn A) is ' +
+    'reconciled to blocked on the very next tick, which then discovers `done` — the report built ' +
+    'from the REAL runLoop\'s persisted state must show B as blocked on A (never not_reached), ' +
+    'with stats/pending correctly accounting for it', async () => {
+    const state = fixtureState({
+      sequence: ['A', 'B'],
+      cards: {
+        A: fixtureCard({ branch: null, spec: null, plan: null }),
+        B: fixtureCard({ branch: null, dependsOn: ['A'] }),
+      },
+    });
+    const written = new Map<string, string>();
+    written.set('/repo/state.json', JSON.stringify(state));
+    written.set('/repo/answers.md', '');
+
+    const loopIo: LoopIO = {
+      exec: mock(async (cmd: string[]): Promise<ExecResult> => {
+        if (cmd[0] === 'git' && cmd[1] === 'symbolic-ref') return { stdout: 'origin/master\n', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'git' && cmd[1] === 'fetch') return { stdout: '', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'git' && cmd[1] === 'checkout') return { stdout: '', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'git' && cmd[1] === 'add') return { stdout: '', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'git' && cmd[1] === 'commit') return { stdout: '', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'git' && cmd[1] === 'push') return { stdout: '', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'create')
+          return { stdout: 'https://example.invalid/o/r/pull/1\n', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks')
+          return { stdout: JSON.stringify([{ name: 'ci', bucket: 'pass' }]), stderr: '', exitCode: 0 };
+        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'merge') return { stdout: '', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'git' && cmd[1] === 'pull') return { stdout: '', stderr: '', exitCode: 0 };
+        throw new Error(`unscripted exec: ${cmd.join(' ')}`);
+      }),
+      sleep: async () => {},
+      fileExists: (p) => !p.endsWith('STOP') && !p.includes('/escalations/'),
+      readFile: (p) => {
+        const c = written.get(p);
+        if (c === undefined) throw new Error(`no fixture for ${p}`);
+        return c;
+      },
+      writeFile: (p, content) => {
+        written.set(p, content);
+      },
+      readLock: () => null,
+      writeLock: () => {},
+      removeLock: () => {},
+      isProcessAlive: () => false,
+      currentPid: () => 4321,
+      now: () => '2026-07-17T00:00:00Z',
+      readPendingCommit: () => null,
+      writePendingCommit: () => {},
+      clearPendingCommit: () => {},
+      spawnSession: () => {
+        throw new Error('no session should ever be spawned in this test — B is only reconciled, never attempted');
+      },
+      appendLog: () => {},
+    };
+
+    const config: RunLoopConfig = {
+      repoRoot: '/repo',
+      statePath: 'state.json',
+      escalationsDir: 'escalations',
+      answersPath: 'answers.md',
+      logsDir: '/logs',
+      model: 'fixture-model',
+      includeEscalated: false,
+      dryRun: false,
+    };
+
+    const loopResult = await runLoop(config, loopIo);
+    expect(loopResult.exitCode).toBe(EXIT_ESCALATED);
+    expect(loopResult.processed).toHaveLength(1);
+    expect(loopResult.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'A' });
+
+    // The bug this guards: without loop.ts persisting the final-tick reconciliation, B would
+    // still read "staged" here, and the report below would show B as not_reached instead of
+    // blocked.
+    const finalState = parseState(JSON.parse(written.get('/repo/state.json') as string));
+    expect(finalState.cards.A.status).toBe('escalated');
+    expect(finalState.cards.B.status).toBe('blocked');
+
+    const report = await buildCampaignReport(
+      finalState,
+      fixtureRun({
+        exitCode: loopResult.exitCode,
+        reason: deriveExitReason({ threw: false, exitCode: loopResult.exitCode, hasMessage: false }),
+      }),
+      fixtureConfig(),
+      ioWith({
+        fileExists: () => true,
+        readFile: () => '**Reason:** planning_needed\n\n## Context\nMissing on disk: spec, plan\n',
+      }),
+    );
+
+    expect(report.cards.B).toEqual({ outcome: 'blocked', blockedOn: 'A' });
+    expect(report.stats).toEqual({ shipped: 0, escalated: 1, blocked: 1, notReached: 0 });
+    // `pending` (needs the owner) still names only A — B needs no owner ruling of its own, it
+    // will unblock automatically once A is answered and re-run; A is what the owner must act on.
+    expect(report.pending).toEqual(['A']);
+  });
+});

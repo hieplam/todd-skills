@@ -1060,6 +1060,40 @@ describe('runLoop — D5′: blocked cascade (W6)', () => {
   });
 });
 
+describe('runLoop — W-F5: a last-tick blocked reconciliation must be PERSISTED, not left in memory', () => {
+  test('A (missing spec/plan) escalates via PLANNING_NEEDED on the ONLY tick; B (dependsOn A) is ' +
+    'reconciled to blocked on the very next tick, which discovers `done` and never processes ' +
+    'another card — the state written through the io seam must still record B as "blocked", not ' +
+    'the stale "staged" the file would carry if the reconciliation only ever lived in memory. ' +
+    'Deliberately TWO cards only (no third independent card whose own persist would flush this ' +
+    'one for free) — exactly W-F5\'s reproduction shape.', async () => {
+    const state = fixtureState({
+      sequence: ['A', 'B'],
+      cards: {
+        A: fixtureCard({ branch: null, spec: null, plan: null }),
+        B: fixtureCard({ branch: null, dependsOn: ['A'] }),
+      },
+    });
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('unused'),
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'A', reason: 'planning_needed' });
+    // No session was ever spawned for B — it was never attempted, only reconciled to blocked.
+    expect(io.spawnSession).not.toHaveBeenCalled();
+
+    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    expect(finalState.cards.A.status).toBe('escalated');
+    expect(finalState.cards.B.status).toBe('blocked');
+  });
+});
+
 describe('runLoop — D5′: escalation_pending phase (prior-run escalation file) parks and continues', () => {
   test('C1 has an unanswered escalation file from a previous run; the pass parks it and still ships independent C2', async () => {
     const state = fixtureState({
