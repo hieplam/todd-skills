@@ -1,8 +1,11 @@
 // Shared types for the campaign runner (Task 2).
 
 /** D2: a card's lifecycle. `staged` (spec+plan on master, not started) -> `running`
- * (executor session in flight) -> `shipped` | `escalated` (terminal). */
-export type CardStatus = 'staged' | 'running' | 'shipped' | 'escalated';
+ * (executor session in flight) -> `shipped` | `escalated` (terminal). `blocked` (Task 1,
+ * spec §O4/W6) is DERIVED state — never written by a session, only computed fresh by
+ * `nextCard` on every call from a card's `dependsOn` and its dependencies' current
+ * statuses. A stored `blocked` on disk is a hint from a prior run, never trusted as-is. */
+export type CardStatus = 'staged' | 'running' | 'shipped' | 'escalated' | 'blocked';
 
 /** D2 per-card record. Nullable fields are unset until the loop (Task 6) fills them in;
  * `baseSha` is REQUIRED (present, but nullable) because D3's schema guard diffs from it. */
@@ -16,6 +19,16 @@ export interface Card {
   mergeSha: string | null;
   sessionId: string | null;
   updatedAt: string | null;
+  /** Task 1 (spec §O4): card ids (must all resolve under `cards`) this card must not start
+   * before. OPTIONAL and absent by default — no `dependsOn` means independent, exactly
+   * today's sequential behavior. Never defaulted to `[]` at the schema layer (see state.ts's
+   * `CardSchema`) so an old v1 state file round-trips byte-identical. */
+  dependsOn?: string[];
+  /** Task 1 (spec §O6/W7): how many auto-answer round-trips this card has been through.
+   * OPTIONAL, conceptually defaults to 0 when absent — callers read `card.autoAnswerRounds
+   * ?? 0`, never relying on a schema-injected default (same byte-identical reasoning as
+   * `dependsOn`). */
+  autoAnswerRounds?: number;
 }
 
 /** D2 campaign state root. `schemaLockPaths` (D3 point 6) and `ownerOnlyEscalations` (D5)

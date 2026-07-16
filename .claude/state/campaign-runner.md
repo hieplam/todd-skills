@@ -241,6 +241,36 @@ C1(PR#36 merged, state `running`) → `verify_only`; C3(missing spec/plan) → `
 - **F10 — missing state file ⇒ raw ENOENT stack trace**, not a clean "state file not found at
   X". Poor first-run UX for an unattended tool.
 
+## Post-merge findings (surfaced by ACTUALLY INSTALLING + USING the thing)
+
+Both PRs merged by the owner with regular merges (#37 `d6de196`, #38 `3c41f23`, both 2 parents).
+
+- **F11 — 🔴 the owner's merge rule had changed and THREE implementations never followed it.**
+  Found only because the owner asked "how do I install this" and the agents got read. The repo
+  shipped **two mutually exclusive Definitions of Done**: `verify-shipped` asserted a 1-parent
+  squash (and **failed the owner's own correctly-merged PR #37**), the tribe agents instructed
+  squash-merge in 12 sites, while the runner's D3 point 2 requires 2 parents. They could never
+  both pass. Fixed in PR #38 + `rule-no-squash-merge` (Golden Example = the runner's real
+  `checkTwoParents`). Proven: PR #37 (regular) now PASSES; PR #33 (a real squash in history)
+  FAILS.
+  - **The lesson:** fixing `c3-215`'s doc earlier fixed the MAP. The agents, the sibling skill,
+    and `c3-217` — the TERRITORY — still said squash. **A doc fix is not a fix.** Prose repeated
+    in three places drifts in three places; that is why it is now a checkable rule.
+- **F12 — 🔴 the Shaman→runner handoff does not exist.** Verified: (1) no `--init` flag — all 11
+  runner flags are inputs, nothing CREATES a `campaign-state.json`; (2) the runner README
+  documents `--state` as required but never shows its schema; (3)
+  `grep -ril "campaign-state|campaign runner" plugins/tribe/agents/` → **nothing** — no agent
+  knows the runner exists. So the normal workflow (Shaman plans → owner runs the runner) fails:
+  nobody writes the state file. **Root cause:** the plan seeded state via "a docs PR in ai-dict";
+  the owner correctly struck ai-dict, which removed the ONLY seeder and nothing replaced it.
+  **Owner ruling: the Shaman authors the state file** (state is a planning artifact; Stage A owns
+  planning artifacts). ~~In flight: `feat/shaman-authors-campaign-state`~~ — **corrected
+  2026-07-16: that branch never existed** (verified: no local/remote branch, no PR). F12 is
+  now scoped into the **campaign-orchestration effort** (spec:
+  `docs/superpowers/specs/2026-07-16-campaign-orchestration-design.md`, plan:
+  `docs/superpowers/plans/2026-07-16-campaign-orchestration.md` — Tasks 4–5 author the
+  state file via the Shaman + document its schema).
+
 ## Learnings bank
 
 - **`bun test` hard-errors (exit 1) on zero test files** — not a soft pass. Hence Task 1's

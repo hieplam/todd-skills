@@ -1,6 +1,6 @@
 ---
 id: c3-3
-c3-seal: 9984f01b4bc76ed072c1534dd159eadd1900b28b5f6bd230f9cf2c08bea109b2
+c3-seal: 6aeb489677fc965d90f1e79823eb2fac4dc59857d30c6f3eee14ccd93033b61a
 title: eval-harness
 type: container
 boundary: service
@@ -16,7 +16,7 @@ Dev-time benchmarking: execute the `evals/evals.json` fixtures that sit next to 
 
 | ID | Name | Category | Status | Goal Contribution |
 | --- | --- | --- | --- | --- |
-| c3-301 | eval-runner | Foundation | active | The single runner for every eval fixture in the repo: isolates each case in a scratch dir, runs with_skill and --safe-mode baseline legs, grades transcripts, rolls up one benchmark.json |
+| c3-301 | eval-runner | foundation | active | The single runner for every eval fixture in the repo: isolates each case in a scratch dir, runs with_skill and --safe-mode baseline legs, grades transcripts, rolls up one benchmark.json |
 
 ## Responsibilities
 

@@ -80,6 +80,21 @@ Shaman, that is equally broken — its questions come to you.
   Decision Log) belongs to the Shaman. Your writes live in your worktree, spec, plan, and report
   file.
 
+### Planning-only dispatch (campaign orchestration Stage A)
+
+Not every dispatch asks for a full build. During campaign orchestration's Stage A authorship
+fan-out (`docs/superpowers/specs/2026-07-16-campaign-orchestration-design.md` §O2 — the
+**campaign runner**'s planning handoff), a Shaman-authority orchestrator session may dispatch you
+as a **planning-Warchief**: the brief still names exactly one campaign card, the Standing
+Constraints, and a report-file path, but asks you to **author its spec (Method step 2) and plan
+(Method step 3) only, then return them** — do **not** proceed to Method steps 4–8 (isolation,
+Hunter orchestration, audit, PR, merge). The dispatching session reviews what you return and
+stages it itself; it is not asking you to ship the card. A brief that does not say this is the
+normal full-build dispatch — treat "author spec+plan, return them, no implementation" as the one
+explicit signal that narrows your contract to planning only. A still-open What/Why question in
+this mode is handled exactly as `NEEDS_DIRECTION` normally would — return it, sharpened, rather
+than guessing; the dispatching session (holding Shaman authority for the campaign) rules on it.
+
 ---
 
 ## Channels — how your status actually travels (non-negotiable mechanics)

@@ -1,0 +1,6 @@
+---
+target: c3-215
+scope: insert
+base: c3-215#n947@v1:sha256:c8183dd1de1bdbe59bcdbc910477f612811e08da52cec6ef424d313949a6b1ac
+---
+| skills/orchestrate-campaign | IN | The campaign's entry point, trigger word "orchestration", invocable from ANY session — main chat, a Shaman, or a Warchief already in play — which is why it is a skill rather than an agent. Assumes Shaman authority for the campaign: authors the campaign state file the runner requires as input (nothing else in the system creates it), runs Stage A planning per the authorship policy (author specs and plans itself for few or complex cards; dispatch one planning-Warchief per card for many trivial ones), triggers the runner in the background, reads the report contract on exit, answers within-authority escalations into the committed answers file — never the campaign's owner-only list — re-triggers at most 2 auto-answer rounds per card before parking it for the owner, and composes the ONE owner report, independently re-verifying every card the runner claims shipped. Depends on the runner's documented CLI contract only (flags, exit codes, report file), never its source modules | installed skill (symlinked into the user's config); resolves the runner from the plugin root, never from the shell's cwd | plugins/tribe/skills/orchestrate-campaign/SKILL.md |

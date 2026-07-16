@@ -923,3 +923,379 @@ describe('runLoop — session error/timeout without a resume attempt: stops for 
     expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1' });
   });
 });
+
+// ===========================================================================================
+// Task 2 — D5′ park-and-continue (spec §O4, plan Task 2, Warchief ruling W-F2)
+// ===========================================================================================
+
+/** Shared boilerplate for a card whose state-commit (escalation OR ship) goes through
+ * `commitStateAndMerge` cleanly: fetch/checkout -B/add/commit/push/create/checks/merge/pull all
+ * succeed. Reused verbatim across the park-and-continue tests below — none of them are testing
+ * `commitStateAndMerge`/`verify.ts` themselves (already covered elsewhere in this file). */
+function cleanCommitAndVerifyHandlers(mergeSha: string): Array<(cmd: string[]) => ExecResult | null> {
+  return [
+    (cmd) => {
+      if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: mergeSha }));
+      if (cmd[0] === 'git' && cmd[1] === 'rev-list') return ok(`${mergeSha} p1 p2`);
+      if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+      if (cmd[0] === 'git' && cmd[1] === 'diff') return ok('');
+      if (cmd[0] === 'git' && cmd[1] === 'fetch') return ok('');
+      if (cmd[0] === 'git' && cmd[1] === 'checkout') return ok('');
+      if (cmd[0] === 'git' && cmd[1] === 'add') return ok('');
+      if (cmd[0] === 'git' && cmd[1] === 'commit') return ok('');
+      if (cmd[0] === 'git' && cmd[1] === 'push') return ok('');
+      if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'create') return ok('https://example.invalid/o/r/pull/990\n');
+      if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+      if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'merge') return ok('');
+      if (cmd[0] === 'git' && cmd[1] === 'pull') return ok('');
+      return null;
+    },
+  ];
+}
+
+describe('runLoop — D5′: escalate-then-continue ordering', () => {
+  test('C1 escalates (NEEDS_DIRECTION); the pass continues to independent C2, which still ships', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: null }),
+        // A branch that IS set to ship — `checkWorktreeAndBranchGone` (D3 point 5) requires
+        // `card.branch` to be non-null to pass, exactly `stateJsonWithTwoFreshCards`'s own
+        // "pre-assigned branch, no PR/worktree trace yet" convention above.
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('c2000001'),
+      spawnQueue: [
+        () => messages(needsDirectionMessages('sess-c1')),
+        () => messages(shippedMessages(2, 'c2000001', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    // An escalation is present, so the pass-level exit code is ESCALATED even though C2
+    // shipped (design note: an escalation always needs a human; that outranks a clean ship).
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1' });
+    expect(result.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C2' });
+
+    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    expect(finalState.cards.C1.status).toBe('escalated');
+    expect(finalState.cards.C2.status).toBe('shipped');
+  });
+});
+
+describe('runLoop — D5′: all cards parked, nothing ships', () => {
+  test('two independent cards both escalate; the pass reaches done and exits ESCALATED', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: null }),
+        C2: fixtureCard({ branch: null, spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('unused'),
+      spawnQueue: [
+        () => messages(needsDirectionMessages('sess-c1')),
+        () => messages(needsDirectionMessages('sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed.every((o) => o.kind === 'escalated')).toBe(true);
+    expect(result.processed.map((o) => o.cardId)).toEqual(['C1', 'C2']);
+  });
+});
+
+describe('runLoop — D5′: blocked cascade (W6)', () => {
+  test('A escalates; B (dependsOn A) becomes blocked and is never attempted; C (independent) still ships', async () => {
+    const state = fixtureState({
+      sequence: ['A', 'B', 'C'],
+      cards: {
+        A: fixtureCard({ branch: null }),
+        B: fixtureCard({
+          branch: null,
+          spec: 'docs/specs/b.md',
+          plan: 'docs/plans/b.md',
+          dependsOn: ['A'],
+        }),
+        C: fixtureCard({ branch: 'feat/c-widget', spec: 'docs/specs/c.md', plan: 'docs/plans/c.md' }),
+      },
+    });
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('c3000001'),
+      spawnQueue: [
+        () => messages(needsDirectionMessages('sess-a')),
+        () => messages(shippedMessages(3, 'c3000001', 'sess-c')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    // B is never in `processed` at all — it was skipped by `nextCard` (blocked), never
+    // `attempted`, so no session was ever spawned for it and no escalation file exists for it.
+    expect(result.processed.map((o) => o.cardId)).toEqual(['A', 'C']);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'A' });
+    expect(result.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C' });
+
+    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    expect(finalState.cards.A.status).toBe('escalated');
+    expect(finalState.cards.B.status).toBe('blocked');
+    expect(finalState.cards.C.status).toBe('shipped');
+    expect(writtenFiles.has('/repo/escalations/B.md')).toBe(false);
+  });
+});
+
+describe('runLoop — W-F5: a last-tick blocked reconciliation must be PERSISTED, not left in memory', () => {
+  test('A (missing spec/plan) escalates via PLANNING_NEEDED on the ONLY tick; B (dependsOn A) is ' +
+    'reconciled to blocked on the very next tick, which discovers `done` and never processes ' +
+    'another card — the state written through the io seam must still record B as "blocked", not ' +
+    'the stale "staged" the file would carry if the reconciliation only ever lived in memory. ' +
+    'Deliberately TWO cards only (no third independent card whose own persist would flush this ' +
+    'one for free) — exactly W-F5\'s reproduction shape.', async () => {
+    const state = fixtureState({
+      sequence: ['A', 'B'],
+      cards: {
+        A: fixtureCard({ branch: null, spec: null, plan: null }),
+        B: fixtureCard({ branch: null, dependsOn: ['A'] }),
+      },
+    });
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('unused'),
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'A', reason: 'planning_needed' });
+    // No session was ever spawned for B — it was never attempted, only reconciled to blocked.
+    expect(io.spawnSession).not.toHaveBeenCalled();
+
+    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    expect(finalState.cards.A.status).toBe('escalated');
+    expect(finalState.cards.B.status).toBe('blocked');
+  });
+});
+
+describe('runLoop — D5′: escalation_pending phase (prior-run escalation file) parks and continues', () => {
+  test('C1 has an unanswered escalation file from a previous run; the pass parks it and still ships independent C2', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        // Only the escalation FILE (not `card.status`) marks C1 pending — exactly
+        // `deriveCardPhase`'s `escalation_pending` short-circuit.
+        C1: fixtureCard({ branch: null }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+      execHandlers: cleanCommitAndVerifyHandlers('abc0002'),
+      spawnQueue: [() => messages(shippedMessages(2, 'abc0002', 'sess-c2'))],
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toEqual([
+      { kind: 'escalation_pending', cardId: 'C1', escalationPath: expect.stringContaining('C1.md') },
+      { kind: 'shipped', cardId: 'C2', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+    ]);
+    // No session was ever spawned for the parked card C1 — only C2's.
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('runLoop — D5′ W-F2: --include-escalated never re-selects the same card twice in one pass', () => {
+  test('C1 (already escalated) escalates AGAIN this pass under --include-escalated; the pass still ' +
+    'reaches and ships the independent C2 — proving each card is attempted at most once per pass, ' +
+    'not merely bounded by --max-cards', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        // Exactly Stage C's re-trigger shape (spec §O6): `--cards <answered> --include-escalated`
+        // against a card that was already `escalated` from a prior run.
+        C1: fixtureCard({ branch: null, status: 'escalated' }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('deadc2c2'),
+      // Only ONE spawnSession call is scripted for C1. If `nextCard` ever re-selected C1 a
+      // second time (the W-F2 bug: an `escalated` card is excluded only when
+      // `includeEscalated` is false, and C1 sits BEFORE C2 in `sequence`), this queue would
+      // be exhausted before C2 is ever reached, and the mock's "spawnSession called more
+      // times than scripted" guard would fire — or, since a `stopped` outcome also parks
+      // rather than exits under D5′, the pass would re-select C1 forever with no `--max-cards`
+      // set to bound it. This test deliberately omits `--max-cards`: the plan explicitly
+      // forbids relying on it to bound this case (that would hide the very bug this test
+      // exists to catch — see `filteredNextCard`'s `attempted`-set doc comment).
+      spawnQueue: [
+        () => messages(needsDirectionMessages('sess-c1-again')),
+        () => messages(shippedMessages(2, 'deadc2c2', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ includeEscalated: true }), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1' });
+    expect(result.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C2' });
+    // C1 was attempted EXACTLY once this pass, never re-selected after its own re-escalation.
+    expect(io.spawnSession).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('runLoop — D5′: --max-cards counts ATTEMPTED cards (shipped + escalated), park-and-continue included', () => {
+  test('max-cards 1: C1 escalates and consumes the whole budget; independent C2 is never attempted', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: null }),
+        C2: fixtureCard({ branch: null, spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('unused'),
+      spawnQueue: [() => messages(needsDirectionMessages('sess-c1'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1' });
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('runLoop — D5′ Warchief audit fix: --max-cards budgets only cards actually WORKED, not merely selected', () => {
+  test('max-cards 1: A parks on a PRIOR-run escalation file (no work done this pass, consumes no budget); ' +
+    'B — the one card actually worked — still ships in the same pass', async () => {
+    // The bug this guards: `attempted` (dedup/termination) and the `--max-cards` BUDGET are
+    // different questions. Plan line: "--max-cards counts attempted cards (shipped +
+    // escalated)" — a card merely PARKED on a stale escalation file (nothing written this
+    // pass) must not consume budget any more than a `blocked` card does. Before this fix,
+    // `attempted.size` alone gated the loop, so `--max-cards 1` would exit after parking A
+    // and B — genuinely progressable, staged, no escalation of its own — would never even be
+    // attempted this pass, even though zero real work happened.
+    const state = fixtureState({
+      sequence: ['A', 'B'],
+      cards: {
+        // Only the escalation FILE (not `card.status`) marks A pending — the
+        // `escalation_pending` phase, exactly like the dedicated test above for that path.
+        A: fixtureCard({ branch: null }),
+        B: fixtureCard({ branch: 'feat/b-widget', spec: 'docs/specs/b.md', plan: 'docs/plans/b.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['A']),
+      execHandlers: cleanCommitAndVerifyHandlers('bbb0001'),
+      spawnQueue: [() => messages(shippedMessages(5, 'bbb0001', 'sess-b'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.processed).toEqual([
+      { kind: 'escalation_pending', cardId: 'A', escalationPath: expect.stringContaining('A.md') },
+      { kind: 'shipped', cardId: 'B', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+    ]);
+    // B's session was in fact spawned this pass — the budget did not stop it.
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('runLoop — D5′: exit-code precedence (escalation outranks session-incomplete)', () => {
+  test('one card escalates and another stops (session error); exit code is ESCALATED, not SESSION_INCOMPLETE', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: null }),
+        C2: fixtureCard({ branch: null, spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('unused'),
+      spawnQueue: [
+        () => messages(needsDirectionMessages('sess-c1')),
+        () => {
+          throw new Error('sdk crashed for c2');
+        },
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1' });
+    expect(result.processed[1]).toMatchObject({ kind: 'stopped', cardId: 'C2' });
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+  });
+});
+
+describe('runLoop — D5′: STOP file created mid-pass finishes the in-flight card only', () => {
+  test('the owner drops STOP while C1 is in flight; C1 finishes and ships, C2 is never started', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({ branch: null, spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('aaaaaaa'),
+      spawnQueue: [() => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1'))],
+    });
+
+    let stopArmed = false;
+    const baseFileExists = io.fileExists as unknown as (p: string) => boolean;
+    io.fileExists = mock((p: string) => {
+      if (p.endsWith('STOP')) return stopArmed;
+      return baseFileExists(p);
+    });
+    const baseSpawnSession = io.spawnSession;
+    io.spawnSession = mock((params) => {
+      // Simulate the owner creating the STOP file WHILE C1's session is in flight — the
+      // in-flight card must still finish (D2's STOP contract), and the NEXT card must never
+      // start.
+      stopArmed = true;
+      return baseSpawnSession(params);
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+    expect(result.exitCode).toBe(EXIT_OK);
+  });
+});
