@@ -171,6 +171,14 @@ async function pollChecksUntilSettled(
  * error — this call also runs on the escalation path (D5), where the usual reason to
  * escalate IS broken CI, so a failed commit here must never take down an escalation that is
  * otherwise valid.
+ *
+ * F3 (spec §D5's retry invariant): the state branch setup is idempotent — a previous run may
+ * have left `campaign-state/<card>` behind locally and/or on the remote (every non-success
+ * return used to leave the target repo sitting on it), and D5 explicitly mandates "the next
+ * run retries the commit first". So this function ALWAYS restores `config.baseBranch` before
+ * returning, on every exit path (success, escalate, commit_failed, and an unexpected
+ * exception) — best-effort: a cleanup failure here is swallowed and never overwrites the
+ * outcome/reason this call is about to report.
  */
 export async function commitStateAndMerge(
   files: string[],
@@ -181,129 +189,172 @@ export async function commitStateAndMerge(
   const branch = branchNameFor(config.card);
   const cwd = config.repoRoot;
 
+  let result: CommitStateAndMergeResult;
   try {
-    const branchResult = await io.exec(['git', 'checkout', '-b', branch], { cwd });
-    if (branchResult.exitCode !== 0) {
-      return {
-        outcome: 'commit_failed',
-        step: 'branch',
-        reason: branchResult.stderr || 'git checkout -b failed',
-      };
-    }
-
-    const addResult = await io.exec(['git', 'add', ...files], { cwd });
-    if (addResult.exitCode !== 0) {
-      return { outcome: 'commit_failed', step: 'add', reason: addResult.stderr || 'git add failed' };
-    }
-
-    const commitResult = await io.exec(['git', 'commit', '-m', title], { cwd });
-    if (commitResult.exitCode !== 0) {
-      return {
-        outcome: 'commit_failed',
-        step: 'commit',
-        reason: commitResult.stderr || 'git commit failed',
-      };
-    }
-
-    const pushResult = await io.exec(['git', 'push', '-u', REMOTE, branch], { cwd });
-    if (pushResult.exitCode !== 0) {
-      return { outcome: 'commit_failed', step: 'push', reason: pushResult.stderr || 'git push failed' };
-    }
-
-    const createResult = await io.exec(
-      [
-        'gh',
-        'pr',
-        'create',
-        '--title',
-        title,
-        '--body',
-        config.prBody,
-        '--base',
-        config.baseBranch,
-        '--head',
-        branch,
-      ],
-      { cwd },
-    );
-    if (createResult.exitCode !== 0) {
-      return {
-        outcome: 'commit_failed',
-        step: 'pr_create',
-        reason: createResult.stderr || 'gh pr create failed',
-      };
-    }
-
-    const pr = parsePrNumber(createResult.stdout);
-    if (pr === null) {
-      return {
-        outcome: 'commit_failed',
-        step: 'pr_create',
-        reason: `could not parse a PR number from gh pr create output: ${createResult.stdout}`,
-      };
-    }
-
-    const { checks, queryOk, attempts } = await pollChecksUntilSettled(io, cwd, pr);
-    const failing = checks.filter(isNotPassing);
-    let waived = false;
-
-    if (!queryOk || failing.length > 0) {
-      const allAdvisory = queryOk && failing.length > 0 && failing.every(isSonar504Advisory);
-      if (!allAdvisory) {
-        return {
-          outcome: 'escalate',
-          branch,
-          pr,
-          reason: queryOk
-            ? 'non-advisory check(s) red after D6 retries exhausted'
-            : 'unable to confirm PR checks after D6 retries exhausted',
-          failedChecks: failing,
-        };
-      }
-
-      // D6 flake waiver: the ONLY red is the advisory SonarCloud-504 bootstrap signature,
-      // and this helper's diff is docs-only by construction (it only ever commits campaign
-      // state files) — merge, recording the exception in the PR body.
-      waived = true;
-      const waiverNote =
-        '\n\n---\n**D6 exception recorded:** merged despite a red check — the only failure ' +
-        'was the advisory SonarCloud bootstrap 504 signature, and this diff is docs-only ' +
-        '(campaign state files only). Any other red never auto-waives.';
-      const editResult = await io.exec(
-        ['gh', 'pr', 'edit', String(pr), '--body', config.prBody + waiverNote],
-        { cwd },
-      );
-      if (editResult.exitCode !== 0) {
-        return {
-          outcome: 'commit_failed',
-          step: 'pr_edit',
-          reason: editResult.stderr || 'gh pr edit failed',
-        };
-      }
-    }
-
-    const mergeResult = await io.exec(
-      ['gh', 'pr', 'merge', String(pr), '--merge', '--delete-branch'],
-      { cwd },
-    );
-    if (mergeResult.exitCode !== 0) {
-      return { outcome: 'commit_failed', step: 'merge', reason: mergeResult.stderr || 'gh pr merge failed' };
-    }
-
-    // Fast-forward-sync the target repo's local base branch. Best-effort: the PR is already
-    // merged on GitHub at this point, so a local sync hiccup is not a commit failure.
-    await io.exec(['git', 'checkout', config.baseBranch], { cwd });
-    await io.exec(['git', 'pull', '--ff-only', REMOTE, config.baseBranch], { cwd });
-
-    return { outcome: 'merged', branch, pr, attempts, waived };
+    result = await attemptCommitStateAndMerge(files, title, config, io, branch, cwd);
   } catch (err) {
     // D5: never throw raw. Any unexpected failure (including an io.exec that itself throws)
     // becomes a structured commit_failed outcome so the caller's escalation path is
     // unaffected.
-    return {
+    result = {
       outcome: 'commit_failed',
       step: 'unexpected',
       reason: err instanceof Error ? err.message : String(err),
     };
   }
+
+  // F3: restore the base branch on every exit path, above, without exception. Best-effort —
+  // a restore/sync failure here must never mask the outcome/reason already decided.
+  try {
+    await io.exec(['git', 'checkout', config.baseBranch], { cwd });
+    if (result.outcome === 'merged') {
+      // The PR is already merged on GitHub at this point, so a local sync hiccup does not
+      // change a `merged` outcome into anything else.
+      await io.exec(['git', 'pull', '--ff-only', REMOTE, config.baseBranch], { cwd });
+    }
+  } catch {
+    // Swallowed deliberately: cleanup never overwrites the result computed above.
+  }
+
+  return result;
+}
+
+async function attemptCommitStateAndMerge(
+  files: string[],
+  title: string,
+  config: GithubConfig,
+  io: GithubIO,
+  branch: string,
+  cwd: string,
+): Promise<CommitStateAndMergeResult> {
+  // F3: idempotent branch setup. Fetch the base branch fresh, then `checkout -B` (git's own
+  // create-or-reset form) from the up-to-date `origin/<base>` ref — never a plain
+  // `checkout -b`, which fails outright against a branch a previous (escalated/failed) run
+  // left behind, and never from whatever HEAD happens to be (a stale local base would
+  // silently re-commit state on top of old history).
+  const fetchResult = await io.exec(['git', 'fetch', REMOTE, config.baseBranch], { cwd });
+  if (fetchResult.exitCode !== 0) {
+    return {
+      outcome: 'commit_failed',
+      step: 'fetch',
+      reason: fetchResult.stderr || 'git fetch failed',
+    };
+  }
+
+  const branchResult = await io.exec(
+    ['git', 'checkout', '-B', branch, `${REMOTE}/${config.baseBranch}`],
+    { cwd },
+  );
+  if (branchResult.exitCode !== 0) {
+    return {
+      outcome: 'commit_failed',
+      step: 'branch',
+      reason: branchResult.stderr || 'git checkout -B failed',
+    };
+  }
+
+  const addResult = await io.exec(['git', 'add', ...files], { cwd });
+  if (addResult.exitCode !== 0) {
+    return { outcome: 'commit_failed', step: 'add', reason: addResult.stderr || 'git add failed' };
+  }
+
+  const commitResult = await io.exec(['git', 'commit', '-m', title], { cwd });
+  if (commitResult.exitCode !== 0) {
+    return {
+      outcome: 'commit_failed',
+      step: 'commit',
+      reason: commitResult.stderr || 'git commit failed',
+    };
+  }
+
+  // F3: force-push. On a retry, the remote branch may already carry a previous attempt's
+  // commit (verified live: a plain push is rejected non-fast-forward in that case) — this
+  // branch exists solely for this helper's own ephemeral state commits, so overwriting a
+  // previous attempt's commit on it is always correct.
+  const pushResult = await io.exec(['git', 'push', '-u', REMOTE, branch, '--force'], { cwd });
+  if (pushResult.exitCode !== 0) {
+    return { outcome: 'commit_failed', step: 'push', reason: pushResult.stderr || 'git push failed' };
+  }
+
+  const createResult = await io.exec(
+    [
+      'gh',
+      'pr',
+      'create',
+      '--title',
+      title,
+      '--body',
+      config.prBody,
+      '--base',
+      config.baseBranch,
+      '--head',
+      branch,
+    ],
+    { cwd },
+  );
+  if (createResult.exitCode !== 0) {
+    return {
+      outcome: 'commit_failed',
+      step: 'pr_create',
+      reason: createResult.stderr || 'gh pr create failed',
+    };
+  }
+
+  const pr = parsePrNumber(createResult.stdout);
+  if (pr === null) {
+    return {
+      outcome: 'commit_failed',
+      step: 'pr_create',
+      reason: `could not parse a PR number from gh pr create output: ${createResult.stdout}`,
+    };
+  }
+
+  const { checks, queryOk, attempts } = await pollChecksUntilSettled(io, cwd, pr);
+  const failing = checks.filter(isNotPassing);
+  let waived = false;
+
+  if (!queryOk || failing.length > 0) {
+    const allAdvisory = queryOk && failing.length > 0 && failing.every(isSonar504Advisory);
+    if (!allAdvisory) {
+      return {
+        outcome: 'escalate',
+        branch,
+        pr,
+        reason: queryOk
+          ? 'non-advisory check(s) red after D6 retries exhausted'
+          : 'unable to confirm PR checks after D6 retries exhausted',
+        failedChecks: failing,
+      };
+    }
+
+    // D6 flake waiver: the ONLY red is the advisory SonarCloud-504 bootstrap signature,
+    // and this helper's diff is docs-only by construction (it only ever commits campaign
+    // state files) — merge, recording the exception in the PR body.
+    waived = true;
+    const waiverNote =
+      '\n\n---\n**D6 exception recorded:** merged despite a red check — the only failure ' +
+      'was the advisory SonarCloud bootstrap 504 signature, and this diff is docs-only ' +
+      '(campaign state files only). Any other red never auto-waives.';
+    const editResult = await io.exec(
+      ['gh', 'pr', 'edit', String(pr), '--body', config.prBody + waiverNote],
+      { cwd },
+    );
+    if (editResult.exitCode !== 0) {
+      return {
+        outcome: 'commit_failed',
+        step: 'pr_edit',
+        reason: editResult.stderr || 'gh pr edit failed',
+      };
+    }
+  }
+
+  const mergeResult = await io.exec(
+    ['gh', 'pr', 'merge', String(pr), '--merge', '--delete-branch'],
+    { cwd },
+  );
+  if (mergeResult.exitCode !== 0) {
+    return { outcome: 'commit_failed', step: 'merge', reason: mergeResult.stderr || 'gh pr merge failed' };
+  }
+
+  return { outcome: 'merged', branch, pr, attempts, waived };
 }
