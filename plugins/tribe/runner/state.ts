@@ -24,6 +24,24 @@ export class UnsupportedStateVersionError extends Error {
   }
 }
 
+/** Thrown by `parseState`/`loadState` when `sequence` names a card id that has no matching
+ * entry in `cards` (e.g. a typo in a hand-edited state file). The schema alone can't catch
+ * this (`sequence` is `string[]`, `cards` is an open record), so `parseState` checks it
+ * explicitly after structural validation. Left unchecked, `nextCard`'s per-card loop would
+ * silently skip the dangling id — and report the campaign `done` if it were the last
+ * unshipped one, even though that card was never built. */
+export class UndefinedSequenceCardError extends Error {
+  readonly cardId: string;
+
+  constructor(cardId: string) {
+    super(
+      `Campaign state's sequence names card id ${JSON.stringify(cardId)}, which has no entry under cards.`,
+    );
+    this.name = 'UndefinedSequenceCardError';
+    this.cardId = cardId;
+  }
+}
+
 const CardStatusSchema = z.enum(['staged', 'running', 'shipped', 'escalated']);
 
 // `looseObject` (zod v4) keeps unknown keys on the parsed object instead of stripping them
@@ -58,12 +76,27 @@ function assertKnownVersion(raw: unknown): void {
   }
 }
 
+/** D2 requires every `sequence` entry to resolve to a `cards` entry. zod's structural schema
+ * can't express that cross-field constraint, so it's checked here, once, at the same load-time
+ * boundary as the version check — refusing the malformed state loudly rather than letting
+ * `nextCard` discover (or silently skip) it card-by-card mid-campaign. */
+function assertSequenceReferentialIntegrity(state: CampaignState): void {
+  for (const cardId of state.sequence) {
+    if (!(cardId in state.cards)) {
+      throw new UndefinedSequenceCardError(cardId);
+    }
+  }
+}
+
 /** Validates `raw` (already-parsed JSON) against the D2 schema. Checks the version FIRST,
  * with a dedicated typed error, rather than letting an unknown major version fall through
- * to (or be silently coerced by) the structural zod validation. */
+ * to (or be silently coerced by) the structural zod validation. Then checks that `sequence`
+ * only names ids `cards` actually defines, for the same reason. */
 export function parseState(raw: unknown): CampaignState {
   assertKnownVersion(raw);
-  return CampaignStateSchema.parse(raw) as CampaignState;
+  const state = CampaignStateSchema.parse(raw) as CampaignState;
+  assertSequenceReferentialIntegrity(state);
+  return state;
 }
 
 /** Loads and validates campaign state through an injected `readFile` seam — this module

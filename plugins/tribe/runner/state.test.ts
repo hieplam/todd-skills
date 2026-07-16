@@ -4,6 +4,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   CURRENT_STATE_VERSION,
+  UndefinedSequenceCardError,
   UnsupportedStateVersionError,
   loadState,
   parseState,
@@ -122,6 +123,17 @@ describe('version rejection', () => {
     const raw = fixtureState();
     delete (raw as Record<string, unknown>).v;
     expect(() => parseState(raw)).toThrow(UnsupportedStateVersionError);
+  });
+});
+
+describe('sequence/cards referential integrity', () => {
+  test('rejects a sequence entry naming a card id absent from cards, instead of letting it be silently skipped as done', () => {
+    // A hand-edited state file with a typo'd sequence id ('C4' has no entry under `cards`).
+    // Before this check existed, parseState accepted this, and nextCard's `if (!card)
+    // continue;` silently skipped C4 — if C4 were the only unshipped id, the campaign loop
+    // would report `{ kind: 'done' }` even though C4 was never built.
+    const raw = fixtureState({ sequence: ['C1', 'C2', 'C4'] });
+    expect(() => parseState(raw)).toThrow(UndefinedSequenceCardError);
   });
 });
 
