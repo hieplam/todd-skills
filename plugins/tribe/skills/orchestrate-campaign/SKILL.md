@@ -77,9 +77,12 @@ value belongs in the campaign's own docs, not here.
 
 #### The campaign state file (`<state-path>`)
 
-The campaign runner's own documentation does not yet show this schema (a known gap — see this
-skill's report to the Warchief). Author exactly this shape; every optional field may simply be
-omitted rather than written as `null`/`[]` when unused:
+The runner README's own `## State file schema` section is the **authoritative** contract for
+this schema (field-by-field types, required/optional, and the load-time validation errors) —
+this skill depends on that documentation, never on the runner's source, per the owner's rule to
+depend on a capability's contract rather than keep a private copy of it. The shape looks like
+this — a short worked example for this skill's own convenience, not a competing specification;
+every optional field may simply be omitted rather than written as `null`/`[]` when unused:
 
 ```json
 {
