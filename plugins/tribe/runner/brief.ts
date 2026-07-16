@@ -1,3 +1,71 @@
-// Executor brief rendering from the committed template (Task 5).
-// Placeholder only — no logic lives here yet.
-export {};
+// Executor brief rendering from the committed template (Task 5a, spec §D5).
+//
+// Reads a single committed asset (`brief-template.md`, shipped alongside this module) and
+// fills it in from the campaign card/state passed by the caller — no repo names, paths,
+// model names, or campaign values are hardcoded here (stateless-capability wall). The
+// `answersContent` param is the raw text of the committed `--answers` rulings file; it is
+// embedded verbatim so a human's ruling on a past escalation reaches every future session
+// (spec §D5).
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+/** Minimal, local view of a campaign card needed to render a brief — decoupled from the
+ * full `Card` shape in `types.ts` (Task 5 must not edit that file). */
+export interface BriefCard {
+  id: string;
+  spec: string | null;
+  plan: string | null;
+}
+
+/** Minimal, local view of campaign state needed to render a brief. */
+export interface BriefState {
+  campaign: string;
+  mergePolicy: string;
+  ownerOnlyEscalations: string[];
+}
+
+const TEMPLATE_PATH = join(import.meta.dir, 'brief-template.md');
+
+function loadTemplate(): string {
+  return readFileSync(TEMPLATE_PATH, 'utf8');
+}
+
+function renderTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
+    if (!Object.prototype.hasOwnProperty.call(vars, key)) {
+      throw new Error(`brief-template.md: unknown placeholder {{${key}}}`);
+    }
+    return vars[key] as string;
+  });
+}
+
+function reportPathFor(campaign: string, cardId: string): string {
+  return `.claude/state/${campaign}/reports/${cardId}.md`;
+}
+
+function goalFor(card: BriefCard): string {
+  const plan = card.plan ?? '(missing)';
+  const spec = card.spec ?? '(missing)';
+  return `Ship ${card.id} end-to-end: implement the plan at ${plan} against the spec at ${spec}, gates green, one regular-merged PR on the target repo's master.`;
+}
+
+/** Renders the committed brief template for one campaign card and embeds the committed
+ * `--answers` rulings file content verbatim (spec §D5). */
+export function executorBrief(card: BriefCard, state: BriefState, answersContent: string): string {
+  const ownerOnly =
+    state.ownerOnlyEscalations.length > 0
+      ? state.ownerOnlyEscalations.join(', ')
+      : '(none declared for this campaign)';
+
+  return renderTemplate(loadTemplate(), {
+    CARD_ID: card.id,
+    CAMPAIGN: state.campaign,
+    SPEC_PATH: card.spec ?? '(missing)',
+    PLAN_PATH: card.plan ?? '(missing)',
+    GOAL: goalFor(card),
+    MERGE_POLICY: state.mergePolicy,
+    OWNER_ONLY_ESCALATIONS: ownerOnly,
+    REPORT_PATH: reportPathFor(state.campaign, card.id),
+    ANSWERS_CONTENT: answersContent,
+  });
+}
