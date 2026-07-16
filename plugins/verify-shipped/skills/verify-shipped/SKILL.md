@@ -1,14 +1,15 @@
 ---
 name: verify-shipped
-description: Use whenever a Warchief (or anyone) reports a piece of work as SHIPPED and that claim needs verifying before it's trusted — before marking a roadmap card shipped, before telling the owner a PR landed, or any time "done" needs mechanical proof instead of a prose report. Runs four checks against GitHub and git — PR state == merged, merge strategy == squash, local master in sync with origin/master, worktree removed — and prints a pass/fail verdict on each. Trigger on phrases like "is this actually shipped?", "verify SHIPPED", "did this really merge?", "check the PR landed", "confirm done". Encodes the owner's own Definition of Done ("PR squash-merged and ready to work on new feature with LATEST CHANGES") as a script instead of trusting a claim.
+description: Use whenever a Warchief (or anyone) reports a piece of work as SHIPPED and that claim needs verifying before it's trusted — before marking a roadmap card shipped, before telling the owner a PR landed, or any time "done" needs mechanical proof instead of a prose report. Runs four checks against GitHub and git — PR state == merged, merge strategy == regular (non-squash) merge, local master in sync with origin/master, worktree removed — and prints a pass/fail verdict on each. Trigger on phrases like "is this actually shipped?", "verify SHIPPED", "did this really merge?", "check the PR landed", "confirm done". Encodes the owner's own Definition of Done ("PR merged via a regular merge — not squashed — and ready to work on new feature with LATEST CHANGES") as a script instead of trusting a claim.
 ---
 
 # Verify Shipped
 
 A Definition-of-Done gate. The owner's global CLAUDE.md already states what "done" means:
-**PR squash-merged, and ready to work on new feature with LATEST CHANGES.** Nothing in this
-repo checked that mechanically before — `SHIPPED` was just a status string a Warchief (or
-anyone) asserted in prose. This skill turns that assertion into four cheap, scripted checks.
+**PR merged via a regular merge — not squashed (`Do not Squash merge`) — and ready to work
+on new feature with LATEST CHANGES.** Nothing in this repo checked that mechanically before —
+`SHIPPED` was just a status string a Warchief (or anyone) asserted in prose. This skill turns
+that assertion into four cheap, scripted checks.
 
 ## When to invoke
 
@@ -16,8 +17,9 @@ anyone) asserted in prose. This skill turns that assertion into four cheap, scri
   in the tribe, this is the Shaman's "verify SHIPPED from evidence only" step after a Warchief
   returns `SHIPPED`.
 - Before telling the owner a PR landed and it's safe to start the next thing.
-- Any time you want a mechanical second opinion on "did this actually merge, squash, and clean
-  up after itself" instead of re-deriving the check by reading PR pages and git log by hand.
+- Any time you want a mechanical second opinion on "did this actually merge as a regular merge,
+  not a squash, and clean up after itself" instead of re-deriving the check by reading PR pages
+  and git log by hand.
 
 ## What it checks
 
@@ -25,12 +27,11 @@ Four independent checks, each reported pass/fail (or `unknown` when the data nee
 isn't available):
 
 1. **`pr_merged`** — the PR's state is `MERGED` (via `gh pr view`).
-2. **`merge_strategy_squash`** — the merge commit has exactly one parent (rules out a 2-parent
-   "merge commit") and its title ends in `(#<PR number>)`, GitHub's default squash-merge commit
-   message shape. This is a heuristic, not an API field — GitHub doesn't expose "merge method"
-   directly. It correctly identifies squash vs. regular merge, but cannot fully distinguish
-   squash from rebase-merge when the PR had exactly one commit (both produce a single-parent
-   commit); read the `detail` field if the verdict looks surprising.
+2. **`merge_strategy_no_squash`** — the merge commit has exactly two parents, the shape of a
+   regular merge commit. A 1-parent commit — whether produced by a squash merge or a rebase
+   merge, both of which the owner's `Do not Squash merge` rule forbids — is a FAIL. Unlike the
+   old squash-detection heuristic, this needs no title-suffix inspection: any parent count other
+   than 2 is a violation regardless of how the single-parent commit was produced.
 3. **`master_in_sync`** — the local base branch (default `master`) has zero commits ahead and
    zero behind `origin/<base>` after a fetch. This is the "ready to work on new feature with
    LATEST CHANGES" half of the owner's definition.
@@ -64,14 +65,14 @@ Read the top-level `verdict` field (`PASS` only when all four checks pass) and e
 ## Example
 
 ```
-$ bash ~/.claude/skills/verify-shipped/scripts/verify-shipped.sh --pr 15 --worktree /tmp/wt-card4 --repo hieplam/todd-skills
+$ bash ~/.claude/skills/verify-shipped/scripts/verify-shipped.sh --pr 37 --worktree /tmp/wt-card4 --repo hieplam/todd-skills
 {
-  "pr_number": "15",
+  "pr_number": "37",
   "base_branch": "master",
   "worktree": "/tmp/wt-card4",
   "checks": {
-    "pr_merged": {"status": "pass", "detail": "PR #15 state is MERGED"},
-    "merge_strategy_squash": {"status": "pass", "detail": "merge commit ... has 1 parent and title ends in (#15) — GitHub's default squash-merge shape"},
+    "pr_merged": {"status": "pass", "detail": "PR #37 state is MERGED"},
+    "merge_strategy_no_squash": {"status": "pass", "detail": "merge commit ... has 2 parents — a regular merge, not squash/rebase"},
     "master_in_sync": {"status": "pass", "detail": "local master == origin/master"},
     "worktree_removed": {"status": "pass", "detail": "/tmp/wt-card4 is gone from disk and from git worktree list"}
   },
