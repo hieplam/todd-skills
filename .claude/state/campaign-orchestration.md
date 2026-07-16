@@ -39,8 +39,8 @@ prefix. Repo trailers `Tribe-Card:` / `Tribe-Task: N/M` are real convention — 
 
 | # | Task | Status | Report |
 |---|------|--------|--------|
-| 1 | `state.ts` — `dependsOn`, `blocked`, `autoAnswerRounds` | ⬜ not started | `reports/orch-task-1.md` |
-| 2 | `loop.ts` — D5′ park-and-continue | ⬜ not started (needs 1) | `reports/orch-task-2.md` |
+| 1 | `state.ts` — `dependsOn`, `blocked`, `autoAnswerRounds` | ✅ shipped `38f4232` — audited: 134 tests (baseline 116), tsc clean; **W-F3 found by probing + fixed + re-probed** (stale `blocked` now reconciles to `staged`); byte-identical v1 round-trip re-verified | `reports/orch-task-1.md` |
+| 2 | `loop.ts` — D5′ park-and-continue | ✅ shipped `35a91e8` — audited: 143 tests, tsc clean, W2 clean; **W-F2 proven by sabotage experiment** (hang vs 107ms pass); **W-F4 fixed** (budget split, RED→GREEN proven); `attempted` dedup intact | `reports/orch-task-2.md` |
 | 3 | `report.ts` — report contract (§O5) | ⬜ not started (needs 1,2) | `reports/orch-task-3.md` |
 | 4 | `orchestrate-campaign` skill (§O1/O3/O6) | ⬜ not started (needs 1–3 contract) | `reports/orch-task-4.md` |
 | 5 | Docs — runner README schema + shaman/warchief awareness | ⬜ not started (needs 1–3) | `reports/orch-task-5.md` |
@@ -67,8 +67,16 @@ Sequencing: 1 → 2 → 3 → (4 ∥ 5) → 6.
 
 ## Next action
 
-Dispatch Hunter for Task 1 (`state.ts` schema additions). Then 2 → 3 → (4 ∥ 5) → 6, auditing
-each deliverable before accepting.
+Task 1 ✅ closed (`38f4232`, 134 tests green). Task 2 dispatched (hunter-orch-2) with the W-F2
+infinite-loop ruling in its brief. Then 3 → (4 ∥ 5) → 6, auditing each deliverable before
+accepting.
+
+**Audit protocol that is EARNING its cost — keep doing this:** every Hunter claim is verified
+against the repo, and every load-bearing behavior is **probed against the real module/CLI**, not
+read and not trusted from a green suite. W-F3 was found this way (132 green tests passed over
+it). Hunter-orch-1 also **went idle once claiming "available" WITHOUT applying the audit fix** —
+`git log` proved the commit sha unchanged. **Never trust an agent's idle/completion notification
+as evidence of work; verify the sha.**
 
 ## Learnings bank (inherited — these BIND this effort)
 
@@ -83,6 +91,89 @@ each deliverable before accepting.
 - **The plan's original seeder was struck (F12 root cause).** The ai-dict docs PR was the ONLY
   thing that authored `campaign-state.json`; removing it left nothing. Tasks 4–5 replace it via
   the Shaman. Watch for the same class of gap: removing a step can silently orphan a contract.
+
+## Warchief findings (found during this effort — must be cleared or carried deliberately)
+
+- **W-F1 — the runner README's resume matrix is STALE and documents a fixed bug as current
+  behavior.** README row (`plugins/tribe/scripts/runner/README.md:80`) says: *"PR found for the
+  branch, `state == "OPEN"`, no `sessionId` recorded | `fresh` | Nothing to resume — spawn fresh
+  (same as 'no trace')."* That is the **pre-F8** behavior. F8 was fixed in `cee591d` (merged
+  `2c17c26`): `loop.ts:171-181` now spawns fresh **carrying a state digest** naming the open PR,
+  precisely so it does not open a duplicate PR — and the in-code comment explicitly rebuts the
+  README's wording ("this is NOT 'same as no trace'"). The code is right; the doc is wrong.
+  **This is the F11 lesson running in reverse** — a code fix that never updated the map. Anyone
+  reading the README to understand resume semantics learns the bug, not the fix.
+  ⇒ **Assigned to Task 5** (which already owns the README). Fix the row; do not let Task 5 add
+  new schema docs on top of a lie.
+
+- **W-F2 — 🔴 park-and-continue INTRODUCES an infinite loop on the `--include-escalated` path.
+  Ruled before dispatch; binds Task 2.** Today `runLoop` `break`s on escalation, so re-selecting
+  the same card is impossible. Once Task 2 turns that `break` into a `continue`, the existing
+  `filteredNextCard` (`loop.ts:431`) → `nextCard(..., { includeEscalated })` returns *the first
+  non-shipped card*. With `--include-escalated` set, an escalated card is **not** skipped ⇒ the
+  loop re-selects the card it just escalated, escalates it again, forever — bounded only by
+  `--max-cards`, which is **unbounded by default**.
+  **This is not exotic: it is the designed Stage C round-trip path.** §O6 re-triggers with
+  exactly `--cards <answered> --include-escalated`. So the normal happy path of the feature this
+  effort exists to build is the path that hangs.
+  ⇒ **Ruling (How, mine):** `runLoop` maintains an in-run `attempted` set — a card is never
+  selected twice in one pass. This also gives the plan's "`--max-cards` counts attempted cards
+  (shipped + escalated)" its natural meaning, and makes the loop's termination argument
+  *structural* (the sequence is finite and each card is attempted ≤ once) rather than incidental.
+  A test MUST cover: `--include-escalated` + a card that escalates again ⇒ pass terminates.
+
+- **W-F3 — `nextCard` SETS `blocked` but never CLEARS a stale one.** Found by **probing the real
+  module** during the Task 1 audit (not by reading, and not by the 132 green tests — which all
+  passed over it). Probe: `A shipped`, `B {status:'blocked', dependsOn:['A']}`, `C staged`,
+  `sequence:['C','B']` ⇒ `nextCard` returns `C` and **returns early**, so `B` is never visited,
+  its stale `blocked` is never corrected, and `persistLocalState` **serializes `blocked` to
+  disk** — for a card whose only dependency has already shipped.
+  `computeBlockedCardIds` is correct (B is rightly absent from the computed set); the bug is
+  that stored status disagrees with derived truth. **Impact is on the owner's ONE artifact:**
+  Task 3's report renders `blocked` cards with a `blockedOn` field, so this state yields
+  *"B blocked, blockedOn: A"* where **A is shipped**. The runner self-heals (next `nextCard`
+  selects B — `blocked` is not in the skip list); the report does not.
+  ⇒ **Ruled + sent back to hunter-orch-1 to amend into `986c1e1`:** reconcile ALL cards against
+  `blockedCardIds` up-front, before the walk's early return — in-set ⇒ `blocked`; stored
+  `blocked` but out-of-set ⇒ reset `staged` (safe: only `staged`/`running` can become blocked,
+  and `running` is re-derived from gh/git by D4, never trusted from the file). Makes the
+  invariant total instead of incidental.
+  **The lesson (third time this effort's lineage has paid for it):** the 132 tests were green,
+  well-written, and covered the cascade thoroughly — they simply never asked what happens to a
+  card the walk returns *before*. A green suite proves the logic its author imagined.
+
+- **W-F4 — `--max-cards` budget counts cards where NO work happened.** Found in the Task 2 audit.
+  `attempted` correctly does dedup (structural termination, the W-F2 fix), but
+  `while (attempted.size < limit)` makes the SAME set answer "how much work have I done?".
+  Those are different questions. `attempted` also absorbs `escalation_pending` and
+  `planning_needed` — cards where nothing happened this pass. Concrete: `--max-cards 1` +
+  first card carries a stale escalation file ⇒ pass parks it, budget spent, **exits having
+  shipped nothing**, with an `EXIT_ESCALATED` that looks like it did something. Diverges from
+  plan line 54 ("counts attempted cards (shipped + escalated)").
+  ⇒ **Ruled + sent back to hunter-orch-2:** split the concerns — `attempted` = dedup only
+  (unchanged); budget counts only genuinely-worked cards (`shipped`/`escalated`/`stopped`).
+  ✅ **CLOSED in `35a91e8`** (`let worked = 0` / `while (worked < limit)`), RED→GREEN proven by
+  reverting `loop.ts` to HEAD with the new test in place and watching it fail for the right
+  reason.
+  **⚠️ Warchief correction — MY ruling was wrong on one detail, the Hunter's reading was
+  better.** I instructed that `planning_needed` consume no budget. The Hunter counts it, and is
+  right: `planning_needed` calls `escalateCard`, which writes the escalation file and yields an
+  `escalated` outcome — so it IS an escalation created this pass, and plan line 54 says the
+  budget counts "shipped + **escalated**". Only `escalation_pending` (a PRIOR run's escalation,
+  nothing written this pass) is correctly excluded. Recorded because a Warchief ruling is not
+  automatically right, and the record should show which party the evidence favored.
+
+### W-F2 — CLOSED, and the ruling was correct (controlled experiment, 2026-07-16)
+
+Independently falsified rather than trusted. Copied the runner to a scratch dir, removed ONLY
+`.filter((id) => !attempted.has(id))`, ran the W-F2 test:
+- **sabotaged code ⇒ HUNG the bun process past 120s**, even with `--timeout 8000` (the tight
+  await loop never yields, so the per-test timeout cannot even fire);
+- **real code ⇒ 1 pass in 136ms.**
+⇒ The infinite loop was real, and the regression test genuinely catches it. Implementing plan
+Task 2 literally ("turn the break into a continue") would have shipped a green-tested runner
+that hangs on §O6's own Stage C re-trigger shape. **Keep this technique** — sabotage-then-run is
+the cheapest way to prove a regression test is load-bearing rather than decorative.
 
 ## Known-carried gaps (surface in the PR — do NOT report the effort done without these)
 
