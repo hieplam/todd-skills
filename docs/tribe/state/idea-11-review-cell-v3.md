@@ -12,8 +12,12 @@ plan: docs/tribe/planning/idea-11-review-cell-v3/plan-cheapwins.md
 - [x] task 1 shipped (skinner.md sub-lenses + path-scope rule; 3 fix rounds, 6 Skinner reports)
 - [x] RESCOPED against the advisory-Skinner law (2026-07-15): see RESCOPE.md; card.md is now the
       rescoped v2 (original preserved as card-v1-original.md)
-- [ ] cheap-wins wave: task 2 (pre-gate.sh), 3a (path-scoped cold diff, warchief half),
-      3b (pre-gate step-6.0 law), 4 (ledger lens/yield columns), evals 1-3 — READY TO BUILD
+- [x] cheap-wins wave SHIPPED (2026-07-16): task 2 pre-gate.sh (b6c173d + fix 1acb201),
+      3a path-scoped cold diff (2a9b952 + fix 8fe27b4), 3b pre-gate step-6.0 law (57ca8b6 + fix
+      c04e0d8), 4 ledger lens/yield columns (e04cef7). Tasks 1/3a/3b dual-Skinner audited (cold
+      lens found F1-F7: 6 Critical + 1 Important, all CONFIRMED->FIXED->verified); task 4 built by
+      hand after the Warchief hit its weekly usage limit — owner-directed, self-verified (49/0
+      suite + D14 mutation bar on all 9 assertions). Evals (task 5) DESCOPED by owner.
 - [ ] deferred wave: task 3c (three-lens expansion), eval 4 — RATIFIED but sequenced last
       (after the cheap wins ship + one data campaign — Decision 1)
 
