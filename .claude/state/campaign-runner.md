@@ -188,6 +188,59 @@ a feature branch. **Surface to the owner.**
 - ADRs warn on **top-down incompleteness**: naming a component obliges naming its container +
   system, and every ref/rule the component cites.
 
+## Smoke findings (live run against REAL GitHub — the harness the owner authorized)
+
+Ran `run.ts --dry-run` against this repo's real PRs (#36 merged, #37 open). **Acceptance #1 is
+PROVEN**: phases derive correctly from live GitHub with zero side effects —
+C1(PR#36 merged, state `running`) → `verify_only`; C3(missing spec/plan) → `PLANNING_NEEDED`.
+
+### PROVEN AGAINST REALITY (was: "never driven a real session")
+
+- **D3 six-point replay vs REAL merged PR #36 → `shipped: true`, all 6 points PASS** with live
+  `gh`/`git`: real `gh api repos/{owner}/{repo}/pulls/36`, real `gh pr checks`, and the real
+  merge commit confirmed to have **2 parents** ⇒ the no-squash enforcement is real, not
+  theoretical. The F4 fix works against reality.
+- **Negative case vs OPEN PR #37 → `shipped: false`, EVERY failed point named** (no
+  short-circuit) incl. correctly detecting the worktree + remote branch still present.
+- **REAL Agent-SDK session spawned** (9s, scratch target repo): pinned §D1 options ACCEPTED by
+  the real SDK; `onSessionStart` fired with a real SDK-assigned id
+  (`684b5756-7299-4414-9208-65f70c583fdc`) ⇒ crash-safety handle is real; result parsed from
+  the typed `result` message → `shipped`, pr `99`, sha `deadbee`.
+- **`settingSources: ['project']` VERIFIED LIVE** — the session read the target repo's
+  CLAUDE.md ("I read the project's CLAUDE.md"). This was one of the THREE SDK facts the PR#107
+  spec got wrong; now proven against reality, not just against `sdk.d.ts`.
+- **RESUME WORKS** — resuming the real session id, the session recalled its own prior context
+  verbatim. **Bogus session id → typed `error` (`error_during_execution`), NOT a crash** ⇒
+  D4's "resume fails → fresh" fallback is genuinely triggerable ("probe by attempting; never
+  list" is sound).
+- **D7 logging works** — log line 1 is the real `system/init` message carrying `session_id`.
+
+### STILL UNPROVEN (honest)
+
+- **`github.ts`'s `gh pr create` / `gh pr merge` / `git push` path.** Mutating; needs a real
+  GitHub repo. **My token has `repo` but NOT `delete_repo`** — any throwaway repo I create is
+  permanent litter in the owner's account, so I did not create one. This is the last
+  significant untested surface.
+- A full end-to-end card ship (session → verify → state PR → next card).
+- The `.runner.lock` contention path and STOP file under a real run.
+
+- **F8 — 🔴 open PR + no sessionId ⇒ blind `fresh` ⇒ DUPLICATE PR.** Violates acceptance #3
+  ("restart resumes without duplicate PRs"). `deriveCardPhase` (`loop.ts:~166`) returns
+  `{kind:'fresh'}` for an OPEN PR when `card.sessionId` is null, reasoning in-comment that it
+  is "same as no trace". **It is not** — there IS a trace: an open PR on GitHub. A blind fresh
+  session doesn't know PR #37 exists and would open a SECOND PR for the same card.
+  **Realistically reachable, not exotic:** §D2 makes mid-card `sessionId` writes LOCAL and
+  uncommitted until the post-verify docs PR, so a fresh clone / new machine / lost local state
+  yields exactly `sessionId: null` + open PR. Fix: spawn fresh **with a state digest** naming
+  the open PR (D4's intent — `buildStateDigest` already exists and is used on the
+  resume-failure path at `loop.ts:675`). Found by the smoke; **all 114 mocked tests pass over
+  it** (nobody mocked OPEN + null sessionId).
+- **F9 — absolute `--state` path silently mangled.** `--state` is repo-relative by design
+  (spec §2), but an absolute path is joined onto repoRoot producing a nonsense path. Should be
+  honored or rejected with a clear message.
+- **F10 — missing state file ⇒ raw ENOENT stack trace**, not a clean "state file not found at
+  X". Poor first-run UX for an unattended tool.
+
 ## Learnings bank
 
 - **`bun test` hard-errors (exit 1) on zero test files** — not a soft pass. Hence Task 1's
