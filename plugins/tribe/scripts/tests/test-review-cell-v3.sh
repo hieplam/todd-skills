@@ -62,6 +62,8 @@ ARTIFACTS_BULLET="$(awk '/^  - \*\*The ban is on narrative/{f=1} /^- \*\*Read \+
 # "$AGENTS/skinner.md" from, two lines above.
 WAR="$(tr '\n' ' ' < "$AGENTS/warchief.md" | tr -s ' ')"
 STEP6="$(awk '/^### 6\./{f=1} /^### 7\./{f=0} f' "$AGENTS/warchief.md" | tr '\n' ' ' | tr -s ' ')"
+RECORD="$(awk '/^#### Recording it/{f=1} /^\*\*The fixer brief/{f=0} f' "$AGENTS/warchief.md" \
+          | tr '\n' ' ' | tr -s ' ')"
 pass=0; fail=0
 has()   { if echo "$2" | grep -qiE "$3"; then echo "ok: $1"; pass=$((pass+1)); \
           else echo "FAIL: $1 (missing: $3)"; fail=$((fail+1)); fi; }
@@ -363,6 +365,18 @@ has "c: checklist admits pre-gate report for contract lens" "$STEP6" \
 # report).
 has "c: contract brief states pre-gate satisfies method step 5" "$STEP6" \
     "the contract lens.s brief explicitly states.{0,20}that the pre-gate.s report already satisfies Method step 5.s suite-verification requirement"
+
+# --- Task 4 (Delta-D): the ledger's lens column + Reviewer-yield table ---------------------
+has "d: ledger gains a lens column"        "$RECORD" 'lens.{0,120}contract.{0,20}cold-exec.{0,20}cold-read'
+has "d: multi-lens findings comma-join"    "$RECORD" 'comma-joined when more than one lens'
+has "d: reviewer-yield table exists"       "$RECORD" 'reviewer yield'
+has "d: yield rows are per lens"           "$RECORD" 'one row per lens'
+has "d: yield columns named"               "$RECORD" \
+    'raised.{0,40}unique.{0,40}confirmed.{0,40}refuted.{0,40}out-of-scope'
+has "d: derived from the ledger only"      "$RECORD" 'derived entirely from the ledger'
+has "d: non-authoritative, never resume"   "$RECORD" 'non-authoritative.{0,80}never.{0,40}resume'
+has "d: cold-read may show zero dispatches" "$RECORD" 'cold-read.{0,160}zero dispatches'
+has "d: the shaman decides from data"      "$RECORD" 'shaman.{0,120}from data'
 
 echo; echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
