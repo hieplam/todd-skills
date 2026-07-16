@@ -1,0 +1,6 @@
+---
+target: c3-215
+scope: block
+base: c3-215#n947@v1:sha256:c8183dd1de1bdbe59bcdbc910477f612811e08da52cec6ef424d313949a6b1ac
+---
+| scripts/runner/run.ts (campaign runner) | IN | Stateless CLI capability: every environment value is an input (--repo, --state, --model, --answers, --escalations-dir, --logs-dir, --session-timeout, --dry-run, --cards, --max-cards, --include-escalated). Executes staged cards sequentially — one fresh Agent-SDK executor session per card, script-verified SHIPPED, state committed to the target repo. D5′ park-and-continue: an escalation writes the escalation file, parks the card, and the pass CONTINUES to the next progressable card — exit 2 means "the pass finished, at least one escalation is pending", never "aborted at the first question"; a card declaring dependsOn a parked card becomes blocked (derived, reconciled to a fixpoint, never hand-authored). Report contract: campaign-report.json plus its .md twin are written next to the state file on every real exit path — but never on --dry-run (zero side effects is a hard contract) and never on a refused start (another live process owns the campaign). The exit code is a hint; the report is the truth. Zero LLM calls in the loop itself; the campaign instance lives in the target repo, never here | bun CLI, repo-invoked (never installed) | plugins/tribe/scripts/runner/run.test.ts |

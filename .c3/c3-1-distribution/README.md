@@ -1,6 +1,6 @@
 ---
 id: c3-1
-c3-seal: 222790f49a80a79144caf3cf69f945afdb318d663d3bad1cb4ade0e964b16c11
+c3-seal: 06809bf27aaa4baafb6d9f31bcb18de6dbb152a32d6e1c97c7490b26d2f5c5d2
 title: distribution
 type: container
 boundary: service
@@ -16,7 +16,7 @@ Install-time distribution: register every plugin in the marketplace manifest and
 
 | ID | Name | Category | Status | Goal Contribution |
 | --- | --- | --- | --- | --- |
-| c3-101 | installer | Foundation | active | The only path from repo checkout to a working ~/.claude install: walks each plugin's layout, links agents/skills, runs post-install hooks idempotently |
+| c3-101 | installer | foundation | active | The only path from repo checkout to a working ~/.claude install: walks each plugin's layout, links agents/skills, runs post-install hooks idempotently |
 
 ## Responsibilities
 
