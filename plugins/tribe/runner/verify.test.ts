@@ -26,6 +26,7 @@ function fixtureConfig(overrides: Partial<VerifyConfig> = {}): VerifyConfig {
   return {
     repoRoot: '/repo',
     schemaLockPaths: ['packages/app/src/domain/sample-types.ts'],
+    docsOnlyPaths: ['docs/'],
     ...overrides,
   };
 }
@@ -95,6 +96,23 @@ function buildIo(opts: MockOptions = {}): VerifyIO {
     },
     readFile(): string {
       return planContent;
+    },
+  };
+}
+
+/** Wraps `buildIo` to also record every `cmd` array `exec` was invoked with, in order —
+ * lets a test assert the LITERAL command string issued, not just the mocked outcome. */
+function buildIoRecordingCalls(opts: MockOptions = {}): { io: VerifyIO; calls: string[][] } {
+  const calls: string[][] = [];
+  const base = buildIo(opts);
+  return {
+    calls,
+    io: {
+      ...base,
+      async exec(cmd: string[], options?: { cwd?: string }) {
+        calls.push(cmd);
+        return base.exec(cmd, options);
+      },
     },
   };
 }
@@ -241,5 +259,89 @@ describe('verifyShipped — never throws', () => {
     const result = await verifyShipped(fixtureCard(), fixtureConfig(), failingIo);
     expect(result.shipped).toBe(false);
     expect(result.failedPoints).toContain('merged');
+  });
+});
+
+// F4 (3-fix): `gh api pulls/<pr>` resolves against the API root, not the current repo, and
+// 404s against the real CLI (gh 2.92.0) — verified by the Warchief against a live PR. The
+// correct call is `gh api repos/{owner}/{repo}/pulls/<pr>`, where `{owner}`/`{repo}` are gh's
+// OWN literal placeholders (substituted by gh itself from the repo in cwd) — never an
+// interpolated repo name, which would violate the stateless-capability wall.
+describe('verifyShipped — point 1: the real gh api path (F4)', () => {
+  test('checkMerged calls gh api against repos/{owner}/{repo}/pulls/<pr>, never bare pulls/<pr>', async () => {
+    const { io, calls } = buildIoRecordingCalls();
+    await verifyShipped(fixtureCard({ pr: 42 }), fixtureConfig(), io);
+
+    const apiCall = calls.find((cmd) => cmd[0] === 'gh' && cmd[1] === 'api');
+    expect(apiCall).toEqual(['gh', 'api', 'repos/{owner}/{repo}/pulls/42']);
+  });
+});
+
+// F2 (3-fix): github.ts treats gh's `skipping` bucket as non-blocking
+// (`bucket !== 'pass' && bucket !== 'skipping'`); verify.ts's checkChecksGreen instead failed
+// on ANY non-'pass' bucket, so a routine path-filtered `skipping` check (common on scoped
+// workflows) would escalate an otherwise healthy card. Warchief ruling: align verify.ts to
+// github.ts — skipped is non-blocking.
+describe('verifyShipped — point 4: the skipping bucket is non-blocking (F2)', () => {
+  test('a check with bucket "skipping" does not fail checksGreen', async () => {
+    const io = buildIo({
+      checks: [
+        { name: 'unit-tests', bucket: 'pass' },
+        { name: 'path-filtered-e2e', bucket: 'skipping' },
+      ],
+    });
+    const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
+    const point = result.points.find((p) => p.id === 'checksGreen');
+    expect(point?.passed).toBe(true);
+  });
+});
+
+// F1 (3-fix): isDocsOnlyDiff hardcoded the `docs/` prefix — a stateless-wall violation (the
+// TARGET repo's directory layout baked into a capability that must work against ANY repo).
+// The docs-only path set is now campaign config (`VerifyConfig.docsOnlyPaths`), threaded
+// exactly like `schemaLockPaths` already is.
+describe('verifyShipped — point 4: docs-only paths are config, not hardcoded (F1)', () => {
+  test('a non-"docs/" prefix configured as docsOnlyPaths still waives a matching sonar-504 diff', async () => {
+    const io = buildIo({
+      checks: [{ name: 'SonarCloud Code Analysis', bucket: 'fail', description: 'bootstrap failed: HTTP 504' }],
+      docsOnlyDiffFiles: ['notes/release-notes.md'],
+    });
+    const result = await verifyShipped(
+      fixtureCard(),
+      fixtureConfig({ docsOnlyPaths: ['notes/'] }),
+      io,
+    );
+    const point = result.points.find((p) => p.id === 'checksGreen');
+    expect(point?.passed).toBe(true);
+    expect(point?.detail).toMatch(/waived/i);
+  });
+
+  test('the exact same diff is NOT waived when docsOnlyPaths does not cover it (hardcoded "docs/" must not leak through)', async () => {
+    const io = buildIo({
+      checks: [{ name: 'SonarCloud Code Analysis', bucket: 'fail', description: 'bootstrap failed: HTTP 504' }],
+      docsOnlyDiffFiles: ['notes/release-notes.md'],
+    });
+    const result = await verifyShipped(
+      fixtureCard(),
+      fixtureConfig({ docsOnlyPaths: ['docs/'] }),
+      io,
+    );
+    const point = result.points.find((p) => p.id === 'checksGreen');
+    expect(point?.passed).toBe(false);
+  });
+
+  test('an EMPTY docsOnlyPaths list fails closed — nothing counts as docs-only, so a code diff never auto-waives', async () => {
+    const io = buildIo({
+      checks: [{ name: 'SonarCloud Code Analysis', bucket: 'fail', description: 'bootstrap failed: HTTP 504' }],
+      docsOnlyDiffFiles: ['docs/note.md'],
+    });
+    const result = await verifyShipped(
+      fixtureCard(),
+      fixtureConfig({ docsOnlyPaths: [] }),
+      io,
+    );
+    const point = result.points.find((p) => p.id === 'checksGreen');
+    expect(point?.passed).toBe(false);
+    expect(point?.detail).toMatch(/not docs-only/i);
   });
 });

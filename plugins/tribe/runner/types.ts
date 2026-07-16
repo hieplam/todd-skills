@@ -28,6 +28,10 @@ export interface CampaignState {
   /** Paths whose diff from a card's baseSha must stay empty unless that card's plan
    * front-matter declares `allowsSchemaChange: true` (D3 point 6). */
   schemaLockPaths: string[];
+  /** Path prefixes that count as "docs-only" for the D6 flake waiver (D3 point 4's
+   * `checksGreen` check) — campaign config, never hardcoded (stateless-capability wall). An
+   * EMPTY list fails closed: nothing counts as docs-only, so a code diff never auto-waives. */
+  docsOnlyPaths: string[];
   /** Trigger names that always escalate to the human owner, regardless of what an
    * executor session claims (D5). */
   ownerOnlyEscalations: string[];

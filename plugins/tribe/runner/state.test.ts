@@ -20,6 +20,7 @@ function fixtureState(overrides: Record<string, unknown> = {}): Record<string, u
     mergePolicy: 'merge',
     sequence: ['C1', 'C2', 'C3'],
     schemaLockPaths: ['packages/app/src/domain/sample-types.ts'],
+    docsOnlyPaths: ['docs/'],
     ownerOnlyEscalations: ['breaking-change'],
     cards: {
       C1: {
@@ -76,6 +77,7 @@ describe('parseState / serializeState round-trip', () => {
     expect(state.campaign).toBe('sample-campaign');
     expect(state.sequence).toEqual(['C1', 'C2', 'C3']);
     expect(state.schemaLockPaths).toEqual(['packages/app/src/domain/sample-types.ts']);
+    expect(state.docsOnlyPaths).toEqual(['docs/']);
     expect(state.ownerOnlyEscalations).toEqual(['breaking-change']);
     expect(state.cards.C1?.status).toBe('shipped');
 

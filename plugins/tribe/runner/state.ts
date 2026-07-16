@@ -65,6 +65,7 @@ export const CampaignStateSchema = z.looseObject({
   mergePolicy: z.string(),
   sequence: z.array(z.string()),
   schemaLockPaths: z.array(z.string()),
+  docsOnlyPaths: z.array(z.string()),
   ownerOnlyEscalations: z.array(z.string()),
   cards: z.record(z.string(), CardSchema),
 });
