@@ -134,4 +134,4 @@ Tribe-Card: campaign-runner
 Tribe-Task: 2b/7
 ```
 
-SHA: filled in after commit (see final report line below).
+SHA: `cf5a85922408bcaeaeebe7eac6babd34695d7afd`

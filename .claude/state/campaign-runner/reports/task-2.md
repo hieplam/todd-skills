@@ -156,7 +156,11 @@ correct me if a checkbox convention is expected elsewhere.
 
 ## Commit
 
-`<filled in after commit>`
+`78d25918adaaa1fb7278fa412e0d859ea7924269` — "feat(tribe): campaign runner — state schema,
+load/serialize, next-card selection (2/7)" (`Tribe-Card: campaign-runner`,
+`Tribe-Task: 2/7`). Files: `plugins/tribe/runner/types.ts`, `plugins/tribe/runner/state.ts`,
+`plugins/tribe/runner/state.test.ts` (new), `plugins/tribe/runner/placeholder.test.ts`
+(deleted), this report.
 
 ## Ambiguity flagged (not blocking — reported per Method, no guess made)
 
