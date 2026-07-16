@@ -117,6 +117,25 @@ This split is **encoded right into the metaphor**: *a tracker naturally walks th
 
 ---
 
+## Campaign runner
+
+Alongside the five agents, the plugin ships a **stateless capability script** —
+[`scripts/runner/`](scripts/runner/README.md) — that drives a roadmap campaign's outer loop
+deterministically: pick the next staged card, run one fresh executor session, script-verify
+it shipped, record state, repeat. It hardcodes no repo/model/campaign value (every
+environment-specific value is a CLI input) and costs zero LLM tokens itself — only the
+sessions it spawns do.
+
+```sh
+bun plugins/tribe/scripts/runner/run.ts --repo <target-repo> --state <path> --model <model> \
+  --answers <path> --escalations-dir <path> --dry-run
+```
+
+See [`scripts/runner/README.md`](scripts/runner/README.md) for the full inputs table, resume
+semantics, escalation workflow, and known limitations.
+
+---
+
 ## Quick reference
 
 | Agent | Technical role | Question | Authority |
