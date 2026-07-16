@@ -154,10 +154,23 @@ Read from `EXIT_*` in `loop.ts` and the argument-parsing path in `run.ts`:
   fact that this module's only call site (`loop.ts`'s `commitState`) is restricted at the
   type/runtime level to `.json`/`.md` paths. If that restriction were ever bypassed, the
   waiver would apply to a non-docs diff too.
-- **The runner has never driven a real Agent-SDK session.** All 114 tests mock every seam
-  (`exec`, `spawnSession`, the filesystem, the clock, the lock) — they prove the loop's
-  *logic* against those mocks, not that a real `gh`/`git`/SDK invocation behaves as assumed.
-  This gap is not theoretical: during verification, `gh api pulls/<pr>` 404'd against a real
-  PR while the 25 tests covering that exact code path passed unchanged. A real end-to-end
-  run (`--dry-run` first, then a scoped `--cards <id> --max-cards 1` run) is required before
-  trusting this against a live campaign.
+- **Mocked tests validate logic, not invocations.** All 116 tests mock every seam (`exec`,
+  `spawnSession`, the filesystem, the clock, the lock). They prove the loop's *logic* against
+  those mocks — not that a real `gh`/`git`/SDK call behaves as assumed. This gap is not
+  theoretical: `gh api pulls/<pr>` 404'd against a real PR while the 25 tests covering that
+  exact path passed unchanged, and a live `--dry-run` later caught an open-PR resume that
+  would have opened a duplicate PR. **Any changed `gh`/`git` command must be executed against
+  a real repo before it is trusted.**
+- **What HAS been verified live** (smoke run, 2026-07-16): `--dry-run` phase derivation against
+  real merged/open PRs; the D3 six-point replay against a real merged PR (all six pass,
+  including a real 2-parent merge commit) and its correct rejection of an open PR; a real
+  Agent-SDK session spawn under the pinned §D1 options, with the SDK-assigned `session_id`
+  captured from the `system/init` message; `settingSources: ['project']` genuinely loading the
+  target repo's CLAUDE.md; a real `resume` recalling prior session context; a bogus resume id
+  surfacing as a typed `error` (so the fresh-fallback path is reachable); and per-session log
+  files.
+- **What is still UNVERIFIED against reality:** `github.ts`'s mutating path — `gh pr create`,
+  `gh pr merge`, `git push` — and therefore a full end-to-end card ship (session → verify →
+  state PR → next card), plus `.runner.lock` contention and the STOP file under a real run.
+  Exercising these needs a disposable GitHub repo. **Do a scoped `--cards <id> --max-cards 1`
+  run under supervision before trusting this against a live campaign.**
