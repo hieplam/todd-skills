@@ -1,6 +1,10 @@
 # Campaign Orchestration — implementation effort STATE
 
-**Status:** running
+**Status:** ✅ **SHIPPED** — PR #40 merged `a781eea` (2 parents, regular merge; `verify-shipped`
+verdict **PASS** on all four checks). Re-verified ON master, not just on the branch: 172 tests
+green, tsc clean, both deliverables present, F12 detection returns `shaman.md`/`warchief.md`.
+**One thing deliberately NOT closed — see "Known-carried gaps": the live-smoke acceptance
+(#1–#3) is BLOCKED-pending-repo by owner directive. Do not report this effort as fully proven.**
 **Role in force:** Claude = **Warchief** (owner ruling, 2026-07-16, re-confirmed for THIS effort).
 Dispatches one Hunter per plan task; never writes feature source itself; audits every
 deliverable; opens PR; **regular merge** (2 parents).
@@ -67,12 +71,25 @@ Sequencing: 1 → 2 → 3 → (4 ∥ 5) → 6.
 
 ## Next action
 
-**All 6 tasks shipped and audited.** PR open; awaiting CI + the owner's **regular merge**
-(2 parents, never squash). After merge: `verify-shipped` the PR, then commit a snapshot of this
-STATE to the repo's docs home per the global resume protocol.
+**Effort closed.** PR #40 merged `a781eea`, `verify-shipped` PASS, master re-verified green.
 
-**The one thing NOT done, by owner directive, and it must not be quietly closed:** the live-smoke
-acceptance (#1–#3) is **BLOCKED-pending-repo**. See "Known-carried gaps" below.
+The ONLY open item is the owner's to authorize, and it is the difference between "well-tested"
+and "proven":
+
+**Close the live-smoke acceptance (#1–#3).** Needs a disposable GitHub repo the owner creates
+(my token has `repo` but NOT `delete_repo` — verified — so anything I create is permanent litter
+in their account). One focused session closes all of it at once:
+1. Acceptance #1 — a live N≥2 campaign from one skill invocation to one report, zero owner
+   interventions, every `shipped` card passing an independent `verify-shipped` replay.
+2. Acceptance #2 — force one card to escalate; independent cards still ship (park-and-continue,
+   live).
+3. Acceptance #3 — answer it into `answers.md`, re-trigger, card ships on round 2,
+   `autoAnswerRounds == 1` in the final report.
+4. **And the prize:** this is the ONLY thing that closes the runner's inherited UNVERIFIED
+   surface — `gh pr create` / `gh pr merge` / `git push`, `.runner.lock` contention, and STOP
+   under a real run. That surface has never executed against reality, across BOTH efforts.
+   Learning F4 (a mocked seam cannot validate an invocation) says that is exactly where the next
+   campaign-stopping bug lives.
 
 **Audit protocol that is EARNING its cost — keep doing this:** every Hunter claim is verified
 against the repo, and every load-bearing behavior is **probed against the real module/CLI**, not
