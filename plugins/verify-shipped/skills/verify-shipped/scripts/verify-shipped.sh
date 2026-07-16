@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # verify-shipped.sh — mechanically check the tribe's Definition of Done.
 #
-# The owner's global CLAUDE.md defines "done" as: PR squash-merged and ready
-# to work on new feature with LATEST CHANGES. This script checks that,
-# mechanically, instead of trusting a Warchief's prose SHIPPED report.
+# The owner's global CLAUDE.md defines "done" as: PR merged via a regular
+# (2-parent) merge and ready to work on new feature with LATEST CHANGES —
+# the owner's standing rule is "Do not Squash merge". This script checks
+# that, mechanically, instead of trusting a Warchief's prose SHIPPED report.
 #
 # Four checks, each reported independently:
-#   1. pr_merged            — PR state == MERGED
-#   2. merge_strategy_squash — merge commit looks like a GitHub squash merge
-#                              (single parent + "(#<PR>)" title suffix)
-#   3. master_in_sync       — local <base> branch has no divergence from
-#                              origin/<base> (0 ahead, 0 behind)
-#   4. worktree_removed     — the given worktree path is gone from both
-#                              `git worktree list` and disk
+#   1. pr_merged              — PR state == MERGED
+#   2. merge_strategy_no_squash — merge commit is a regular merge: exactly
+#                                2 parents. A 1-parent commit (squash or
+#                                rebase) is a FAIL.
+#   3. master_in_sync         — local <base> branch has no divergence from
+#                                origin/<base> (0 ahead, 0 behind)
+#   4. worktree_removed       — the given worktree path is gone from both
+#                                `git worktree list` and disk
 #
 # Output: JSON summary on stdout only. Logs go to stderr.
 # Exit codes: 0 = ran to completion (regardless of pass/fail); 2 = setup error.
@@ -89,7 +91,7 @@ else
   CHECK1_STATUS="fail"; CHECK1_DETAIL="PR #$PR_NUMBER state is $PR_STATE, not MERGED"
 fi
 
-# ---------- check 2: merge_strategy_squash ----------
+# ---------- check 2: merge_strategy_no_squash ----------
 CHECK2_STATUS="unknown"
 CHECK2_DETAIL="PR not merged — cannot check merge strategy"
 if [[ "$CHECK1_STATUS" == "pass" ]]; then
@@ -104,16 +106,12 @@ if [[ "$CHECK1_STATUS" == "pass" ]]; then
       CHECK2_DETAIL="merge commit $MERGE_SHA not available locally even after fetch"
     else
       PARENT_COUNT=$(git log -1 --format='%P' "$MERGE_SHA" | wc -w | tr -d ' ')
-      TITLE_LINE=$(git log -1 --format='%s' "$MERGE_SHA")
-      if [[ "$PARENT_COUNT" != "1" ]]; then
-        CHECK2_STATUS="fail"
-        CHECK2_DETAIL="merge commit $MERGE_SHA has $PARENT_COUNT parents (a 2-parent merge commit is a regular merge, not squash)"
-      elif [[ "$TITLE_LINE" == *"(#$PR_NUMBER)" ]]; then
+      if [[ "$PARENT_COUNT" == "2" ]]; then
         CHECK2_STATUS="pass"
-        CHECK2_DETAIL="merge commit $MERGE_SHA has 1 parent and title ends in (#$PR_NUMBER) — GitHub's default squash-merge shape"
+        CHECK2_DETAIL="merge commit $MERGE_SHA has 2 parents — a regular merge, not squash/rebase"
       else
         CHECK2_STATUS="fail"
-        CHECK2_DETAIL="merge commit $MERGE_SHA has 1 parent but title '$TITLE_LINE' lacks the (#$PR_NUMBER) suffix GitHub's squash merge adds — looks like a rebase-merge instead"
+        CHECK2_DETAIL="merge commit $MERGE_SHA has $PARENT_COUNT parent(s) — expected 2 parents for a regular merge; a 1-parent commit is a squash or rebase merge, both of which violate the owner's 'Do not Squash merge' rule"
       fi
     fi
   fi
@@ -181,7 +179,7 @@ print(json.dumps({
     "worktree": worktree,
     "checks": {
         "pr_merged":             {"status": c1_status, "detail": c1_detail},
-        "merge_strategy_squash": {"status": c2_status, "detail": c2_detail},
+        "merge_strategy_no_squash": {"status": c2_status, "detail": c2_detail},
         "master_in_sync":        {"status": c3_status, "detail": c3_detail},
         "worktree_removed":      {"status": c4_status, "detail": c4_detail},
     },

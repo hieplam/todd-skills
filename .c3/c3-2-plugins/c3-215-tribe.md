@@ -1,6 +1,6 @@
 ---
 id: c3-215
-c3-seal: 1255dfcf5e5be6237a0a7f342c3b95e3cb11a435157ba3b2946f9835a095f3c2
+c3-seal: 298c981635aa16840471d8102c76358f355d9c1fcc2db55023e5e9da66f7af2c
 title: tribe
 type: component
 category: feature
@@ -11,6 +11,7 @@ uses:
     - ref-evals-fixture
     - ref-plugin-layout
     - rule-bash-strict-mode
+    - rule-no-squash-merge
 ---
 
 ## Goal
@@ -56,6 +57,7 @@ Owns the delivery role contracts: who may talk to whom (Owner ⇄ Shaman ⇄ War
 | ref-evals-fixture | ref | Agent-kind eval cases (kind: "agent", per-case agent field) | binding | The reason the fixture shape grew the agent flavor |
 | ref-docs-lifecycle | ref | Specs/plans/evidence for tribe's own feature work | binding | Most docs/superpowers files are tribe designs |
 | rule-bash-strict-mode | rule | heartbeat/resume/validate-plan scripts + their tests | binding | — |
+| rule-no-squash-merge | rule | Every merge the Warchief performs, and the campaign runner's D3 point 2 that verifies it | binding | The agent definitions instructed squash-merge in 12 places, which the runner's 2-parent check rejects — the rule is what keeps agents, runner, and the owner's standing rule on one merge shape |
 
 ## Contract
 

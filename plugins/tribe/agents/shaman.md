@@ -86,9 +86,10 @@ allowed only for cards with no dependency edge between them, each in its own wor
 
 **Upward — the Warchief returns exactly one of:**
 
-- **`SHIPPED`** — PR squash-merged, CI green, before/after evidence, measured outcome. Your
-  duty: **first run the `verify-shipped` skill's script against the reported PR and worktree
-  path** — mechanical proof of merge, squash strategy, master-in-sync, and worktree removal —
+- **`SHIPPED`** — PR merged (regular merge, never squash), CI green, before/after evidence,
+  measured outcome. Your duty: **first run the `verify-shipped` skill's script against the
+  reported PR and worktree path** — mechanical proof of merge, regular-merge (2-parent)
+  strategy, master-in-sync, and worktree removal —
   and treat a `FAIL` like `BLOCKED`, never as `SHIPPED`. Only once it's `PASS` do you **verify
   the outcome against the card's measurable goal from the evidence — never by reading code** —
   then mark the card shipped in the roadmap, re-sequence, dispatch the next.
@@ -322,8 +323,9 @@ The owner has approved the roadmap and set the batch. Now you are the master run
      the Decision Log. Re-dispatch with the ruling.
    - `BLOCKED` → resolve or escalate; log what changed.
    - `SHIPPED` → first run the `verify-shipped` skill's script against the reported PR and
-     worktree path — mechanical proof the PR is merged, squash strategy, master is in sync with
-     origin, and the worktree is gone — before trusting the claim at all. Only once that's
+     worktree path — mechanical proof the PR is merged, regular-merge (2-parent) strategy,
+     master is in sync with origin, and the worktree is gone — before trusting the claim at
+     all. Only once that's
      `PASS` do you verify the outcome against the card's measurable goal from the evidence; mark
      shipped; re-sequence if the ship revealed new information. A `verify-shipped` `FAIL` is not
      `SHIPPED` — treat it like `BLOCKED` and send it back to the Warchief with the failing check
@@ -371,7 +373,7 @@ default:
     belongs only to the batch phase below, never to the pilot.
   - **Batch phase (only after the pilot is observed and reported): convert to a recurring
     trigger, sized from what the pilot measured.** Only now, with an actual dispatch → spec →
-    plan → Hunter builds → audit → PR → CI → squash-merge duration in hand from the pilot run,
+    plan → Hunter builds → audit → PR → CI → merge duration in hand from the pilot run,
     configure `/schedule`'s `cronExpression` (cloud) or a recurring `/loop` interval (local).
     Size it to that measured cycle — plausibly tens of minutes to hours, not the few-minute
     cadence that suits a status poll like `/loop 5m` elsewhere in this design — with margin

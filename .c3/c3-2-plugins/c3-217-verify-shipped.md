@@ -1,19 +1,20 @@
 ---
 id: c3-217
-c3-seal: b116c2339fa3cd58f741b938a5db62071f2ef40f1441a8b866a6e6e7b3f75d0b
+c3-seal: cf79abedf21d4a6a08b43413dca4e8cc8e978d30d024d891705984b5e0fcc132
 title: verify-shipped
 type: component
 category: feature
 parent: c3-2
-goal: 'Mechanically verify a SHIPPED claim against the owner''s Definition of Done: PR merged, squash strategy, local master in sync with origin, worktree removed.'
+goal: 'Mechanically verify a SHIPPED claim against the owner''s Definition of Done: PR merged, a regular 2-parent merge (never squashed), local master in sync with origin, worktree removed.'
 uses:
     - ref-plugin-layout
     - rule-bash-strict-mode
+    - rule-no-squash-merge
 ---
 
 ## Goal
 
-Mechanically verify a SHIPPED claim against the owner's Definition of Done: PR merged, squash strategy, local master in sync with origin, worktree removed.
+Mechanically verify a SHIPPED claim against the owner's Definition of Done: PR merged, a regular 2-parent merge (never squashed), local master in sync with origin, worktree removed.
 
 ## Parent Fit
 
@@ -52,6 +53,7 @@ Owns the executable form of "PR squash-merged and ready to work on new feature w
 | --- | --- | --- | --- | --- |
 | ref-plugin-layout | ref | Directory shape | binding | — |
 | rule-bash-strict-mode | rule | verify-shipped.sh preamble | binding | — |
+| rule-no-squash-merge | rule | Check 2 (merge_strategy_no_squash) — the parent-count assertion this skill exists to make | binding | This skill asserted the INVERSE (exactly 1 parent = squash) and failed the owner's own correctly-merged PR #37; the rule is the single source of the merge shape it must check |
 
 ## Contract
 
