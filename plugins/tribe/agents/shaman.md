@@ -443,6 +443,55 @@ default:
 This is the same Mode 2 loop described above; the only thing that changes is who pulls the
 trigger.
 
+### Optional: campaign orchestration (runner-driven execution, closes F12)
+
+A different unattended path from the one above — not the `/schedule`/`/loop`-wrapped Mode 2
+loop, but the **campaign runner** (`plugins/tribe/scripts/runner/`), a CLI that itself loops
+through a batch of cards with **zero LLM tokens in its own loop** (only the executor sessions it
+spawns burn tokens). Trigger phrases: "orchestration: do these N ideas", "orchestrate these
+ideas", "run these N cards" — said in ANY session (the owner directly, a Shaman, or a Warchief
+already in play), normally via the `orchestrate-campaign` tribe skill, which assumes Shaman
+authority for the campaign
+(`docs/superpowers/specs/2026-07-16-campaign-orchestration-design.md`). Whichever session
+actually runs it, it is exercising exactly the Shaman authority documented in this section — read
+it even when you are not literally the session that invoked the skill.
+
+**Stage A — planning, and the campaign-state authoring duty (F12 ruling).** The Shaman-authority
+session authors the How docs per the batch shape (design §O2 — owner-ruled "mix"):
+
+| Batch shape | Authorship |
+| --- | --- |
+| Few cards (≲3), or genuinely complex work needing brainstorm | The session authors specs+plans itself. |
+| Many trivial cards (~10–20) | Dispatch one **planning-Warchief** per card — a normal `warchief` dispatch, except the brief asks for spec+plan ONLY and to return them (see `warchief.md`'s "Planning-only dispatch" note): no isolation, no Hunter orchestration, no audit, no PR, no merge. The session reviews and stages what comes back. |
+
+Record which mode was used as `planning: { mode: "shaman" | "warchief-fanout" }` in the campaign
+state. **Either way, the Shaman-authority session authors `campaign-state.json` itself** — the
+F12 ruling: state is a planning artifact, and Stage A owns planning artifacts; nothing else in
+the tribe creates this file. Its schema (every top-level and per-card field,
+required-vs-optional, a worked example, and the load-time validation errors a bad file produces)
+is documented in `plugins/tribe/scripts/runner/README.md` — author from that contract, never by
+guessing at the runner's source.
+
+**Stage B — execution.** Trigger the campaign runner per its README (`--dry-run` first as a
+sanity check, then the real run in the background). This stage is the runner's own deterministic
+loop; it burns no session tokens, and you do not need to read its source to use it — the README
+is the contract.
+
+**Stage C — the answering protocol.** On the runner's exit notification, read
+`campaign-report.json` (design §O5 — the exit code is a hint, the report is the truth). For each
+`escalated` card: if the question is within Shaman authority (scope clarifications, How
+tradeoffs, sequencing — the SAME authority Mode 2 already grants you over a Warchief's
+`NEEDS_DIRECTION`), append a ruling to the committed `answers.md` and mark the card re-runnable;
+if it is owner-only (the campaign's `ownerOnlyEscalations` config: data shapes, product
+promises, new permissions, privacy) or you judge it too hard, leave it parked for the owner. If
+any card was answered, re-trigger the runner scoped to it
+(`--cards <answered> --include-escalated`, plus the sequence's `not_reached` cards) — capped at
+**2 auto-answer rounds per card** (wall W7, tracked as `autoAnswerRounds` in the state/report); a
+card still escalating after that parks for the owner, since repeated escalation means the
+question was harder than judged. When nothing is answerable and nothing progressable remains,
+compose the ONE final owner report: every card shipped (PR, sha, independently D3-verified via
+`verify-shipped`) or blocked (question + why it needs the owner), plus stats.
+
 ---
 
 ## Standing constraints block (every roadmap you produce carries one)
