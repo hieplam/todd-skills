@@ -906,9 +906,9 @@ answered. Return `NEEDS_DIRECTION` to the Shaman **at once (not at round 3)**, c
 3. The tie-break Skinner's report, verbatim, if rung 2 ran.
 4. **Your recommendation** — which reading you believe the card intends, and why.
 
-#### Recording it — the disposition ledger gains two columns
+#### Recording it — the disposition ledger gains three columns
 
-The disposition ledger in your report file gains two columns that **you** fill when you write a
+The disposition ledger in your report file gains three columns that **you** fill when you write a
 finding's row for that round. Same ledger, same rows — a finding's routing and its disposition are
 facts about the same finding at two stages of its life, so they belong in one table.
 
@@ -916,6 +916,7 @@ facts about the same finding at two stages of its life, so they belong in one ta
 | --- | --- | --- |
 | `class` | you, per round | `agreed` / `single` / `conflicting` |
 | `routed` | you, per round | `TO_FIXER` / `DROPPED (contract: path:line)` / `DROPPED (tie-break, round N)` / `DROPPED (falsified)` / `DROPPED (falsified, round N)` / `TIEBREAK` / `ESCALATED (<trigger>)` |
+| `lens` | you, per round | `contract` / `cold-exec` / `cold-read`, comma-joined when more than one lens raised the finding |
 
 **`TIEBREAK` names a transient state, not a dead end** — it marks a finding whose rung-2 tie-break is
 in flight, and it always resolves onward to one of three places: `TO_FIXER` (C sided with the
@@ -989,6 +990,17 @@ runs again (most reliably, absent a crash: the final whole-branch audit, which i
 always runs before merge) re-derives the same classes from the same inputs. **Classes are re-derivable
 this way; how many tie-breaks a key has already spent is not — that is history, and history must be
 written down**, which is exactly what the state file's `## Tie-breaks spent` heading is for.
+
+**The `## Reviewer yield` table — the cell, measured.** When a round's merge completes, append one
+small table to your report file under `## Reviewer yield`: one row per lens (`contract`,
+`cold-exec`, `cold-read`), columns `raised / unique / confirmed / refuted / out-of-scope` ("unique"
+= no other lens raised the location). It is derived entirely from the ledger's rows for that round
+— no new bookkeeping source — and like the report file itself it is non-authoritative and never
+used for resume. While the cell dispatches only `contract` and `cold-exec` (the current two-lens
+Law 1), `cold-read`'s row legitimately shows zero dispatches — that is correct data, not a bug,
+unless and until a future card wires a second cold lens in. Its consumer is the Shaman, deciding
+from data after enough campaigns whether each seat earns its place: which lens finds, which lens
+confirms, which lens only echoes.
 
 **The fixer brief — a finding is a hypothesis, not an order.** A finding is a falsifiable claim, not
 an order — and your CONFIRMED disposition is a routing act, not proof. Never hand a fixer Hunter a
