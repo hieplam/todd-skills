@@ -1,0 +1,6 @@
+---
+target: c3-215
+scope: insert
+base: c3-215#n948@v1:sha256:d44689c13901dea14024127d4c6eae7c10cf134db7b1e3431d1e0880cd348366
+---
+| The skill resolves the runner to a wrong path, or a campaign starts on a machine that cannot finish it | Editing resolve-runner.sh, doctor.sh, or re-inlining runner resolution into SKILL.md as shell prose | Invisible on the author's machine, where `~/.claude/skills/orchestrate-campaign` always exists — this class needs a SECOND machine to appear. The original `readlink -f` fallback printed nothing and exited 1 when the skill was not installed there; `$()` discarded the exit code, `dirname ""` returned `.`, and it collapsed to `./scripts/runner` against the target repo. A moved repo was worse: readlink prints the deepest surviving ancestor, so the result was a confident WRONG absolute path | bash plugins/tribe/scripts/tests/test-fresh-machine.sh (throwaway HOME per probe — the isolation is load-bearing: without overriding HOME every probe reads the author's real install and passes against a broken resolver). Mutation-check any change: swap the old expression back in and confirm the harness FAILS, incl. `an empty HOME never yields the forbidden relative path` |
