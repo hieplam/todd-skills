@@ -134,28 +134,46 @@ and exit codes** — never by reading or naming its source files.
 skill can be triggered from ANY session (§O1), whose working directory is normally
 `<target-repo>` — the campaign you're running, not wherever this skill's own plugin happens to
 live. A bare relative script path only works by accident, when your shell's cwd happens to be
-this plugin's own repo; it fails everywhere else. Resolve the plugin's own root once, the same
-two-tier way this plugin's Shaman role resolves its own sibling scripts:
+this plugin's own repo; it fails everywhere else.
+
+**Do not hand-write the resolution — run the bundled resolver.** It ships beside this file, so
+`<skill-dir>` is the base directory announced when this skill loaded:
 
 ```sh
-runner_dir="${CLAUDE_PLUGIN_ROOT:-}/scripts/runner"
-[ -f "$runner_dir/run.ts" ] || runner_dir="$(dirname "$(dirname "$(readlink -f ~/.claude/skills/orchestrate-campaign)")")/scripts/runner"
+runner_dir="$(bash "<skill-dir>/resolve-runner.sh")" || exit 1
 ```
 
-- `$CLAUDE_PLUGIN_ROOT` is Claude Code's own plugin-root variable, set whenever this skill loads
-  as part of a native/marketplace-cached plugin install — `scripts/` always lands as a sibling of
-  `skills/` there.
-- The fallback walks the symlink a local install creates for THIS skill
-  (`~/.claude/skills/orchestrate-campaign`) back to the plugin repo, then up to the plugin root,
-  then into `scripts/runner` — covering the local symlink-install path.
-- **If neither yields an existing `$runner_dir/run.ts`, do not guess or fall back to a bare
-  relative path.** Ask the owner where this plugin is installed and use that instead — the same
-  discipline the Shaman role uses when it can't resolve its own heartbeat checker.
+- On success it prints the runner directory's **absolute** path and exits 0, having already proven
+  `run.ts` exists there. It checks `$CLAUDE_PLUGIN_ROOT` first (a native/marketplace-cached
+  install, where `scripts/` is a sibling of `skills/`), then locates itself through the symlink a
+  local install creates — covering both install shapes.
+- On failure it prints **nothing** to stdout and exits 3 with a named diagnostic on stderr. Take
+  that exit at face value: surface the diagnostic to the owner and stop. **Never substitute a
+  guess or a bare relative path** — that is the one failure this resolver exists to make
+  impossible, so re-introducing it by hand defeats the purpose.
+
+Why a script rather than a line of shell here: the expression this replaced failed *open*. On a
+machine where the skill was not installed under `~/.claude/skills`, `readlink -f` printed nothing
+and exited 1; `$(…)` swallowed the exit code, `dirname ""` returned `.`, and the whole thing
+collapsed to `./scripts/runner` — resolved against the target repo. `scripts/tests/test-fresh-machine.sh`
+holds that wall.
 
 This never touches your own working directory and never requires a `cd` — `--repo <target-repo>`
 (unchanged, below) is what points every run at its actual target; the runner sets its own `cwd`
 for every `git`/`gh` call from that flag, never from your shell's cwd. Use `$runner_dir/run.ts` as
 the script path in every invocation that follows.
+
+**Then preflight the machine — once per campaign, before the first real run.** The runner shells
+out to `bun` and `gh` and drives the Agent SDK; each is provisioned per machine, so a fresh clone
+can install cleanly and still fail hours into a run:
+
+```sh
+bash "$(dirname "$(dirname "$runner_dir")")/scripts/doctor.sh"
+```
+
+It exits 0 when every prerequisite is present, or exits 1 naming each gap and its remedy. On a
+non-zero exit, relay the gaps to the owner and stop — do not start a campaign on a machine that
+cannot finish it.
 
 1. **Always `--dry-run` first** — zero side effects (no lock acquired, nothing written, no
    session spawned). Sanity-check the derived next action before committing to a real run:
