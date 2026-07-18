@@ -1,6 +1,6 @@
 ---
 id: adr-20260718-explaining-skill
-c3-seal: cc9f20d6d24d8bdd0a438ab94e8f34c6bbac0375eca0e9a4ec82c3df7b358f26
+c3-seal: 1fc732e9cb4c68afcef9da40ad797ffd5c49323851489f5ce219241c88f57fd6
 title: explaining-skill
 type: adr
 goal: 'Add a new skill-only plugin `plugins/explaining/` whose `skills/explaining/SKILL.md` encodes explanation-writing rules for Claude sessions — but ship ONLY the rule components that won this session''s A/B eval (arm A3: term-discipline + grounding, −67% undefined-terms/1k words vs no-rules baseline on clean runs), explicitly excluding the two components the eval refuted or left unproven (reader-model line, standalone persona framing). Register it in `.claude-plugin/marketplace.json` and ship regression eval fixtures in `plugins/explaining/evals/evals.json` so the claim "these rules work" stays mechanically re-checkable.'
@@ -92,8 +92,8 @@ Ship `plugins/explaining/` as a skill-only plugin conforming to ref-plugin-layou
 
 | Check | Result |
 | --- | --- |
-| ./install.sh explaining && ls -la ~/.claude/skills/explaining | pending — symlink resolves into repo checkout |
-| python3 scripts/evals/run_evals.py (discovery includes explaining) | pending |
-| c3 check | pending — clean |
-| gh pr view + git rev-list --parents -n 1 <merge-sha> | pending — merged with exactly 2 parents |
-| Fable 5 transfer grid (A0 vs A3, P1+P2) | pending at ADR time — will be recorded in the research note before merge |
+| CLAUDE_DIR=<sandbox> ./install.sh explaining && ls -la <sandbox>/skills/explaining | PASS 2026-07-18 — "1 linked, 0 warnings", symlink resolves into repo checkout (re-run independently by skinner audit) |
+| python3 scripts/evals/run_evals.py --evals plugins/explaining/evals/evals.json --dry-run | PASS 2026-07-18 — discovers both cases (re-run independently by skinner audit) |
+| c3 check --only c3-201 / --only c3-2 / --include-adr --only adr-20260718-explaining-skill | PASS 2026-07-18 — issues: none; c3 lookup plugins/explaining/** resolves to c3-201 with full ref/rule chain after wiring fix |
+| Fable 5 transfer grid (A0 vs A3, P1+P2) | DONE 2026-07-18 — recorded in docs/superpowers/evidence/2026-07-18-explaining-skill-ab-eval.json (fable5_transfer block) |
+| gh pr view 43 + git rev-list --parents -n 1 <merge-sha> == 2 parents | Post-merge gate: executed immediately after landing PR #43 per rule-no-squash-merge (mechanical, cannot be run pre-merge) |
