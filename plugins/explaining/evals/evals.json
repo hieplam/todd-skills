@@ -1,0 +1,20 @@
+{
+  "skill_name": "explaining",
+  "kind": "skill",
+  "evals": [
+    {
+      "id": 1,
+      "name": "nats-jetstream-acks-terms-introduced-and-claims-grounded",
+      "prompt": "Explain how NATS JetStream consumer acknowledgment works and what happens when acks are late or missing.",
+      "expected_output": "Every technical term outside a senior backend developer's general baseline (e.g. ack floor, AckExplicit/AckAll/AckNone, ack wait, redelivery, MaxDeliver, WorkQueue semantics) gets a brief definition or lead-in sentence at its first use — no bare jargon drops mid-explanation. Abstract claims about delivery guarantees or failure behavior are anchored by a concrete example, config/code snippet, or verifiable fact rather than left as unanchored generalities; specifics the model cannot verify are marked as such instead of asserted.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "dotnet-channel-backpressure-terms-introduced-and-claims-grounded",
+      "prompt": "Explain backpressure in .NET Channel<T> and when bounded vs unbounded channels matter.",
+      "expected_output": "Every domain-specific term (e.g. backpressure, bounded/unbounded channel, BoundedChannelFullMode, WriteAsync suspension, rendezvous) is introduced with a short definition or contextual lead-in at first use. Abstract claims (e.g. about memory growth, producer/consumer speed mismatch, when bounding matters) are each paired with a code snippet or concrete worked example; the answer does not pad with definitions of things a senior .NET developer already knows (variables, async/await basics).",
+      "files": []
+    }
+  ]
+}

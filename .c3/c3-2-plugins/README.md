@@ -1,16 +1,16 @@
 ---
 id: c3-2
-c3-seal: 8a190221edc5b79ae23178efc979b2d37b6873f834e236222172c2daf7b5eb5a
+c3-seal: d3ae852a72c7c12d46dd83efcdc7c57cbf3ca3b28a89c459ac11b2d5437c23ea
 title: plugins
 type: container
 boundary: service
 parent: c3-0
-goal: 'Claude Code runtime content: the 8 installable plugins — agents and skills that, once symlinked into `~/.claude`, extend every Claude Code session with delivery orchestration (tribe), quality gates (check-diff-coverage, refactor-for-testability, verify-shipped), planning (splitting-plans), publishing (research-to-blog), observability (workflow-journal), and media production (simple-image-video).'
+goal: 'Claude Code runtime content: the 9 installable plugins — agents and skills that, once symlinked into `~/.claude`, extend every Claude Code session with delivery orchestration (tribe), quality gates (check-diff-coverage, refactor-for-testability, verify-shipped), planning (splitting-plans), publishing (research-to-blog), observability (workflow-journal), media production (simple-image-video), and evidence-gated explanation style (explaining).'
 ---
 
 ## Goal
 
-Claude Code runtime content: the 8 installable plugins — agents and skills that, once symlinked into `~/.claude`, extend every Claude Code session with delivery orchestration (tribe), quality gates (check-diff-coverage, refactor-for-testability, verify-shipped), planning (splitting-plans), publishing (research-to-blog), observability (workflow-journal), and media production (simple-image-video).
+Claude Code runtime content: the 9 installable plugins — agents and skills that, once symlinked into `~/.claude`, extend every Claude Code session with delivery orchestration (tribe), quality gates (check-diff-coverage, refactor-for-testability, verify-shipped), planning (splitting-plans), publishing (research-to-blog), observability (workflow-journal), media production (simple-image-video), and evidence-gated explanation style (explaining).
 
 ## Components
 
@@ -24,12 +24,13 @@ Claude Code runtime content: the 8 installable plugins — agents and skills tha
 | c3-215 | tribe | feature | active | 5-agent chain of command (Shaman/Warchief/Hunter + Tracker/Skinner gates) delivering squash-merged PRs with evidence |
 | c3-216 | simple-image-video | feature | active | Animates one still image into a seamlessly-looping music video via sine-driven Remotion effects |
 | c3-217 | verify-shipped | feature | active | Mechanically verifies the Definition of Done: PR merged via squash, master synced, worktree removed |
+| c3-201 | explaining | feature | active | Two eval-proven explanation-writing rules (term discipline + grounding); refuted rule candidates excluded by A/B data |
 
 ## Responsibilities
 
 - Each plugin conforms to the shared layout contract (`.claude-plugin/plugin.json` + `agents/` and/or `skills/<name>/SKILL.md`, optional `install.sh` hook, `claude-md/`, `scripts/`, `evals/`) so the installer can walk it without per-plugin logic.
 - Plugins own their business logic and runtime assets end-to-end (skill references, helper scripts, templates); nothing here runs at install time except declared `install.sh` hooks.
-- Plugins that ship `evals/evals.json` fixtures (splitting-plans, check-diff-coverage, refactor-for-testability, tribe) keep them in the shared fixture shape so the eval-harness container can benchmark them unmodified.
+- Plugins that ship `evals/evals.json` fixtures (splitting-plans, check-diff-coverage, refactor-for-testability, tribe, explaining) keep them in the shared fixture shape so the eval-harness container can benchmark them unmodified.
 - Cross-plugin contracts stay file-based: tribe writes roadmap/spec/plan/report files; verify-shipped checks git/GitHub state produced by tribe's Warchief — no plugin imports another's code.
 
 ## Complexity Assessment

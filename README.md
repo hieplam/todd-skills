@@ -51,6 +51,7 @@ them.
 | `verify-shipped` | skills | Mechanically verify a SHIPPED claim against GitHub and git. |
 | `workflow-journal` | skills | Render each Workflow run to a readable Markdown record. |
 | `simple-image-video` | skills | Animate a still image into a short video. |
+| `explaining` | skills | Two eval-proven writing rules (term discipline + grounding) for explanatory prose; refuted rule candidates excluded by A/B data. |
 
 ## The campaign runner (not installed — run it from a checkout)
 
