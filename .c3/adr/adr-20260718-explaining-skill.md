@@ -1,6 +1,6 @@
 ---
 id: adr-20260718-explaining-skill
-c3-seal: ce76784d30fc2ad80ade2f0c000d00f6dfda8c470be5328032e3d9a0727e4551
+c3-seal: cc9f20d6d24d8bdd0a438ab94e8f34c6bbac0375eca0e9a4ec82c3df7b358f26
 title: explaining-skill
 type: adr
 goal: 'Add a new skill-only plugin `plugins/explaining/` whose `skills/explaining/SKILL.md` encodes explanation-writing rules for Claude sessions — but ship ONLY the rule components that won this session''s A/B eval (arm A3: term-discipline + grounding, −67% undefined-terms/1k words vs no-rules baseline on clean runs), explicitly excluding the two components the eval refuted or left unproven (reader-model line, standalone persona framing). Register it in `.claude-plugin/marketplace.json` and ship regression eval fixtures in `plugins/explaining/evals/evals.json` so the claim "these rules work" stays mechanically re-checkable.'
@@ -53,7 +53,7 @@ Ship `plugins/explaining/` as a skill-only plugin conforming to ref-plugin-layou
 | plugins/explaining/evals/evals.json | 2 regression cases in shared fixture shape (skill_name, kind: skill, evals[].prompt/expected_output) using the eval's clean prompts P1/P2 | scripts/evals/run_evals.py discovers it |
 | .claude-plugin/marketplace.json | Append explaining entry | rule-marketplace-registration check |
 | README.md plugin table | Add row for explaining | diff |
-| .c3 docs | New component c3-218-explaining under c3-2; update c3-2 ## Components; wire component | c3 check clean |
+| .c3 docs | New component c3-201-explaining under c3-2; update c3-2 ## Components; wire component | c3 check clean |
 
 ## Underlay C3 Changes
 
@@ -67,7 +67,7 @@ Ship `plugins/explaining/` as a skill-only plugin conforming to ref-plugin-layou
 | --- | --- | --- |
 | ./install.sh --list | Lists explaining (skills: 1); install links ~/.claude/skills/explaining → repo | command output after implementation |
 | scripts/evals/run_evals.py | Discovers and can execute plugins/explaining/evals/evals.json in with/without-skill configurations | discovery run output |
-| c3 check | Validates c3-218 component doc + c3-2 container membership stay in sync | clean check |
+| c3 check | Validates c3-201 component doc + c3-2 container membership stay in sync | clean check |
 | GitHub PR merge | rule-no-squash-merge: merge commit has exactly 2 parents (git rev-list --parents -n 1 <sha>) | parent count check post-merge |
 
 ## Alternatives Considered
