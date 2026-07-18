@@ -1,0 +1,529 @@
+{
+ "artifact": "A/B eval of explanation-rule components backing the explaining skill (adr-20260718-explaining-skill)",
+ "date": "2026-07-18",
+ "method": {
+  "generation": "isolated `claude -p` per cell: scratch cwd, --setting-sources project, --strict-mcp-config; arm rule text via --append-system-prompt",
+  "arms": {
+   "A0": "no rules",
+   "A1": "Ground every claim with truth, code or fact.",
+   "A2": "term-discipline (define/lead-in at first use)",
+   "A3": "A1+A2",
+   "A4": "A3 + reader-model line"
+  },
+  "prompts": {
+   "P1": "NATS JetStream consumer acks",
+   "P2": ".NET Channel<T> backpressure",
+   "P3": "Claude API prompt caching (CONTAMINATED: triggered built-in claude-api skill in 10/10 runs; excluded from clean analysis)"
+  },
+  "grading": "blind (random IDs), Sonnet grader, count-based metrics; ~13% hand spot-check",
+  "metrics": {
+   "m1k": "undefined terms per 1k words (lower better)",
+   "m2": "grounded/total abstract claims (higher better)",
+   "m3": "over-explained baseline terms (lower better)"
+  }
+ },
+ "clean_summary_opus48_P1P2_n4_per_arm": {
+  "A0": {
+   "m1k": 12.18,
+   "m2": 0.38,
+   "m3": 0.25
+  },
+  "A1": {
+   "m1k": 11.17,
+   "m2": 0.44,
+   "m3": 0.25
+  },
+  "A2": {
+   "m1k": 5.41,
+   "m2": 0.43,
+   "m3": 1.25
+  },
+  "A3": {
+   "m1k": 4.06,
+   "m2": 0.47,
+   "m3": 0.75
+  },
+  "A4": {
+   "m1k": 10.04,
+   "m2": 0.42,
+   "m3": 0.75
+  }
+ },
+ "fable5_transfer_A0_vs_A3_P1P2_n4": {
+  "A0": {
+   "m1k": 8.92,
+   "m1k_std": 3.49,
+   "m2": 0.5,
+   "m3": 0.5
+  },
+  "A3": {
+   "m1k": 8.2,
+   "m1k_std": 1.34,
+   "m2": 0.52,
+   "m3": 0.75
+  },
+  "reading": "fable baseline already near rules' level; pair mainly narrows variance; no measured harm"
+ },
+ "decision": "ship A3 pair only; A4 reader-model refuted (m1k regressed, +18% words); persona framing excluded per arXiv 2311.10054",
+ "limits": "n=4/arm clean runs, directional; LLM grader over-counts fragments (spot-checked); P3 excluded",
+ "runs_main": [
+  {
+   "arm": "A2",
+   "prompt": "P1",
+   "rep": "r1",
+   "blind": "X1624",
+   "words": 879,
+   "m1": 2,
+   "m1k": 2.2753128555176336,
+   "m2": 0.22857142857142856,
+   "m3": 2,
+   "claims": "8/35"
+  },
+  {
+   "arm": "A4",
+   "prompt": "P1",
+   "rep": "r1",
+   "blind": "X1765",
+   "words": 844,
+   "m1": 7,
+   "m1k": 8.293838862559243,
+   "m2": 0.3333333333333333,
+   "m3": 0,
+   "claims": "15/45"
+  },
+  {
+   "arm": "A1",
+   "prompt": "P1",
+   "rep": "r2",
+   "blind": "X1819",
+   "words": 920,
+   "m1": 9,
+   "m1k": 9.782608695652174,
+   "m2": 0.125,
+   "m3": 1,
+   "claims": "4/32"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P1",
+   "rep": "r2",
+   "blind": "X2009",
+   "words": 842,
+   "m1": 9,
+   "m1k": 10.688836104513063,
+   "m2": 0.2647058823529412,
+   "m3": 0,
+   "claims": "9/34"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P3",
+   "rep": "r2",
+   "blind": "X2063",
+   "words": 615,
+   "m1": 8,
+   "m1k": 13.008130081300813,
+   "m2": 0.28,
+   "m3": 1,
+   "claims": "7/25"
+  },
+  {
+   "arm": "A2",
+   "prompt": "P2",
+   "rep": "r1",
+   "blind": "X2962",
+   "words": 794,
+   "m1": 4,
+   "m1k": 5.037783375314861,
+   "m2": 0.5294117647058824,
+   "m3": 0,
+   "claims": "18/34"
+  },
+  {
+   "arm": "A2",
+   "prompt": "P3",
+   "rep": "r1",
+   "blind": "X3013",
+   "words": 534,
+   "m1": 5,
+   "m1k": 9.363295880149813,
+   "m2": 0.125,
+   "m3": 1,
+   "claims": "2/16"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P3",
+   "rep": "r2",
+   "blind": "X3108",
+   "words": 825,
+   "m1": 6,
+   "m1k": 7.2727272727272725,
+   "m2": 0.46875,
+   "m3": 1,
+   "claims": "15/32"
+  },
+  {
+   "arm": "A1",
+   "prompt": "P3",
+   "rep": "r1",
+   "blind": "X3125",
+   "words": 688,
+   "m1": 10,
+   "m1k": 14.534883720930232,
+   "m2": 0.7307692307692307,
+   "m3": 0,
+   "claims": "19/26"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P3",
+   "rep": "r1",
+   "blind": "X3563",
+   "words": 286,
+   "m1": 9,
+   "m1k": 31.46853146853147,
+   "m2": 0.25,
+   "m3": 0,
+   "claims": "2/8"
+  },
+  {
+   "arm": "A1",
+   "prompt": "P2",
+   "rep": "r1",
+   "blind": "X3788",
+   "words": 781,
+   "m1": 6,
+   "m1k": 7.682458386683739,
+   "m2": 0.7368421052631579,
+   "m3": 0,
+   "claims": "14/19"
+  },
+  {
+   "arm": "A4",
+   "prompt": "P3",
+   "rep": "r1",
+   "blind": "X4529",
+   "words": 1088,
+   "m1": 12,
+   "m1k": 11.029411764705882,
+   "m2": 0.37209302325581395,
+   "m3": 1,
+   "claims": "16/43"
+  },
+  {
+   "arm": "A4",
+   "prompt": "P1",
+   "rep": "r2",
+   "blind": "X4703",
+   "words": 1113,
+   "m1": 7,
+   "m1k": 6.289308176100629,
+   "m2": 0.48936170212765956,
+   "m3": 0,
+   "claims": "23/47"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P2",
+   "rep": "r2",
+   "blind": "X4732",
+   "words": 888,
+   "m1": 0,
+   "m1k": 0.0,
+   "m2": 0.7142857142857143,
+   "m3": 0,
+   "claims": "20/28"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P2",
+   "rep": "r1",
+   "blind": "X4842",
+   "words": 776,
+   "m1": 3,
+   "m1k": 3.865979381443299,
+   "m2": 0.4666666666666667,
+   "m3": 0,
+   "claims": "14/30"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P2",
+   "rep": "r2",
+   "blind": "X5176",
+   "words": 727,
+   "m1": 6,
+   "m1k": 8.253094910591471,
+   "m2": 0.4666666666666667,
+   "m3": 0,
+   "claims": "14/30"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P1",
+   "rep": "r1",
+   "blind": "X6375",
+   "words": 765,
+   "m1": 14,
+   "m1k": 18.300653594771244,
+   "m2": 0.2727272727272727,
+   "m3": 0,
+   "claims": "12/44"
+  },
+  {
+   "arm": "A1",
+   "prompt": "P1",
+   "rep": "r1",
+   "blind": "X6700",
+   "words": 762,
+   "m1": 17,
+   "m1k": 22.30971128608924,
+   "m2": 0.1935483870967742,
+   "m3": 0,
+   "claims": "6/31"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P3",
+   "rep": "r1",
+   "blind": "X6959",
+   "words": 587,
+   "m1": 14,
+   "m1k": 23.85008517887564,
+   "m2": 0.6666666666666666,
+   "m3": 1,
+   "claims": "18/27"
+  },
+  {
+   "arm": "A4",
+   "prompt": "P3",
+   "rep": "r2",
+   "blind": "X7157",
+   "words": 337,
+   "m1": 7,
+   "m1k": 20.771513353115726,
+   "m2": 0.1,
+   "m3": 0,
+   "claims": "1/10"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P1",
+   "rep": "r1",
+   "blind": "X7191",
+   "words": 1043,
+   "m1": 5,
+   "m1k": 4.793863854266539,
+   "m2": 0.2727272727272727,
+   "m3": 2,
+   "claims": "9/33"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P2",
+   "rep": "r1",
+   "blind": "X7205",
+   "words": 957,
+   "m1": 11,
+   "m1k": 11.494252873563218,
+   "m2": 0.5,
+   "m3": 1,
+   "claims": "14/28"
+  },
+  {
+   "arm": "A2",
+   "prompt": "P2",
+   "rep": "r2",
+   "blind": "X7614",
+   "words": 641,
+   "m1": 6,
+   "m1k": 9.360374414976599,
+   "m2": 0.7666666666666667,
+   "m3": 0,
+   "claims": "23/30"
+  },
+  {
+   "arm": "A2",
+   "prompt": "P1",
+   "rep": "r2",
+   "blind": "X8231",
+   "words": 806,
+   "m1": 4,
+   "m1k": 4.962779156327543,
+   "m2": 0.1891891891891892,
+   "m3": 3,
+   "claims": "7/37"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P1",
+   "rep": "r2",
+   "blind": "X8421",
+   "words": 924,
+   "m1": 7,
+   "m1k": 7.575757575757576,
+   "m2": 0.4166666666666667,
+   "m3": 1,
+   "claims": "15/36"
+  },
+  {
+   "arm": "A2",
+   "prompt": "P3",
+   "rep": "r2",
+   "blind": "X8528",
+   "words": 668,
+   "m1": 6,
+   "m1k": 8.982035928143713,
+   "m2": 0.2857142857142857,
+   "m3": 2,
+   "claims": "6/21"
+  },
+  {
+   "arm": "A1",
+   "prompt": "P2",
+   "rep": "r2",
+   "blind": "X8549",
+   "words": 815,
+   "m1": 4,
+   "m1k": 4.9079754601226995,
+   "m2": 0.696969696969697,
+   "m3": 0,
+   "claims": "23/33"
+  },
+  {
+   "arm": "A4",
+   "prompt": "P2",
+   "rep": "r2",
+   "blind": "X9002",
+   "words": 1053,
+   "m1": 17,
+   "m1k": 16.144349477682812,
+   "m2": 0.358974358974359,
+   "m3": 1,
+   "claims": "14/39"
+  },
+  {
+   "arm": "A1",
+   "prompt": "P3",
+   "rep": "r2",
+   "blind": "X9688",
+   "words": 576,
+   "m1": 6,
+   "m1k": 10.416666666666666,
+   "m2": 0.32,
+   "m3": 2,
+   "claims": "8/25"
+  },
+  {
+   "arm": "A4",
+   "prompt": "P2",
+   "rep": "r1",
+   "blind": "X9782",
+   "words": 1273,
+   "m1": 12,
+   "m1k": 9.426551453260016,
+   "m2": 0.5098039215686274,
+   "m3": 2,
+   "claims": "26/51"
+  }
+ ],
+ "runs_fable": [
+  {
+   "arm": "A3",
+   "prompt": "P1",
+   "rep": "r1",
+   "blind": "F3409",
+   "words": 723,
+   "m1": 7,
+   "m1k": 9.681881051175658,
+   "m2": 0.34782608695652173,
+   "m3": 0,
+   "claims": "8/23"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P2",
+   "rep": "r2",
+   "blind": "F6058",
+   "words": 627,
+   "m1": 6,
+   "m1k": 9.569377990430622,
+   "m2": 0.7894736842105263,
+   "m3": 0,
+   "claims": "15/19"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P2",
+   "rep": "r2",
+   "blind": "F6568",
+   "words": 667,
+   "m1": 6,
+   "m1k": 8.995502248875562,
+   "m2": 0.8181818181818182,
+   "m3": 1,
+   "claims": "18/22"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P1",
+   "rep": "r2",
+   "blind": "F7691",
+   "words": 708,
+   "m1": 5,
+   "m1k": 7.062146892655367,
+   "m2": 0.2222222222222222,
+   "m3": 1,
+   "claims": "8/36"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P2",
+   "rep": "r1",
+   "blind": "F7794",
+   "words": 716,
+   "m1": 3,
+   "m1k": 4.189944134078212,
+   "m2": 0.7083333333333334,
+   "m3": 1,
+   "claims": "17/24"
+  },
+  {
+   "arm": "A3",
+   "prompt": "P2",
+   "rep": "r1",
+   "blind": "F7835",
+   "words": 849,
+   "m1": 6,
+   "m1k": 7.067137809187279,
+   "m2": 0.7096774193548387,
+   "m3": 1,
+   "claims": "22/31"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P1",
+   "rep": "r1",
+   "blind": "F8372",
+   "words": 634,
+   "m1": 8,
+   "m1k": 12.618296529968454,
+   "m2": 0.3103448275862069,
+   "m3": 0,
+   "claims": "9/29"
+  },
+  {
+   "arm": "A0",
+   "prompt": "P1",
+   "rep": "r2",
+   "blind": "F9344",
+   "words": 751,
+   "m1": 7,
+   "m1k": 9.320905459387484,
+   "m2": 0.17647058823529413,
+   "m3": 1,
+   "claims": "6/34"
+  }
+ ]
+}
