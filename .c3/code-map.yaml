@@ -1,6 +1,8 @@
 c3-101:
   - .claude-plugin/**
   - install.sh
+c3-201:
+  - plugins/explaining/**
 c3-210:
   - plugins/splitting-plans/**
 c3-211:
