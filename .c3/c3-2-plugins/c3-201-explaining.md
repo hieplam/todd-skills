@@ -1,11 +1,16 @@
 ---
 id: c3-201
-c3-seal: 97ee5a661544c2a6d696b63a7fcc80ed4a0ce2b3c670b01347c873dcf7462d9d
+c3-seal: e7e3703ddf7d97875573467802185c2ecd274b5e782ae4e67a7aec3464b781d5
 title: explaining
 type: component
-category: foundation
+category: feature
 parent: c3-2
 goal: 'Ship the `explaining` skill: two explanation-writing rules (term discipline + grounding) whose retention is gated on A/B eval numbers, installable as a skill-only plugin so every Claude Code session writes explanatory prose a context-less reader can follow.'
+uses:
+    - ref-docs-lifecycle
+    - ref-evals-fixture
+    - ref-plugin-layout
+    - rule-marketplace-registration
 ---
 
 ## Goal
@@ -48,6 +53,8 @@ Owns the `explaining` skill definition (`skills/explaining/SKILL.md`) and its re
 | Reference | Type | Governs | Precedence | Notes |
 | --- | --- | --- | --- | --- |
 | ref-plugin-layout | ref | Directory shape (.claude-plugin/plugin.json, skills/, evals/) | container ref | complied |
+| ref-evals-fixture | ref | evals/evals.json shared fixture shape (skill_name/kind/evals[].id/name/prompt/expected_output/files, prose rubric) | container ref | complied |
+| ref-docs-lifecycle | ref | Dated eval-evidence artifact docs/superpowers/evidence/2026-07-18-explaining-skill-ab-eval.json | repo ref | complied |
 | rule-marketplace-registration | rule | Marketplace entry, same commit as plugin dir | repo rule | complied |
 | adr-20260718-explaining-skill | adr | Which rules ship and why; eval evidence bounds | work order | source of the rule-selection decision |
 
