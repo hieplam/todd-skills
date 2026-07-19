@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-19-tribe-local-progress-home-design.md`
 
+## Delivery status (owner decision, 2026-07-19)
+
+This PR delivers **Tasks 1–5** (the feature + tests). **Task 6 (the C3 ADR + `ref-docs-lifecycle`
+update) is DEFERRED**: a `c3x` serializer bug corrupts unrelated entities (drops inline-code
+backticks, truncates table cells at `|`) on any write op, so updating the C3 docs via the CLI is
+unsafe until that upstream tool is fixed. Root cause is recorded for follow-up. **Task 7 (rollout)**
+is a one-time operation run at/after merge, not code.
+
 ## Global Constraints
 
 - Every `.sh` file starts with `set -euo pipefail` (`rule-bash-strict-mode`, all 14 tracked scripts).
