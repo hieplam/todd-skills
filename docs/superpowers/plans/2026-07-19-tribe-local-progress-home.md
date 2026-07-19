@@ -222,7 +222,7 @@ git commit -m "feat(tribe): resume-check reads state from ~/.tribe home, falls b
 - Consumes: `tribe_home` from Task 1.
 - Produces: `migrate-state.sh [repo-dir]` that (1) copies `docs/tribe/state/*.md` from every worktree into `<home>/state/`, (2) ensures `docs/tribe/state/` is in `.gitignore`, (3) `git rm -r --cached docs/tribe/state/`, (4) prints a summary. Idempotent: re-running copies nothing new and does not double-add the gitignore line. Does NOT auto-commit (prints the commit command).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```bash
 #!/usr/bin/env bash
@@ -258,12 +258,12 @@ check "gitignore line not duplicated" "$n" "1"
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"; [[ "$FAIL" -eq 0 ]]
 ```
 
-- [ ] **Step 2: Run, verify fail**
+- [x] **Step 2: Run, verify fail**
 
 Run: `bash plugins/tribe/scripts/tests/test-migrate-state.sh`
 Expected: FAIL — script missing.
 
-- [ ] **Step 3: Write `migrate-state.sh`**
+- [x] **Step 3: Write `migrate-state.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -298,12 +298,12 @@ echo "migrate-state: copied $copied file(s) to $HOME_DIR/state"
 echo "next: git -C '$REPO' add .gitignore && git -C '$REPO' commit -m 'chore(tribe): stop tracking operational state (moved to ~/.tribe)'"
 ```
 
-- [ ] **Step 4: Run, verify pass**
+- [x] **Step 4: Run, verify pass**
 
 Run: `bash plugins/tribe/scripts/tests/test-migrate-state.sh`
 Expected: `5 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/migrate-state.sh plugins/tribe/scripts/tests/test-migrate-state.sh
