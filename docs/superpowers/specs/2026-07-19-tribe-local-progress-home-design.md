@@ -161,7 +161,7 @@ branch feat/idea-01   branch feat/idea-02   branch feat/idea-03
 
 ## Touchpoints
 
-- **New:** `plugins/tribe/scripts/tribe-home.sh`, `plugins/tribe/scripts/migrate-state.sh`.
+- **New:** `plugins/tribe/scripts/tribe-home.sh`, `plugins/tribe/scripts/migrate-state.sh`, `plugins/tribe/scripts/archive-card.sh`.
 - **Edit:** `plugins/tribe/scripts/resume-check.sh`; `plugins/tribe/agents/warchief.md`,
   `shaman.md`, `hunter.md`; `plugins/tribe/README.md` (document `~/.tribe/`); repo `.gitignore`.
 - **Tests:** `test-resume-check.sh` (home model + fallback), `test-disagreement-routing.sh`,
