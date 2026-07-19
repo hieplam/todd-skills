@@ -124,7 +124,7 @@ git commit -m "feat(tribe): add tribe-home.sh — per-repo local progress home p
 - Consumes: `tribe_home` from Task 1.
 - Produces: unchanged JSON shape on stdout (`cards[]`, `orphaned_cards[]`). New behavior: cards are discovered from `<home>/state/*.md`; if that dir is empty/absent, discovery falls back to the current per-worktree `docs/tribe/state/` scan.
 
-- [ ] **Step 1: Write the failing tests** (append two cases to `test-resume-check.sh`)
+- [x] **Step 1: Write the failing tests** (append two cases to `test-resume-check.sh`)
 
 Add near the other scenario blocks. First make the whole suite home-safe by exporting a fake HOME at the top (after `trap`): `export HOME="$TMP/home"; mkdir -p "$HOME"`. Then:
 
@@ -147,12 +147,12 @@ run_check "$TMP/fb.json" "$repo2"                      # home/state absent for r
 check "fallback discovers in-repo card" "$(jget "$TMP/fb.json" cards.0.card)" "idea-fb"
 ```
 
-- [ ] **Step 2: Run the tests, verify the new cases fail**
+- [x] **Step 2: Run the tests, verify the new cases fail**
 
 Run: `bash plugins/tribe/scripts/tests/test-resume-check.sh`
 Expected: the two new `check` lines print `not ok` (home discovery not implemented; `cards.0.card` is `MISSING`). Pre-existing cases still `ok`.
 
-- [ ] **Step 3: Implement home discovery + fallback**
+- [x] **Step 3: Implement home discovery + fallback**
 
 In `resume-check.sh`, before the `python3` heredoc call (around `:47`), compute the home and pass it in:
 
@@ -198,12 +198,12 @@ for state_dir, name in state_files():
 
 Keep the orphan-recovery block (`:251-275`) as-is — it already recovers a branch by scanning `git cat-file` for committed state, which still serves the fallback path.
 
-- [ ] **Step 4: Run the full suite, verify green**
+- [x] **Step 4: Run the full suite, verify green**
 
 Run: `bash plugins/tribe/scripts/tests/test-resume-check.sh`
 Expected: `N passed, 0 failed` (all pre-existing cases plus the two new ones).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/resume-check.sh plugins/tribe/scripts/tests/test-resume-check.sh

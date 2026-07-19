@@ -45,11 +45,13 @@ REPO_ROOT="${REPO_ROOT:-$PWD}"
 git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 || DIE "not a git repository: $REPO_ROOT"
 command -v python3 >/dev/null 2>&1 || DIE "python3 is required but not on PATH"
 
-python3 - "$REPO_ROOT" "$ROADMAP" <<'PY'
+HOME_DIR="$("$(dirname "$0")/tribe-home.sh" "$REPO_ROOT" 2>/dev/null || true)"
+python3 - "$REPO_ROOT" "$ROADMAP" "${HOME_DIR:-}" <<'PY'
 import json, os, re, shutil, subprocess, sys
 from datetime import datetime, timezone
 
 repo_root, roadmap_arg = sys.argv[1], sys.argv[2]
+home_dir = sys.argv[3] if len(sys.argv) > 3 else ""
 GH = os.environ.get("RESUME_CHECK_GH", "gh")
 
 STATE_HEADER_RE = re.compile(r"^#\s*tribe-state:\s*(\S+)")
@@ -210,43 +212,53 @@ def next_action(card):
         return "RESUME_DELIVERY"
     return f"CONTINUE task {card['last_completed_task'] + 1}"
 
+def state_files():
+    # (state_dir, filename) pairs. Prefer the local home; fall back to the
+    # in-repo per-worktree scan when the home has no state yet (un-migrated repo).
+    home_state = os.path.join(home_dir, "state") if home_dir else ""
+    if home_state and os.path.isdir(home_state):
+        names = [n for n in sorted(os.listdir(home_state)) if n.endswith(".md")]
+        if names:
+            return [(home_state, n) for n in names]
+    out = []
+    for wt in list_worktrees(repo_root):
+        sd = os.path.join(wt["path"], "docs", "tribe", "state")
+        if os.path.isdir(sd):
+            out += [(sd, n) for n in sorted(os.listdir(sd)) if n.endswith(".md")]
+    return out
+
 cards, discovered = [], set()
-for wt in list_worktrees(repo_root):
-    state_dir = os.path.join(wt["path"], "docs", "tribe", "state")
-    if not os.path.isdir(state_dir):
+for state_dir, name in state_files():
+    state = parse_state_file(os.path.join(state_dir, name))
+    if state is None:
         continue
-    for name in sorted(os.listdir(state_dir)):
-        if not name.endswith(".md"):
-            continue
-        state = parse_state_file(os.path.join(state_dir, name))
-        if state is None:
-            continue
-        f = state["fields"]
-        trailer_last = trailer_progress(wt["path"], f.get("base-sha"))
-        cb_prefix, total, plan_exists = plan_checkbox_progress(wt["path"], f.get("plan"))
-        inconsistencies = []
-        if plan_exists and cb_prefix != trailer_last:
-            inconsistencies.append(
-                f"plan checkboxes show {cb_prefix} completed task(s) but git trailers show "
-                f"{trailer_last} — git wins; correct the checkboxes before proceeding")
-        card = {
-            "card": state["slug"],
-            "worktree": wt["path"],
-            "branch": wt["branch"],
-            "plan": f.get("plan"),
-            "state_file": os.path.join("docs", "tribe", "state", name),
-            "milestones": state["milestones"],
-            "last_completed_task": trailer_last,
-            "total_tasks": total,
-            "dirty": is_dirty(wt["path"]),
-            "mid_merge": mid_merge(wt["path"]),
-            "pushed": pushed(wt["path"]),
-            "delivery": delivery_status(wt["path"]),
-            "inconsistencies": inconsistencies,
-        }
-        card["next_action"] = next_action(card)
-        cards.append(card)
-        discovered.add(state["slug"])
+    f = state["fields"]
+    wt_path = f.get("worktree", repo_root)   # state file carries its own worktree
+    trailer_last = trailer_progress(wt_path, f.get("base-sha"))
+    cb_prefix, total, plan_exists = plan_checkbox_progress(wt_path, f.get("plan"))
+    inconsistencies = []
+    if plan_exists and cb_prefix != trailer_last:
+        inconsistencies.append(
+            f"plan checkboxes show {cb_prefix} completed task(s) but git trailers show "
+            f"{trailer_last} — git wins; correct the checkboxes before proceeding")
+    card = {
+        "card": state["slug"],
+        "worktree": wt_path,
+        "branch": f.get("branch"),
+        "plan": f.get("plan"),
+        "state_file": os.path.join(state_dir, name),
+        "milestones": state["milestones"],
+        "last_completed_task": trailer_last,
+        "total_tasks": total,
+        "dirty": is_dirty(wt_path),
+        "mid_merge": mid_merge(wt_path),
+        "pushed": pushed(wt_path),
+        "delivery": delivery_status(wt_path),
+        "inconsistencies": inconsistencies,
+    }
+    card["next_action"] = next_action(card)
+    cards.append(card)
+    discovered.add(state["slug"])
 
 orphans = []
 roadmap_path = roadmap_arg or os.path.join(repo_root, "docs", "ROADMAP.md")
