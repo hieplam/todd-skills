@@ -150,16 +150,21 @@ The report file above is a heartbeat for *liveness*; committed state is the memo
 git commit**, so a crash can never separate them — and anything uncommitted is *defined*
 as never having happened.
 
-- **Create the state file at intake.** `docs/tribe/state/CARD-SLUG.md` in your worktree,
-  committed before spec work starts, in this exact shape (resume-check.sh parses it —
-  replace the capitalized tokens, keep the field names):
+- **Create the state file at intake.** At `<home>/state/CARD-SLUG.md`, where `<home>` is
+  `$(bash "$dir/tribe-home.sh")` (resolved via the same
+  `dir="${CLAUDE_PLUGIN_ROOT:-}/scripts"; [ -f "$dir/tribe-home.sh" ] || dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts"`
+  pattern already used for `heartbeat-check.sh`). Create the dir with
+  `mkdir -p "<home>/state"` before writing. The file is **not committed** to the repo —
+  it lives only in `~/.tribe/<key>/state/`. Write it before spec work starts, in this
+  exact shape (resume-check.sh parses it — replace the capitalized tokens, keep the
+  field names):
 
   ```markdown
   # tribe-state: CARD-SLUG
   roadmap: ROADMAP-PATH
   worktree: ABSOLUTE-WORKTREE-PATH
   branch: BRANCH-NAME
-  report: REPORT-FILE-PATH
+  report: HOME/reports/CARD-SLUG.md
   base-sha: SHA
   plan: PLAN-PATH-RELATIVE-TO-WORKTREE
 
@@ -202,7 +207,9 @@ as never having happened.
   - `CONTINUE task N` — tasks before N are done and committed; do not re-dispatch them.
   - `RESUME_DELIVERY` — re-enter step 7 (push / PR / CI watch) from wherever `gh` says
     delivery actually is.
-  - `VERIFY_SHIPPED` — the PR already merged; skip to step 8 and close out.
+  - `VERIFY_SHIPPED` — the PR already merged; run
+    `bash "$dir/archive-card.sh" CARD-SLUG` (resolved via the same scripts-dir pattern)
+    to archive the card's state, then skip to step 8 and close out.
   Never re-derive progress from prose, memory, or the report file — the script's
   reconciliation of trailers, checkboxes, and state file is the single source of resume
   truth (the report file stays what it is: a liveness heartbeat).
@@ -536,10 +543,12 @@ commands to understand the code and to falsify its own hypotheses. What it is de
 statement of what the code was *supposed* to do.
 
 **The cold lens's diff is path-scoped, not just its brief.** Build it with an explicit exclusion
-list covering, at minimum, `docs/tribe/planning/`, `docs/tribe/state/`, and any file that is a
+list covering, at minimum, `docs/tribe/planning/`, and any file that is a
 committed contract document for the card under audit — the tribe's specs, plans, and idea cards
 live in-repo, so an un-scoped full-range diff hands the cold lens the contract exactly as
-effectively as putting it in the brief would (the forbidden-channel table above names this). The
+effectively as putting it in the brief would (the forbidden-channel table above names this).
+(`docs/tribe/state/` is no longer committed — state lives in `~/.tribe/<key>/state/` — so it
+is excluded from diffs automatically.) The
 **contract lens's diff stays full-range**: it already holds the contract, so narrowing it would
 only blind the conformance check, never protect anything.
 
@@ -780,7 +789,7 @@ evaluation order fire early?), the dispute has a mechanical oracle. Dispatch **o
 and take the **majority direction** across the three independent samples.
 
 **Before dispatching C, WRITE AND COMMIT the finding key under a `## Tie-breaks spent` heading in
-the card's state file** (`docs/tribe/state/CARD-SLUG.md`) — **the heading records key PLUS STATUS,
+the card's state file** (`~/.tribe/<key>/state/CARD-SLUG.md`) — **the heading records key PLUS STATUS,
 never a bare key** (W15): the line format is **`<finding-key>: dispatched`**,
 one status line per event, appended, never overwritten — the same
 commit-before-act discipline as D12a: a record is an artifact, not a claim. That write is what
@@ -999,7 +1008,7 @@ trail** of a finding's whole history — and it is **explicitly NON-AUTHORITATIV
 one-tie-break-per-key cap: per the crash-safe-resume doctrine above, anything not git-committed is
 defined as never having happened, and the report file is never committed mid-round. The
 **authoritative, crash-safe record that a finding key has spent its tie-break lives in the card's
-state file** (`docs/tribe/state/CARD-SLUG.md`, already the tribe's one sanctioned resume artifact)
+state file** (`~/.tribe/<key>/state/CARD-SLUG.md`, already the tribe's one sanctioned resume artifact)
 under its `## Tie-breaks spent` heading — written and committed before the tie-break Skinner is
 dispatched, per rung 2 above, exactly as the doctrine's commit-before-act discipline already
 requires. An audit round is otherwise idempotent — the diff is unchanged, so any audit round that

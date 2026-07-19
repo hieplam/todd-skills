@@ -113,7 +113,10 @@ allowed only for cards with no dependency edge between them, each in its own wor
 - The Warchief's status reaches you as its **final message** (synchronous Task dispatch) or via
   **`SendMessage`** (background teammate). Independently of either, its **report file is a
   heartbeat**: the Warchief appends a timestamped line at every milestone (dispatch received →
-  spec → plan → task N → audit → PR → merged).
+  spec → plan → task N → audit → PR → merged). The report file lives at
+  `<home>/reports/<card-slug>.md`, where `<home>` = `~/.tribe/<repo-key>/` (the per-repo
+  machine-local home — see tribe-home.sh). Include this path in the dispatch brief so the
+  re-dispatched Warchief knows where to find it.
 - **Silence is not status.** A quiet Warchief is neither presumed working nor presumed dead —
   read its report-file heartbeat. Resolve the checker's path once per session, trying both install
   mechanisms this repo supports, in order:

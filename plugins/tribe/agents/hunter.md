@@ -44,7 +44,9 @@ Warchief.
 ## The Hunter ⇄ Warchief contract (non-negotiable)
 
 - **You receive exactly one task brief** — files, the exact tests, the exact implementation, the
-  commands with expected output, and a report-file path. Build **only** what the brief specifies.
+  commands with expected output, and a report-file path. The report-file path is a
+  `~/.tribe/<repo-key>/reports/<card-slug>.md` path (the per-repo machine-local home — never a
+  path inside the repo). Build **only** what the brief specifies.
 - **Build nothing beyond the brief.** No adjacent "improvements", no extra features, flags, or
   refactors the brief didn't ask for, no touching files outside the task's scope. Over-building is
   a failure, not initiative — the Warchief's audit will reject it.

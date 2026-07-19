@@ -5,6 +5,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="$HERE/../resume-check.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+export HOME="$TMP/home"; mkdir -p "$HOME"
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf 'ok - %s\n' "$1"; }
 bad() { FAIL=$((FAIL+1)); printf 'not ok - %s\n' "$1"; }
@@ -252,6 +253,23 @@ echo "post-task junk" >> "$WT6/src.txt"
 run_check "$TMP/out19.json" "$R6"
 check "post-completion dirt discards and resumes delivery" "$(jget "$TMP/out19.json" cards.0.next_action)" "DISCARD_AND_RESUME_DELIVERY"
 git_c "$WT6" checkout -q -- .
+
+# --- home-dir discovery: state lives in ~/.tribe/<key>/state, not the worktree ---
+repo="$TMP/home-repo"; new_repo "$repo"
+wt="$(new_card_worktree "$repo" idea-home)"          # writes state INTO the worktree
+home="$(bash "$HERE/../tribe-home.sh" "$repo")"
+mkdir -p "$home/state"
+mv "$wt/docs/tribe/state/idea-home.md" "$home/state/idea-home.md"
+git_c "$wt" rm -q --cached docs/tribe/state/idea-home.md
+git_c "$wt" commit -qm "chore: de-track state (migrated to home)"
+run_check "$TMP/home.json" "$repo"
+check "home-dir card discovered" "$(jget "$TMP/home.json" cards.0.card)" "idea-home"
+
+# --- fallback: no home state → old in-repo scan still resumes ---
+repo2="$TMP/fb-repo"; new_repo "$repo2"
+new_card_worktree "$repo2" idea-fb >/dev/null        # state stays committed in worktree
+run_check "$TMP/fb.json" "$repo2"                      # home/state absent for repo2
+check "fallback discovers in-repo card" "$(jget "$TMP/fb.json" cards.0.card)" "idea-fb"
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

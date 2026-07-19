@@ -298,8 +298,8 @@ fi
 # assertion (verified by mutation, see Hunter report).
 has "a: cold diff is path-scoped"              "$STEP6" \
     'cold lens.s diff is path-scoped, not just its brief'
-has "a: planning and state dirs excluded"      "$STEP6" \
-    'covering, at minimum,.{0,10}docs/tribe/planning.{0,40}docs/tribe/state'
+has "a: planning dir excluded"                 "$STEP6" \
+    'covering, at minimum,.{0,10}docs/tribe/planning'
 has "a: unscoped range is a forbidden channel" "$STEP6" \
     'un-scoped full-range diff.{0,80}(range|diff) hands the cold lens the contract'
 has "a: contract lens diff stays full-range"   "$STEP6" \
