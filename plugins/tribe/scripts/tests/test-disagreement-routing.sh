@@ -740,7 +740,7 @@ has 'classes are re-derivable from the diff, but spent tie-break history is not 
 # resume-check.sh says REVERT_AND_REDO; the round's work is discarded and "never happened" -- but
 # the report-file ledger still claims the key's tie-break is spent, so the resumed Warchief
 # escalates to a human instead of ever retrying the mechanical oracle. D18 (Shaman ruling) settles
-# it: the AUTHORITATIVE record moves to the card's STATE FILE (docs/tribe/state/CARD-SLUG.md,
+# it: the AUTHORITATIVE record moves to the card's STATE FILE (~/.tribe/<key>/state/CARD-SLUG.md,
 # already the tribe's one sanctioned resume artifact), written and committed BEFORE the tie-break
 # Skinner is dispatched -- the same commit-before-act discipline as D12a. The report-file ledger
 # keeps its TIEBREAK row as the human-readable audit trail, EXPLICITLY NON-AUTHORITATIVE for the
@@ -817,7 +817,7 @@ has 'the reconciliation clause: uncommitted is never-happened, and the report fi
 # gaps 1 char each; `.{0,40}` keeps 39 chars of headroom on each).
 has 'the state file is the authoritative crash-safe record, the tribes one sanctioned resume artifact' \
     "$STEP6" \
-    'authoritative, crash-safe record that a finding key has.{0,40}spent its.{0,40}tie-break lives in the card.s state file.{0,40}docs/tribe/state/CARD-SLUG.md.{0,40}already the tribe.s one sanctioned resume artifact'
+    'authoritative, crash-safe record that a finding key has.{0,40}spent its.{0,40}tie-break lives in the card.s state file.{0,40}~/.tribe/<key>/state/CARD-SLUG.md.{0,40}already the tribe.s one sanctioned resume artifact'
 
 # ...and it is written and committed BEFORE the tie-break Skinner is dispatched, per rung 2 above
 # -- the Shaman's one binding requirement from D18. Actual gaps 3, 2 chars; `.{0,40}` keeps >=36

@@ -148,4 +148,38 @@ semantics, escalation workflow, and known limitations.
 
 ---
 
+## Local operational home
+
+The tribe stores its per-campaign **operational state** in a machine-local directory keyed to the
+repo — never committed:
+
+```
+~/.tribe/<repo-key>/
+├── state/      # in-flight per-card resume records (written at intake, read by resume-check.sh)
+│   └── <card-slug>.md
+├── archive/    # shipped cards, moved here on VERIFY_SHIPPED (by archive-card.sh)
+│   └── <card-slug>.md
+└── reports/    # Warchief heartbeat/report files
+    └── <card-slug>.md
+```
+
+`<repo-key>` = the canonical main-worktree path with `/` → `-` (e.g.
+`-Users-home-repos-todd-skills`). All linked worktrees of one repo share the same key and
+therefore the same home. Derive it via `bash plugins/tribe/scripts/tribe-home.sh [repo-dir]`.
+
+**What lives here vs. in `docs/tribe/`:**
+- `~/.tribe/<key>/` — operational runtime data (resume state, reports). Machine-local, never
+  committed to git.
+- `docs/tribe/` — durable contracts (specs, plans, Decision Log, ideas, `ROADMAP.md`). Always
+  committed, always in source control.
+
+To migrate an existing repo's committed `docs/tribe/state/*.md` to the home:
+
+```sh
+bash plugins/tribe/scripts/migrate-state.sh [repo-dir]
+# then commit the resulting .gitignore change
+```
+
+---
+
 *Plugin: `tribe` — Shaman · Warchief · Hunter · Tracker · Skinner*

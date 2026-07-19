@@ -390,32 +390,32 @@ git commit -m "feat(tribe): add archive-card.sh — archive state on VERIFY_SHIP
 **Interfaces:**
 - Consumes: the home concept + `tribe-home.sh` (agents call it to resolve `<home>` for the state/report paths).
 
-- [ ] **Step 1: Update the phrasing assertions to expect the home path (make them fail first)**
+- [x] **Step 1: Update the phrasing assertions to expect the home path (make them fail first)**
 
 In `test-disagreement-routing.sh:820` and `:743`, and `test-review-cell-v3.sh:302`, change the expected regex from `docs/tribe/state/CARD-SLUG.md` to the new convention, e.g. `~/.tribe/<key>/state/CARD-SLUG.md` (match the exact wording you will write into `warchief.md` in Step 3). Run the two suites; they now FAIL because `warchief.md` still says the old path.
 
 Run: `bash plugins/tribe/scripts/tests/test-disagreement-routing.sh; bash plugins/tribe/scripts/tests/test-review-cell-v3.sh`
 Expected: the retargeted assertions print `not ok`.
 
-- [ ] **Step 2: Update `warchief.md`**
+- [x] **Step 2: Update `warchief.md`**
 
 - `:153` intake: state file is created at `<home>/state/CARD-SLUG.md`, where `<home>` is `$(bash "$dir/tribe-home.sh")` resolved via the same `${CLAUDE_PLUGIN_ROOT:-}/scripts` pattern already used for `heartbeat-check.sh`/`validate-plan.sh` (`:126`, `:327`). Add a one-line `mkdir -p "<home>/state"`.
 - `:783`, `:1002` and the disagreement-routing clauses: replace `docs/tribe/state/CARD-SLUG.md` with `~/.tribe/<key>/state/CARD-SLUG.md` (the local, un-committed resume artifact).
 - Report path convention: reports live at `<home>/reports/<card>.md`.
 - On delivery close (VERIFY_SHIPPED), the Warchief runs `archive-card.sh <slug>` (resolved via the same scripts-dir pattern).
 
-- [ ] **Step 3: Update `shaman.md` + `hunter.md` + `README.md`**
+- [x] **Step 3: Update `shaman.md` + `hunter.md` + `README.md`**
 
 - `shaman.md`: Channels & liveness — report/heartbeat paths become `<home>/reports/…`.
 - `hunter.md`: note the report path comes from the brief (brief now carries a `~/.tribe/<key>/reports/…` path).
 - `README.md`: add a "Local operational home" section documenting the `~/.tribe/<key>/{state,archive,reports}/` layout and that it is machine-local, never committed; contracts stay under `docs/tribe/`.
 
-- [ ] **Step 4: Run the phrasing suites, verify green**
+- [x] **Step 4: Run the phrasing suites, verify green**
 
 Run: `bash plugins/tribe/scripts/tests/test-disagreement-routing.sh; bash plugins/tribe/scripts/tests/test-review-cell-v3.sh`
 Expected: both `0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/agents/warchief.md plugins/tribe/agents/shaman.md plugins/tribe/agents/hunter.md plugins/tribe/README.md plugins/tribe/scripts/tests/test-disagreement-routing.sh plugins/tribe/scripts/tests/test-review-cell-v3.sh
