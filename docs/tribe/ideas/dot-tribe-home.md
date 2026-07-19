@@ -1,6 +1,13 @@
 # Idea card: `.tribe/` — the tribe's persistent home inside the consuming repo
 
-- **Status:** captured for a future campaign (owner directive, 2026-07-12). Not yet specced.
+> **SUPERSEDED (owner directive, 2026-07-19).** The canonical design is
+> `docs/superpowers/specs/2026-07-19-tribe-local-progress-home-design.md`. That spec overrides the
+> **location** call below: progress lives in a **home-dir, per-repo** tree
+> (`~/.tribe/<encoded-main-repo-path>/`, the Claude Code transcript model), **not** an in-repo
+> `.tribe/`. The reasoning below (report locality, who creates the dir, idea-09/idea-10
+> interactions) still informs the design, but read the spec for what is being built.
+
+- **Status:** SUPERSEDED — see canonical spec above. (Originally captured 2026-07-12.)
 - **Owner ruling context:** raised mid implementation-campaign; current campaign keeps its
   already-briefed report path (`~/.claude/tribe-reports/impl/`), this card governs everything after.
 
