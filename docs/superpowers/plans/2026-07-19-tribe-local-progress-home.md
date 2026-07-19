@@ -322,7 +322,7 @@ git commit -m "feat(tribe): add migrate-state.sh — one-shot move of state to ~
 - Consumes: `tribe_home` from Task 1.
 - Produces: `archive-card.sh <slug> [repo-dir]` that moves `<home>/state/<slug>.md` → `<home>/archive/<slug>.md` (creating `archive/`). No-op with exit 0 and a message if the state file is already absent (idempotent for re-dispatched delivery).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```bash
 #!/usr/bin/env bash
@@ -347,9 +347,9 @@ bash "$SCRIPT" idea-01 "$repo" >/dev/null && ok "idempotent no-op when absent" |
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"; [[ "$FAIL" -eq 0 ]]
 ```
 
-- [ ] **Step 2: Run, verify fail** — Run: `bash plugins/tribe/scripts/tests/test-archive-card.sh` → FAIL (script missing).
+- [x] **Step 2: Run, verify fail** — Run: `bash plugins/tribe/scripts/tests/test-archive-card.sh` → FAIL (script missing).
 
-- [ ] **Step 3: Write `archive-card.sh`**
+- [x] **Step 3: Write `archive-card.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -367,9 +367,9 @@ mv "$src" "$HOME_DIR/archive/$SLUG.md"
 echo "archive-card: $SLUG → $HOME_DIR/archive/$SLUG.md"
 ```
 
-- [ ] **Step 4: Run, verify pass** — Expected: `2 passed, 0 failed`.
+- [x] **Step 4: Run, verify pass** — Expected: `2 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/archive-card.sh plugins/tribe/scripts/tests/test-archive-card.sh
