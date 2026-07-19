@@ -30,7 +30,7 @@
 **Interfaces:**
 - Produces: an executable `tribe-home.sh [repo-dir]` that prints `"$HOME/.tribe/<key>"` on stdout (no trailing subdir). `repo-dir` defaults to `$PWD`. Exit 2 if not a git repo. Also usable as `source`d: defines `tribe_home()` and `tribe_home_key()`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```bash
 #!/usr/bin/env bash
@@ -65,12 +65,12 @@ check "non-git dir exits 2" "$rc" "2"
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"; [[ "$FAIL" -eq 0 ]]
 ```
 
-- [ ] **Step 2: Run the tests, verify they fail**
+- [x] **Step 2: Run the tests, verify they fail**
 
 Run: `bash plugins/tribe/scripts/tests/test-tribe-home.sh`
 Expected: FAIL — `tribe-home.sh` does not exist yet (`No such file or directory`).
 
-- [ ] **Step 3: Write `tribe-home.sh`**
+- [x] **Step 3: Write `tribe-home.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -100,12 +100,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 ```
 
-- [ ] **Step 4: Make executable, run the tests, verify they pass**
+- [x] **Step 4: Make executable, run the tests, verify they pass**
 
 Run: `chmod +x plugins/tribe/scripts/tribe-home.sh && bash plugins/tribe/scripts/tests/test-tribe-home.sh`
 Expected: `3 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/tribe-home.sh plugins/tribe/scripts/tests/test-tribe-home.sh
