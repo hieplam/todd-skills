@@ -23,6 +23,13 @@ Ground every claim with truth, code or fact. Pair each abstract or general state
 
 If you cannot ground a claim, mark it explicitly as unverified/opinion or delete it. Prefer showing the artifact first, then explaining it — the artifact carries its own context.
 
+## Rule 3 — Named a concept instead of the behaviour
+
+For example: "Best-effort" is a label from the OKRA frame. At the code, a reader has no referent for it — it sounds like it means something but says nothing checkable.
+
+Avoid: // Best-effort: persists the snapshot; on ANY failure it logs (no PII) and swallows — it NEVER throws.
+Follow:  // Never throws: persists the snapshot, or logs and swallows on failure.
+
 ## Self-check before finishing
 
 Scan the draft once and fix:
