@@ -43,7 +43,7 @@ them.
 
 | Plugin | Kind | What it does |
 | --- | --- | --- |
-| `tribe` | agents | Five agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, plus Tracker and Skinner reviewers). Questions flow up as statuses, decisions flow down as cards and briefs. |
+| `tribe` | agents | Six agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, plus Tracker and Skinner reviewers and the read-only Scout code-analyzer). Questions flow up as statuses, decisions flow down as cards and briefs. |
 | `research-to-blog` | agents | Turn a session insight or a bare topic into a bilingual EN+VI research note and published blog posts. |
 | `splitting-plans` | skills | Split a large plan into isolated, dependency-aware sub-plans for parallel subagents. |
 | `check-diff-coverage` | skills | Measure uncovered diff vs main and drive a remediation loop (.NET, Go). |
