@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tribe Campaign Runner — Giải thích code TypeScript</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/gruvbox-dark-medium.min.css" />
+<style>
+  :root {
+    --matcha-bg: #f3f6ec;
+    --matcha-bg-soft: #eaf0dd;
+    --matcha-card: #fbfcf6;
+    --matcha-100: #e4ecd4;
+    --matcha-200: #cfe0b6;
+    --matcha-300: #a9c489;
+    --matcha-400: #8bab63;
+    --matcha-500: #6f9147;
+    --matcha-600: #567336;
+    --matcha-700: #3f562a;
+    --matcha-800: #2c3d1e;
+    --ink: #2b3623;
+    --ink-soft: #4d5b41;
+    --ink-faint: #74815f;
+    --accent-amber: #c08a3e;
+    --border: #d9e3c6;
+    --code-bg: #2b332420;
+    --shadow: 0 1px 2px rgba(63,86,42,.06), 0 6px 20px rgba(63,86,42,.08);
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #e9f1d8 0%, var(--matcha-bg) 45%) fixed;
+    color: var(--ink);
+    line-height: 1.72;
+    font-size: 16px;
+  }
+
+  .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 0; max-width: 1360px; margin: 0 auto; }
+
+  /* ---------- Sidebar ---------- */
+  aside {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+    padding: 30px 20px 40px; border-right: 1px solid var(--border);
+  }
+  aside .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  aside .brand .logo { font-size: 26px; }
+  aside .brand h1 { font-size: 17px; margin: 0; color: var(--matcha-700); letter-spacing: .2px; }
+  aside .sub { font-size: 12px; color: var(--ink-faint); margin: 0 0 22px 36px; }
+  nav a {
+    display: block; text-decoration: none; color: var(--ink-soft);
+    padding: 6px 12px; border-radius: 9px; font-size: 13.5px; margin: 2px 0;
+    border-left: 3px solid transparent; transition: all .15s ease;
+  }
+  nav a:hover { background: var(--matcha-100); color: var(--matcha-700); }
+  nav a.active { background: var(--matcha-100); color: var(--matcha-700); border-left-color: var(--matcha-400); font-weight: 600; }
+  nav a.lvl2 { margin-left: 12px; font-size: 12.5px; padding-left: 14px; color: var(--ink-faint); }
+
+  /* ---------- Main ---------- */
+  main { padding: 46px 54px 120px; min-width: 0; }
+  .hero {
+    background: linear-gradient(135deg, var(--matcha-600), var(--matcha-400));
+    color: #fbfef5; border-radius: 22px; padding: 40px 42px; box-shadow: var(--shadow);
+    position: relative; overflow: hidden; margin-bottom: 40px;
+  }
+  .hero::after {
+    content: "🍵"; position: absolute; right: 28px; top: 50%; transform: translateY(-50%);
+    font-size: 120px; opacity: .14;
+  }
+  .hero h1 { margin: 0 0 8px; font-size: 32px; letter-spacing: -.5px; }
+  .hero p { margin: 0; font-size: 15.5px; max-width: 640px; opacity: .95; }
+  .hero .tags { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .hero .tags span { background: rgba(255,255,255,.2); padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 500; }
+
+  section { margin-bottom: 46px; scroll-margin-top: 20px; }
+  h2 {
+    font-size: 25px; color: var(--matcha-700); margin: 8px 0 6px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  h2 .num {
+    background: var(--matcha-400); color: #fff; font-size: 15px; font-weight: 700;
+    width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+    flex: none;
+  }
+  h3 { font-size: 18.5px; color: var(--matcha-600); margin: 28px 0 4px; }
+  h4 { font-size: 15.5px; color: var(--matcha-700); margin: 20px 0 2px; }
+  p { margin: 10px 0; }
+  a.inline { color: var(--matcha-600); }
+
+  .card {
+    background: var(--matcha-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px 26px; box-shadow: var(--shadow); margin: 16px 0;
+  }
+
+  /* diagram box */
+  .diagram {
+    background: var(--matcha-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 26px; box-shadow: var(--shadow); margin: 20px 0; overflow-x: auto;
+  }
+  .diagram .cap {
+    font-size: 13px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 1.4px;
+    font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .diagram .cap::before { content: "◍"; color: var(--matcha-400); font-size: 15px; }
+  .mermaid { display: flex; justify-content: center; }
+
+  /* callouts */
+  .note, .warn, .tip, .cs {
+    border-radius: 12px; padding: 14px 18px 14px 46px; margin: 16px 0; position: relative; font-size: 14.5px;
+  }
+  .note { background: #eef4e0; border: 1px solid #d5e3ba; }
+  .note::before { content: "📝"; position: absolute; left: 16px; top: 13px; }
+  .warn { background: #faf1e0; border: 1px solid #ecd5a8; }
+  .warn::before { content: "⚠️"; position: absolute; left: 16px; top: 13px; }
+  .tip { background: #e7f2e9; border: 1px solid #bcdcc2; }
+  .tip::before { content: "💡"; position: absolute; left: 16px; top: 13px; }
+  .cs { background: #eef0f8; border: 1px solid #ccd2e8; }
+  .cs::before { content: "＃"; position: absolute; left: 16px; top: 12px; color: #6a74a8; font-weight: 700; font-size: 17px; }
+  .cs strong { color: #4b5697; }
+
+  /* code */
+  pre {
+    background: #282828; border-radius: 12px; padding: 0; margin: 14px 0; overflow: hidden;
+    box-shadow: var(--shadow); border: 1px solid #3c3c34;
+  }
+  pre .filebar {
+    background: #32322c; color: #b9c39a; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    padding: 7px 16px; border-bottom: 1px solid #45453b; display: flex; align-items: center; gap: 8px;
+  }
+  pre .filebar::before { content: "●●●"; color: #57573f; letter-spacing: 2px; font-size: 9px; }
+  pre code { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.62; display: block; padding: 16px 18px; }
+  code.inl {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; background: var(--matcha-100);
+    color: var(--matcha-700); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--border);
+  }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; background: var(--matcha-card); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+  th { background: var(--matcha-500); color: #fff; text-align: left; padding: 11px 15px; font-weight: 600; font-size: 13px; }
+  td { padding: 10px 15px; border-top: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #f7faf0; }
+  td code, th code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+
+  ul.clean { list-style: none; padding-left: 0; }
+  ul.clean li { padding: 5px 0 5px 26px; position: relative; }
+  ul.clean li::before { content: "🌿"; position: absolute; left: 0; font-size: 13px; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 12.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 1px solid rgba(0,0,0,.1); }
+
+  footer { color: var(--ink-faint); font-size: 13px; text-align: center; padding: 30px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 30px 22px 80px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside>
+    <div class="brand"><span class="logo">🪨</span><h1>Tribe Campaign Runner</h1></div>
+    <p class="sub">Giải thích code TypeScript · top-down</p>
+    <nav id="toc">
+      <a href="#tong-quan">1 · Bức tranh tổng thể</a>
+      <a href="#seam" class="lvl2">Ý niệm: The Seam (DI)</a>
+      <a href="#kien-truc">2 · Kiến trúc &amp; module map</a>
+      <a href="#flow-tong">3 · Flow hoàn chỉnh (sequence)</a>
+      <a href="#run">4 · run.ts — entrypoint</a>
+      <a href="#loop">5 · loop.ts — orchestrator</a>
+      <a href="#loop-derive" class="lvl2">deriveCardPhase (§D4)</a>
+      <a href="#loop-lock" class="lvl2">Lock chống 2 instance</a>
+      <a href="#loop-main" class="lvl2">runLoop — vòng lặp</a>
+      <a href="#state">6 · state.ts — schema &amp; card</a>
+      <a href="#state-blocked" class="lvl2">blocked là derived</a>
+      <a href="#session">7 · session.ts — bọc SDK</a>
+      <a href="#verify">8 · verify.ts — 6 điểm</a>
+      <a href="#github">9 · github.ts — commit/PR/merge</a>
+      <a href="#report">10 · report.ts — báo cáo</a>
+      <a href="#brief">11 · brief.ts + types.ts</a>
+      <a href="#status">12 · Vòng đời Card (state machine)</a>
+      <a href="#tong-ket">13 · Tổng kết thiết kế</a>
+    </nav>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <main>
+    <div class="hero">
+      <h1>Tribe Campaign Runner</h1>
+      <p>Một <strong>orchestrator</strong> viết bằng TypeScript: nó điều phối việc "ship" từng hạng mục công việc (card) của một chiến dịch phát triển phần mềm — tự nó <em>không viết code, không gọi AI</em>, chỉ đẻ ra và giám sát các phiên thực thi.</p>
+      <div class="tags">
+        <span>9 module · ~3.400 dòng</span><span>Dependency Injection triệt để</span><span>Không hardcode môi trường</span><span>Dành cho dev C# đọc TS</span>
+      </div>
+    </div>
+
+    <div class="note">Tài liệu này ghép <strong>diagram</strong> (để hình dung nhanh) với <strong>giải thích chi tiết + code chú thích</strong> (để hiểu cặn kẽ). Đi từ ý niệm tổng quát xuống từng class. Các cú pháp "đường ngọt" (sugar syntax) của TS được đối chiếu sang C# để bạn dễ liên hệ.</div>
+
+    <!-- ============ 1. TỔNG QUAN ============ -->
+    <section id="tong-quan">
+      <h2><span class="num">1</span> Bức tranh tổng thể — bộ code này làm gì?</h2>
+      <p>Trong plugin <code class="inl">tribe</code> có một <strong>campaign runner</strong> (trình chạy chiến dịch) nằm ở <code class="inl">plugins/tribe/scripts/runner/</code>. Trước tiên, vài thuật ngữ (định nghĩa trước khi dùng):</p>
+      <ul class="clean">
+        <li><strong>Campaign (chiến dịch):</strong> một loạt hạng mục công việc xếp theo thứ tự.</li>
+        <li><strong>Card (thẻ):</strong> một đơn vị công việc (vd "thêm feature X"), mỗi card có <em>spec</em> + <em>plan</em>.</li>
+        <li><strong>Executor session (phiên thực thi):</strong> một tiến trình <em>Claude Agent SDK</em> được spawn ra để <strong>thực sự làm</strong> một card (viết code, mở PR, merge). Runner chỉ đẻ ra rồi giám sát.</li>
+        <li><strong>Orchestrator (nhạc trưởng):</strong> chính là runner — điều phối, <strong>không tự làm việc chuyên môn</strong>, tốn 0 token LLM.</li>
+      </ul>
+
+      <div class="diagram">
+        <div class="cap">Diagram 1 · Ý niệm — vòng lặp cốt lõi</div>
+        <div class="mermaid">
+flowchart LR
+  A["🗂️ Roadmap<br/>danh sách Card đã xếp thứ tự"] --> B["① Lấy Card<br/>tiến được kế tiếp"]
+  B --> C["② Spawn 1<br/>Executor Session"]
+  C --> D{"③ Verify<br/>đã SHIPPED thật chưa?"}
+  D -->|pass| E["④ Ghi state<br/>+ report"]
+  D -->|fail| F["🚩 Escalate<br/>cần người quyết định"]
+  E --> B
+  F --> B
+  B -.->|hết card| G["✅ done"]
+        </div>
+      </div>
+
+      <p>Vòng lặp trên là toàn bộ tinh thần của runner: <em>lấy card → chạy 1 session → kiểm chứng độc lập → ghi trạng thái → lặp</em>. Một nguyên tắc bao trùm mọi module là <strong>"stateless-capability wall"</strong> (bức tường năng lực không trạng thái): runner <strong>không hardcode</strong> giá trị môi trường nào (tên repo, model, đường dẫn, giá trị campaign) — tất cả là input truyền qua CLI. Nhờ đó cùng một script chạy được cho bất kỳ repo/campaign nào.</p>
+
+      <!-- SEAM -->
+      <h3 id="seam">Ý niệm quan trọng nhất: "The Seam" (Dependency Injection)</h3>
+      <p>Đây là điều dân C# thấy quen nhất. <strong>Mọi thao tác chạm vào thế giới thực</strong> — gọi <code class="inl">git</code>/<code class="inl">gh</code>, đọc/ghi file, spawn SDK, đọc đồng hồ, đọc lock — <strong>không</strong> gọi trực tiếp trong module logic, mà đi qua một <em>interface được inject vào</em> (TS gọi là "seam" — đường may).</p>
+      <div class="cs"><strong>Đối chiếu C#:</strong> đây chính là <strong>constructor injection</strong> với các interface <code>IFileSystem</code>, <code>IProcessRunner</code>… để unit test không đụng file/network thật. Ví dụ <code>VerifyIO</code> bên dưới ≈ một interface bạn đăng ký vào DI container.</p>
+
+      <pre><div class="filebar">verify.ts — interface seam</div><code class="language-typescript">export interface VerifyIO {
+  exec(cmd: string[], options?: { cwd?: string }): Promise&lt;ExecResult&gt;;
+  readFile(resolvedPath: string): Promise&lt;string&gt; | string;
+}</code></pre>
+
+      <table>
+        <tr><th>Cú pháp TS</th><th>Ý nghĩa</th><th>Tương đương C#</th></tr>
+        <tr><td><code>Promise&lt;ExecResult&gt;</code></td><td>Kết quả bất đồng bộ</td><td><code>Task&lt;ExecResult&gt;</code> (<code>async/await</code> giống hệt)</td></tr>
+        <tr><td><code>Promise&lt;string&gt; | string</code></td><td><strong>Union type</strong>: "string HOẶC Promise&lt;string&gt;"</td><td>Không có sẵn — gần nhất là overload</td></tr>
+        <tr><td><code>options?:</code></td><td>Tham số <strong>optional</strong></td><td><code>options = null</code> (nullable)</td></tr>
+        <tr><td><code>cmd: string[]</code></td><td>Mảng chuỗi</td><td><code>string[]</code></td></tr>
+      </table>
+
+      <div class="tip"><strong>Vì sao quan trọng:</strong> chỉ <code class="inl">run.ts</code> được phép <code class="inl">import</code> <code class="inl">node:fs</code>, <code class="inl">child_process</code> và SDK thật. Mọi module khác chỉ nhận seam ⇒ chúng là <strong>pure</strong> (thuần) và <strong>unit-test được 100%</strong> mà không đụng binary/network thật.</div>
+    </section>
+
+    <!-- ============ 2. KIẾN TRÚC ============ -->
+    <section id="kien-truc">
+      <h2><span class="num">2</span> Kiến trúc &amp; bản đồ module</h2>
+      <p>9 module chia thành 3 tầng: <strong>wiring</strong> (ráp thế giới thực) → <strong>orchestration</strong> (logic điều phối) → <strong>capabilities</strong> (từng năng lực chuyên biệt). Mũi tên nét liền = "gọi/điều phối"; nét đứt = "chạm thế giới thực (chỉ run.ts &amp; session.ts)".</p>
+
+      <div class="diagram">
+        <div class="cap">Diagram 2 · Kiến trúc — ai gọi ai, ai chạm thế giới thực</div>
+        <div class="mermaid">
+flowchart TB
+  subgraph WORLD["🌍 Thế giới thực (side effects)"]
+    direction LR
+    GIT["git / gh CLI"]
+    FS["File system"]
+    SDK["Claude Agent SDK"]
+    OS["Clock · PID · Lock"]
+  end
+
+  RUN["run.ts<br/><i>CLI entrypoint + wiring (DI)</i>"]
+  LOOP["loop.ts<br/><i>Orchestrator — vòng lặp chính</i>"]
+  STATE["state.ts<br/><i>schema · load/save · nextCard</i>"]
+  SESSION["session.ts<br/><i>bọc SDK · spawn/parse</i>"]
+  VERIFY["verify.ts<br/><i>6 điểm kiểm chứng</i>"]
+  GITHUB["github.ts<br/><i>commit · PR · merge state</i>"]
+  REPORT["report.ts<br/><i>JSON + Markdown report</i>"]
+  BRIEF["brief.ts<br/><i>render template</i>"]
+  TYPES["types.ts<br/><i>models dùng chung</i>"]
+
+  RUN -->|"parseArgs → RunLoopConfig"| LOOP
+  RUN -.->|"inject LoopIO (realExec, fs, spawn…)"| WORLD
+  RUN --> REPORT
+
+  LOOP --> STATE
+  LOOP --> SESSION
+  LOOP --> VERIFY
+  LOOP --> GITHUB
+  LOOP --> BRIEF
+
+  SESSION -.->|"import trực tiếp"| SDK
+  STATE --> TYPES
+  VERIFY --> TYPES
+  REPORT --> TYPES
+  BRIEF --> TYPES
+
+  classDef world fill:#e7dcc4,stroke:#b7a06a,color:#4a3d1e;
+  classDef wire fill:#cfe0b6,stroke:#8bab63,color:#2c3d1e;
+  classDef orch fill:#a9c489,stroke:#567336,color:#22301a,font-weight:bold;
+  classDef cap fill:#fbfcf6,stroke:#a9c489,color:#3f562a;
+  class GIT,FS,SDK,OS world;
+  class RUN wire;
+  class LOOP orch;
+  class STATE,SESSION,VERIFY,GITHUB,REPORT,BRIEF,TYPES cap;
+        </div>
+        <div class="legend">
+          <span><span class="swatch" style="background:#cfe0b6"></span> Wiring (run.ts)</span>
+          <span><span class="swatch" style="background:#a9c489"></span> Orchestrator (loop.ts)</span>
+          <span><span class="swatch" style="background:#fbfcf6"></span> Capability thuần (test được)</span>
+          <span><span class="swatch" style="background:#e7dcc4"></span> Thế giới thực</span>
+        </div>
+      </div>
+
+      <table>
+        <tr><th>Module</th><th>Vai trò</th><th>Ẩn dụ C#</th></tr>
+        <tr><td><code>run.ts</code></td><td>CLI entrypoint, ráp seam thực</td><td><code>Program.Main</code> + <code>Startup</code> DI</td></tr>
+        <tr><td><code>loop.ts</code></td><td>Orchestrator chính (vòng lặp)</td><td><code>CampaignService</code></td></tr>
+        <tr><td><code>state.ts</code></td><td>Schema + load/save + chọn card</td><td><code>Repository</code> + validation</td></tr>
+        <tr><td><code>session.ts</code></td><td>Bọc Claude Agent SDK</td><td>Adapter cho 1 external SDK</td></tr>
+        <tr><td><code>verify.ts</code></td><td>6 bước kiểm chứng "đã shipped"</td><td>Domain validator</td></tr>
+        <tr><td><code>github.ts</code></td><td>Commit/push/PR/merge state</td><td>Git/GitHub gateway</td></tr>
+        <tr><td><code>report.ts</code></td><td>Sinh report JSON + Markdown</td><td>Output DTO builder</td></tr>
+        <tr><td><code>brief.ts</code></td><td>Render brief từ template</td><td>Template renderer</td></tr>
+        <tr><td><code>types.ts</code></td><td>Kiểu dữ liệu dùng chung</td><td>POCO/DTO models</td></tr>
+      </table>
+    </section>
+
+    <!-- ============ 3. FLOW TỔNG ============ -->
+    <section id="flow-tong">
+      <h2><span class="num">3</span> Một flow hoàn chỉnh — các class kết nối ra sao</h2>
+      <p>Sơ đồ tuần tự (sequence diagram) dưới đây trace <strong>một card duy nhất</strong> đi từ lúc CLI khởi động đến khi được "ship", cho thấy mọi class nói chuyện với nhau như thế nào. Đây là "sợi dây xuyên suốt" — đọc kỹ nó rồi các phần sau chỉ là zoom vào từng chặng.</p>
+
+      <div class="diagram">
+        <div class="cap">Diagram 3 · Sequence — vòng đời 1 card (happy path + verify)</div>
+        <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as 👤 Owner (CLI)
+  participant R as run.ts
+  participant L as loop.ts
+  participant ST as state.ts
+  participant D as deriveCardPhase
+  participant SE as session.ts
+  participant SDK as Claude SDK
+  participant V as verify.ts
+  participant G as github.ts
+
+  U->>R: bun run.ts --repo --state --model …
+  R->>R: parseArgs(argv) → RunLoopConfig
+  R->>L: runLoop(config, LoopIO)
+  L->>L: acquireLock() — chống 2 instance
+  L->>ST: loadState() + nextCard()
+  ST-->>L: card "X" (tiến được)
+  L->>D: deriveCardPhase(X) — hỏi git/gh
+  D-->>L: { kind: 'fresh' }
+  L->>SE: runSession(brief)
+  SE->>SDK: query(prompt, pinnedOptions)
+  SDK-->>SE: system/init → session_id
+  SE->>L: onSessionStart(id) → status='running' (ghi ngay, crash-safe)
+  SDK-->>SE: … messages … → result "SHIPPED #42 abc1234"
+  SE-->>L: { outcome:'shipped', pr:42, sha }
+  L->>V: verifyShipped(card) — 6 điểm độc lập
+  V-->>L: { shipped: true }
+  L->>ST: status='shipped' + persistLocalState()
+  L->>G: commitStateAndMerge(state.json)
+  G-->>L: { outcome:'merged' }
+  L-->>R: LoopResult { exitCode: 0, processed }
+  R->>R: writeReport() → campaign-report.json/.md
+  R-->>U: exit 0
+        </div>
+      </div>
+
+      <div class="note"><strong>Điểm mấu chốt trong sơ đồ:</strong> dòng "SHIPPED #42" từ SDK <em>chỉ là tín hiệu</em>. Runner <strong>không tin ngay</strong> — nó gọi <code class="inl">verifyShipped</code> chạy lại 6 kiểm tra thật (PR đã merge chưa? merge kiểu regular? CI xanh? …). Chỉ khi verify pass thì card mới được ghi <code class="inl">shipped</code>.</div>
+    </section>
+
+    <!-- ============ 4. RUN.TS ============ -->
+    <section id="run">
+      <h2><span class="num">4</span> <code>run.ts</code> — điểm vào (entrypoint)</h2>
+      <p>File này là <code class="inl">Program.Main</code>. Hai phần rạch ròi: <strong>parseArgs</strong> (thuần, test được) và <strong>main()</strong> (ráp thế giới thực, không test).</p>
+
+      <h3>4a · <code>parseArgs</code> — parse CLI, trả union kết quả</h3>
+      <pre><div class="filebar">run.ts</div><code class="language-typescript">export function parseArgs(argv: string[]): ParseArgsResult | ParseArgsError {
+  const raw = new Map&lt;string, string | true&gt;();     // ≈ Dictionary&lt;string, object&gt; nhưng type-safe
+  for (let i = 0; i &lt; argv.length; i++) {
+    const token = argv[i] as string;                  // 'as' = ép kiểu ở mức compiler (KHÔNG check runtime)
+    if (!token.startsWith('--')) continue;
+    if (token === '--dry-run' || token === '--include-escalated') {
+      raw.set(token, true);                           // flag boolean → lưu literal true
+      continue;
+    }
+    const value = argv[i + 1];                         // flag có value → lấy token kế tiếp
+    if (value === undefined) return { error: `${token} requires a value` };
+    raw.set(token, value); i += 1;
+  }
+  // … kiểm tra REQUIRED_FLAGS: --repo --state --model --answers --escalations-dir …
+}</code></pre>
+
+      <div class="cs"><strong>Đối chiếu C#:</strong> kiểu trả về <code>ParseArgsResult | ParseArgsError</code> là <strong>discriminated union</strong> — pattern thay cho <code>throw Exception</code>. Caller kiểm tra bằng <code>if ('error' in parsed)</code>. Giống <code>OneOf&lt;Success, Error&gt;</code> hay <code>Result&lt;T&gt;</code>.</div>
+      <p><code class="inl">REQUIRED_FLAGS</code> bắt buộc <code class="inl">--repo, --state, --model, --answers, --escalations-dir</code> — đúng "stateless wall": không có default, phải truyền vào. <code class="inl">parseArgs</code> thuần (không I/O) nên unit-test đầy đủ.</p>
+
+      <h3>4b · <code>main()</code> — ráp seam thật (KHÔNG unit-test)</h3>
+      <pre><div class="filebar">run.ts — realExec bọc child_process.spawn</div><code class="language-typescript">function realExec(cmd: string[], opts?: { cwd?: string }): Promise&lt;ExecResult&gt; {
+  return new Promise((resolve) =&gt; {                    // ≈ TaskCompletionSource
+    const child = spawn(cmd[0] as string, cmd.slice(1), { cwd: opts?.cwd });
+    let stdout = '';
+    child.stdout?.on('data', (chunk) =&gt; (stdout += chunk.toString())); // ?. = optional chaining
+    child.on('close', (code) =&gt; resolve({ stdout, stderr, exitCode: code ?? 1 })); // ?? = nullish coalescing
+  });
+}</code></pre>
+      <table>
+        <tr><th>Sugar</th><th>Ý nghĩa</th><th>C#</th></tr>
+        <tr><td><code>child.stdout?.on()</code></td><td>Nếu null thì bỏ qua, không lỗi</td><td><code>?.</code></td></tr>
+        <tr><td><code>code ?? 1</code></td><td>null/undefined thì lấy 1</td><td><code>??</code></td></tr>
+        <tr><td><code>new Promise((resolve)=&gt;…)</code></td><td>Gói callback API cũ thành async</td><td><code>TaskCompletionSource</code></td></tr>
+      </table>
+
+      <p><code class="inl">isProcessAlive</code> probe OS xem một PID còn sống (dùng cho lock):</p>
+      <pre><div class="filebar">run.ts</div><code class="language-typescript">function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);   // signal 0 = CHỈ kiểm tra tồn tại, KHÔNG giết
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM'; // EPERM = tồn tại nhưng không có quyền → vẫn sống
+  }
+}</code></pre>
+
+      <p>Cuối <code class="inl">main()</code>: chạy <code class="inl">runLoop</code>, bắt exception, rồi <strong>luôn</strong> ghi report qua <code class="inl">tryWriteReport</code> (trừ dry-run/locked), rồi <code class="inl">process.exit(code)</code>.</p>
+      <pre><div class="filebar">run.ts</div><code class="language-typescript">if (import.meta.main) {   // ≈ "if đây là assembly được gọi trực tiếp" — chỉ chạy khi file này là entrypoint
+  main();
+}</code></pre>
+      <div class="warn"><strong>Triết lý exit code:</strong> 0=OK · 1=locked · 2=escalated · 3=session-incomplete · 4=error. Comment trong code nhấn mạnh: <em>"exit code chỉ là gợi ý, report mới là sự thật"</em>.</div>
+    </section>
+
+    <!-- ============ 5. LOOP.TS ============ -->
+    <section id="loop">
+      <h2><span class="num">5</span> <code>loop.ts</code> — orchestrator chính (trái tim)</h2>
+      <p>File lớn nhất (993 dòng). Tôi chia theo khối chức năng.</p>
+
+      <!-- deriveCardPhase -->
+      <h3 id="loop-derive">5.1 · <code>deriveCardPhase</code> — "phân loại thực tại" cho resume (§D4)</h3>
+      <p>Phần thông minh nhất. Khi runner khởi động lại (vd sau crash), nó <strong>không tin trạng thái ghi trong file</strong> mà <strong>hỏi lại git/gh</strong>. Nguyên tắc vàng trong comment: <em>"file là data, git/gh mới là authority (thẩm quyền)"</em>.</p>
+
+      <div class="diagram">
+        <div class="cap">Diagram 4 · Cây quyết định deriveCardPhase (§D4 resume matrix)</div>
+        <div class="mermaid">
+flowchart TD
+  S(["deriveCardPhase(card)"]) --> ESC{"Có file<br/>escalation?<br/>(và !includeEscalated)"}
+  ESC -->|có| P1["🚩 escalation_pending<br/>(chờ người, park)"]
+  ESC -->|không| BR{"card.branch<br/>tồn tại?"}
+  BR -->|không| F1["🆕 fresh<br/>(chưa từng làm)"]
+  BR -->|có| PR{"gh pr view branch<br/>→ state?"}
+  PR -->|MERGED| V1["✔️ verify_only<br/>(chỉ cần kiểm chứng)"]
+  PR -->|OPEN + có sessionId| R1["♻️ resume<br/>(reason: pr_open)"]
+  PR -->|OPEN + KHÔNG sessionId| F2["🆕 fresh + digest<br/>(F8: báo 'đã có PR, đừng mở PR 2')"]
+  PR -->|absent| EX{"branch/worktree<br/>còn tồn tại?"}
+  EX -->|có + sessionId| R2["♻️ resume<br/>(reason: branch_no_pr)"]
+  EX -->|có + KHÔNG sessionId| RV["🔄 revert_and_redo<br/>(xoá branch rác, làm lại)"]
+  EX -->|không| F3["🆕 fresh"]
+
+  classDef term fill:#a9c489,stroke:#567336,color:#22301a;
+  classDef q fill:#fbfcf6,stroke:#a9c489,color:#3f562a;
+  class P1,F1,V1,R1,F2,R2,RV,F3 term;
+  class ESC,BR,PR,EX q;
+        </div>
+      </div>
+
+      <p>Kết quả là một <strong>discriminated union</strong> <code class="inl">CardPhase</code> (giống <code class="inl">abstract record</code> + pattern matching trong C# hiện đại):</p>
+      <pre><div class="filebar">loop.ts</div><code class="language-typescript">export type CardPhase =
+  | { kind: 'verify_only'; pr: number }                                  // PR đã merged → chỉ verify
+  | { kind: 'resume'; sessionId: string; reason: 'pr_open'|'branch_no_pr'; pr?: number } // resume session cũ
+  | { kind: 'revert_and_redo' }                                          // branch rác không PR → xoá làm lại
+  | { kind: 'fresh'; digest?: string }                                   // làm mới (digest = tóm tắt nếu cần)
+  | { kind: 'escalation_pending'; escalationPath: string };              // đang chờ người</code></pre>
+
+      <div class="warn"><strong>Comment F8 rất quan trọng:</strong> nếu PR đang <em>OPEN</em> mà <strong>không</strong> có <code class="inl">sessionId</code> để resume, spawn "fresh mù" sẽ khiến session mới <strong>mở PR thứ 2</strong>. Nên nó nhét <code class="inl">digest</code> (tóm tắt trạng thái) để session mới biết "PR #N đã tồn tại — đừng mở PR mới, hãy tiếp tục nó".</div>
+
+      <!-- Lock -->
+      <h3 id="loop-lock">5.2 · Lock chống chạy 2 instance (§D2)</h3>
+      <pre><div class="filebar">loop.ts</div><code class="language-typescript">export function acquireLock(io: LockIO): LockResult {
+  const existing = io.readLock();
+  if (existing &amp;&amp; io.isProcessAlive(existing.pid)) {   // có process SỐNG đang giữ lock
+    return { ok: false, reason: `… held by live pid ${existing.pid} …`, heldBy: existing };
+  }
+  io.writeLock({ pid: io.currentPid(), startedAt: io.now() });  // lock chết/trống → chiếm
+  return { ok: true };
+}</code></pre>
+      <div class="tip"><strong>Vì sao dùng liveness-probe thay vì TTL:</strong> TTL quá ngắn thì giết nhầm session dài, TTL quá dài thì lock chết kẹt lâu. Probe process (<code class="inl">process.kill(pid,0)</code>) thì <em>chính xác cả hai chiều</em>, tốn đúng 1 syscall.</div>
+
+      <!-- runLoop -->
+      <h3 id="loop-main">5.3 · <code>runLoop</code> — vòng lặp chính</h3>
+
+      <div class="diagram">
+        <div class="cap">Diagram 5 · Flowchart runLoop — park-and-continue (§D5′)</div>
+        <div class="mermaid">
+flowchart TD
+  A(["runLoop(config, io)"]) --> DRY{"--dry-run?"}
+  DRY -->|có| DR["runDryRun<br/>(0 side-effect)"] --> ENDOK
+  DRY -->|không| LK{"acquireLock ok?"}
+  LK -->|không| LKX["exit LOCKED (1)"]
+  LK -->|có| STOP0{"file STOP?"}
+  STOP0 -->|có| ENDOK["exit OK — thoát sạch"]
+  STOP0 -->|không| PREP["resolve baseBranch · đọc answers<br/>· retry pendingCommit · loadState"]
+  PREP --> W{"worked &lt; maxCards?"}
+  W -->|không| FLUSH
+  W -->|có| STOP1{"file STOP<br/>giữa các card?"}
+  STOP1 -->|có| FLUSH["persistLocalState<br/>(flush blocked tính lúc done)"]
+  STOP1 -->|không| NC["filteredNextCard(attempted)"]
+  NC --> KIND{"kind?"}
+  KIND -->|done| FLUSH
+  KIND -->|planning_needed| PN["escalateCard('planning_needed')<br/>worked+1"] --> W
+  KIND -->|card| PH["deriveCardPhase"]
+  PH --> EPH{"escalation_pending?"}
+  EPH -->|có| PARK["park: attempted+1<br/>(KHÔNG tốn worked)"] --> W
+  EPH -->|không| ACT["actOnCard → ship / escalate / stop<br/>attempted+1 · worked+1"] --> W
+  FLUSH --> RET["computeExitCode(processed)"] --> FIN(["finally: releaseLock"])
+
+  classDef q fill:#fbfcf6,stroke:#a9c489,color:#3f562a;
+  classDef act fill:#a9c489,stroke:#567336,color:#22301a;
+  class DRY,LK,STOP0,STOP1,W,KIND,EPH q;
+  class PREP,PN,PH,PARK,ACT,FLUSH,RET act;
+        </div>
+      </div>
+
+      <pre><div class="filebar">loop.ts — trái tim vòng lặp</div><code class="language-typescript">const attempted = new Set&lt;string&gt;();     // các card ĐÃ CHỌN pass này (chống lặp vô hạn)
+let worked = 0;                           // ngân sách --max-cards đã tiêu
+const limit = config.maxCards ?? Infinity;
+
+while (worked &lt; limit) {
+  if (isStopRequested(...)) break;                 // STOP được tôn trọng GIỮA các card
+  const nc = filteredNextCard(state, config, io, attempted);
+  if (nc.kind === 'done') break;
+
+  if (nc.kind === 'planning_needed') { /* escalate */ worked += 1; continue; }
+
+  const phase = await deriveCardPhase(nc.cardId, nc.card, ...);
+  if (phase.kind === 'escalation_pending') {
+    attempted.add(nc.cardId);                       // park: đánh dấu đã xét, KHÔNG tốn budget
+    processed.push({ kind: 'escalation_pending', ... });
+    continue;
+  }
+  const outcome = await actOnCard(nc.cardId, phase, state, resolved, io);
+  attempted.add(nc.cardId);
+  processed.push(outcome);
+  worked += 1;
+}
+persistLocalState(state, resolved, io);   // W-F5: flush trạng thái blocked tính lúc 'done'</code></pre>
+
+      <p>Ba điều thiết kế đắt giá ở đây:</p>
+      <ul class="clean">
+        <li><strong><code>attempted</code> (Set) vs <code>worked</code> (số) tách biệt.</strong> <code class="inl">attempted</code> đảm bảo <em>kết thúc chắc chắn</em> — mỗi card mỗi pass chỉ chọn 1 lần, sequence đưa cho <code class="inl">nextCard</code> <strong>co lại mỗi vòng</strong> ⇒ không lặp vô hạn. <code class="inl">worked</code> chỉ đếm việc thực (ship/escalate/stop) để tôn trọng <code class="inl">--max-cards</code>. Card chỉ "parked" (escalation cũ) không tốn budget.</li>
+        <li><strong>Park-and-continue (D5′):</strong> escalate/stop <em>không</em> dừng cả pass — vòng sau tự lấy card tiếp theo. Một pass có thể có nhiều kết cục khác nhau.</li>
+        <li><strong>STOP file mềm:</strong> dừng <em>giữa</em> các card, không bao giờ cắt ngang 1 card đang chạy. Dùng <code class="inl">finally { releaseLock(io) }</code> ≈ <code class="inl">finally</code> C#.</li>
+      </ul>
+      <div class="cs"><strong>Đối chiếu C#:</strong> <code>Set&lt;string&gt;</code> ≈ <code>HashSet&lt;string&gt;</code>. <code>?? Infinity</code> — <code>Infinity</code> là số thật trong JS (vô cực), nên vòng <code>while (worked &lt; Infinity)</code> chạy đến khi <code>break</code>.</div>
+
+      <h4>Resume-with-fallback (bên trong <code>actOnCard</code>)</h4>
+      <pre><div class="filebar">loop.ts — runCardSession</div><code class="language-typescript">if (phase.kind === 'resume') {
+  const resumeResult = await runSession({ brief: prompt, resume: phase.sessionId }, ...);
+  if (resumeResult.outcome !== 'error') return resumeResult;   // resume OK
+
+  // resume THẤT BẠI (không transcript) → fallback: spawn fresh NHƯNG kèm digest trạng thái
+  const digest = buildStateDigest(cardId, card, resumeResult.finalText);
+  const brief = executorBrief(..., `${digest}\n\n---\n\n${resolved.answersContent}`);
+  return runSession({ brief }, ...);
+}</code></pre>
+      <div class="note"><strong>Tinh tế:</strong> chỉ fallback khi outcome là <code class="inl">'error'</code>, <strong>KHÔNG</strong> fallback khi <code class="inl">'timeout'</code> — vì timeout nghĩa là session cũ có thể <em>vẫn đang chạy</em>, spawn thêm sẽ nhân đôi công việc.</div>
+    </section>
+
+    <!-- ============ 6. STATE.TS ============ -->
+    <section id="state">
+      <h2><span class="num">6</span> <code>state.ts</code> — schema, load/save, chọn card</h2>
+
+      <h3>6.1 · Validation bằng Zod</h3>
+      <p><strong>Zod</strong> là thư viện validate schema lúc <em>runtime</em> của TS (C# không có tương đương trực tiếp; gần nhất là FluentValidation + tự suy ra type từ schema).</p>
+      <pre><div class="filebar">state.ts</div><code class="language-typescript">const CardSchema = z.looseObject({           // looseObject: GIỮ field lạ thay vì xoá
+  status: CardStatusSchema,
+  spec: z.string().nullable(),
+  dependsOn: z.array(z.string()).optional(), // optional, KHÔNG .default([]) — xem note dưới
+  ...
+});</code></pre>
+      <ul class="clean">
+        <li><code class="inl">z.looseObject</code> giữ lại field runner chưa biết ⇒ load→save <strong>round-trip byte-identical</strong>.</li>
+        <li><code class="inl">dependsOn</code> cố ý <strong>không</strong> <code class="inl">.default([])</code>: nếu inject default, file save ra sẽ có key mới dù JSON gốc không có ⇒ phá vỡ byte-identical. Caller tự áp default <code class="inl">card.dependsOn ?? []</code>.</li>
+      </ul>
+
+      <h3>6.2 · Từ chối "loud" mọi state hỏng ngay lúc load</h3>
+      <p>4 lớp lỗi custom (<code class="inl">extends Error</code> ≈ kế thừa <code class="inl">Exception</code>): version lạ, <code class="inl">sequence</code> trỏ card không tồn tại, <code class="inl">dependsOn</code> trỏ card không tồn tại, và <strong>cycle</strong> trong đồ thị phụ thuộc. Cycle detection dùng <strong>DFS gray/white</strong> kinh điển:</p>
+      <pre><div class="filebar">state.ts</div><code class="language-typescript">function visit(cardId: string): void {
+  if (onStack.has(cardId)) {                     // gặp lại node đang trong stack → CÓ chu trình
+    const cycleStart = path.indexOf(cardId);
+    throw new CircularDependencyError([...path.slice(cycleStart), cardId]);
+  }
+  if (visited.has(cardId)) return;
+  visited.add(cardId); onStack.add(cardId); path.push(cardId);
+  for (const dep of state.cards[cardId]?.dependsOn ?? []) visit(dep);
+  path.pop(); onStack.delete(cardId);
+}</code></pre>
+      <div class="cs"><strong>Đối chiếu C#:</strong> <code>[...path.slice(cycleStart), cardId]</code> — <code>...</code> là <strong>spread operator</strong> (rải mảng ra). Giống tạo <code>new List(range){ cardId }</code>. <code>Set.has</code> ≈ <code>HashSet.Contains</code>.</div>
+
+      <!-- blocked derived -->
+      <h3 id="state-blocked">6.3 · <code>blocked</code> là trạng thái DẪN XUẤT (derived) — ý niệm cốt lõi</h3>
+      <p><code class="inl">blocked</code> <strong>không bao giờ được tin từ file</strong> — nó được <strong>tính lại mỗi lần gọi</strong> từ <code class="inl">dependsOn</code> + trạng thái hiện tại của dependency. Hàm chạy tới <strong>fixpoint</strong> (lặp tới khi không thêm được gì nữa):</p>
+      <pre><div class="filebar">state.ts — computeBlockedCardIds</div><code class="language-typescript">while (changed) {
+  changed = false;
+  for (const [cardId, card] of Object.entries(cards)) {   // for…of + destructuring [k, v]
+    if (blocked.has(cardId) || card.status === 'shipped' || card.status === 'escalated') continue;
+    const isParked = (card.dependsOn ?? []).some((depId) =&gt;
+      cards[depId]?.status === 'escalated' || blocked.has(depId));  // dep bị escalated hoặc (bắc cầu) blocked
+    if (isParked) { blocked.add(cardId); changed = true; }
+  }
+}</code></pre>
+      <div class="warn"><strong>Vì sao 1 pass là sai:</strong> với <code class="inl">A escalated</code>, <code class="inl">B dependsOn A</code>, <code class="inl">C dependsOn B</code> — duyệt 1 lần theo thứ tự <code class="inl">[C,B,A]</code> sẽ thấy B "chưa ship" chứ chưa "blocked" khi xét C ⇒ bỏ sót C. Lặp tới fixpoint khiến kết quả <strong>độc lập với thứ tự</strong> các key.</div>
+      <div class="cs"><strong>Đối chiếu C#:</strong> <code>Object.entries(cards)</code> ≈ <code>foreach (var kvp in dict)</code> trả về cặp <code>[key, value]</code>. <code>for (const [k, v] of …)</code> là <strong>array destructuring</strong> (tách phần tử mảng vào biến, giống deconstruction tuple C#).</div>
+
+      <p><code class="inl">nextCard</code> trước khi duyệt sẽ <code class="inl">reconcileBlockedStatuses</code> (đồng bộ status <em>blocked</em> cho <strong>toàn bộ</strong> cards — fix bug "set blocked nhưng không bao giờ clear"), rồi duyệt <code class="inl">sequence</code>: bỏ qua shipped/escalated/blocked, bỏ card có dependency chưa ship, và nếu card kế tiếp thiếu spec/plan trên đĩa ⇒ trả <code class="inl">planning_needed</code>.</p>
+    </section>
+
+    <!-- ============ 7. SESSION.TS ============ -->
+    <section id="session">
+      <h2><span class="num">7</span> <code>session.ts</code> — bọc Claude Agent SDK</h2>
+      <p>Module <strong>DUY NHẤT</strong> được <code class="inl">import '@anthropic-ai/claude-agent-sdk'</code>. Nếu SDK nâng cấp, chỉ file này đổi (cô lập "SDK drift").</p>
+
+      <h3>7.1 · Pinned options (§D1) — cấu hình spawn cố định</h3>
+      <pre><div class="filebar">session.ts</div><code class="language-typescript">systemPrompt: { type: 'preset', preset: 'claude_code' }, // BẮT BUỘC để CLAUDE.md có hiệu lực
+settingSources: ['project'],                              // load config của TARGET repo
+plugins: [{ type: 'local', path: TRIBE_PLUGIN_DIR }],     // dùng agent tribe, KHÔNG dùng ~/.claude/agents
+permissionMode: 'bypassPermissions',                      // headless: không bao giờ treo chờ hỏi quyền</code></pre>
+      <p><code class="inl">TRIBE_PLUGIN_DIR = join(import.meta.dir, '..', '..')</code> — suy ra từ vị trí file, <strong>không hardcode path tuyệt đối</strong>. <code class="inl">import.meta.dir</code> ≈ <code class="inl">__dirname</code> (thư mục chứa file).</p>
+
+      <h3>7.2 · Parse từ typed <code>result</code>, KHÔNG scrape stdout</h3>
+      <pre><div class="filebar">session.ts</div><code class="language-typescript">const SHIPPED_RE = /SHIPPED\s+#?(\d+)\s+([0-9a-f]{7,40})/i;   // regex bắt "SHIPPED #123 abc1234"
+
+function parseResultMessage(message: SessionMessage): SessionResult {
+  const finalText = typeof message.result === 'string' ? message.result : '';
+  if (message.subtype !== 'success') return { outcome: 'error', ... };
+  const shipped = finalText.match(SHIPPED_RE);
+  if (shipped) return { outcome: 'shipped', pr: Number(shipped[1]), sha: shipped[2] };
+  if (NEEDS_DIRECTION_RE.test(finalText)) return { outcome: 'needs_direction', ... };
+  return { outcome: 'error', ... };
+}</code></pre>
+      <div class="cs"><strong>Đối chiếu C#:</strong> <code>SessionMessage</code> có index signature <code>[key: string]: unknown</code> — "object có thể có thêm key string bất kỳ, kiểu <code>unknown</code>". <code>unknown</code> ≈ <code>object</code> nhưng an toàn hơn (phải narrow/ép trước khi dùng, không như <code>any</code>).</div>
+
+      <h3>7.3 · Stream messages + timeout bằng <code>Promise.race</code></h3>
+      <pre><div class="filebar">session.ts — consumeSession</div><code class="language-typescript">for await (const message of sessionMessages) {   // ≈ await foreach (var m in IAsyncEnumerable)
+  if (message.type === 'system' &amp;&amp; message.subtype === 'init') {
+    io.onSessionStart(String(message.session_id ?? ''));   // ghi sessionId NGAY khi có (crash-safe)
+    logPath = `${config.logsDir}/${config.card}-${sessionId}.log`;
+  }
+  io.appendLog(logPath, JSON.stringify(message));
+  if (message.type === 'result') return parseResultMessage(message);
+}</code></pre>
+      <p>Timeout dùng <code class="inl">Promise.race([sessionPromise, timeoutPromise])</code> — "ai xong trước thắng", giống <code class="inl">Task.WhenAny</code>. Khi timeout, gọi <code class="inl">abortController.abort()</code> (giống <code class="inl">CancellationToken</code>).</p>
+      <div class="tip"><strong>Triết lý:</strong> <code class="inl">runSession</code> <strong>không bao giờ throw</strong> — mọi lỗi (spawn fail, giữa chừng fail, timeout) đều thành <code class="inl">SessionResult</code> có <code class="inl">outcome</code> rõ ràng. "Lỗi là kết quả báo cáo được, không phải exception."</div>
+    </section>
+
+    <!-- ============ 8. VERIFY.TS ============ -->
+    <section id="verify">
+      <h2><span class="num">8</span> <code>verify.ts</code> — 6 điểm kiểm chứng "đã shipped" (§D3)</h2>
+      <p><code class="inl">verifyShipped</code> chạy <strong>6 kiểm tra độc lập</strong>, <strong>không short-circuit</strong> (không dừng ở lỗi đầu) để báo cáo <em>mọi</em> điểm fail — vì kết quả này đi vào file escalation mà con người sẽ đọc.</p>
+
+      <div class="diagram">
+        <div class="cap">Diagram 6 · 6 điểm của verifyShipped (chạy hết, gộp kết quả)</div>
+        <div class="mermaid">
+flowchart LR
+  IN(["verifyShipped(card)"]) --> P1["① merged?<br/>gh api pulls/N"]
+  IN --> P2["② mergeCommit<br/>2 parents?<br/>(regular, NOT squash)"]
+  IN --> P3["③ mergeSha là<br/>ancestor origin/master?"]
+  IN --> P4["④ checksGreen?<br/>(+ waiver Sonar-504)"]
+  IN --> P5["⑤ worktree +<br/>branch đã dọn?"]
+  IN --> P6["⑥ schemaGuard<br/>(không đụng file lock)"]
+  P1 --> AGG{{"shipped = mọi điểm pass<br/>failedPoints = [đ. fail]"}}
+  P2 --> AGG
+  P3 --> AGG
+  P4 --> AGG
+  P5 --> AGG
+  P6 --> AGG
+
+  classDef pt fill:#fbfcf6,stroke:#a9c489,color:#3f562a;
+  classDef agg fill:#a9c489,stroke:#567336,color:#22301a;
+  class P1,P2,P3,P4,P5,P6 pt;
+  class AGG agg;
+        </div>
+      </div>
+
+      <pre><div class="filebar">verify.ts</div><code class="language-typescript">const points: VerifyPointResult[] = [
+  merged.point,                                // 1. PR đã merged?
+  await checkTwoParents(merged.mergeSha, ...),  // 2. merge commit 2 parent? (regular, KHÔNG squash)
+  await checkAncestor(merged.mergeSha, ...),    // 3. mergeSha là ancestor của origin/master?
+  await checkChecksGreen(card, ...),            // 4. CI xanh?
+  await checkWorktreeAndBranchGone(card, ...),  // 5. worktree + branch đã dọn?
+  await checkSchemaGuard(card, ...),            // 6. không đụng file schema-lock (trừ khi plan cho phép)
+];
+const failedPoints = points.filter((p) =&gt; !p.passed).map((p) =&gt; p.id);
+return { shipped: failedPoints.length === 0, points, failedPoints };</code></pre>
+
+      <ul class="clean">
+        <li><strong>Bước 2 (2 parents):</strong> merge thường có 2 parent; squash/rebase chỉ 1. Đây là cách <em>enforce luật "no-squash"</em> của owner bằng code.</li>
+        <li><strong>Bước 4 flake-waiver (D6):</strong> nếu check đỏ <em>duy nhất</em> khớp signature "SonarCloud 504" <strong>và</strong> diff chỉ toàn docs ⇒ tha. <code class="inl">docsOnlyPaths</code> rỗng thì <strong>fail-closed</strong> (không tha gì) — default ngược lại sẽ tha nhầm mọi code diff.</li>
+        <li><strong>Bước 6 schema guard</strong> đọc front-matter YAML tối giản của plan (chỉ 1 flag <code class="inl">allowsSchemaChange</code>, không phải YAML parser đầy đủ).</li>
+      </ul>
+      <div class="note"><code class="inl">{owner}</code>/<code class="inl">{repo}</code> trong <code class="inl">gh api repos/{owner}/{repo}/pulls/N</code> là <strong>placeholder của chính gh</strong> (gh tự thay từ repo trong cwd) — <em>không</em> phải interpolation của runner ⇒ giữ đúng stateless wall.</div>
+    </section>
+
+    <!-- ============ 9. GITHUB.TS ============ -->
+    <section id="github">
+      <h2><span class="num">9</span> <code>github.ts</code> — commit/push/PR/merge state (§D6)</h2>
+      <p>Helper "docs-PR" tự động: commit file state lên branch <code class="inl">campaign-state/&lt;card&gt;</code>, mở PR, poll CI, <strong>merge regular</strong> (không squash), xoá branch, ff-sync base branch. Toàn bộ trả <strong>outcome có cấu trúc, KHÔNG throw</strong> — vì nó cũng chạy trên đường escalation (mà lý do escalate thường CHÍNH LÀ CI hỏng).</p>
+      <pre><div class="filebar">github.ts — kiểu kết quả (union)</div><code class="language-typescript">export type CommitStateAndMergeResult = MergedResult | EscalateResult | CommitFailedResult;</code></pre>
+
+      <h3>9.1 · Poll CI với retry</h3>
+      <pre><div class="filebar">github.ts</div><code class="language-typescript">for (;;) {                                          // vòng lặp có điều kiện thoát bên trong
+  attempts += 1;
+  const result = await io.exec(['gh','pr','checks', String(pr), '--json','name,bucket,description'], {cwd});
+  const checks = result.exitCode === 0 ? safeParseChecks(result.stdout) : [];
+  const settled = queryOk &amp;&amp; checks.filter(isNotPassing).length === 0;
+  if (settled || attempts &gt; D6_MAX_RETRIES) return { checks, queryOk, attempts };
+  await io.sleep(D6_RETRY_SPACING_MS);              // 10 phút — nhưng qua seam nên test KHÔNG chờ thật
+}</code></pre>
+      <div class="tip"><code class="inl">D6_RETRY_SPACING_MS = 10*60*1000</code> đi qua <code class="inl">io.sleep</code> (seam) ⇒ test chạy bằng mili-giây, production chờ 10 phút thật.</div>
+
+      <h3>9.2 · Idempotent branch setup (F3)</h3>
+      <p>Lần retry, branch cũ có thể còn ⇒ dùng <code class="inl">git checkout -B</code> (create-or-reset) chứ không <code class="inl">-b</code> (fail nếu branch tồn tại), và <code class="inl">push --force</code> (branch này chỉ chứa state ephemeral nên ghi đè luôn đúng). Quan trọng: <strong>luôn khôi phục base branch ở mọi đường thoát</strong> (best-effort, nuốt lỗi cleanup để không đè outcome đã quyết).</p>
+    </section>
+
+    <!-- ============ 10. REPORT.TS ============ -->
+    <section id="report">
+      <h2><span class="num">10</span> <code>report.ts</code> — sinh báo cáo (§O5)</h2>
+      <p>Sinh <strong>1 cấu trúc <code>CampaignReport</code> chung</strong>, rồi render ra <strong>cả JSON và Markdown</strong> từ cùng structure đó ⇒ parity JSON↔MD là <em>cấu trúc</em>, không phải "hứa bằng tay".</p>
+      <pre><div class="filebar">report.ts</div><code class="language-typescript">export async function writeReport(state, run, dir, config, io): Promise&lt;CampaignReport&gt; {
+  const report = await buildCampaignReport(state, run, config, io);
+  io.writeFile(join(dir, REPORT_JSON_FILENAME), `${JSON.stringify(report, null, 2)}\n`);
+  io.writeFile(join(dir, REPORT_MD_FILENAME), renderReportMarkdown(report));
+  return report;
+}</code></pre>
+      <p>Hai quyết định quan trọng được tách thành <strong>hàm thuần unit-test riêng</strong> (để <code class="inl">run.ts</code> mỏng):</p>
+      <pre><div class="filebar">report.ts</div><code class="language-typescript">export function shouldWriteReport(p: { dryRun: boolean; exitCode: number }): boolean {
+  if (p.dryRun) return false;                  // dry-run: 0 side-effect
+  if (p.exitCode === EXIT_LOCKED) return false; // process bị từ chối KHÔNG được đè report của process sống
+  return true;
+}
+export function deriveExitReason(p): ExitReason {
+  if (p.threw) return 'error';
+  if (p.exitCode === EXIT_ESCALATED) return 'escalations_pending';
+  if (p.exitCode === EXIT_SESSION_INCOMPLETE) return 'session_incomplete';
+  if (p.hasMessage) return 'stop_requested';
+  return 'done';
+}</code></pre>
+      <div class="note"><code class="inl">report.ts</code> đọc <code class="inl">card.status</code> là <strong>authoritative</strong> — <em>không</em> tự tính lại fixpoint <code class="inl">dependsOn</code> (state.ts đã sở hữu việc đó). <code class="inl">blockedOn</code> suy từ <code class="inl">dependsOn</code> (dependency đầu tiên chưa ship).</div>
+    </section>
+
+    <!-- ============ 11. BRIEF + TYPES ============ -->
+    <section id="brief">
+      <h2><span class="num">11</span> <code>brief.ts</code> + <code>types.ts</code></h2>
+      <p><code class="inl">brief.ts</code> đọc <code class="inl">brief-template.md</code> (asset commit kèm) rồi thay placeholder <code class="inl">{{VAR}}</code>:</p>
+      <pre><div class="filebar">brief.ts</div><code class="language-typescript">function renderTemplate(template: string, vars: Record&lt;string, string&gt;): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) =&gt; {
+    if (!Object.prototype.hasOwnProperty.call(vars, key))
+      throw new Error(`unknown placeholder {{${key}}}`);   // placeholder lạ → fail loud
+    return vars[key] as string;
+  });
+}</code></pre>
+      <div class="cs"><strong>Đối chiếu C#:</strong> <code>Record&lt;string, string&gt;</code> ≈ <code>Dictionary&lt;string,string&gt;</code>. <code>\{\{(\w+)\}\}</code> khớp <code>{{TEN}}</code> — <code>\{</code> phải escape vì <code>{</code> là ký tự đặc biệt trong regex.</div>
+      <p><code class="inl">types.ts</code> chứa model dùng chung (<code class="inl">Card</code>, <code class="inl">CampaignState</code>, <code class="inl">CardStatus</code>…) ≈ thư mục <code class="inl">Models/</code> chứa POCO. Comment đặc biệt kỹ về việc <code class="inl">dependsOn</code>/<code class="inl">autoAnswerRounds</code> là optional-không-default để giữ round-trip byte-identical.</p>
+    </section>
+
+    <!-- ============ 12. STATE MACHINE ============ -->
+    <section id="status">
+      <h2><span class="num">12</span> Vòng đời một Card (state machine)</h2>
+      <p>5 trạng thái. Điểm mấu chốt: <code class="inl">running</code> luôn được <em>re-derive</em> từ git/gh (không tin file), và <code class="inl">blocked</code> là <em>derived</em> tính lại mỗi lần (không phải trạng thái được "ghi" bởi session).</p>
+      <div class="diagram">
+        <div class="cap">Diagram 7 · State machine của CardStatus</div>
+        <div class="mermaid">
+stateDiagram-v2
+  [*] --> staged: spec+plan trên master, chưa bắt đầu
+  staged --> running: onSessionStart (SDK cấp session_id)
+  running --> shipped: verifyShipped pass ✔️
+  running --> escalated: needs_direction / verify fail x2 🚩
+  staged --> blocked: (derived) dependency bị escalated/blocked
+  blocked --> staged: (derived) dependency đã ship → mở khoá
+  escalated --> running: owner ra ruling + --include-escalated ♻️
+  shipped --> [*]
+  escalated --> [*]: (terminal cho tới khi có người)
+
+  note right of blocked
+    KHÔNG do session ghi.
+    Tính lại tới fixpoint
+    mỗi lần nextCard() chạy.
+  end note
+  note right of running
+    KHÔNG tin từ file.
+    deriveCardPhase hỏi lại
+    git/gh mỗi khi khởi động.
+  end note
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 13. TỔNG KẾT ============ -->
+    <section id="tong-ket">
+      <h2><span class="num">13</span> Tổng kết — 7 điểm thiết kế nên nhớ</h2>
+      <div class="card">
+        <ul class="clean">
+          <li><strong>Seam / Dependency Injection ở mọi nơi</strong> → thuần &amp; test được 100% không đụng git/network/SDK thật.</li>
+          <li><strong>"File là data, git/gh là thẩm quyền"</strong> → <code class="inl">deriveCardPhase</code> luôn hỏi lại thực tại, không tin file (chống crash/resume, không mở PR trùng).</li>
+          <li><strong>Discriminated union + trả outcome thay vì throw</strong> → mọi lỗi là kết quả báo cáo được (<code class="inl">CardPhase</code>, <code class="inl">SessionResult</code>, <code class="inl">CommitStateAndMergeResult</code>…).</li>
+          <li><strong><code>blocked</code> là derived</strong>, tính lại tới fixpoint mỗi lần → độc lập thứ tự, không tin status cũ trên đĩa.</li>
+          <li><strong>Stateless wall</strong> → không hardcode repo/model/campaign; tất cả là CLI input.</li>
+          <li><strong>Kết thúc chắc chắn (structural)</strong> → Set <code class="inl">attempted</code> làm sequence co lại mỗi vòng, đảm bảo loop luôn dừng.</li>
+          <li><strong>Ship = verify độc lập</strong> → không tin dòng "SHIPPED" của agent; chạy lại 6 kiểm tra thật.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      🍵 Tribe Campaign Runner · tài liệu giải thích tự sinh · <code>plugins/tribe/scripts/runner/</code><br/>
+      Diagram bằng Mermaid · Syntax highlight bằng highlight.js · Tông màu matcha
+    </footer>
+  </main>
+</div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      fontFamily: 'Inter, sans-serif',
+      primaryColor: '#eaf0dd',
+      primaryTextColor: '#2c3d1e',
+      primaryBorderColor: '#8bab63',
+      lineColor: '#6f9147',
+      secondaryColor: '#e7dcc4',
+      tertiaryColor: '#fbfcf6',
+      noteBkgColor: '#faf1e0',
+      noteTextColor: '#4a3d1e',
+      noteBorderColor: '#ecd5a8',
+      actorBkg: '#cfe0b6',
+      actorBorder: '#567336',
+      actorTextColor: '#22301a',
+      signalColor: '#3f562a',
+      signalTextColor: '#3f562a',
+      labelBoxBkgColor: '#eaf0dd',
+      labelBoxBorderColor: '#8bab63',
+      loopTextColor: '#3f562a'
+    }
+  });
+
+  // highlight.js
+  hljs.highlightAll();
+
+  // TOC active-state on scroll
+  const links = [...document.querySelectorAll('#toc a')];
+  const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map.get(e.target.id);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
