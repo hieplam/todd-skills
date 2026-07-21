@@ -2,7 +2,7 @@
 
 > An agent *tribe* for the software development lifecycle. Each agent is a role in a prehistoric hunting tribe — every role answers **exactly one question** and **never steps on another's toes**.
 
-`tribe` is a plugin that bundles 5 agents into a 3-tier hierarchy plus 2 review gates. The "hunting tribe" metaphor isn't just for fun — it **encodes function into the name**, so that when you read the code/config you can immediately guess what each agent does, when it runs, and how far its authority reaches.
+`tribe` is a plugin that bundles 6 agents into a 3-tier hierarchy plus 2 review gates and 1 analysis specialist. The "hunting tribe" metaphor isn't just for fun — it **encodes function into the name**, so that when you read the code/config you can immediately guess what each agent does, when it runs, and how far its authority reaches.
 
 ---
 
@@ -15,6 +15,7 @@
 | 🏹 **Hunter** | Worker | (execution) — turn specs into real artifacts |
 | 👣 **Tracker** | Review gate (during dev) | *Does this diff follow our written rules?* |
 | 🔪 **Skinner** | Review gate (before "done") | *Is the work actually done?* |
+| 🧭 **Scout** | Analysis specialist (before the hunt) | *Where will this code break next?* |
 
 **Basic flow:**
 
@@ -95,6 +96,20 @@ Shaman  ──(vision: what/why)──▶  Warchief
 
 ---
 
+### 🧭 Scout — *code-analyzer (before the hunt / on demand)*
+
+**Answers:** *Where will this code break next, and what shape is inviting it?*
+
+**What it actually does:** Surveys **existing, working code** — no diff required — for the structural and readability problems that invite future bugs. Its method encodes hard-won review lessons: read the recorded decisions (ADRs/C3/docs) *before* the code; sweep at **three altitudes** (line, component structure, design-vs-framework); diff reality against the **simplest from-scratch implementation**; hunt **dead states** (code servicing a state that can never occur) and **hand-rolled framework primitives**; distrust sibling conventions (a pattern repeated N times is still a choice); never satisfice on a requested finding count. Prefers fixes that **delete** code over fixes that add abstraction, and distills every finding into a **rule candidate** — so Scout's findings become Tracker's checklist tomorrow. Read-only: it reports; it never edits.
+
+**Ownership:** The Scout is the **single source of truth** for *pre-emptive design/structure analysis of working code*. It inspects the **terrain** — where the ground will give way — before anyone commits to a path across it.
+
+**Why the name Scout:** The scout ranges ahead of the hunting party, reads the terrain, and reports hazards **without touching anything** — the party decides the route. That matches an analyzer that finds defect-inviting structure in code that "works fine today" and hands the map back, changing nothing itself.
+
+**Boundary with Tracker/Skinner:** Tracker checks a *diff* against rules already written; Skinner checks *claimed-done work* against its requirement contract. Scout analyzes *standing code* for what no rule covers yet — and feeds new rule candidates back to the rules files Tracker enforces.
+
+---
+
 ## The critical boundary: Tracker ≠ Skinner
 
 These two review agents must **never have their roles merged**. The orchestrator (Warchief) calls **both**, but at two different times for two different questions:
@@ -119,7 +134,7 @@ This split is **encoded right into the metaphor**: *a tracker naturally walks th
 
 ## Campaign runner
 
-Alongside the five agents, the plugin ships a **stateless capability script** —
+Alongside the six agents, the plugin ships a **stateless capability script** —
 [`scripts/runner/`](scripts/runner/README.md) — that drives a roadmap campaign's outer loop
 deterministically: pick the next staged card, run one fresh executor session, script-verify
 it shipped, record state, repeat. It hardcodes no repo/model/campaign value (every
@@ -145,6 +160,7 @@ semantics, escalation workflow, and known limitations.
 | 🏹 Hunter | Worker / implementer | (execution) | Code, commit, report |
 | 👣 Tracker | code-reviewer | Does the diff follow rules? | Advisory (BLOCK/APPROVE) |
 | 🔪 Skinner | adversarial-reviewer | Is the work actually done? | Evidence-backed **findings** — Warchief adjudicates (CONFIRMED/REFUTED/DEBT) |
+| 🧭 Scout | code-analyzer | Where will this code break next? | Advisory findings + rule candidates; read-only |
 
 ---
 
@@ -182,4 +198,4 @@ bash plugins/tribe/scripts/migrate-state.sh [repo-dir]
 
 ---
 
-*Plugin: `tribe` — Shaman · Warchief · Hunter · Tracker · Skinner*
+*Plugin: `tribe` — Shaman · Warchief · Hunter · Tracker · Skinner · Scout*
