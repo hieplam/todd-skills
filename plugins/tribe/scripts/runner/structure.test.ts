@@ -68,4 +68,22 @@ describe('structural contract', () => {
   test('run.ts is pure wiring: no node:fs / node:child_process import', () => {
     expect(allImportsOf('run.ts').filter((s) => WORLD.includes(s))).toEqual([]);
   });
+
+  // Ambient-state seal (kanna's no-restricted-syntax selectors, carried as a script rule
+  // until typescript-eslint supports TS >= 7.1 — plan Amendment A3, issue #10940).
+  function codeOf(file: string): string {
+    return readFileSync(join(DIR, file), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+  }
+  test('no ambient process.env read outside adapters', () => {
+    for (const f of CORE_FILES) {
+      expect({ file: f, bad: /process\.env\b/.test(codeOf(f)) }).toEqual({ file: f, bad: false });
+    }
+  });
+  test('process.exit only in the composition root (run.ts)', () => {
+    for (const f of CORE_FILES.filter((f) => f !== 'run.ts')) {
+      expect({ file: f, bad: /process\.exit\s*\(/.test(codeOf(f)) }).toEqual({ file: f, bad: false });
+    }
+  });
 });
