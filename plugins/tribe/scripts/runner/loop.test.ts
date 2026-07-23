@@ -7,10 +7,6 @@
 // the stateless-capability wall.
 import { describe, expect, mock, test } from 'bun:test';
 import {
-  EXIT_ESCALATED,
-  EXIT_LOCKED,
-  EXIT_OK,
-  EXIT_SESSION_INCOMPLETE,
   acquireLock,
   deriveCardPhase,
   extractMergeSha,
@@ -29,6 +25,7 @@ import {
   type PendingCommit,
   type RunLoopConfig,
 } from './loop.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
 import type { VerifyResult } from './verify.ts';

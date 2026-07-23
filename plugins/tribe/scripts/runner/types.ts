@@ -85,3 +85,14 @@ export interface CardResult {
 }
 
 export type NextCardResult = NoCardResult | PlanningNeededResult | CardResult;
+
+/** Process exit codes — the runner's shared vocabulary, homed in the kernel so leaf modules
+ * (report.ts) import them from here, never from the orchestrator (lesson L5: anything used
+ * by 2+ modules lives in the kernel). */
+export const EXIT_OK = 0;
+export const EXIT_LOCKED = 1;
+export const EXIT_ESCALATED = 2;
+export const EXIT_SESSION_INCOMPLETE = 3;
+/** "An unhandled exception surfaced after `runLoop` was entered" — consumed only by run.ts's
+ * `main()`; the exit code is a hint, the report is the truth (§O3). */
+export const EXIT_ERROR = 4;

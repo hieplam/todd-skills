@@ -17,15 +17,12 @@ import {
   type ReportRunInfo,
 } from './report.ts';
 import {
-  EXIT_ESCALATED,
-  EXIT_LOCKED,
-  EXIT_OK,
-  EXIT_SESSION_INCOMPLETE,
   runLoop,
   type ExecResult,
   type LoopIO,
   type RunLoopConfig,
 } from './loop.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { parseState } from './state.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';

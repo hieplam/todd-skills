@@ -54,8 +54,12 @@ describe('structural contract', () => {
   });
 
   // --- false today: flipped live by CU1 tasks ---
-  test.todo('leaf modules never import the orchestrator (only run.ts + tests may)'); // Task 2
-  test.todo('session.ts is pure: no SDK import outside session.adapter.ts'); // Task 3
-  test.todo('brief.ts is pure: no node:fs import'); // Task 4
-  test.todo('run.ts is pure wiring: no node:fs / node:child_process import'); // Task 5
+  test('leaf modules never import the orchestrator (only run.ts + tests may)', () => {
+    for (const f of CORE_FILES.filter((f) => f !== 'run.ts')) {
+      expect({ file: f, bad: allImportsOf(f).filter((s) => s === './loop.ts' || s === './loop') }).toEqual({ file: f, bad: [] });
+    }
+  });
+  test.todo('session.ts is pure: no SDK import outside session.adapter.ts', () => {}); // Task 3
+  test.todo('brief.ts is pure: no node:fs import', () => {}); // Task 4
+  test.todo('run.ts is pure wiring: no node:fs / node:child_process import', () => {}); // Task 5
 });

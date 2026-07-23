@@ -10,7 +10,6 @@ import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import {
-  EXIT_LOCKED,
   runLoop,
   stateDirOf,
   type ExecResult,
@@ -24,15 +23,7 @@ import { loadState } from './state.ts';
 import { sdkSpawnSession } from './session.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
 import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from './report.ts';
-
-/** run.ts's own exit code for "an unhandled exception surfaced after `runLoop` was entered"
- * (Task 3 design note: "any error after the state was loadable" is a real, distinct exit path
- * from `EXIT_LOCKED`/`EXIT_ESCALATED`/`EXIT_SESSION_INCOMPLETE`, none of which fit it). Lives
- * here, not in loop.ts/report.ts, because it is purely a process-exit-code concern of this
- * file's own `main()` wiring — `report.ts`'s `run.reason` ('error') is the artifact that
- * actually carries the meaning; this numeric code is only ever a hint (§O3: "the exit code is
- * a hint, the report is the truth"). */
-const EXIT_ERROR = 4;
+import { EXIT_ERROR } from './types.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 

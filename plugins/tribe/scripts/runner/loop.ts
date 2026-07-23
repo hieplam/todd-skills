@@ -8,6 +8,7 @@
 // "intelligence" it touches is the typed `SessionResult` a spawned session reports back.
 import { dirname, join } from 'node:path';
 import type { Card, CampaignState, NextCardResult, StateIO } from './types.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { loadState, nextCard, serializeState } from './state.ts';
 import { verifyShipped } from './verify.ts';
 import type { ExecResult, VerifyConfig, VerifyIO, VerifyResult } from './verify.ts';
@@ -366,11 +367,6 @@ interface ResolvedConfig extends RunLoopConfig {
   baseBranch: string;
   answersContent: string;
 }
-
-export const EXIT_OK = 0;
-export const EXIT_LOCKED = 1;
-export const EXIT_ESCALATED = 2;
-export const EXIT_SESSION_INCOMPLETE = 3;
 
 export type CardOutcome =
   | { kind: 'shipped'; cardId: string; commitResult: CommitStateAndMergeResult }
