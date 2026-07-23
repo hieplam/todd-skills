@@ -1,11 +1,9 @@
 // Pinned Claude Agent SDK query() options + session spawn/parse (Task 5b, spec §D1).
 //
-// This is the ONLY module in the runner that may import `@anthropic-ai/claude-agent-sdk`
-// (spec "SDK drift" risk note) — an SDK upgrade must only ever touch this file. Every other
-// module reaches a session through the `SessionIO` seam below, never the SDK package
-// directly.
+// PURE module: the SDK itself is imported only by `session.adapter.ts` (the zero-LLM wall).
+// This file owns the pinned option block and the message-parsing logic; every module reaches
+// a session through the `SessionIO` seam below, never the SDK package directly.
 import { join } from 'node:path';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 
 /** The tribe plugin's own directory (`plugins/tribe`), derived from this module's location
  * — NEVER a hardcoded absolute path (stateless-capability wall). This is what the SDK's
@@ -115,13 +113,6 @@ export function buildSessionOptions(
     options.resume = input.resume;
   }
   return options;
-}
-
-/** The real SDK spawn, wrapping `query()` — used to build the production `SessionIO`. Not
- * exercised by unit tests (it would hit the real SDK); the option-building and
- * message-parsing logic it depends on is fully covered without it. */
-export function sdkSpawnSession(params: SpawnSessionParams): AsyncIterable<SessionMessage> {
-  return query({ prompt: params.prompt, options: params.options }) as unknown as AsyncIterable<SessionMessage>;
 }
 
 const SHIPPED_RE = /SHIPPED\s+#?(\d+)\s+([0-9a-f]{7,40})/i;

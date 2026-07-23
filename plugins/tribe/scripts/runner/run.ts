@@ -20,7 +20,7 @@ import {
   type RunLoopConfig,
 } from './loop.ts';
 import { loadState } from './state.ts';
-import { sdkSpawnSession } from './session.ts';
+import { sdkSpawnSession } from './session.adapter.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
 import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from './report.ts';
 import { EXIT_ERROR } from './types.ts';
