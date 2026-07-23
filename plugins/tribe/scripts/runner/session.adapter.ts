@@ -1,7 +1,7 @@
 // session.adapter.ts — the runner's ONLY import of `@anthropic-ai/claude-agent-sdk`
 // (spec "SDK drift" risk note + the zero-LLM wall). An SDK upgrade touches this file and
 // nothing else; every other module reaches a session through the `SessionIO` seam.
-// Enforced by structure.test.ts + eslint.config.js, not by this comment.
+// Enforced by structure.test.ts (ESLint layer deferred until typescript-eslint supports TS >= 7.1 — plan Amendment A3).
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
 

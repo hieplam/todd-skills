@@ -1,7 +1,7 @@
 // run-io.adapter.ts — the production LoopIO: every real-world primitive the runner touches
 // (filesystem, child processes, clock, own pid) lives behind this one adapter leaf. Pure
 // modules receive it as the injected `io` parameter and never import these primitives
-// themselves (purity wall — enforced by structure.test.ts + eslint.config.js).
+// themselves (purity wall — enforced by structure.test.ts; ESLint layer deferred per Amendment A3).
 import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';

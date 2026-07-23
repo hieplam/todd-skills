@@ -3,7 +3,7 @@
 // Pure TypeScript orchestrator: every world-touching call (gh/git, fs, the SDK spawn, the
 // clock, the lock) goes through the injected `LoopIO` seam below — this module never
 // imports `child_process`, `fs`, or the SDK package itself (that stays confined to
-// session.ts, per spec §D1's "SDK drift" risk note). Tests drive a fully mocked `LoopIO` and
+// session.adapter.ts, per spec §D1's "SDK drift" risk note). Tests drive a fully mocked `LoopIO` and
 // never hit a real binary. Acceptance #5: this module makes zero model/LLM calls — the only
 // "intelligence" it touches is the typed `SessionResult` a spawned session reports back.
 import { dirname, join } from 'node:path';

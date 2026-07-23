@@ -1,11 +1,11 @@
 // CLI entrypoint for the campaign runner (Task 6, spec §2).
 //
-// `parseArgs` is pure (no I/O) and fully unit-tested. `main()` below it is the real-world
-// wiring — gh/git via `child_process`, the filesystem, the real SDK spawn (`sdkSpawnSession`
-// from session.ts), the system clock, and the process's own pid/liveness — and is
-// deliberately NOT unit-tested, same precedent as session.ts's `sdkSpawnSession`: the logic
-// it depends on (`runLoop`, `deriveCardPhase`, ...) is fully covered without touching a real
-// binary or the network.
+// `parseArgs` is pure (no I/O) and fully unit-tested. `main()` below it is the COMPOSITION
+// ROOT: the only module allowed to wire adapters — it builds the production `LoopIO` via
+// `buildRealIo` (run-io.adapter.ts, which owns every fs/child_process primitive and the real
+// SDK spawn from session.adapter.ts) and hands it to `runLoop`. `main()` is deliberately NOT
+// unit-tested: the logic it depends on (`runLoop`, `deriveCardPhase`, ...) is fully covered
+// without touching a real binary or the network (same precedent as the adapters themselves).
 import { dirname, join } from 'node:path';
 import {
   runLoop,
