@@ -3,11 +3,11 @@
 //
 // Directory roles (visible hierarchy, not filename convention):
 //   core/types.ts             shared kernel: imports nothing local; home of ALL shared vocabulary
-//   ports/                    IO seam interfaces only (added once ports/ exists)
+//   ports/                    every IO seam interface's single home
 //   adapters/*.adapter.ts     the ONLY files that may import world-touching modules (fs,
 //                             child_process, http, the Agent SDK)
 //   cli/main.ts               composition root: the only file that may VALUE-import adapters
-//                             and the orchestrator (core/loop.ts, or core/loop/** once split)
+//                             and the orchestrator (core/loop.ts's barrel + core/loop/** split)
 //   run.ts (root shim)        proves the external CLI contract; imports only cli/main.ts
 //   everything else in core/  pure core
 // Tests are exempt everywhere (they need real IO or mocks freely) — kanna's own exemption.
@@ -87,8 +87,8 @@ function resolveLocalImport(fromFile: string, specifier: string): string | null 
   return resolved.join('/');
 }
 
-/** True if a resolved local import path points at the orchestrator — `core/loop.ts` today,
- * or any module under `core/loop/` once §Stage-3 splits it into a directory + barrel. */
+/** True if a resolved local import path points at the orchestrator — `core/loop.ts` (the pure
+ * re-export barrel) or any module under `core/loop/` (its actual split implementation). */
 function isOrchestrator(resolved: string | null): boolean {
   return resolved === 'core/loop.ts' || resolved?.startsWith('core/loop/') === true;
 }
