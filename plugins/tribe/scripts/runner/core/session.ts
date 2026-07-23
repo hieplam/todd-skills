@@ -9,10 +9,10 @@ import { join } from 'node:path';
  * — NEVER a hardcoded absolute path (stateless-capability wall). This is what the SDK's
  * `plugins` option loads the tribe agents from, so a stale user-global `~/.claude/agents`
  * copy cannot shadow them inside an executor session (spec §D1, "Agent duplication" risk).
- * This module lives at `plugins/tribe/scripts/runner/session.ts` (ref-plugin-layout: the
- * runner is repo-invoked, not installed, so it sits under `scripts/`) — two directories up
+ * This module lives at `plugins/tribe/scripts/runner/core/session.ts` (ref-plugin-layout: the
+ * runner is repo-invoked, not installed, so it sits under `scripts/`) — three directories up
  * from here is `plugins/tribe`. */
-export const TRIBE_PLUGIN_DIR = join(import.meta.dir, '..', '..');
+export const TRIBE_PLUGIN_DIR = join(import.meta.dir, '..', '..', '..');
 
 /** Terminal outcome of one executor session, derived only from the typed `result` message —
  * never by scraping stdout (spec §D3: done is script-verified, agent SHIPPED is a signal). */

@@ -90,7 +90,7 @@ describe('runSession — §D1 option set (regression guard against SDK drift)', 
   });
 
   test('TRIBE_PLUGIN_DIR resolves on disk to the real plugins/tribe directory (not counted by eye)', () => {
-    // The runner lives at plugins/tribe/scripts/runner/ — two levels below plugins/tribe.
+    // The runner lives at plugins/tribe/scripts/runner/core/ — three levels below plugins/tribe.
     // Prove the resolved path is that exact directory by checking a file that only exists
     // there, not by asserting a string suffix alone.
     expect(TRIBE_PLUGIN_DIR.endsWith(join('plugins', 'tribe'))).toBe(true);
