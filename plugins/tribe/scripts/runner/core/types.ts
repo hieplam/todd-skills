@@ -51,16 +51,6 @@ export interface CampaignState {
   cards: Record<string, Card>;
 }
 
-/** io seam for nextCard's disk checks (D5 PLANNING_NEEDED detection). state.ts never calls
- * `fs` directly — every world-touching check is injected through this. */
-export interface StateIO {
-  /** The target repo root that `spec`/`plan` paths are resolved against (an input, per
-   * spec §2 — never hardcoded). */
-  repoRoot: string;
-  /** Returns true if the given (already-resolved) path exists on disk. */
-  fileExists(resolvedPath: string): boolean;
-}
-
 export interface NextCardOptions {
   /** Include `escalated` cards as eligible "next" candidates (`--include-escalated`). */
   includeEscalated?: boolean;
@@ -85,6 +75,21 @@ export interface CardResult {
 }
 
 export type NextCardResult = NoCardResult | PlanningNeededResult | CardResult;
+
+/** §D6/§D5 — the shape of the files a state commit is allowed to touch. Homed in the
+ * kernel (not `ports/ports.ts`) because it is used by 2+ modules (`core/loop.ts`'s
+ * `toCommitFileList`/`commitState`, and `ports.ts`'s own `PendingCommit`) — lesson L5:
+ * anything used by 2+ modules lives in the kernel. Exactly two named, single-purpose fields
+ * (never a bare `string[]` a caller could smuggle an arbitrary path into); `core/loop.ts`'s
+ * `assertStateOrEscalationPath` additionally asserts every path ends in `.json`/`.md` at
+ * runtime. */
+export interface StateCommitFiles {
+  /** The campaign state JSON path (relative to repoRoot) — always included. */
+  statePath: string;
+  /** An escalation markdown path (relative to repoRoot) — only present when this commit
+   * records an escalation. */
+  escalationPath?: string;
+}
 
 /** Process exit codes — the runner's shared vocabulary, homed in the kernel so leaf modules
  * (report.ts) import them from here, never from the orchestrator (lesson L5: anything used

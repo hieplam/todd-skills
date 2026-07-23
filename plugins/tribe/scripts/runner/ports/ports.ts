@@ -1,0 +1,207 @@
+// ports/ports.ts — the single home of every IO seam the runner injects. Pure type
+// declarations only (no runtime values): every world-touching effect (gh/git, fs, the clock,
+// the lock, the Agent SDK spawn) is reached through one of the interfaces below, never a
+// direct import of the world-touching module itself (that stays confined to `adapters/`).
+//
+// Small capability ports compose into the bigger per-module seams (`LoopIO`, `GithubIO`,
+// `LockIO`) so every existing mock/test in core/*.test.ts stays compatible for free —
+// TypeScript's structural typing means an object satisfying the composed interface already
+// satisfies each capability port, with no test rewritten.
+import type { StateCommitFiles } from '../core/types.ts';
+
+// ---------------------------------------------------------------------------------------
+// Capability ports — the smallest independent IO seams.
+// ---------------------------------------------------------------------------------------
+
+export interface ExecPort {
+  exec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult>;
+}
+export interface TimerPort {
+  sleep(ms: number): Promise<void>;
+}
+export interface ClockPort {
+  now(): string;
+}
+export interface FsPort {
+  fileExists(resolvedPath: string): boolean;
+  readFile(resolvedPath: string): Promise<string> | string;
+  writeFile(resolvedPath: string, content: string): void;
+}
+export interface LogPort {
+  appendLog(logPath: string, line: string): void;
+}
+export interface ProcessPort {
+  /** OS-level liveness probe (production: `process.kill(pid, 0)`, catching ESRCH). Chosen
+   * over a time-based staleness guess: a TTL either wedges a legitimately long-running
+   * session (TTL too short) or leaves a truly dead lock stuck for an arbitrary window (TTL
+   * too long); a liveness probe is exact in both directions and costs one syscall. */
+  isProcessAlive(pid: number): boolean;
+  currentPid(): number;
+}
+export interface LockStorePort {
+  readLock(): LockInfo | null;
+  writeLock(info: LockInfo): void;
+  removeLock(): void;
+}
+export interface PendingCommitPort {
+  readPendingCommit(): PendingCommit | null;
+  writePendingCommit(pc: PendingCommit): void;
+  clearPendingCommit(): void;
+}
+export interface SessionSpawnPort {
+  spawnSession(params: SpawnSessionParams): AsyncIterable<SessionMessage>;
+}
+
+// ---------------------------------------------------------------------------------------
+// ExecResult — unified. Previously defined TWICE, identically, in core/verify.ts and
+// core/github.ts (core/loop.ts re-exported the verify.ts one) — one definition now.
+// ---------------------------------------------------------------------------------------
+
+/** One shell/network call, injected. Production wires this to `child_process` + `gh`/`git`;
+ * tests drive a fully mocked matrix and never invoke a real binary. */
+export interface ExecResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+// ---------------------------------------------------------------------------------------
+// verify.ts's seam.
+// ---------------------------------------------------------------------------------------
+
+/** io seam for verify.ts. `exec` covers every gh/git call; `readFile` covers reading the
+ * card's plan file for the D3 point-6 front-matter guard — both are injected so this
+ * module stays pure TypeScript (test-first rule, global constraint). */
+export interface VerifyIO {
+  exec(cmd: string[], options?: { cwd?: string }): Promise<ExecResult>;
+  /** `resolvedPath` is already joined against `config.repoRoot` by this module — callers
+   * never see a bare relative path. */
+  readFile(resolvedPath: string): Promise<string> | string;
+}
+
+// ---------------------------------------------------------------------------------------
+// github.ts's seam. Composed from the capability algebra above — a bare `exec` + `sleep`.
+// ---------------------------------------------------------------------------------------
+
+/** World-touching seam. No direct `child_process`/`fs`/network import anywhere in
+ * `github.ts` — every git/gh call and every wait goes through this. */
+export interface GithubIO extends ExecPort, TimerPort {}
+
+// ---------------------------------------------------------------------------------------
+// report.ts's seam.
+// ---------------------------------------------------------------------------------------
+
+/** World-touching seam. No direct `fs`/`child_process` import anywhere in `report.ts`. */
+export interface ReportIO {
+  fileExists(resolvedPath: string): boolean;
+  readFile(resolvedPath: string): string | Promise<string>;
+  writeFile(resolvedPath: string, content: string): void;
+}
+
+// ---------------------------------------------------------------------------------------
+// state.ts's seam (moved out of core/types.ts — the kernel imports nothing local, so this
+// seam interface, which is pure vocabulary but not part of the shared data shapes, lives
+// here instead; state.ts/loop.ts/state.test.ts import it from here).
+// ---------------------------------------------------------------------------------------
+
+/** io seam for nextCard's disk checks (D5 PLANNING_NEEDED detection). state.ts never calls
+ * `fs` directly — every world-touching check is injected through this. */
+export interface StateIO {
+  /** The target repo root that `spec`/`plan` paths are resolved against (an input, per
+   * spec §2 — never hardcoded). */
+  repoRoot: string;
+  /** Returns true if the given (already-resolved) path exists on disk. */
+  fileExists(resolvedPath: string): boolean;
+}
+
+// ---------------------------------------------------------------------------------------
+// session.ts's seam + the pinned §D1 option shapes.
+// ---------------------------------------------------------------------------------------
+
+/** Loose supertype of the SDK's `SDKMessage` discriminated union — the runner only ever
+ * narrows on `type`/`subtype`/`session_id`/`result`, so it doesn't need (or want) to import
+ * the SDK's full internal message union outside session.adapter.ts. */
+export interface SessionMessage {
+  type: string;
+  subtype?: string;
+  session_id?: string;
+  result?: string;
+  [key: string]: unknown;
+}
+
+export interface SpawnSessionParams {
+  prompt: string;
+  options: PinnedSessionOptions;
+}
+
+/** The seam: production code funnels every session spawn through here so tests never hit
+ * the real SDK or the network. Log writing is injected too (`appendLog`). */
+export interface SessionIO {
+  spawnSession(params: SpawnSessionParams): AsyncIterable<SessionMessage>;
+  /** Invoked IMMEDIATELY on receipt of the first `system/init` message's `session_id` —
+   * before any further message is processed. This drives the crash-safe state write; the
+   * session id is SDK-assigned and cannot be known before spawn (spec §D1/§D4). */
+  onSessionStart(sessionId: string): void;
+  appendLog(logPath: string, line: string): void;
+}
+
+/** The exact §D1 pinned option set, pinned in this one module. Every field is load-bearing
+ * — do not "simplify" any away (see the per-field notes on `buildSessionOptions` in
+ * `core/session.ts`). */
+export interface PinnedSessionOptions {
+  cwd: string;
+  model: string;
+  systemPrompt: { type: 'preset'; preset: 'claude_code' };
+  settingSources: ['project'];
+  plugins: Array<{ type: 'local'; path: string }>;
+  permissionMode: 'bypassPermissions';
+  allowDangerouslySkipPermissions: true;
+  abortController: AbortController;
+  executable: 'bun';
+  resume?: string;
+}
+
+// ---------------------------------------------------------------------------------------
+// loop.ts's seams — the §D4 phase-derivation io, the §D2 single-instance lock, the pending
+// state-commit record, and the full orchestrator seam.
+// ---------------------------------------------------------------------------------------
+
+export interface DerivePhaseIO {
+  exec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult>;
+  fileExists(resolvedPath: string): boolean;
+}
+
+export interface LockInfo {
+  pid: number;
+  startedAt: string;
+}
+
+/** §D2 single-instance lock seam. Composed from the capability algebra above. */
+export interface LockIO extends LockStorePort, ProcessPort, ClockPort {}
+
+/** §D6/§D5 — the ONLY path this capability may use to commit files via
+ * `commitStateAndMerge`. `github.ts`'s D6 sonar waiver assumes its diff is docs-only BY
+ * CONSTRUCTION (it only ever commits campaign state files) — so this module must never be
+ * able to hand it a code file. `StateCommitFiles` (kernel: `core/types.ts`, since 2+ modules
+ * use it) has exactly two named, single-purpose fields (never a bare `string[]` the rest of
+ * the orchestrator could smuggle an arbitrary path into). */
+export interface PendingCommit {
+  card: string;
+  files: StateCommitFiles;
+  title: string;
+}
+
+/** The full seam the orchestrator (`core/loop.ts`) needs. Every field is injected;
+ * production wiring (`adapters/run-io.adapter.ts`) supplies the real gh/git/fs/SDK/clock/lock
+ * implementations. Composed from the capability algebra above — the member set is exactly
+ * today's `LoopIO`, just assembled from smaller named pieces instead of one flat interface. */
+export interface LoopIO
+  extends ExecPort,
+    TimerPort,
+    ClockPort,
+    FsPort,
+    LogPort,
+    ProcessPort,
+    LockStorePort,
+    PendingCommitPort,
+    SessionSpawnPort {}

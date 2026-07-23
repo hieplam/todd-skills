@@ -13,7 +13,8 @@ import {
   serializeState,
   nextCard,
 } from './state.ts';
-import type { Card, CampaignState, StateIO } from './types.ts';
+import type { Card, CampaignState } from './types.ts';
+import type { StateIO } from '../ports/ports.ts';
 
 function fixtureState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

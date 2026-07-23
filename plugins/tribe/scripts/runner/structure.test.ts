@@ -44,7 +44,9 @@ function walk(dir: string): string[] {
 const ROOT_SHIM = readdirSync(ROOT).includes('run.ts') ? ['run.ts'] : [];
 const SOURCE_FILES = [...walk('core'), ...walk('ports'), ...walk('adapters'), ...walk('cli'), ...ROOT_SHIM].sort();
 const CORE_FILES = SOURCE_FILES.filter((f) => f.startsWith('core/'));
+const PORTS_FILES = SOURCE_FILES.filter((f) => f.startsWith('ports/'));
 const ADAPTER_FILES = SOURCE_FILES.filter((f) => f.startsWith('adapters/'));
+const CLI_FILES = SOURCE_FILES.filter((f) => f.startsWith('cli/'));
 
 /** Module specifiers of every import in the file, including `import type`. */
 function allImportsOf(file: string): string[] {
@@ -165,5 +167,24 @@ describe('structural contract', () => {
     if (!ROOT_SHIM.length) return; // brand-new checkouts mid-migration; real repo always has it.
     const specifiers = allImportsOf('run.ts');
     expect(specifiers.length > 0 && specifiers.every((s) => s === './cli/main.ts')).toBe(true);
+  });
+
+  // --- ports/ (added once the IO-seam split lands: every seam interface's single home) ---
+  test('ports/ files are type-only, and only import from core/types.ts', () => {
+    for (const f of PORTS_FILES) {
+      const valueSpecifiers = valueImportsOf(f).filter((s) => s.startsWith('.'));
+      expect({ file: f, bad: valueSpecifiers }).toEqual({ file: f, bad: [] });
+      const localSpecifiers = allImportsOf(f).filter((s) => s.startsWith('.'));
+      const bad = localSpecifiers.filter((s) => resolveLocalImport(f, s) !== 'core/types.ts');
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
+  test('no interface X...IO / ...Port DECLARATION outside ports/ (re-exports are exempt)', () => {
+    for (const f of [...CORE_FILES, ...ADAPTER_FILES, ...CLI_FILES]) {
+      const src = codeOf(f);
+      const bad = [...src.matchAll(/\binterface\s+(\w*(?:IO|Port))\b/g)].map((m) => m[1] as string);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
   });
 });

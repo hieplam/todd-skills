@@ -7,11 +7,11 @@
 // never hit a real binary. Acceptance #5: this module makes zero model/LLM calls — the only
 // "intelligence" it touches is the typed `SessionResult` a spawned session reports back.
 import { dirname, join } from 'node:path';
-import type { Card, CampaignState, NextCardResult, StateIO } from './types.ts';
+import type { Card, CampaignState, NextCardResult, StateCommitFiles } from './types.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { loadState, nextCard, serializeState } from './state.ts';
 import { verifyShipped } from './verify.ts';
-import type { ExecResult, VerifyConfig, VerifyIO, VerifyResult } from './verify.ts';
+import type { VerifyConfig, VerifyIO, VerifyResult } from './verify.ts';
 import { commitStateAndMerge } from './github.ts';
 import type { CommitStateAndMergeResult, GithubConfig, GithubIO } from './github.ts';
 import { runSession } from './session.ts';
@@ -24,8 +24,17 @@ import type {
 } from './session.ts';
 import { BRIEF_TEMPLATE_PATH, executorBrief } from './brief.ts';
 import type { BriefCard, BriefState } from './brief.ts';
+import type {
+  DerivePhaseIO,
+  ExecResult,
+  LockIO,
+  LockInfo,
+  LoopIO,
+  PendingCommit,
+  StateIO,
+} from '../ports/ports.ts';
 
-export type { ExecResult };
+export type { DerivePhaseIO, ExecResult, LockIO, LockInfo, LoopIO, PendingCommit };
 
 // ---------------------------------------------------------------------------------------
 // §D4 — the resume matrix, derived from reality, never from the state file.
@@ -55,11 +64,6 @@ export interface DerivePhaseConfig {
   /** `--include-escalated`: bypasses the escalation-file short-circuit — the human has
    * already ruled and is deliberately forcing a retry of a previously escalated card. */
   includeEscalated: boolean;
-}
-
-export interface DerivePhaseIO {
-  exec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult>;
-  fileExists(resolvedPath: string): boolean;
 }
 
 interface PrLookup {
@@ -201,25 +205,6 @@ export async function deriveCardPhase(
 // holder is a stale crash artifact and must not wedge the runner forever.
 // ---------------------------------------------------------------------------------------
 
-export interface LockInfo {
-  pid: number;
-  startedAt: string;
-}
-
-export interface LockIO {
-  readLock(): LockInfo | null;
-  writeLock(info: LockInfo): void;
-  removeLock(): void;
-  /** OS-level liveness probe (production: `process.kill(pid, 0)`, catching ESRCH). Chosen
-   * over a time-based staleness guess (see the task-6 report): a TTL either wedges a
-   * legitimately long-running session (TTL too short) or leaves a truly dead lock stuck for
-   * an arbitrary window (TTL too long); a liveness probe is exact in both directions and
-   * costs one syscall. */
-  isProcessAlive(pid: number): boolean;
-  currentPid(): number;
-  now(): string;
-}
-
 export type LockResult =
   | { ok: true }
   | { ok: false; reason: string; heldBy: LockInfo };
@@ -257,19 +242,12 @@ export function isStopRequested(stopFilePath: string, io: { fileExists(p: string
 // §D6/§D5 — the ONLY path this capability may use to commit files via `commitStateAndMerge`.
 // `github.ts`'s D6 sonar waiver assumes its diff is docs-only BY CONSTRUCTION (it only ever
 // commits campaign state files) — so this module must never be able to hand it a code file.
-// `StateCommitFiles` has exactly two named, single-purpose fields (never a bare `string[]`
-// the rest of this module could smuggle an arbitrary path into), and `toCommitFileList`
-// additionally asserts every path ends in `.json`/`.md` at runtime. `commitState` is the
-// ONLY call site of `commitStateAndMerge` in this module — there is no second path in.
+// `StateCommitFiles` (kernel: `core/types.ts`) has exactly two named, single-purpose fields
+// (never a bare `string[]` the rest of this module could smuggle an arbitrary path into),
+// and `toCommitFileList` additionally asserts every path ends in `.json`/`.md` at runtime.
+// `commitState` is the ONLY call site of `commitStateAndMerge` in this module — there is no
+// second path in.
 // ---------------------------------------------------------------------------------------
-
-export interface StateCommitFiles {
-  /** The campaign state JSON path (relative to repoRoot) — always included. */
-  statePath: string;
-  /** An escalation markdown path (relative to repoRoot) — only present when this commit
-   * records an escalation. */
-  escalationPath?: string;
-}
 
 const ALLOWED_COMMIT_EXTENSIONS = ['.json', '.md'];
 
@@ -303,39 +281,11 @@ export async function commitState(
   return commitStateAndMerge(toCommitFileList(files), title, config, io);
 }
 
-export interface PendingCommit {
-  card: string;
-  files: StateCommitFiles;
-  title: string;
-}
-
 // ---------------------------------------------------------------------------------------
-// The full seam this module needs. Every field is injected; production wiring (run.ts)
-// supplies the real gh/git/fs/SDK/clock/lock implementations.
+// The full seam this module needs (`LoopIO`, plus `PendingCommit`) is homed in
+// `ports/ports.ts`. Every field is injected; production wiring (`adapters/run-io.adapter.ts`,
+// wired by `cli/main.ts`) supplies the real gh/git/fs/SDK/clock/lock implementations.
 // ---------------------------------------------------------------------------------------
-
-export interface LoopIO {
-  exec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult>;
-  sleep(ms: number): Promise<void>;
-
-  fileExists(resolvedPath: string): boolean;
-  readFile(resolvedPath: string): Promise<string> | string;
-  writeFile(resolvedPath: string, content: string): void;
-
-  readLock(): LockInfo | null;
-  writeLock(info: LockInfo): void;
-  removeLock(): void;
-  isProcessAlive(pid: number): boolean;
-  currentPid(): number;
-  now(): string;
-
-  readPendingCommit(): PendingCommit | null;
-  writePendingCommit(pc: PendingCommit): void;
-  clearPendingCommit(): void;
-
-  spawnSession(params: SpawnSessionParams): AsyncIterable<SessionMessage>;
-  appendLog(logPath: string, line: string): void;
-}
 
 export interface RunLoopConfig {
   /** `--repo` */

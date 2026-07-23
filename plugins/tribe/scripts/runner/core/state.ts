@@ -5,7 +5,8 @@
 // `child_process`, or performs network I/O.
 import { join } from 'node:path';
 import { z } from 'zod';
-import type { Card, CampaignState, NextCardOptions, NextCardResult, StateIO } from './types.ts';
+import type { Card, CampaignState, NextCardOptions, NextCardResult } from './types.ts';
+import type { StateIO } from '../ports/ports.ts';
 
 /** The only major version this runner understands today (D2). */
 export const CURRENT_STATE_VERSION = 1;

@@ -7,24 +7,9 @@
 // this module never imports `child_process`, `fs`, or performs network I/O itself.
 import { join } from 'node:path';
 import type { Card } from './types.ts';
+import type { ExecResult, VerifyIO } from '../ports/ports.ts';
 
-/** One shell/network call, injected. Production wires this to `child_process` +
- * `gh`/`git`; tests drive a fully mocked matrix and never invoke a real binary. */
-export interface ExecResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}
-
-/** io seam for verify.ts. `exec` covers every gh/git call; `readFile` covers reading the
- * card's plan file for the D3 point-6 front-matter guard — both are injected so this
- * module stays pure TypeScript (test-first rule, global constraint). */
-export interface VerifyIO {
-  exec(cmd: string[], options?: { cwd?: string }): Promise<ExecResult>;
-  /** `resolvedPath` is already joined against `config.repoRoot` by this module — callers
-   * never see a bare relative path. */
-  readFile(resolvedPath: string): Promise<string> | string;
-}
+export type { ExecResult, VerifyIO };
 
 /** Everything verify.ts needs from campaign config — deliberately a narrow, LOCAL type
  * (not `CampaignState`). `schemaLockPaths`/`docsOnlyPaths` are campaign config carried by the
