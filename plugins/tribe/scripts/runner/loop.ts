@@ -352,7 +352,6 @@ export interface RunLoopConfig {
   model: string;
   /** `--session-timeout`, in ms */
   sessionTimeoutMs?: number;
-  maxTurns?: number;
   /** `--cards` */
   cardsFilter?: string[];
   /** `--max-cards` */
@@ -674,7 +673,6 @@ function sessionConfigFor(cardId: string, resolved: ResolvedConfig): RunSessionC
   return {
     repoRoot: resolved.repoRoot,
     model: resolved.model,
-    maxTurns: resolved.maxTurns,
     sessionTimeoutMs: resolved.sessionTimeoutMs,
     logsDir: resolved.logsDir,
     card: cardId,

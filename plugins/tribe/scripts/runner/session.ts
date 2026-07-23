@@ -38,8 +38,6 @@ export interface RunSessionConfig {
   repoRoot: string;
   /** `--model` input: executor model tier. Never defaulted here — always caller-supplied. */
   model: string;
-  /** `--session-timeout`-derived turn cap, if the caller wants one. */
-  maxTurns?: number;
   /** `--session-timeout` input, in ms: wall-clock abort for this session. */
   sessionTimeoutMs?: number;
   /** `--logs-dir` input: session log files land at `<logsDir>/<card>-<sessionId>.log`. */
@@ -85,7 +83,6 @@ export interface PinnedSessionOptions {
   plugins: Array<{ type: 'local'; path: string }>;
   permissionMode: 'bypassPermissions';
   allowDangerouslySkipPermissions: true;
-  maxTurns?: number;
   abortController: AbortController;
   executable: 'bun';
   resume?: string;
@@ -105,7 +102,6 @@ export function buildSessionOptions(
     plugins: [{ type: 'local', path: TRIBE_PLUGIN_DIR }], // tribe agents, never ~/.claude/agents
     permissionMode: 'bypassPermissions', // owner-ruled: headless, never hangs
     allowDangerouslySkipPermissions: true, // required by the SDK for the above
-    maxTurns: config.maxTurns,
     abortController,
     executable: 'bun',
   };

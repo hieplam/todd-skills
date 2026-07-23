@@ -67,7 +67,7 @@ describe('runSession — §D1 option set (regression guard against SDK drift)', 
       ]);
     };
 
-    const config = fixtureConfig({ maxTurns: 12 });
+    const config = fixtureConfig();
     await runSession({ brief: 'do the thing' }, config, io);
 
     expect(capturedOptions).toBeDefined();
@@ -79,7 +79,6 @@ describe('runSession — §D1 option set (regression guard against SDK drift)', 
     expect(options.plugins).toEqual([{ type: 'local', path: TRIBE_PLUGIN_DIR }]);
     expect(options.permissionMode).toBe('bypassPermissions');
     expect(options.allowDangerouslySkipPermissions).toBe(true);
-    expect(options.maxTurns).toBe(12);
     expect(options.abortController).toBeInstanceOf(AbortController);
     expect(options.executable).toBe('bun');
     expect(options.resume).toBeUndefined();
