@@ -556,14 +556,19 @@ function buildEscalationMarkdown(
   ].join('\n');
 }
 
-async function escalateCard(
-  cardId: string,
-  reason: string,
-  detail: string,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<CardOutcome> {
+/** The per-card working set threaded through every card-scoped function. `card` is
+ * deliberately NOT a member: it is always derived as `ctx.state.cards[ctx.cardId]` at point
+ * of use, so the invariant "card IS the state entry" holds by construction (a separately
+ * threaded `card` invites a `{...card}` copy that silently never persists). */
+interface CardCtx {
+  cardId: string;
+  state: CampaignState;
+  resolved: ResolvedConfig;
+  io: LoopIO;
+}
+
+async function escalateCard(ctx: CardCtx, reason: string, detail: string): Promise<CardOutcome> {
+  const { cardId, state, resolved, io } = ctx;
   const escalationRelPath = `${resolved.escalationsDir}/${cardId}.md`;
   const markdown = buildEscalationMarkdown(cardId, reason, detail, resolved);
   // D5: the local escalation file + exit code stand alone even if the commit below fails —
@@ -589,14 +594,9 @@ async function escalateCard(
   return { kind: 'escalated', cardId, escalationPath: escalationRelPath, reason, commitResult };
 }
 
-async function shipCard(
-  cardId: string,
-  card: Card,
-  verifyResult: VerifyResult,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<CardOutcome> {
+async function shipCard(ctx: CardCtx, verifyResult: VerifyResult): Promise<CardOutcome> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   card.status = 'shipped';
   card.mergeSha = extractMergeSha(verifyResult) ?? card.mergeSha;
   card.updatedAt = io.now();
@@ -654,12 +654,9 @@ function buildStateDigest(cardId: string, card: Card, resumeFailureReason: strin
   ].join('\n');
 }
 
-function buildSessionIOForCard(
-  card: Card,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): SessionIO {
+function buildSessionIOForCard(ctx: CardCtx): SessionIO {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   return {
     spawnSession: (params) => io.spawnSession(params),
     appendLog: (path, line) => io.appendLog(path, line),
@@ -686,7 +683,9 @@ function sessionConfigFor(cardId: string, resolved: ResolvedConfig): RunSessionC
 
 /** REVERT_AND_REDO: delete the stale worktree + branch (local and remote) so a fresh session
  * starts from a clean slate — the doctrine B5's executor proved (spec §D4). */
-async function performRevertAndRedo(card: Card, resolved: ResolvedConfig, io: LoopIO): Promise<void> {
+async function performRevertAndRedo(ctx: CardCtx): Promise<void> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   const branch = card.branch;
   if (!branch) return;
 
@@ -714,19 +713,14 @@ async function performRevertAndRedo(card: Card, resolved: ResolvedConfig, io: Lo
  * session carrying a state digest. `revert_and_redo` and a blind `fresh` (no digest) just spawn
  * fresh with the plain brief; a `fresh` phase carrying a digest (F8: open PR, no sessionId)
  * spawns fresh too, but with that digest prepended — never blind. */
-async function runCardSession(
-  cardId: string,
-  phase: CardPhase,
-  card: Card,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<SessionResult> {
+async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<SessionResult> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   const sessionConfig = sessionConfigFor(cardId, resolved);
 
   if (phase.kind === 'resume') {
     const prompt = phase.reason === 'pr_open' ? CONTINUE_PR_OPEN_PROMPT : CONTINUE_BRANCH_PROMPT;
-    const resumeIO = buildSessionIOForCard(card, state, resolved, io);
+    const resumeIO = buildSessionIOForCard(ctx);
     const resumeResult = await runSession(
       { brief: prompt, resume: phase.sessionId },
       sessionConfig,
@@ -743,7 +737,7 @@ async function runCardSession(
       `${digest}\n\n---\n\n${resolved.answersContent}`,
       resolved.briefTemplate,
     );
-    const freshIO = buildSessionIOForCard(card, state, resolved, io);
+    const freshIO = buildSessionIOForCard(ctx);
     return runSession({ brief }, sessionConfig, freshIO);
   }
 
@@ -754,17 +748,12 @@ async function runCardSession(
       ? `${phase.digest}\n\n---\n\n${resolved.answersContent}`
       : resolved.answersContent;
   const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent, resolved.briefTemplate);
-  const freshIO = buildSessionIOForCard(card, state, resolved, io);
+  const freshIO = buildSessionIOForCard(ctx);
   return runSession({ brief }, sessionConfig, freshIO);
 }
 
-async function actOnCard(
-  cardId: string,
-  phase: CardPhase,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<CardOutcome> {
+async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOutcome> {
+  const { cardId, state, resolved, io } = ctx;
   const card = state.cards[cardId];
 
   if (phase.kind === 'verify_only') {
@@ -776,16 +765,16 @@ async function actOnCard(
     };
     const result = await verifyWithRetry(card, verifyConfig, io);
     if (result.shipped) {
-      return shipCard(cardId, card, result, state, resolved, io);
+      return shipCard(ctx, result);
     }
-    return escalateCard(cardId, 'verify_failed_twice', formatVerifyFailure(result), state, resolved, io);
+    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result));
   }
 
   if (phase.kind === 'revert_and_redo') {
-    await performRevertAndRedo(card, resolved, io);
+    await performRevertAndRedo(ctx);
   }
 
-  const sessionResult = await runCardSession(cardId, phase, card, state, resolved, io);
+  const sessionResult = await runCardSession(ctx, phase);
 
   if (sessionResult.outcome === 'shipped') {
     card.pr = sessionResult.pr ?? card.pr;
@@ -796,13 +785,13 @@ async function actOnCard(
     };
     const result = await verifyWithRetry(card, verifyConfig, io);
     if (result.shipped) {
-      return shipCard(cardId, card, result, state, resolved, io);
+      return shipCard(ctx, result);
     }
-    return escalateCard(cardId, 'verify_failed_twice', formatVerifyFailure(result), state, resolved, io);
+    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result));
   }
 
   if (sessionResult.outcome === 'needs_direction') {
-    return escalateCard(cardId, 'needs_direction', sessionResult.finalText, state, resolved, io);
+    return escalateCard(ctx, 'needs_direction', sessionResult.finalText);
   }
 
   // 'error' or 'timeout' with no further D4 fallback available (a fresh/revert_and_redo
@@ -910,16 +899,11 @@ async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopI
     const nc = filteredNextCard(state, resolved, io, attempted);
     if (nc.kind === 'done') break;
 
+    const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
+
     if (nc.kind === 'planning_needed') {
       attempted.add(nc.cardId);
-      const outcome = await escalateCard(
-        nc.cardId,
-        'planning_needed',
-        `Missing on disk: ${nc.missing.join(', ')}`,
-        state,
-        resolved,
-        io,
-      );
+      const outcome = await escalateCard(ctx, 'planning_needed', `Missing on disk: ${nc.missing.join(', ')}`);
       processed.push(outcome);
       worked += 1;
       continue;
@@ -946,7 +930,7 @@ async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopI
       continue;
     }
 
-    const outcome = await actOnCard(nc.cardId, phase, state, resolved, io);
+    const outcome = await actOnCard(ctx, phase);
     attempted.add(nc.cardId);
     processed.push(outcome);
     worked += 1;
