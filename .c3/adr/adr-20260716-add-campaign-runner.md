@@ -1,6 +1,6 @@
 ---
 id: adr-20260716-add-campaign-runner
-c3-seal: ec8eb508cd30bced624ff53fb5a4967f4caf213cc03b6a432bdc7e0f5d370c3c
+c3-seal: f2f809c1510ce52a8d7888408472b55cbfd98f8c4b0f0bbbd391b65c3308c44a
 title: add-campaign-runner
 type: adr
 goal: |-
@@ -114,7 +114,7 @@ self-contradictory at rest.
 | --- | --- | --- |
 | bypassPermissions lets a spawned session run anything the shell can | Owner-ruled and accepted. Contained by: private repos, worktree isolation, script-side verification of every claim, the STOP file, and a wall-clock abort | session.ts pins permissionMode: 'bypassPermissions' + allowDangerouslySkipPermissions in ONE module; --session-timeout drives an AbortController |
 | Mocked seams validate the logic but not the commands — a plausible-but-wrong invocation passes every test | Proved real, not theoretical: gh api pulls/<pr> (copied literally from the spec's shorthand) 404s and would have failed verification for EVERY card while 25 tests passed. Now repos/{owner}/{repo}/pulls/<pr>. Every gh/git string was executed against the real CLI before being trusted | gh api repos/{owner}/{repo}/pulls/36 → {"merged":true,...}; gh api pulls/36 → 404. Also verified live: git rev-list --parents, git merge-base --is-ancestor, git worktree list --porcelain, git ls-remote --heads |
-| SDK drift silently changes option/message shapes | All query() options pinned in one module (session.ts); an upgrade touches one file. Every §D1 fact was verified against the installed sdk.d.ts rather than memory | session_id confirmed on SDKSystemMessage; SettingSource = 'user'|'project'|'local'; executable?: 'bun'|'deno'|'node'; SDKResultSuccess.result: string |
+| SDK drift silently changes option/message shapes | All query() options pinned in one module (session.ts); an upgrade touches one file. Every §D1 fact was verified against the installed sdk.d.ts rather than memory | session_id confirmed on SDKSystemMessage; SettingSource = 'user' |
 | A stale user-global ~/.claude/agents copy shadows the plugin's agent definitions inside executor sessions | Sessions load agents via the SDK plugins: [{type:'local', path: TRIBE_PLUGIN_DIR}] option only, never from user scope. TRIBE_PLUGIN_DIR is derived from import.meta.dir, never hardcoded | Proven post-relocation: resolves to .../plugins/tribe, with .claude-plugin/plugin.json and agents/warchief.md reachable from it |
 | The runner auto-waives a red check on a code diff (D6 forbids this absolutely) | github.ts's waiver assumes its diff is docs-only BY CONSTRUCTION, so the loop is constrained to pass it state/escalation files only; verify.ts's docs-only path set is campaign config and an EMPTY list fails closed (nothing counts as docs-only) rather than waiving everything | github.test.ts asserts a non-advisory red returns escalate and that no merge command runs; verify.test.ts asserts the sonar-504 signature does NOT waive a code diff |
 | State/reality divergence — the state file lies about what shipped | Structural: "the file is data, gh/git is authority". Every card's phase is re-derived from GitHub on each start (D4); a card is accepted only when the six-point replay passes (D3) | loop.test.ts covers every row of the D4 resume matrix |
@@ -126,7 +126,7 @@ self-contradictory at rest.
 | verifyShipped (D3 six-point replay) | Rejects an agent's SHIPPED claim unless the PR is merged, the merge commit has exactly 2 parents (squash/rebase fails — this is what makes the no-squash rule mechanical), the sha is an ancestor of origin/master, checks are green, the worktree/branch are gone, and the schema guard is clean | plugins/tribe/scripts/runner/verify.test.ts |
 | bun test in plugins/tribe/scripts/runner/ | 114 tests over the loop, resume matrix, escalation, verification, D6 retry/waiver policy, and CLI; all seams mocked, no network | bun test → 114 pass / 0 fail |
 | bunx tsc --noEmit | Type-checks the pinned §D1 option block against the SDK's real Options type — a wrong option shape fails the gate rather than failing at runtime | exit 0 |
-| Stateless-capability grep | No repo name, absolute path, model name, or campaign value in the runner source | grep -rniE "ai-dict|/Users/" plugins/tribe/scripts/runner --include=*.ts → only a test asserting absence |
+| Stateless-capability grep | No repo name, absolute path, model name, or campaign value in the runner source | grep -rniE "ai-dict |
 | install.sh component loop | With the runner under scripts/, plugins/tribe/*/ yields only whitelisted names — no "unsupported component type" warning | Simulated over plugins/tribe/*/: agents, claude-md, evals, scripts — all OK |
 
 ## Verification
@@ -136,7 +136,7 @@ self-contradictory at rest.
 | cd plugins/tribe/scripts/runner && bun test | 114 pass / 0 fail / 279 expect() calls |
 | cd plugins/tribe/scripts/runner && bunx tsc --noEmit | exit 0, no output |
 | gh api repos/{owner}/{repo}/pulls/36 vs gh api pulls/36 | {"merged":true,"merge_commit_sha":"48d691e…"} vs {"message":"Not Found","status":"404"} — proves the corrected invocation and the original defect |
-| git rev-list --parents -n 1 48d691e | wc -w | 3 tokens (sha + 2 parents) ⇒ the 2-parent regular-merge check is real; a squash yields 1 parent and fails |
+| git rev-list --parents -n 1 48d691e | wc -w |
 | TRIBE_PLUGIN_DIR resolution post-relocation | resolves to <repo>/plugins/tribe; .claude-plugin/plugin.json and agents/warchief.md both reachable ⇒ executor sessions load the tribe agents |
 | install.sh whitelist over plugins/tribe/*/ | agents, claude-md, evals, scripts — zero unsupported-component warnings |
 | grep -rn "squash" .c3/ after apply | No surviving claim that the tribe squash-merges |

@@ -1,6 +1,6 @@
 ---
 id: adr-20260716-enforce-no-squash-merge
-c3-seal: d7c2c0653dbcf05ef2aa0a6591bef02a2edcc9ee57dc2686984e7bbe4a325508
+c3-seal: 5a0889bd9a9e9d508b6df98990d48740e586152af571681d59c371e7dc90e65b
 title: enforce-no-squash-merge
 type: adr
 goal: |-
@@ -73,7 +73,7 @@ change-unit updating the rule **and every implementation in its Scope together**
 | Check | Result |
 | --- | --- |
 | c3x check --only rule-no-squash-merge | ok: true |
-| git rev-list --parents -n 1 d6de196f102b36241413e41b01448b2c012e57ad | wc -w | 3 tokens (commit + 2 parents) — the owner's real merge is a regular merge, the shape this rule mandates and the old verify-shipped check rejected |
+| git rev-list --parents -n 1 d6de196f102b36241413e41b01448b2c012e57ad | wc -w |
 | grep -rn -i squash plugins/tribe/agents/ | every surviving hit is a deliberate "never squash" prohibition; zero instructions to squash |
 | bash plugins/verify-shipped/skills/verify-shipped/scripts/verify-shipped.sh against PR #37 | the merge-strategy check PASSES after the fix (it FAILS today) |
 | c3x check --only c3-215 and --only c3-217 after apply | ok: true; both cite rule-no-squash-merge |
