@@ -159,6 +159,19 @@ export interface PinnedSessionOptions {
   abortController: AbortController;
   executable: 'bun';
   resume?: string;
+  /** PreToolUse deny-hook enforcing the anti-livelock wall (a backgrounded job dies with the
+   * one-shot session that started it). Prose in the brief alone failed six workers in the
+   * 2026-07-17 incident, so the rule is enforced at the permission layer too. */
+  hooks: { PreToolUse: Array<{ hooks: Array<(input: unknown) => Promise<HookDecision>> }> };
+}
+
+/** What a PreToolUse hook returns: either nothing (allow) or an explicit deny. */
+export interface HookDecision {
+  hookSpecificOutput?: {
+    hookEventName: 'PreToolUse';
+    permissionDecision: 'deny';
+    permissionDecisionReason: string;
+  };
 }
 
 // ---------------------------------------------------------------------------------------

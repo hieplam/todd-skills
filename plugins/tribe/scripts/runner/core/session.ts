@@ -4,9 +4,9 @@
 // This file owns the pinned option block and the message-parsing logic; every module reaches
 // a session through the `SessionIO` seam below, never the SDK package directly.
 import { join } from 'node:path';
-import type { PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams } from '../ports/ports.ts';
+import type { HookDecision, PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams } from '../ports/ports.ts';
 
-export type { PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams };
+export type { HookDecision, PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams };
 
 /** The tribe plugin's own directory (`plugins/tribe`), derived from this module's location
  * — NEVER a hardcoded absolute path (stateless-capability wall). This is what the SDK's
@@ -49,6 +49,44 @@ export interface RunSessionConfig {
   card: string;
 }
 
+/** The reason text a denied backgrounding attempt reports back to the executor. Phrased as
+ * an instruction, not just a refusal, so the session's next move is obvious. */
+export const BACKGROUNDING_DENIED_REASON =
+  'Backgrounding is disabled for campaign executor sessions: this session ends the moment it ' +
+  'stops calling tools, and a backgrounded job dies with it. Re-run this call in the ' +
+  'foreground with timeout: 600000 (Bash) or run_in_background: false (Agent/Task). If the ' +
+  'work cannot fit in 600s, split it by exact file name and run each part in the foreground.';
+
+/** PURE: decides whether one PreToolUse event is an attempt to background work.
+ *
+ * This is the enforcement half of the anti-livelock wall. The 2026-07-17 campaign incident
+ * killed 6 of 14 workers exactly this way — a worker backgrounded the ~5m30s e2e suite, said
+ * "I'll wait for it to finish", and that sentence WAS its final message, so the session died
+ * on the spot and took the job with it. The brief already forbids this in prose; prose failed
+ * six times, so the same rule is enforced here where the model cannot talk its way past it.
+ *
+ * Bash is denied on `run_in_background: true`; Agent/Task is denied unless it explicitly
+ * opts out with `run_in_background: false`, because those tools background BY DEFAULT — an
+ * omitted field is the dangerous case, not the safe one. */
+export function decideBackgroundingHook(input: unknown): HookDecision {
+  const event = (input ?? {}) as { tool_name?: unknown; tool_input?: unknown };
+  const toolName = typeof event.tool_name === 'string' ? event.tool_name : '';
+  const toolInput = (event.tool_input ?? {}) as { run_in_background?: unknown };
+  const requested = toolInput.run_in_background;
+
+  const backgrounds =
+    toolName === 'Bash' ? requested === true : (toolName === 'Agent' || toolName === 'Task') && requested !== false;
+
+  if (!backgrounds) return {};
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: BACKGROUNDING_DENIED_REASON,
+    },
+  };
+}
+
 /** Builds the §D1 option block verbatim. */
 export function buildSessionOptions(
   input: RunSessionInput,
@@ -65,6 +103,8 @@ export function buildSessionOptions(
     allowDangerouslySkipPermissions: true, // required by the SDK for the above
     abortController,
     executable: 'bun',
+    // Anti-livelock wall, enforced (not merely stated in the brief) — see decideBackgroundingHook.
+    hooks: { PreToolUse: [{ hooks: [(hookInput: unknown) => Promise.resolve(decideBackgroundingHook(hookInput))] }] },
   };
   if (input.resume) {
     options.resume = input.resume;
