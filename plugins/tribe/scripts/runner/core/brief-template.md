@@ -29,6 +29,22 @@ scope beyond this card.
 - Stay inside this card's plan. No scope creep, no adjacent refactors, no speculative
   generality.
 
+## Session liveness (hard wall — this is what kills runs)
+
+Your session ends the instant you stop calling tools. There is no human to wake you, and no
+notification can reach you. A backgrounded job dies with you. Therefore:
+
+- **Never** background anything, and **never** end a turn to wait for something.
+- Every Bash call that runs tests/builds/e2e: pass `timeout: 600000` (10 min, the maximum)
+  and never `run_in_background`. A 6-minute foreground e2e run is normal and correct.
+- Every Agent/Task call: pass `run_in_background: false`. Sub-agents background by DEFAULT,
+  which will kill you.
+- If a command genuinely cannot fit in 600s, split it by exact spec/test file name and run
+  each part in the foreground.
+
+A tool call that tries to background is blocked at the permission layer and returns an
+error — that block is this wall enforcing itself, not a bug to work around.
+
 ## Evidence policy
 
 Every task is test-first: a failing test before the code, gates (formatter/linter/
