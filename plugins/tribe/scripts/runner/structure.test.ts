@@ -62,6 +62,8 @@ describe('structural contract', () => {
   test('session.ts is pure: no SDK import outside session.adapter.ts', () => {
     expect(allImportsOf('session.ts').includes('@anthropic-ai/claude-agent-sdk')).toBe(false);
   });
-  test.todo('brief.ts is pure: no node:fs import', () => {}); // Task 4
+  test('brief.ts is pure: no node:fs import', () => {
+    expect(allImportsOf('brief.ts').filter((s) => WORLD.includes(s))).toEqual([]);
+  });
   test.todo('run.ts is pure wiring: no node:fs / node:child_process import', () => {}); // Task 5
 });

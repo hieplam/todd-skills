@@ -22,7 +22,7 @@ import type {
   SessionResult,
   SpawnSessionParams,
 } from './session.ts';
-import { executorBrief } from './brief.ts';
+import { BRIEF_TEMPLATE_PATH, executorBrief } from './brief.ts';
 import type { BriefCard, BriefState } from './brief.ts';
 
 export type { ExecResult };
@@ -366,6 +366,7 @@ export interface RunLoopConfig {
 interface ResolvedConfig extends RunLoopConfig {
   baseBranch: string;
   answersContent: string;
+  briefTemplate: string;
 }
 
 export type CardOutcome =
@@ -740,6 +741,7 @@ async function runCardSession(
       toBriefCard(cardId, card),
       toBriefState(state),
       `${digest}\n\n---\n\n${resolved.answersContent}`,
+      resolved.briefTemplate,
     );
     const freshIO = buildSessionIOForCard(card, state, resolved, io);
     return runSession({ brief }, sessionConfig, freshIO);
@@ -751,7 +753,7 @@ async function runCardSession(
     phase.kind === 'fresh' && phase.digest
       ? `${phase.digest}\n\n---\n\n${resolved.answersContent}`
       : resolved.answersContent;
-  const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent);
+  const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent, resolved.briefTemplate);
   const freshIO = buildSessionIOForCard(card, state, resolved, io);
   return runSession({ brief }, sessionConfig, freshIO);
 }
@@ -879,7 +881,8 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
 
     const baseBranch = await resolveBaseBranch(io, config.repoRoot);
     const answersContent = String(await io.readFile(join(config.repoRoot, config.answersPath)));
-    const resolved: ResolvedConfig = { ...config, baseBranch, answersContent };
+    const briefTemplate = String(await io.readFile(BRIEF_TEMPLATE_PATH));
+    const resolved: ResolvedConfig = { ...config, baseBranch, answersContent, briefTemplate };
 
     const pending = io.readPendingCommit();
     if (pending) {

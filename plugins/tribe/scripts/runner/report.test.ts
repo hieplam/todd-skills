@@ -23,6 +23,7 @@ import {
   type RunLoopConfig,
 } from './loop.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
+import { BRIEF_TEMPLATE_PATH } from './brief.ts';
 import { parseState } from './state.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
@@ -538,6 +539,7 @@ describe('writeReport — reflects persisted state even when the state-commit PR
       sleep: async () => {},
       fileExists: (p) => !p.endsWith('STOP') && !p.includes('/escalations/'),
       readFile: (p) => {
+        if (p === BRIEF_TEMPLATE_PATH) return '# Executor brief for {{CARD_ID}}\n{{ANSWERS_CONTENT}}';
         const c = written.get(p);
         if (c === undefined) throw new Error(`no fixture for ${p}`);
         return c;
@@ -632,6 +634,7 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
       sleep: async () => {},
       fileExists: (p) => !p.endsWith('STOP') && !p.includes('/escalations/'),
       readFile: (p) => {
+        if (p === BRIEF_TEMPLATE_PATH) return '# Executor brief for {{CARD_ID}}\n{{ANSWERS_CONTENT}}';
         const c = written.get(p);
         if (c === undefined) throw new Error(`no fixture for ${p}`);
         return c;
