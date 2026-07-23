@@ -93,6 +93,25 @@ function isOrchestrator(resolved: string | null): boolean {
   return resolved === 'core/loop.ts' || resolved?.startsWith('core/loop/') === true;
 }
 
+/** True if a resolved local import path points at an adapter — anything under `adapters/`
+ * (covers `resolveLocalImport`'s output) or literally ending `.adapter.ts` (belt-and-braces:
+ * catches a specifier resolved from an unexpected relative depth). */
+function isAdapterPath(resolved: string | null): boolean {
+  return resolved?.startsWith('adapters/') === true || resolved?.endsWith('.adapter.ts') === true;
+}
+
+/** Every quoted RELATIVE string literal in `file`'s comment-stripped source, with
+ * `import type ...;` statements stripped first (Skinner audit, 2026-07-24: the prior version
+ * of this scan only parsed static `from '...'` syntax via `allImportsOf`/`valueImportsOf` —
+ * missing dynamic `import()`, `require()`, and side-effect imports entirely, a real
+ * regression from the old flat suite's any-quote-form ban). Only literals starting with `.`
+ * are candidates (a relative path) — this keeps ordinary string literals (log messages,
+ * gh/git argv, prompts) out without needing to distinguish import syntax at all. */
+function relativeStringLiteralsOf(file: string): string[] {
+  const src = codeOf(file).replace(/import\s+type\s[^;]+;/gs, '');
+  return [...src.matchAll(/['"](\.[^'"]*)['"]/g)].map((m) => m[1] as string);
+}
+
 const WORLD = ['fs', 'node:fs', 'node:fs/promises', 'child_process', 'node:child_process', 'http', 'node:http', 'https', 'node:https', '@anthropic-ai/claude-agent-sdk'];
 
 describe('structural contract', () => {
@@ -136,6 +155,28 @@ describe('structural contract', () => {
     for (const f of ADAPTER_FILES) {
       const bad = valueImportsOf(f)
         .filter((s) => s.startsWith('.'))
+        .map((s) => resolveLocalImport(f, s))
+        .filter(isOrchestrator);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
+  // Skinner audit (2026-07-24), restoring the old flat suite's hardened strength: banning the
+  // SPECIFIER STRING itself, in any quote/import form (dynamic `import()`, `require()`,
+  // side-effect imports — not just static `from '...'`), over comment-stripped,
+  // `import type`-stripped source. `core/loop.ts`/`core/loop/**` (the orchestrator) are exempt
+  // — its own submodules legitimately import each other and adapters/other-adapters legitimately
+  // import each other too (adapter-path rule is core-only, per the original test's own scope).
+  test('adapter/orchestrator specifiers appear in core (non-orchestrator) and adapter files only inside import type, in any form', () => {
+    for (const f of CORE_FILES) {
+      if (isOrchestrator(f)) continue;
+      const bad = relativeStringLiteralsOf(f)
+        .map((s) => resolveLocalImport(f, s))
+        .filter((r) => isAdapterPath(r) || isOrchestrator(r));
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+    for (const f of ADAPTER_FILES) {
+      const bad = relativeStringLiteralsOf(f)
         .map((s) => resolveLocalImport(f, s))
         .filter(isOrchestrator);
       expect({ file: f, bad }).toEqual({ file: f, bad: [] });
