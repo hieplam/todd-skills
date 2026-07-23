@@ -142,10 +142,14 @@ describe('structural contract', () => {
     }
   });
 
-  test('cli/main.ts contains no node:fs / node:child_process specifier', () => {
-    const banned = ['fs', 'node:fs', 'node:fs/promises', 'child_process', 'node:child_process'];
+  test('cli/main.ts contains no world-touching module specifier', () => {
+    // Full WORLD sweep (not just fs/child_process): the old flat-layout suite swept every
+    // banned specifier over the composition root too. http/https/the Agent SDK are already
+    // covered elsewhere (the SDK-importer test above), but sweeping the full list here keeps
+    // this test's own contract exact — cli/main.ts wires adapters, it never touches the world
+    // directly, for ANY of the banned specifiers, not just two of them.
     const src = codeOf('cli/main.ts');
-    const bad = banned.filter((m) => src.includes(`'${m}'`) || src.includes(`"${m}"`));
+    const bad = WORLD.filter((m) => src.includes(`'${m}'`) || src.includes(`"${m}"`));
     expect(bad).toEqual([]);
   });
 
