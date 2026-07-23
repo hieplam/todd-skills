@@ -86,4 +86,28 @@ describe('structural contract', () => {
       expect({ file: f, bad: /process\.exit\s*\(/.test(codeOf(f)) }).toEqual({ file: f, bad: false });
     }
   });
+
+  // Import-form hardening (Skinner audit, 2026-07-23): the from-'...' regex alone missed
+  // dynamic import(), import x = require(), side-effect imports, and double-quoted
+  // specifiers. Banning the module SPECIFIER STRING itself, in any quote, anywhere in
+  // comment-stripped source covers every import form at once.
+  test('world-touching module specifiers appear nowhere in core files, in any form', () => {
+    for (const f of CORE_FILES) {
+      const src = codeOf(f);
+      const bad = WORLD.filter((m) => src.includes(`'${m}'`) || src.includes(`"${m}"`));
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+  test('adapter/orchestrator specifiers appear in core (non-run) files only inside import type', () => {
+    for (const f of CORE_FILES.filter((f) => f !== 'run.ts')) {
+      const src = codeOf(f).replace(/import\s+type\s[^;]+;/gs, '');
+      const bad = [...src.matchAll(/['"]((?:[^'"]*\.adapter(?:\.ts)?)|(?:\.\/loop(?:\.ts)?))['"]/g)].map((m) => m[1] as string);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+  test('adapters never value-import the orchestrator', () => {
+    for (const f of SOURCE_FILES.filter((f) => f.endsWith('.adapter.ts'))) {
+      expect({ file: f, bad: valueImportsOf(f).filter((s) => s === './loop.ts' || s === './loop') }).toEqual({ file: f, bad: [] });
+    }
+  });
 });
