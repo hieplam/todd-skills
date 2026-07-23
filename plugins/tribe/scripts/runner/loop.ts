@@ -805,6 +805,14 @@ async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOutcome> {
   };
 }
 
+function derivePhaseConfigOf(config: RunLoopConfig): DerivePhaseConfig {
+  return {
+    repoRoot: config.repoRoot,
+    escalationsDir: config.escalationsDir,
+    includeEscalated: config.includeEscalated,
+  };
+}
+
 async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult> {
   const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
   const nc = filteredNextCard(state, config, io);
@@ -824,16 +832,7 @@ async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult>
     };
   }
 
-  const phase = await deriveCardPhase(
-    nc.cardId,
-    nc.card,
-    {
-      repoRoot: config.repoRoot,
-      escalationsDir: config.escalationsDir,
-      includeEscalated: config.includeEscalated,
-    },
-    io,
-  );
+  const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(config), io);
   return { exitCode: EXIT_OK, processed: [], dryRunPlan: { cardId: nc.cardId, phase } };
 }
 
@@ -909,16 +908,7 @@ async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopI
       continue;
     }
 
-    const phase = await deriveCardPhase(
-      nc.cardId,
-      nc.card,
-      {
-        repoRoot: resolved.repoRoot,
-        escalationsDir: resolved.escalationsDir,
-        includeEscalated: resolved.includeEscalated,
-      },
-      io,
-    );
+    const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(resolved), io);
 
     if (phase.kind === 'escalation_pending') {
       // D5′: an unanswered escalation from a PRIOR run — nothing to do this pass but park
