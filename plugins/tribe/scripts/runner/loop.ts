@@ -352,7 +352,6 @@ export interface RunLoopConfig {
   model: string;
   /** `--session-timeout`, in ms */
   sessionTimeoutMs?: number;
-  maxTurns?: number;
   /** `--cards` */
   cardsFilter?: string[];
   /** `--max-cards` */
@@ -556,14 +555,19 @@ function buildEscalationMarkdown(
   ].join('\n');
 }
 
-async function escalateCard(
-  cardId: string,
-  reason: string,
-  detail: string,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<CardOutcome> {
+/** The per-card working set threaded through every card-scoped function. `card` is
+ * deliberately NOT a member: it is always derived as `ctx.state.cards[ctx.cardId]` at point
+ * of use, so the invariant "card IS the state entry" holds by construction (a separately
+ * threaded `card` invites a `{...card}` copy that silently never persists). */
+interface CardCtx {
+  cardId: string;
+  state: CampaignState;
+  resolved: ResolvedConfig;
+  io: LoopIO;
+}
+
+async function escalateCard(ctx: CardCtx, reason: string, detail: string): Promise<CardOutcome> {
+  const { cardId, state, resolved, io } = ctx;
   const escalationRelPath = `${resolved.escalationsDir}/${cardId}.md`;
   const markdown = buildEscalationMarkdown(cardId, reason, detail, resolved);
   // D5: the local escalation file + exit code stand alone even if the commit below fails —
@@ -589,14 +593,9 @@ async function escalateCard(
   return { kind: 'escalated', cardId, escalationPath: escalationRelPath, reason, commitResult };
 }
 
-async function shipCard(
-  cardId: string,
-  card: Card,
-  verifyResult: VerifyResult,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<CardOutcome> {
+async function shipCard(ctx: CardCtx, verifyResult: VerifyResult): Promise<CardOutcome> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   card.status = 'shipped';
   card.mergeSha = extractMergeSha(verifyResult) ?? card.mergeSha;
   card.updatedAt = io.now();
@@ -654,12 +653,9 @@ function buildStateDigest(cardId: string, card: Card, resumeFailureReason: strin
   ].join('\n');
 }
 
-function buildSessionIOForCard(
-  card: Card,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): SessionIO {
+function buildSessionIOForCard(ctx: CardCtx): SessionIO {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   return {
     spawnSession: (params) => io.spawnSession(params),
     appendLog: (path, line) => io.appendLog(path, line),
@@ -677,7 +673,6 @@ function sessionConfigFor(cardId: string, resolved: ResolvedConfig): RunSessionC
   return {
     repoRoot: resolved.repoRoot,
     model: resolved.model,
-    maxTurns: resolved.maxTurns,
     sessionTimeoutMs: resolved.sessionTimeoutMs,
     logsDir: resolved.logsDir,
     card: cardId,
@@ -686,7 +681,9 @@ function sessionConfigFor(cardId: string, resolved: ResolvedConfig): RunSessionC
 
 /** REVERT_AND_REDO: delete the stale worktree + branch (local and remote) so a fresh session
  * starts from a clean slate — the doctrine B5's executor proved (spec §D4). */
-async function performRevertAndRedo(card: Card, resolved: ResolvedConfig, io: LoopIO): Promise<void> {
+async function performRevertAndRedo(ctx: CardCtx): Promise<void> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   const branch = card.branch;
   if (!branch) return;
 
@@ -714,19 +711,14 @@ async function performRevertAndRedo(card: Card, resolved: ResolvedConfig, io: Lo
  * session carrying a state digest. `revert_and_redo` and a blind `fresh` (no digest) just spawn
  * fresh with the plain brief; a `fresh` phase carrying a digest (F8: open PR, no sessionId)
  * spawns fresh too, but with that digest prepended — never blind. */
-async function runCardSession(
-  cardId: string,
-  phase: CardPhase,
-  card: Card,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<SessionResult> {
+async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<SessionResult> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
   const sessionConfig = sessionConfigFor(cardId, resolved);
 
   if (phase.kind === 'resume') {
     const prompt = phase.reason === 'pr_open' ? CONTINUE_PR_OPEN_PROMPT : CONTINUE_BRANCH_PROMPT;
-    const resumeIO = buildSessionIOForCard(card, state, resolved, io);
+    const resumeIO = buildSessionIOForCard(ctx);
     const resumeResult = await runSession(
       { brief: prompt, resume: phase.sessionId },
       sessionConfig,
@@ -743,7 +735,7 @@ async function runCardSession(
       `${digest}\n\n---\n\n${resolved.answersContent}`,
       resolved.briefTemplate,
     );
-    const freshIO = buildSessionIOForCard(card, state, resolved, io);
+    const freshIO = buildSessionIOForCard(ctx);
     return runSession({ brief }, sessionConfig, freshIO);
   }
 
@@ -754,17 +746,12 @@ async function runCardSession(
       ? `${phase.digest}\n\n---\n\n${resolved.answersContent}`
       : resolved.answersContent;
   const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent, resolved.briefTemplate);
-  const freshIO = buildSessionIOForCard(card, state, resolved, io);
+  const freshIO = buildSessionIOForCard(ctx);
   return runSession({ brief }, sessionConfig, freshIO);
 }
 
-async function actOnCard(
-  cardId: string,
-  phase: CardPhase,
-  state: CampaignState,
-  resolved: ResolvedConfig,
-  io: LoopIO,
-): Promise<CardOutcome> {
+async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOutcome> {
+  const { cardId, state, resolved, io } = ctx;
   const card = state.cards[cardId];
 
   if (phase.kind === 'verify_only') {
@@ -776,16 +763,16 @@ async function actOnCard(
     };
     const result = await verifyWithRetry(card, verifyConfig, io);
     if (result.shipped) {
-      return shipCard(cardId, card, result, state, resolved, io);
+      return shipCard(ctx, result);
     }
-    return escalateCard(cardId, 'verify_failed_twice', formatVerifyFailure(result), state, resolved, io);
+    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result));
   }
 
   if (phase.kind === 'revert_and_redo') {
-    await performRevertAndRedo(card, resolved, io);
+    await performRevertAndRedo(ctx);
   }
 
-  const sessionResult = await runCardSession(cardId, phase, card, state, resolved, io);
+  const sessionResult = await runCardSession(ctx, phase);
 
   if (sessionResult.outcome === 'shipped') {
     card.pr = sessionResult.pr ?? card.pr;
@@ -796,13 +783,13 @@ async function actOnCard(
     };
     const result = await verifyWithRetry(card, verifyConfig, io);
     if (result.shipped) {
-      return shipCard(cardId, card, result, state, resolved, io);
+      return shipCard(ctx, result);
     }
-    return escalateCard(cardId, 'verify_failed_twice', formatVerifyFailure(result), state, resolved, io);
+    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result));
   }
 
   if (sessionResult.outcome === 'needs_direction') {
-    return escalateCard(cardId, 'needs_direction', sessionResult.finalText, state, resolved, io);
+    return escalateCard(ctx, 'needs_direction', sessionResult.finalText);
   }
 
   // 'error' or 'timeout' with no further D4 fallback available (a fresh/revert_and_redo
@@ -813,6 +800,14 @@ async function actOnCard(
     kind: 'stopped',
     cardId,
     reason: `session ended with outcome "${sessionResult.outcome}": ${sessionResult.finalText}`,
+  };
+}
+
+function derivePhaseConfigOf(config: RunLoopConfig): DerivePhaseConfig {
+  return {
+    repoRoot: config.repoRoot,
+    escalationsDir: config.escalationsDir,
+    includeEscalated: config.includeEscalated,
   };
 }
 
@@ -835,17 +830,104 @@ async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult>
     };
   }
 
-  const phase = await deriveCardPhase(
-    nc.cardId,
-    nc.card,
-    {
-      repoRoot: config.repoRoot,
-      escalationsDir: config.escalationsDir,
-      includeEscalated: config.includeEscalated,
-    },
-    io,
-  );
+  const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(config), io);
   return { exitCode: EXIT_OK, processed: [], dryRunPlan: { cardId: nc.cardId, phase } };
+}
+
+/** STOP honored before any work: a present STOP file ends the run cleanly, before the lock's
+ * critical section does anything. */
+function startupStopResult(config: RunLoopConfig, io: LoopIO): LoopResult | null {
+  if (!isStopRequested(stopFilePathOf(config), io)) return null;
+  return {
+    exitCode: EXIT_OK,
+    processed: [],
+    message: 'STOP file present; exiting cleanly before processing any card.',
+  };
+}
+
+/** Loads everything `RunLoopConfig` doesn't carry: the base branch (from origin/HEAD), the
+ * committed --answers rulings, and the committed brief template — all through the io seam. */
+async function resolveRunContext(config: RunLoopConfig, io: LoopIO): Promise<ResolvedConfig> {
+  const baseBranch = await resolveBaseBranch(io, config.repoRoot);
+  const answersContent = String(await io.readFile(join(config.repoRoot, config.answersPath)));
+  const briefTemplate = String(await io.readFile(BRIEF_TEMPLATE_PATH));
+  return { ...config, baseBranch, answersContent, briefTemplate };
+}
+
+/** Crash recovery: retries a prior run's pending state commit before any new work. */
+async function retryPendingCommit(resolved: ResolvedConfig, io: LoopIO): Promise<void> {
+  const pending = io.readPendingCommit();
+  if (!pending) return;
+  const retryResult = await commitState(pending.files, pending.title, githubConfigFor(resolved, pending.card), io);
+  if (retryResult.outcome === 'merged') {
+    io.clearPendingCommit();
+  }
+}
+
+/** One D5′ park-and-continue pass over the campaign: derive-and-act until `done`, STOP, or
+ * the --max-cards budget is spent. */
+async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopIO): Promise<LoopResult> {
+  const processed: CardOutcome[] = [];
+  // Warchief audit fix (Task 2): `attempted` and the `--max-cards` BUDGET are two different
+  // questions, and conflating them was a bug. `attempted` answers ONLY "have I already
+  // selected this card id this pass?" — every selected card, unconditionally, is what keeps
+  // `filteredNextCard`'s termination argument structural (see that function's own doc
+  // comment). `worked` answers "how much of the operator's requested budget have I actually
+  // spent?" — plan: "--max-cards counts attempted cards (shipped + escalated)", i.e. cards
+  // where something was actually DONE this pass. A card parked on a PRIOR run's escalation
+  // file (`escalation_pending`) writes nothing and decides nothing this pass — exactly like
+  // a `blocked` card `nextCard` itself skips — so it must not consume budget either; only
+  // `planning_needed` (a genuine new escalation is written) and the generic `actOnCard`
+  // outcomes (`shipped`/`escalated`/`stopped` — real work happened) increment `worked`.
+  const attempted = new Set<string>();
+  let worked = 0;
+  const limit = resolved.maxCards ?? Infinity;
+
+  // D5′ park-and-continue: loop until either no progressable card remains (`done`) or the
+  // `--max-cards` budget (`worked`, above) is spent. `attempted` alone bounds how many times
+  // the loop can tick even when `worked` never reaches `limit` (e.g. every remaining card is
+  // `escalation_pending`) — see `filteredNextCard`'s doc comment (Warchief ruling W-F2) for
+  // why that must be structural, not incidental.
+  while (worked < limit) {
+    if (isStopRequested(stopFilePathOf(resolved), io)) {
+      break;
+    }
+
+    const nc = filteredNextCard(state, resolved, io, attempted);
+    if (nc.kind === 'done') break;
+
+    const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
+
+    if (nc.kind === 'planning_needed') {
+      attempted.add(nc.cardId);
+      const outcome = await escalateCard(ctx, 'planning_needed', `Missing on disk: ${nc.missing.join(', ')}`);
+      processed.push(outcome);
+      worked += 1;
+      continue;
+    }
+
+    const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(resolved), io);
+
+    if (phase.kind === 'escalation_pending') {
+      // D5′: an unanswered escalation from a PRIOR run — nothing to do this pass but park
+      // it (see the `CardOutcome.escalation_pending` doc) and move to the next card. Marks
+      // `attempted` (never re-select it this pass) but NOT `worked` (no budget spent — see
+      // the audit-fix comment above `attempted`'s declaration).
+      attempted.add(nc.cardId);
+      processed.push({ kind: 'escalation_pending', cardId: nc.cardId, escalationPath: phase.escalationPath });
+      continue;
+    }
+
+    const outcome = await actOnCard(ctx, phase);
+    attempted.add(nc.cardId);
+    processed.push(outcome);
+    worked += 1;
+    // D5′: `escalated`/`stopped` no longer `break` the pass — the next tick naturally
+    // re-derives the next progressable card (excluding this one, now `attempted`) via
+    // `filteredNextCard`/`nextCard`'s own blocked-cascade reconciliation (W6).
+  }
+
+  return { exitCode: computeExitCode(processed), processed };
 }
 
 /** The main loop, spec §D2/§D4/§D5′ tied together: acquire the single-instance lock → STOP-file
@@ -871,107 +953,14 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
   }
 
   try {
-    if (isStopRequested(stopFilePathOf(config), io)) {
-      return {
-        exitCode: EXIT_OK,
-        processed: [],
-        message: 'STOP file present; exiting cleanly before processing any card.',
-      };
-    }
+    const stopped = startupStopResult(config, io);
+    if (stopped) return stopped;
 
-    const baseBranch = await resolveBaseBranch(io, config.repoRoot);
-    const answersContent = String(await io.readFile(join(config.repoRoot, config.answersPath)));
-    const briefTemplate = String(await io.readFile(BRIEF_TEMPLATE_PATH));
-    const resolved: ResolvedConfig = { ...config, baseBranch, answersContent, briefTemplate };
-
-    const pending = io.readPendingCommit();
-    if (pending) {
-      const retryResult = await commitState(
-        pending.files,
-        pending.title,
-        githubConfigFor(resolved, pending.card),
-        io,
-      );
-      if (retryResult.outcome === 'merged') {
-        io.clearPendingCommit();
-      }
-    }
+    const resolved = await resolveRunContext(config, io);
+    await retryPendingCommit(resolved, io);
 
     const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
-    const processed: CardOutcome[] = [];
-    // Warchief audit fix (Task 2): `attempted` and the `--max-cards` BUDGET are two different
-    // questions, and conflating them was a bug. `attempted` answers ONLY "have I already
-    // selected this card id this pass?" — every selected card, unconditionally, is what keeps
-    // `filteredNextCard`'s termination argument structural (see that function's own doc
-    // comment). `worked` answers "how much of the operator's requested budget have I actually
-    // spent?" — plan: "--max-cards counts attempted cards (shipped + escalated)", i.e. cards
-    // where something was actually DONE this pass. A card parked on a PRIOR run's escalation
-    // file (`escalation_pending`) writes nothing and decides nothing this pass — exactly like
-    // a `blocked` card `nextCard` itself skips — so it must not consume budget either; only
-    // `planning_needed` (a genuine new escalation is written) and the generic `actOnCard`
-    // outcomes (`shipped`/`escalated`/`stopped` — real work happened) increment `worked`.
-    const attempted = new Set<string>();
-    let worked = 0;
-    const limit = config.maxCards ?? Infinity;
-
-    // D5′ park-and-continue: loop until either no progressable card remains (`done`) or the
-    // `--max-cards` budget (`worked`, above) is spent. `attempted` alone bounds how many times
-    // the loop can tick even when `worked` never reaches `limit` (e.g. every remaining card is
-    // `escalation_pending`) — see `filteredNextCard`'s doc comment (Warchief ruling W-F2) for
-    // why that must be structural, not incidental.
-    while (worked < limit) {
-      if (isStopRequested(stopFilePathOf(config), io)) {
-        break;
-      }
-
-      const nc = filteredNextCard(state, config, io, attempted);
-      if (nc.kind === 'done') break;
-
-      if (nc.kind === 'planning_needed') {
-        attempted.add(nc.cardId);
-        const outcome = await escalateCard(
-          nc.cardId,
-          'planning_needed',
-          `Missing on disk: ${nc.missing.join(', ')}`,
-          state,
-          resolved,
-          io,
-        );
-        processed.push(outcome);
-        worked += 1;
-        continue;
-      }
-
-      const phase = await deriveCardPhase(
-        nc.cardId,
-        nc.card,
-        {
-          repoRoot: resolved.repoRoot,
-          escalationsDir: resolved.escalationsDir,
-          includeEscalated: resolved.includeEscalated,
-        },
-        io,
-      );
-
-      if (phase.kind === 'escalation_pending') {
-        // D5′: an unanswered escalation from a PRIOR run — nothing to do this pass but park
-        // it (see the `CardOutcome.escalation_pending` doc) and move to the next card. Marks
-        // `attempted` (never re-select it this pass) but NOT `worked` (no budget spent — see
-        // the audit-fix comment above `attempted`'s declaration).
-        attempted.add(nc.cardId);
-        processed.push({ kind: 'escalation_pending', cardId: nc.cardId, escalationPath: phase.escalationPath });
-        continue;
-      }
-
-      const outcome = await actOnCard(nc.cardId, phase, state, resolved, io);
-      attempted.add(nc.cardId);
-      processed.push(outcome);
-      worked += 1;
-      // D5′: `escalated`/`stopped` no longer `break` the pass — the next tick naturally
-      // re-derives the next progressable card (excluding this one, now `attempted`) via
-      // `filteredNextCard`/`nextCard`'s own blocked-cascade reconciliation (W6).
-    }
-
+    const result = await runPass(state, resolved, io);
     // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
     // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable
     // card) — that tick never reaches `actOnCard`/`escalateCard`/`shipCard`, so the mutation
@@ -983,7 +972,7 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
     // byte-identical round-trip means a pass with no reconciliation to flush just rewrites the
     // same bytes (harmless, no spurious diff).
     persistLocalState(state, resolved, io);
-    return { exitCode: computeExitCode(processed), processed };
+    return result;
   } finally {
     releaseLock(io);
   }
