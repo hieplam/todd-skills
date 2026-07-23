@@ -380,32 +380,60 @@ Read from `EXIT_*` in `loop.ts`, plus `run.ts`'s own `EXIT_ERROR`:
 
 ## Structure
 
-The directory is flat — no subfolders — with each file's role carried entirely by its
-filename convention (kanna's evolved practice), enforced executably by `structure.test.ts`:
+The directory is a visible hierarchy — `ls runner/` answers "where is the CLI entrypoint,
+where are the IO seams, where are the types, where are the adapters" directly from folder
+names, no filename convention required — enforced executably by `structure.test.ts`:
 
-- **`types.ts`** — the shared kernel: imports nothing local, and is home to ALL shared
-  vocabulary, including the `EXIT_*` constants. Every other file may import from it.
-- **`*.adapter.ts`** — the only files allowed to import a world-touching module (`fs`,
-  `child_process`, `http`/`https`, the Agent SDK). `session.adapter.ts` is the sole importer
-  of `@anthropic-ai/claude-agent-sdk`; `run-io.adapter.ts` owns every `fs`/`child_process`
-  primitive and assembles the production `LoopIO`.
-- **`run.ts`** — the composition root: the only file allowed to VALUE-import an adapter or
-  `loop.ts` (the orchestrator). It wires `buildRealIo()` into `runLoop()` and nothing else
-  does that wiring.
-- **everything else** — pure core: `loop.ts`, `state.ts`, `verify.ts`, `github.ts`,
-  `report.ts`, `brief.ts`, `session.ts`. Every world-touching effect is reached through an
-  injected `*IO` seam (`LoopIO`, `StateIO`, `SessionIO`, ...), never a direct import.
+- **`cli/main.ts`** — the composition root: the only file allowed to VALUE-import an adapter
+  or the orchestrator (`core/loop.ts`). It wires `buildRealIo()` (from
+  `adapters/run-io.adapter.ts`) into `runLoop()` and nothing else does that wiring. `main()`
+  is exported (unit-tested indirectly through `parseArgs`, its one pure piece) and also run
+  directly via `if (import.meta.main)`.
+- **`run.ts`** (repo root, one level above `cli/`) — a thin shim, not the entrypoint itself:
+  `import { main } from './cli/main.ts'; if (import.meta.main) main();`. It exists only
+  because two external contracts prove the runner by this exact path —
+  `orchestrate-campaign`'s `resolve-runner.sh` and `test-fresh-machine.sh` both assert
+  `scripts/runner/run.ts` exists — so it has to keep resolving even though the real logic
+  lives in `cli/main.ts`.
+- **`ports/ports.ts`** — the single home of every injected IO seam (`VerifyIO`, `GithubIO`,
+  `ReportIO`, `StateIO`, `SessionIO`, `DerivePhaseIO`, `LockIO`, `LoopIO`, ...) plus the
+  unified `ExecResult` (previously defined twice, identically, in two core modules). The
+  bigger seams (`LoopIO`, `GithubIO`, `LockIO`) are composed from small capability ports
+  (`ExecPort`, `TimerPort`, `ClockPort`, `FsPort`, `LogPort`, `ProcessPort`, `LockStorePort`,
+  `PendingCommitPort`, `SessionSpawnPort`) — structural typing means every existing mock
+  still satisfies the composed interface. `ports/` contains type declarations only: no
+  runtime values, and its only import is a type-only one from `core/types.ts`.
+- **`core/types.ts`** — the shared kernel: imports nothing local, and is home to ALL shared
+  vocabulary, including the `EXIT_*` constants, `RunLoopConfig`/`ResolvedConfig`, and
+  `StateCommitFiles`. Every other file may import from it.
+- **`core/loop.ts` + `core/loop/`** — the orchestrator. `core/loop.ts` is a pure re-export
+  barrel (every symbol it ever exported is still available from that same path); the actual
+  logic is split into `core/loop/phase.ts` (the §D4 resume matrix), `core/loop/lock.ts` (the
+  §D2 single-instance lock + STOP file), `core/loop/commit-guard.ts` (the D6/D5 commit wall),
+  `core/loop/card-actions.ts` (per-card escalate/ship/session work), and
+  `core/loop/run-loop.ts` (the pass + `runLoop` entry point).
+- **everything else in `core/`** — pure logic: `state.ts`, `verify.ts`, `github.ts`,
+  `report.ts`, `brief.ts`, `session.ts`. Every world-touching effect is reached through a
+  `ports/ports.ts` seam, never a direct import; each of these modules re-exports the seam
+  type(s) its own tests/importers pull from it (e.g. `verify.ts` re-exports `VerifyIO`).
+- **`adapters/*.adapter.ts`** — the only files allowed to import a world-touching module
+  (`fs`, `child_process`, `http`/`https`, the Agent SDK). `session.adapter.ts` is the sole
+  importer of `@anthropic-ai/claude-agent-sdk`; `run-io.adapter.ts` owns every
+  `fs`/`child_process` primitive and assembles the production `LoopIO`.
 
-Import direction is one-way, wired only by `run.ts`:
+Import direction is one-way, wired only by `cli/main.ts`:
 
 | Layer | May import |
 | --- | --- |
-| kernel (`types.ts`) | nothing local |
-| core (everything else, minus adapters/`run.ts`) | kernel only |
-| adapters (`*.adapter.ts`) / `run.ts` | kernel, core, and (adapters/`run.ts` only) each other |
+| kernel (`core/types.ts`) | nothing local |
+| ports (`ports/ports.ts`) | `core/types.ts` only, and only as types |
+| core (everything under `core/` except `types.ts`) | kernel, ports |
+| adapters (`adapters/*.adapter.ts`) | kernel, ports, core, and other adapters |
+| cli (`cli/main.ts`) / root `run.ts` shim | kernel, ports, core, adapters |
 
-Enforcement is `structure.test.ts`, run via `bun run check` (`tsc --noEmit` + `bun test`) —
-not ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amendment A3,
+Enforcement is `structure.test.ts` (walks `core/`, `ports/`, `adapters/`, `cli/`, and the
+root `run.ts` shim recursively), run via `bun run check` (`tsc --noEmit` + `bun test`) — not
+ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amendment A3,
 [typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
 
 ## Known limitations
