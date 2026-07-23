@@ -3,7 +3,7 @@
 // nothing else; every other module reaches a session through the `SessionIO` seam.
 // Enforced by structure.test.ts (ESLint layer deferred until typescript-eslint supports TS >= 7.1 — plan Amendment A3).
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { SessionMessage, SpawnSessionParams } from './session.ts';
+import type { SessionMessage, SpawnSessionParams } from '../core/session.ts';
 
 /** The real SDK spawn, wrapping `query()` — used by run.ts to build the production
  * `SessionIO`. Not exercised by unit tests (it would hit the real SDK); the option-building

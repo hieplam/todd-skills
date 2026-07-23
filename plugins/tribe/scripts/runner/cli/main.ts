@@ -13,11 +13,11 @@ import {
   type LoopIO,
   type LoopResult,
   type RunLoopConfig,
-} from './loop.ts';
-import { loadState } from './state.ts';
-import { buildRealIo } from './run-io.adapter.ts';
-import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from './report.ts';
-import { EXIT_ERROR } from './types.ts';
+} from '../core/loop.ts';
+import { loadState } from '../core/state.ts';
+import { buildRealIo } from '../adapters/run-io.adapter.ts';
+import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from '../core/report.ts';
+import { EXIT_ERROR } from '../core/types.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 
@@ -156,7 +156,7 @@ async function tryWriteReport(config: RunLoopConfig, io: LoopIO, run: ReportRunI
   }
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
   if ('error' in parsed) {
     console.error(`campaign runner: ${parsed.error}`);
