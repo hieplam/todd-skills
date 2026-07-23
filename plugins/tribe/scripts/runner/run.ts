@@ -1,38 +1,23 @@
 // CLI entrypoint for the campaign runner (Task 6, spec §2).
 //
-// `parseArgs` is pure (no I/O) and fully unit-tested. `main()` below it is the real-world
-// wiring — gh/git via `child_process`, the filesystem, the real SDK spawn (`sdkSpawnSession`
-// from session.ts), the system clock, and the process's own pid/liveness — and is
-// deliberately NOT unit-tested, same precedent as session.ts's `sdkSpawnSession`: the logic
-// it depends on (`runLoop`, `deriveCardPhase`, ...) is fully covered without touching a real
-// binary or the network.
+// `parseArgs` is pure (no I/O) and fully unit-tested. `main()` below it is the COMPOSITION
+// ROOT: the only module allowed to wire adapters — it builds the production `LoopIO` via
+// `buildRealIo` (run-io.adapter.ts, which owns every fs/child_process primitive and the real
+// SDK spawn from session.adapter.ts) and hands it to `runLoop`. `main()` is deliberately NOT
+// unit-tested: the logic it depends on (`runLoop`, `deriveCardPhase`, ...) is fully covered
+// without touching a real binary or the network (same precedent as the adapters themselves).
 import { dirname, join } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { spawn } from 'node:child_process';
 import {
-  EXIT_LOCKED,
   runLoop,
   stateDirOf,
-  type ExecResult,
-  type LockInfo,
   type LoopIO,
   type LoopResult,
-  type PendingCommit,
   type RunLoopConfig,
 } from './loop.ts';
 import { loadState } from './state.ts';
-import { sdkSpawnSession } from './session.ts';
-import type { SessionMessage, SpawnSessionParams } from './session.ts';
+import { buildRealIo } from './run-io.adapter.ts';
 import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from './report.ts';
-
-/** run.ts's own exit code for "an unhandled exception surfaced after `runLoop` was entered"
- * (Task 3 design note: "any error after the state was loadable" is a real, distinct exit path
- * from `EXIT_LOCKED`/`EXIT_ESCALATED`/`EXIT_SESSION_INCOMPLETE`, none of which fit it). Lives
- * here, not in loop.ts/report.ts, because it is purely a process-exit-code concern of this
- * file's own `main()` wiring — `report.ts`'s `run.reason` ('error') is the artifact that
- * actually carries the meaning; this numeric code is only ever a hint (§O3: "the exit code is
- * a hint, the report is the truth"). */
-const EXIT_ERROR = 4;
+import { EXIT_ERROR } from './types.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 
@@ -142,82 +127,6 @@ export function parseArgs(argv: string[]): ParseArgsResult | ParseArgsError {
       cardsFilter,
       includeEscalated,
       dryRun,
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------------------
-// Real-world wiring (not unit-tested; see the file-level doc comment for why).
-// ---------------------------------------------------------------------------------------
-
-function realExec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult> {
-  return new Promise((resolve) => {
-    const child = spawn(cmd[0] as string, cmd.slice(1), { cwd: opts?.cwd });
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.on('data', (chunk) => (stdout += chunk.toString()));
-    child.stderr?.on('data', (chunk) => (stderr += chunk.toString()));
-    child.on('close', (code) => resolve({ stdout, stderr, exitCode: code ?? 1 }));
-    child.on('error', (err) => resolve({ stdout, stderr: err.message, exitCode: 1 }));
-  });
-}
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
-function buildRealIo(config: RunLoopConfig): LoopIO {
-  const stateDir = dirname(join(config.repoRoot, config.statePath));
-  const lockPath = join(stateDir, '.runner.lock');
-  const pendingCommitPath = join(stateDir, '.pending-commit.json');
-
-  return {
-    exec: realExec,
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-
-    fileExists: (p) => existsSync(p),
-    readFile: (p) => readFileSync(p, 'utf8'),
-    writeFile: (p, content) => {
-      mkdirSync(dirname(p), { recursive: true });
-      writeFileSync(p, content);
-    },
-
-    readLock: () => {
-      if (!existsSync(lockPath)) return null;
-      return JSON.parse(readFileSync(lockPath, 'utf8')) as LockInfo;
-    },
-    writeLock: (info) => {
-      mkdirSync(dirname(lockPath), { recursive: true });
-      writeFileSync(lockPath, JSON.stringify(info));
-    },
-    removeLock: () => {
-      if (existsSync(lockPath)) rmSync(lockPath);
-    },
-    isProcessAlive,
-    currentPid: () => process.pid,
-    now: () => new Date().toISOString(),
-
-    readPendingCommit: () => {
-      if (!existsSync(pendingCommitPath)) return null;
-      return JSON.parse(readFileSync(pendingCommitPath, 'utf8')) as PendingCommit;
-    },
-    writePendingCommit: (pc) => {
-      mkdirSync(dirname(pendingCommitPath), { recursive: true });
-      writeFileSync(pendingCommitPath, JSON.stringify(pc));
-    },
-    clearPendingCommit: () => {
-      if (existsSync(pendingCommitPath)) rmSync(pendingCommitPath);
-    },
-
-    spawnSession: (params: SpawnSessionParams): AsyncIterable<SessionMessage> => sdkSpawnSession(params),
-    appendLog: (logPath, line) => {
-      mkdirSync(dirname(logPath), { recursive: true });
-      writeFileSync(logPath, `${line}\n`, { flag: 'a' });
     },
   };
 }

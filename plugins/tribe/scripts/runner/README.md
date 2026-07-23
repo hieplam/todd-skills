@@ -378,6 +378,36 @@ Read from `EXIT_*` in `loop.ts`, plus `run.ts`'s own `EXIT_ERROR`:
 | `3` | `EXIT_SESSION_INCOMPLETE` | D5′: at least one card's session ended `error`/`timeout` with no further D4 fallback (no card in this pass escalated); state was already recorded locally, so the next start resumes it — this is not a human-decision escalation. |
 | `4` | `EXIT_ERROR` (`run.ts`, not a `loop.ts` constant) | An unhandled exception surfaced after `runLoop` was entered. The report's `run.reason` is `'error'` — per §O3, treat the report as authoritative over this numeric code. |
 
+## Structure
+
+The directory is flat — no subfolders — with each file's role carried entirely by its
+filename convention (kanna's evolved practice), enforced executably by `structure.test.ts`:
+
+- **`types.ts`** — the shared kernel: imports nothing local, and is home to ALL shared
+  vocabulary, including the `EXIT_*` constants. Every other file may import from it.
+- **`*.adapter.ts`** — the only files allowed to import a world-touching module (`fs`,
+  `child_process`, `http`/`https`, the Agent SDK). `session.adapter.ts` is the sole importer
+  of `@anthropic-ai/claude-agent-sdk`; `run-io.adapter.ts` owns every `fs`/`child_process`
+  primitive and assembles the production `LoopIO`.
+- **`run.ts`** — the composition root: the only file allowed to VALUE-import an adapter or
+  `loop.ts` (the orchestrator). It wires `buildRealIo()` into `runLoop()` and nothing else
+  does that wiring.
+- **everything else** — pure core: `loop.ts`, `state.ts`, `verify.ts`, `github.ts`,
+  `report.ts`, `brief.ts`, `session.ts`. Every world-touching effect is reached through an
+  injected `*IO` seam (`LoopIO`, `StateIO`, `SessionIO`, ...), never a direct import.
+
+Import direction is one-way, wired only by `run.ts`:
+
+| Layer | May import |
+| --- | --- |
+| kernel (`types.ts`) | nothing local |
+| core (everything else, minus adapters/`run.ts`) | kernel only |
+| adapters (`*.adapter.ts`) / `run.ts` | kernel, core, and (adapters/`run.ts` only) each other |
+
+Enforcement is `structure.test.ts`, run via `bun run check` (`tsc --noEmit` + `bun test`) —
+not ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amendment A3,
+[typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
+
 ## Known limitations
 
 - **`verifyWithRetry` retries with zero delay.** The D3 verify-shipped check is attempted

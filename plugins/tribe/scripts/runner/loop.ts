@@ -3,11 +3,12 @@
 // Pure TypeScript orchestrator: every world-touching call (gh/git, fs, the SDK spawn, the
 // clock, the lock) goes through the injected `LoopIO` seam below — this module never
 // imports `child_process`, `fs`, or the SDK package itself (that stays confined to
-// session.ts, per spec §D1's "SDK drift" risk note). Tests drive a fully mocked `LoopIO` and
+// session.adapter.ts, per spec §D1's "SDK drift" risk note). Tests drive a fully mocked `LoopIO` and
 // never hit a real binary. Acceptance #5: this module makes zero model/LLM calls — the only
 // "intelligence" it touches is the typed `SessionResult` a spawned session reports back.
 import { dirname, join } from 'node:path';
 import type { Card, CampaignState, NextCardResult, StateIO } from './types.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { loadState, nextCard, serializeState } from './state.ts';
 import { verifyShipped } from './verify.ts';
 import type { ExecResult, VerifyConfig, VerifyIO, VerifyResult } from './verify.ts';
@@ -21,7 +22,7 @@ import type {
   SessionResult,
   SpawnSessionParams,
 } from './session.ts';
-import { executorBrief } from './brief.ts';
+import { BRIEF_TEMPLATE_PATH, executorBrief } from './brief.ts';
 import type { BriefCard, BriefState } from './brief.ts';
 
 export type { ExecResult };
@@ -365,12 +366,8 @@ export interface RunLoopConfig {
 interface ResolvedConfig extends RunLoopConfig {
   baseBranch: string;
   answersContent: string;
+  briefTemplate: string;
 }
-
-export const EXIT_OK = 0;
-export const EXIT_LOCKED = 1;
-export const EXIT_ESCALATED = 2;
-export const EXIT_SESSION_INCOMPLETE = 3;
 
 export type CardOutcome =
   | { kind: 'shipped'; cardId: string; commitResult: CommitStateAndMergeResult }
@@ -744,6 +741,7 @@ async function runCardSession(
       toBriefCard(cardId, card),
       toBriefState(state),
       `${digest}\n\n---\n\n${resolved.answersContent}`,
+      resolved.briefTemplate,
     );
     const freshIO = buildSessionIOForCard(card, state, resolved, io);
     return runSession({ brief }, sessionConfig, freshIO);
@@ -755,7 +753,7 @@ async function runCardSession(
     phase.kind === 'fresh' && phase.digest
       ? `${phase.digest}\n\n---\n\n${resolved.answersContent}`
       : resolved.answersContent;
-  const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent);
+  const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent, resolved.briefTemplate);
   const freshIO = buildSessionIOForCard(card, state, resolved, io);
   return runSession({ brief }, sessionConfig, freshIO);
 }
@@ -883,7 +881,8 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
 
     const baseBranch = await resolveBaseBranch(io, config.repoRoot);
     const answersContent = String(await io.readFile(join(config.repoRoot, config.answersPath)));
-    const resolved: ResolvedConfig = { ...config, baseBranch, answersContent };
+    const briefTemplate = String(await io.readFile(BRIEF_TEMPLATE_PATH));
+    const resolved: ResolvedConfig = { ...config, baseBranch, answersContent, briefTemplate };
 
     const pending = io.readPendingCommit();
     if (pending) {

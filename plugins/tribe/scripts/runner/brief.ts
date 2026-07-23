@@ -6,7 +6,6 @@
 // `answersContent` param is the raw text of the committed `--answers` rulings file; it is
 // embedded verbatim so a human's ruling on a past escalation reaches every future session
 // (spec §D5).
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Minimal, local view of a campaign card needed to render a brief — decoupled from the
@@ -24,11 +23,9 @@ export interface BriefState {
   ownerOnlyEscalations: string[];
 }
 
-const TEMPLATE_PATH = join(import.meta.dir, 'brief-template.md');
-
-function loadTemplate(): string {
-  return readFileSync(TEMPLATE_PATH, 'utf8');
-}
+/** Absolute path of the committed template asset — pure path computation; the CALLER reads
+ * it (through its own injected IO seam) and passes the content in. */
+export const BRIEF_TEMPLATE_PATH = join(import.meta.dir, 'brief-template.md');
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
@@ -51,13 +48,13 @@ function goalFor(card: BriefCard): string {
 
 /** Renders the committed brief template for one campaign card and embeds the committed
  * `--answers` rulings file content verbatim (spec §D5). */
-export function executorBrief(card: BriefCard, state: BriefState, answersContent: string): string {
+export function executorBrief(card: BriefCard, state: BriefState, answersContent: string, template: string): string {
   const ownerOnly =
     state.ownerOnlyEscalations.length > 0
       ? state.ownerOnlyEscalations.join(', ')
       : '(none declared for this campaign)';
 
-  return renderTemplate(loadTemplate(), {
+  return renderTemplate(template, {
     CARD_ID: card.id,
     CAMPAIGN: state.campaign,
     SPEC_PATH: card.spec ?? '(missing)',

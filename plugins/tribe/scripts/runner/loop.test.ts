@@ -7,10 +7,6 @@
 // the stateless-capability wall.
 import { describe, expect, mock, test } from 'bun:test';
 import {
-  EXIT_ESCALATED,
-  EXIT_LOCKED,
-  EXIT_OK,
-  EXIT_SESSION_INCOMPLETE,
   acquireLock,
   deriveCardPhase,
   extractMergeSha,
@@ -29,6 +25,8 @@ import {
   type PendingCommit,
   type RunLoopConfig,
 } from './loop.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
+import { BRIEF_TEMPLATE_PATH } from './brief.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
 import type { VerifyResult } from './verify.ts';
@@ -413,6 +411,7 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
       return true;
     }),
     readFile: mock((p: string) => {
+      if (p === BRIEF_TEMPLATE_PATH) return '# Executor brief for {{CARD_ID}}\n{{ANSWERS_CONTENT}}';
       const content = writtenFiles.get(p);
       if (content === undefined) throw new Error(`readFile: no fixture for ${p}`);
       return content;

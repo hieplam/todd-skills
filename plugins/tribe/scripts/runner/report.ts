@@ -17,7 +17,7 @@
 // GitHub commit, so the state this module reads already reflects the outcome regardless of
 // whether that commit later succeeds.
 import { join } from 'node:path';
-import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_SESSION_INCOMPLETE } from './loop.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import type { Card, CampaignState } from './types.ts';
 
 export const REPORT_JSON_FILENAME = 'campaign-report.json';

@@ -2,8 +2,11 @@
 // including the embedded --answers file content (spec §D5). Fixtures are deliberately
 // neutral (no repo names, no campaign-specific values) — the stateless-capability wall.
 import { describe, expect, test } from 'bun:test';
-import { executorBrief } from './brief.ts';
+import { readFileSync } from 'node:fs';
+import { BRIEF_TEMPLATE_PATH, executorBrief } from './brief.ts';
 import type { BriefCard, BriefState } from './brief.ts';
+
+const TEMPLATE = readFileSync(BRIEF_TEMPLATE_PATH, 'utf8');
 
 function fixtureCard(overrides: Partial<BriefCard> = {}): BriefCard {
   return {
@@ -93,18 +96,18 @@ No other terminal line is a valid signal.
 
 describe('executorBrief', () => {
   test('renders the committed template with card/state substitutions and the embedded answers content (snapshot)', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS);
+    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE);
     expect(rendered).toBe(EXPECTED_BRIEF);
   });
 
   test('embeds the answers file content verbatim so a past ruling reaches every future session', () => {
     const distinctiveRuling = '## ruling\n\nAlways use the neutral fixture, never a real repo name.\n';
-    const rendered = executorBrief(fixtureCard(), fixtureState(), distinctiveRuling);
+    const rendered = executorBrief(fixtureCard(), fixtureState(), distinctiveRuling, TEMPLATE);
     expect(rendered).toContain(distinctiveRuling);
   });
 
   test('never squash: the regular-merge order is explicit', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS);
+    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE);
     expect(rendered).toContain('gh pr merge --merge');
     expect(rendered).toContain('NEVER squash');
   });
@@ -114,6 +117,7 @@ describe('executorBrief', () => {
       fixtureCard({ id: 'X9', spec: 'docs/superpowers/specs/x9.md', plan: 'docs/superpowers/plans/x9.md' }),
       fixtureState({ campaign: 'other-campaign', ownerOnlyEscalations: [] }),
       FIXTURE_ANSWERS,
+      TEMPLATE,
     );
     expect(rendered).toContain('card X9 (other-campaign)');
     expect(rendered).toContain('.claude/state/other-campaign/reports/X9.md');
