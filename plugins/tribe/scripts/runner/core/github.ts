@@ -9,22 +9,9 @@
 // escalate IS broken CI), so a failed commit must never invalidate an escalation — every
 // failure path here returns a structured outcome, never a thrown error.
 
-/** Result of a single injected shell invocation (git/gh). */
-export interface ExecResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}
+import type { ExecResult, GithubIO } from '../ports/ports.ts';
 
-/** World-touching seam. No direct `child_process`/`fs`/network import anywhere in this
- * module — every git/gh call and every wait goes through this. */
-export interface GithubIO {
-  /** Runs `args` (argv, no shell string) with `cwd` set to the target repo root. */
-  exec(args: string[], opts?: { cwd?: string }): Promise<ExecResult>;
-  /** D6's 10-minute retry spacing goes through this seam so tests exercise the retry policy
-   * in milliseconds instead of actually waiting. */
-  sleep(ms: number): Promise<void>;
-}
+export type { ExecResult, GithubIO };
 
 /** Everything environment-specific this helper needs, as inputs — never baked in. */
 export interface GithubConfig {

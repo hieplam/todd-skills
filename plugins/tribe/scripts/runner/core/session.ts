@@ -4,15 +4,18 @@
 // This file owns the pinned option block and the message-parsing logic; every module reaches
 // a session through the `SessionIO` seam below, never the SDK package directly.
 import { join } from 'node:path';
+import type { PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams } from '../ports/ports.ts';
+
+export type { PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams };
 
 /** The tribe plugin's own directory (`plugins/tribe`), derived from this module's location
  * — NEVER a hardcoded absolute path (stateless-capability wall). This is what the SDK's
  * `plugins` option loads the tribe agents from, so a stale user-global `~/.claude/agents`
  * copy cannot shadow them inside an executor session (spec §D1, "Agent duplication" risk).
- * This module lives at `plugins/tribe/scripts/runner/session.ts` (ref-plugin-layout: the
- * runner is repo-invoked, not installed, so it sits under `scripts/`) — two directories up
+ * This module lives at `plugins/tribe/scripts/runner/core/session.ts` (ref-plugin-layout: the
+ * runner is repo-invoked, not installed, so it sits under `scripts/`) — three directories up
  * from here is `plugins/tribe`. */
-export const TRIBE_PLUGIN_DIR = join(import.meta.dir, '..', '..');
+export const TRIBE_PLUGIN_DIR = join(import.meta.dir, '..', '..', '..');
 
 /** Terminal outcome of one executor session, derived only from the typed `result` message —
  * never by scraping stdout (spec §D3: done is script-verified, agent SHIPPED is a signal). */
@@ -44,48 +47,6 @@ export interface RunSessionConfig {
   logsDir: string;
   /** The card id this session is executing, for log file naming. */
   card: string;
-}
-
-/** Loose supertype of the SDK's `SDKMessage` discriminated union — the runner only ever
- * narrows on `type`/`subtype`/`session_id`/`result`, so it doesn't need (or want) to import
- * the SDK's full internal message union outside this file. */
-export interface SessionMessage {
-  type: string;
-  subtype?: string;
-  session_id?: string;
-  result?: string;
-  [key: string]: unknown;
-}
-
-export interface SpawnSessionParams {
-  prompt: string;
-  options: PinnedSessionOptions;
-}
-
-/** The seam: production code funnels every session spawn through here so tests never hit
- * the real SDK or the network. Log writing is injected too (`appendLog`). */
-export interface SessionIO {
-  spawnSession(params: SpawnSessionParams): AsyncIterable<SessionMessage>;
-  /** Invoked IMMEDIATELY on receipt of the first `system/init` message's `session_id` —
-   * before any further message is processed. This drives the crash-safe state write; the
-   * session id is SDK-assigned and cannot be known before spawn (spec §D1/§D4). */
-  onSessionStart(sessionId: string): void;
-  appendLog(logPath: string, line: string): void;
-}
-
-/** The exact §D1 pinned option set, pinned in this one module. Every field is load-bearing
- * — do not "simplify" any away (see the per-field notes on `buildSessionOptions`). */
-export interface PinnedSessionOptions {
-  cwd: string;
-  model: string;
-  systemPrompt: { type: 'preset'; preset: 'claude_code' };
-  settingSources: ['project'];
-  plugins: Array<{ type: 'local'; path: string }>;
-  permissionMode: 'bypassPermissions';
-  allowDangerouslySkipPermissions: true;
-  abortController: AbortController;
-  executable: 'bun';
-  resume?: string;
 }
 
 /** Builds the §D1 option block verbatim. */

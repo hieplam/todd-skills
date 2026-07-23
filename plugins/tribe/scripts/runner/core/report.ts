@@ -19,6 +19,9 @@
 import { join } from 'node:path';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import type { Card, CampaignState } from './types.ts';
+import type { ReportIO } from '../ports/ports.ts';
+
+export type { ReportIO };
 
 export const REPORT_JSON_FILENAME = 'campaign-report.json';
 export const REPORT_MD_FILENAME = 'campaign-report.md';
@@ -48,13 +51,6 @@ export interface ReportConfig {
   repoRoot: string;
   /** `--escalations-dir`, relative to repoRoot. */
   escalationsDir: string;
-}
-
-/** World-touching seam. No direct `fs`/`child_process` import anywhere in this module. */
-export interface ReportIO {
-  fileExists(resolvedPath: string): boolean;
-  readFile(resolvedPath: string): string | Promise<string>;
-  writeFile(resolvedPath: string, content: string): void;
 }
 
 export type CardReportEntry =

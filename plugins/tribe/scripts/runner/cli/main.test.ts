@@ -5,7 +5,7 @@
 // model, or campaign (stateless-capability wall); `--session-timeout`/`--logs-dir` are the
 // two protocol-level defaults spec §2 itself documents.
 import { describe, expect, test } from 'bun:test';
-import { parseArgs } from './run.ts';
+import { parseArgs } from './main.ts';
 
 describe('parseArgs — required flags', () => {
   const REQUIRED = ['--repo', '/repo', '--state', 'state.json', '--model', 'sonnet', '--answers', 'answers.md', '--escalations-dir', 'escalations'];

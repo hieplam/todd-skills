@@ -5,8 +5,8 @@
 import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import type { ExecResult, LockInfo, LoopIO, PendingCommit, RunLoopConfig } from './loop.ts';
-import type { SessionMessage, SpawnSessionParams } from './session.ts';
+import type { ExecResult, LockInfo, LoopIO, PendingCommit, RunLoopConfig } from '../core/loop.ts';
+import type { SessionMessage, SpawnSessionParams } from '../core/session.ts';
 import { sdkSpawnSession } from './session.adapter.ts';
 
 function realExec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult> {

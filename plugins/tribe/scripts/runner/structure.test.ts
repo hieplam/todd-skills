@@ -1,113 +1,248 @@
 // structure.test.ts — the runner's structural contract, executable (lesson L2: an
 // architectural invariant is a lint/test in CI, or it is a wish).
 //
-// Roles (flat directory + filename convention — no folders):
-//   types.ts                 shared kernel: imports nothing local; home of ALL shared vocabulary
-//   *.adapter.ts             the ONLY files that may import world-touching modules (fs,
-//                            child_process, http, the Agent SDK)
-//   run.ts                   composition root: the only file that may VALUE-import adapters
-//                            and loop.ts
-//   everything else          pure core
+// Directory roles (visible hierarchy, not filename convention):
+//   core/types.ts             shared kernel: imports nothing local; home of ALL shared vocabulary
+//   ports/                    every IO seam interface's single home
+//   adapters/*.adapter.ts     the ONLY files that may import world-touching modules (fs,
+//                             child_process, http, the Agent SDK)
+//   cli/main.ts               composition root: the only file that may VALUE-import adapters
+//                             and the orchestrator (core/loop.ts's barrel + core/loop/** split)
+//   run.ts (root shim)        proves the external CLI contract; imports only cli/main.ts
+//   everything else in core/  pure core
 // Tests are exempt everywhere (they need real IO or mocks freely) — kanna's own exemption.
 import { describe, expect, test } from 'bun:test';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const DIR = import.meta.dir;
-const SOURCE_FILES = readdirSync(DIR)
-  .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-  .sort();
-const CORE_FILES = SOURCE_FILES.filter((f) => !f.endsWith('.adapter.ts'));
+const ROOT = import.meta.dir;
+
+/** Recursively collects non-test `.ts` source files under `dir` (relative to ROOT), skipping
+ * `node_modules`. Returned paths are ROOT-relative and always use `/` separators. */
+function walk(dir: string): string[] {
+  const abs = join(ROOT, dir);
+  let entries: string[];
+  try {
+    entries = readdirSync(abs);
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  for (const entry of entries) {
+    if (entry === 'node_modules') continue;
+    const absEntry = join(abs, entry);
+    if (statSync(absEntry).isDirectory()) {
+      out.push(...walk(`${dir}/${entry}`));
+      continue;
+    }
+    if (!entry.endsWith('.ts') || entry.endsWith('.test.ts')) continue;
+    out.push(`${dir}/${entry}`);
+  }
+  return out;
+}
+
+const ROOT_SHIM = readdirSync(ROOT).includes('run.ts') ? ['run.ts'] : [];
+const SOURCE_FILES = [...walk('core'), ...walk('ports'), ...walk('adapters'), ...walk('cli'), ...ROOT_SHIM].sort();
+const CORE_FILES = SOURCE_FILES.filter((f) => f.startsWith('core/'));
+const PORTS_FILES = SOURCE_FILES.filter((f) => f.startsWith('ports/'));
+const ADAPTER_FILES = SOURCE_FILES.filter((f) => f.startsWith('adapters/'));
+const CLI_FILES = SOURCE_FILES.filter((f) => f.startsWith('cli/'));
 
 /** Module specifiers of every import in the file, including `import type`. */
 function allImportsOf(file: string): string[] {
-  const src = readFileSync(join(DIR, file), 'utf8');
-  return [...src.matchAll(/from\s+'([^']+)'/g)].map((m) => m[1] as string);
+  const src = readFileSync(join(ROOT, file), 'utf8');
+  return [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1] as string);
 }
 
 /** Module specifiers of value imports only (`import type` statements stripped first). */
 function valueImportsOf(file: string): string[] {
-  const src = readFileSync(join(DIR, file), 'utf8').replace(/import\s+type\s[^;]+;/gs, '');
-  return [...src.matchAll(/from\s+'([^']+)'/g)].map((m) => m[1] as string);
+  const src = readFileSync(join(ROOT, file), 'utf8').replace(/import\s+type\s[^;]+;/gs, '');
+  return [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1] as string);
+}
+
+/** Comment-stripped source (Skinner audit, 2026-07-23): specifier-string bans and
+ * ambient-state bans can't be dodged inside a comment. */
+function codeOf(file: string): string {
+  return readFileSync(join(ROOT, file), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
+/** Resolves a relative local specifier (e.g. `'../core/loop.ts'` imported from
+ * `adapters/run-io.adapter.ts`) to a ROOT-relative path (e.g. `'core/loop.ts'`). Returns
+ * `null` for non-relative (bare/world) specifiers. */
+function resolveLocalImport(fromFile: string, specifier: string): string | null {
+  if (!specifier.startsWith('.')) return null;
+  const fromDir = fromFile.includes('/') ? fromFile.slice(0, fromFile.lastIndexOf('/')) : '.';
+  const parts = `${fromDir}/${specifier}`.split('/');
+  const resolved: string[] = [];
+  for (const part of parts) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') {
+      resolved.pop();
+      continue;
+    }
+    resolved.push(part);
+  }
+  return resolved.join('/');
+}
+
+/** True if a resolved local import path points at the orchestrator — `core/loop.ts` (the pure
+ * re-export barrel) or any module under `core/loop/` (its actual split implementation). */
+function isOrchestrator(resolved: string | null): boolean {
+  return resolved === 'core/loop.ts' || resolved?.startsWith('core/loop/') === true;
+}
+
+/** True if a resolved local import path points at an adapter — anything under `adapters/`
+ * (covers `resolveLocalImport`'s output) or literally ending `.adapter.ts` (belt-and-braces:
+ * catches a specifier resolved from an unexpected relative depth). */
+function isAdapterPath(resolved: string | null): boolean {
+  return resolved?.startsWith('adapters/') === true || resolved?.endsWith('.adapter.ts') === true;
+}
+
+/** Every quoted RELATIVE string literal in `file`'s comment-stripped source, with
+ * `import type ...;` statements stripped first (Skinner audit, 2026-07-24: the prior version
+ * of this scan only parsed static `from '...'` syntax via `allImportsOf`/`valueImportsOf` —
+ * missing dynamic `import()`, `require()`, and side-effect imports entirely, a real
+ * regression from the old flat suite's any-quote-form ban). Only literals starting with `.`
+ * are candidates (a relative path) — this keeps ordinary string literals (log messages,
+ * gh/git argv, prompts) out without needing to distinguish import syntax at all. */
+function relativeStringLiteralsOf(file: string): string[] {
+  const src = codeOf(file).replace(/import\s+type\s[^;]+;/gs, '');
+  return [...src.matchAll(/['"](\.[^'"]*)['"]/g)].map((m) => m[1] as string);
 }
 
 const WORLD = ['fs', 'node:fs', 'node:fs/promises', 'child_process', 'node:child_process', 'http', 'node:http', 'https', 'node:https', '@anthropic-ai/claude-agent-sdk'];
 
 describe('structural contract', () => {
-  // --- true today: locked in immediately ---
-  test('types.ts is a leaf: no local imports at all', () => {
-    expect(allImportsOf('types.ts').filter((s) => s.startsWith('./'))).toEqual([]);
-  });
-  test('loop/state/verify/github/report never import world-touching modules', () => {
-    for (const f of ['loop.ts', 'state.ts', 'verify.ts', 'github.ts', 'report.ts']) {
-      expect({ file: f, bad: allImportsOf(f).filter((s) => WORLD.includes(s)) }).toEqual({ file: f, bad: [] });
-    }
-  });
-  test('only session-owned files import the Agent SDK', () => {
-    const importers = SOURCE_FILES.filter((f) => allImportsOf(f).includes('@anthropic-ai/claude-agent-sdk'));
-    expect(importers.every((f) => f.startsWith('session'))).toBe(true);
-  });
-  test('adapters are value-imported only by run.ts or other adapters', () => {
-    for (const f of CORE_FILES.filter((f) => f !== 'run.ts')) {
-      expect({ file: f, bad: valueImportsOf(f).filter((s) => s.includes('.adapter')) }).toEqual({ file: f, bad: [] });
-    }
+  test('core/types.ts is a leaf: no local imports at all', () => {
+    expect(allImportsOf('core/types.ts').filter((s) => s.startsWith('.'))).toEqual([]);
   });
 
-  // --- false today: flipped live by CU1 tasks ---
-  test('leaf modules never import the orchestrator (only run.ts + tests may)', () => {
-    for (const f of CORE_FILES.filter((f) => f !== 'run.ts')) {
-      expect({ file: f, bad: allImportsOf(f).filter((s) => s === './loop.ts' || s === './loop') }).toEqual({ file: f, bad: [] });
-    }
-  });
-  test('session.ts is pure: no SDK import outside session.adapter.ts', () => {
-    expect(allImportsOf('session.ts').includes('@anthropic-ai/claude-agent-sdk')).toBe(false);
-  });
-  test('brief.ts is pure: no node:fs import', () => {
-    expect(allImportsOf('brief.ts').filter((s) => WORLD.includes(s))).toEqual([]);
-  });
-  test('run.ts is pure wiring: no node:fs / node:child_process import', () => {
-    expect(allImportsOf('run.ts').filter((s) => WORLD.includes(s))).toEqual([]);
-  });
-
-  // Ambient-state seal (kanna's no-restricted-syntax selectors, carried as a script rule
-  // until typescript-eslint supports TS >= 7.1 — plan Amendment A3, issue #10940).
-  function codeOf(file: string): string {
-    return readFileSync(join(DIR, file), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/[^\n]*/g, '');
-  }
-  test('no ambient process.env read outside adapters', () => {
-    for (const f of CORE_FILES) {
-      expect({ file: f, bad: /process\.env\b/.test(codeOf(f)) }).toEqual({ file: f, bad: false });
-    }
-  });
-  test('process.exit only in the composition root (run.ts)', () => {
-    for (const f of CORE_FILES.filter((f) => f !== 'run.ts')) {
-      expect({ file: f, bad: /process\.exit\s*\(/.test(codeOf(f)) }).toEqual({ file: f, bad: false });
-    }
-  });
-
-  // Import-form hardening (Skinner audit, 2026-07-23): the from-'...' regex alone missed
-  // dynamic import(), import x = require(), side-effect imports, and double-quoted
-  // specifiers. Banning the module SPECIFIER STRING itself, in any quote, anywhere in
-  // comment-stripped source covers every import form at once.
-  test('world-touching module specifiers appear nowhere in core files, in any form', () => {
+  test('core/** never contains a world-touching module specifier, in any form', () => {
     for (const f of CORE_FILES) {
       const src = codeOf(f);
       const bad = WORLD.filter((m) => src.includes(`'${m}'`) || src.includes(`"${m}"`));
       expect({ file: f, bad }).toEqual({ file: f, bad: [] });
     }
   });
-  test('adapter/orchestrator specifiers appear in core (non-run) files only inside import type', () => {
-    for (const f of CORE_FILES.filter((f) => f !== 'run.ts')) {
-      const src = codeOf(f).replace(/import\s+type\s[^;]+;/gs, '');
-      const bad = [...src.matchAll(/['"]((?:[^'"]*\.adapter(?:\.ts)?)|(?:\.\/loop(?:\.ts)?))['"]/g)].map((m) => m[1] as string);
+
+  test('only adapters/session.adapter.ts imports the Agent SDK', () => {
+    const importers = SOURCE_FILES.filter((f) => allImportsOf(f).includes('@anthropic-ai/claude-agent-sdk'));
+    expect(importers).toEqual(['adapters/session.adapter.ts']);
+  });
+
+  test('adapters are value-imported only by cli/ or other adapters (core/ports never value-import adapters)', () => {
+    for (const f of SOURCE_FILES) {
+      if (f.startsWith('cli/') || f.startsWith('adapters/')) continue;
+      const bad = valueImportsOf(f).filter((s) => s.includes('.adapter'));
       expect({ file: f, bad }).toEqual({ file: f, bad: [] });
     }
   });
+
+  test('leaf core modules never import the orchestrator (only core/loop itself, cli/, and tests may)', () => {
+    for (const f of CORE_FILES) {
+      if (isOrchestrator(f)) continue;
+      const bad = allImportsOf(f)
+        .filter((s) => s.startsWith('.'))
+        .map((s) => resolveLocalImport(f, s))
+        .filter(isOrchestrator);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
   test('adapters never value-import the orchestrator', () => {
-    for (const f of SOURCE_FILES.filter((f) => f.endsWith('.adapter.ts'))) {
-      expect({ file: f, bad: valueImportsOf(f).filter((s) => s === './loop.ts' || s === './loop') }).toEqual({ file: f, bad: [] });
+    for (const f of ADAPTER_FILES) {
+      const bad = valueImportsOf(f)
+        .filter((s) => s.startsWith('.'))
+        .map((s) => resolveLocalImport(f, s))
+        .filter(isOrchestrator);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
+  // Skinner audit (2026-07-24), restoring the old flat suite's hardened strength: banning the
+  // SPECIFIER STRING itself, in any quote/import form (dynamic `import()`, `require()`,
+  // side-effect imports — not just static `from '...'`), over comment-stripped,
+  // `import type`-stripped source. The old suite swept the adapter-path ban over EVERY core
+  // file except run.ts — including loop.ts itself — so the orchestrator directory
+  // (`core/loop.ts` + `core/loop/**`) is NOT exempt from the adapter-path half of this check;
+  // it is exempt only from the orchestrator-path half (its own submodules legitimately import
+  // each other). Adapters are likewise exempt from the adapter-path half only (adapters
+  // legitimately import other adapters), never from the orchestrator-path half.
+  test('adapter/orchestrator specifiers appear in core and adapter files only inside import type, in any form', () => {
+    for (const f of CORE_FILES) {
+      if (isOrchestrator(f)) continue;
+      const bad = relativeStringLiteralsOf(f)
+        .map((s) => resolveLocalImport(f, s))
+        .filter((r) => isAdapterPath(r) || isOrchestrator(r));
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+    for (const f of ADAPTER_FILES) {
+      const bad = relativeStringLiteralsOf(f)
+        .map((s) => resolveLocalImport(f, s))
+        .filter(isOrchestrator);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
+  test('the orchestrator (core/loop.ts + core/loop/**) never references an adapter, in any form', () => {
+    for (const f of CORE_FILES) {
+      if (!isOrchestrator(f)) continue;
+      const bad = relativeStringLiteralsOf(f)
+        .map((s) => resolveLocalImport(f, s))
+        .filter(isAdapterPath);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
+  test('cli/main.ts contains no world-touching module specifier', () => {
+    // Full WORLD sweep (not just fs/child_process): the old flat-layout suite swept every
+    // banned specifier over the composition root too. http/https/the Agent SDK are already
+    // covered elsewhere (the SDK-importer test above), but sweeping the full list here keeps
+    // this test's own contract exact — cli/main.ts wires adapters, it never touches the world
+    // directly, for ANY of the banned specifiers, not just two of them.
+    const src = codeOf('cli/main.ts');
+    const bad = WORLD.filter((m) => src.includes(`'${m}'`) || src.includes(`"${m}"`));
+    expect(bad).toEqual([]);
+  });
+
+  test('process.exit appears only in cli/main.ts', () => {
+    for (const f of SOURCE_FILES) {
+      if (f === 'cli/main.ts') continue;
+      expect({ file: f, bad: /process\.exit\s*\(/.test(codeOf(f)) }).toEqual({ file: f, bad: false });
+    }
+  });
+
+  test('no ambient process.env read outside adapters/', () => {
+    for (const f of SOURCE_FILES) {
+      if (f.startsWith('adapters/')) continue;
+      expect({ file: f, bad: /process\.env\b/.test(codeOf(f)) }).toEqual({ file: f, bad: false });
+    }
+  });
+
+  test('root run.ts shim imports only from ./cli/main.ts', () => {
+    if (!ROOT_SHIM.length) return; // brand-new checkouts mid-migration; real repo always has it.
+    const specifiers = allImportsOf('run.ts');
+    expect(specifiers.length > 0 && specifiers.every((s) => s === './cli/main.ts')).toBe(true);
+  });
+
+  // --- ports/ (added once the IO-seam split lands: every seam interface's single home) ---
+  test('ports/ files are type-only, and only import from core/types.ts', () => {
+    for (const f of PORTS_FILES) {
+      const valueSpecifiers = valueImportsOf(f).filter((s) => s.startsWith('.'));
+      expect({ file: f, bad: valueSpecifiers }).toEqual({ file: f, bad: [] });
+      const localSpecifiers = allImportsOf(f).filter((s) => s.startsWith('.'));
+      const bad = localSpecifiers.filter((s) => resolveLocalImport(f, s) !== 'core/types.ts');
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
+  test('no interface X...IO / ...Port DECLARATION outside ports/ (re-exports are exempt)', () => {
+    for (const f of [...CORE_FILES, ...ADAPTER_FILES, ...CLI_FILES]) {
+      const src = codeOf(f);
+      const bad = [...src.matchAll(/\binterface\s+(\w*(?:IO|Port))\b/g)].map((m) => m[1] as string);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
     }
   });
 });

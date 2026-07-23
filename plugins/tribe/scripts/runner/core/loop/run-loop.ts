@@ -1,0 +1,261 @@
+// The pass + entry: derive-and-act until `done`, honoring STOP and the `--max-cards` budget,
+// tied together with the §D2 lock and crash-recovery (pending-commit retry).
+import { join } from 'node:path';
+import type { CampaignState, NextCardResult, ResolvedConfig, RunLoopConfig } from '../types.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from '../types.ts';
+import { loadState, nextCard } from '../state.ts';
+import { BRIEF_TEMPLATE_PATH } from '../brief.ts';
+import type { LoopIO, StateIO } from '../../ports/ports.ts';
+import { acquireLock, isStopRequested, releaseLock, stopFilePathOf } from './lock.ts';
+import { deriveCardPhase, derivePhaseConfigOf, type CardPhase } from './phase.ts';
+import { commitState, githubConfigFor, persistLocalState } from './commit-guard.ts';
+import { actOnCard, escalateCard, type CardCtx, type CardOutcome } from './card-actions.ts';
+
+export interface DryRunPlan {
+  cardId: string | null;
+  phase: CardPhase | null;
+  done?: boolean;
+  planningNeeded?: { cardId: string; missing: Array<'spec' | 'plan'> };
+}
+
+export interface LoopResult {
+  exitCode: number;
+  processed: CardOutcome[];
+  message?: string;
+  dryRunPlan?: DryRunPlan;
+}
+
+/** D5′ park-and-continue (spec §O4/§2 wall reads): a single pass can now end with a MIX of
+ * outcomes — some cards shipped, some escalated (new this pass or still pending from a prior
+ * one), some merely `stopped` (a session error/timeout with no further D4 fallback). This
+ * precedence turns that mix into the ONE exit code the caller (Stage C, or a human running the
+ * CLI by hand) reads. An escalation always needs a human ruling, so it outranks a `stopped`
+ * card — which is "safe to retry, no judgment needed" — even when other cards in the same pass
+ * shipped cleanly (design note: an escalation is the thing needing a human; session-incomplete
+ * merely resumes next run). `EXIT_OK` only when every attempted card shipped, or none were
+ * attempted at all (e.g. the campaign was already fully `done`). */
+function computeExitCode(processed: CardOutcome[]): number {
+  if (processed.some((o) => o.kind === 'escalated' || o.kind === 'escalation_pending')) {
+    return EXIT_ESCALATED;
+  }
+  if (processed.some((o) => o.kind === 'stopped')) {
+    return EXIT_SESSION_INCOMPLETE;
+  }
+  return EXIT_OK;
+}
+
+/** Derives the target repo's base branch from `origin/HEAD` rather than hardcoding
+ * `master`/`main` (stateless-capability wall: no campaign/repo value baked in). Verified
+ * against the real CLI: `git symbolic-ref --short refs/remotes/origin/HEAD` -> `origin/master`
+ * (see the task-6 report's transcript). Falls back to `master` only if the query itself
+ * fails (e.g. `origin/HEAD` was never set) — a protocol-level default, not a campaign value. */
+export async function resolveBaseBranch(
+  io: { exec: LoopIO['exec'] },
+  repoRoot: string,
+): Promise<string> {
+  const result = await io.exec(['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], {
+    cwd: repoRoot,
+  });
+  if (result.exitCode !== 0) {
+    return 'master';
+  }
+  const trimmed = result.stdout.trim();
+  return trimmed.startsWith('origin/') ? trimmed.slice('origin/'.length) : trimmed || 'master';
+}
+
+/** D5′ park-and-continue (Warchief ruling W-F2): `attempted` excludes any card id already
+ * attempted THIS pass from the candidate sequence, independent of `card.status`. This is what
+ * makes the park-and-continue loop's termination argument STRUCTURAL rather than incidental —
+ * every pass attempts each card at most once (the sequence handed to `nextCard` strictly
+ * shrinks every iteration, bounded by `state.sequence.length`), so a pass is guaranteed to
+ * reach `done` without ever depending on a status mutation "eventually" excluding a card.
+ *
+ * Without this, two real triggers loop forever once `break` becomes `continue`: (1) an already
+ * `escalated` card is excluded by `nextCard` ONLY when `includeEscalated` is false — Stage C's
+ * own re-trigger shape (`--cards <answered> --include-escalated`, spec §O6) sets it true, so a
+ * card that escalates AGAIN this pass would be re-selected every tick; (2) a card with a
+ * pending PRIOR-run escalation file is never excluded by `card.status` at all — the file, not
+ * the status, is what `deriveCardPhase` keys on (see `CardOutcome`'s `escalation_pending`
+ * doc). Both cases are exercised in loop.test.ts's "W-F2" and "escalation_pending" suites. */
+function filteredNextCard(
+  state: CampaignState,
+  config: RunLoopConfig,
+  io: LoopIO,
+  attempted: ReadonlySet<string> = new Set(),
+): NextCardResult {
+  const sequence = (
+    config.cardsFilter && config.cardsFilter.length > 0
+      ? state.sequence.filter((id) => config.cardsFilter?.includes(id))
+      : state.sequence
+  ).filter((id) => !attempted.has(id));
+  const view: CampaignState = { ...state, sequence };
+  const stateIO: StateIO = { repoRoot: config.repoRoot, fileExists: (p) => io.fileExists(p) };
+  return nextCard(view, stateIO, { includeEscalated: config.includeEscalated });
+}
+
+async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult> {
+  const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
+  const nc = filteredNextCard(state, config, io);
+
+  if (nc.kind === 'done') {
+    return { exitCode: EXIT_OK, processed: [], dryRunPlan: { cardId: null, phase: null, done: true } };
+  }
+  if (nc.kind === 'planning_needed') {
+    return {
+      exitCode: EXIT_OK,
+      processed: [],
+      dryRunPlan: {
+        cardId: nc.cardId,
+        phase: null,
+        planningNeeded: { cardId: nc.cardId, missing: nc.missing },
+      },
+    };
+  }
+
+  const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(config), io);
+  return { exitCode: EXIT_OK, processed: [], dryRunPlan: { cardId: nc.cardId, phase } };
+}
+
+/** STOP honored before any work: a present STOP file ends the run cleanly, before the lock's
+ * critical section does anything. */
+function startupStopResult(config: RunLoopConfig, io: LoopIO): LoopResult | null {
+  if (!isStopRequested(stopFilePathOf(config), io)) return null;
+  return {
+    exitCode: EXIT_OK,
+    processed: [],
+    message: 'STOP file present; exiting cleanly before processing any card.',
+  };
+}
+
+/** Loads everything `RunLoopConfig` doesn't carry: the base branch (from origin/HEAD), the
+ * committed --answers rulings, and the committed brief template — all through the io seam. */
+async function resolveRunContext(config: RunLoopConfig, io: LoopIO): Promise<ResolvedConfig> {
+  const baseBranch = await resolveBaseBranch(io, config.repoRoot);
+  const answersContent = String(await io.readFile(join(config.repoRoot, config.answersPath)));
+  const briefTemplate = String(await io.readFile(BRIEF_TEMPLATE_PATH));
+  return { ...config, baseBranch, answersContent, briefTemplate };
+}
+
+/** Crash recovery: retries a prior run's pending state commit before any new work. */
+async function retryPendingCommit(resolved: ResolvedConfig, io: LoopIO): Promise<void> {
+  const pending = io.readPendingCommit();
+  if (!pending) return;
+  const retryResult = await commitState(pending.files, pending.title, githubConfigFor(resolved, pending.card), io);
+  if (retryResult.outcome === 'merged') {
+    io.clearPendingCommit();
+  }
+}
+
+/** One D5′ park-and-continue pass over the campaign: derive-and-act until `done`, STOP, or
+ * the --max-cards budget is spent. */
+async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopIO): Promise<LoopResult> {
+  const processed: CardOutcome[] = [];
+  // Warchief audit fix (Task 2): `attempted` and the `--max-cards` BUDGET are two different
+  // questions, and conflating them was a bug. `attempted` answers ONLY "have I already
+  // selected this card id this pass?" — every selected card, unconditionally, is what keeps
+  // `filteredNextCard`'s termination argument structural (see that function's own doc
+  // comment). `worked` answers "how much of the operator's requested budget have I actually
+  // spent?" — plan: "--max-cards counts attempted cards (shipped + escalated)", i.e. cards
+  // where something was actually DONE this pass. A card parked on a PRIOR run's escalation
+  // file (`escalation_pending`) writes nothing and decides nothing this pass — exactly like
+  // a `blocked` card `nextCard` itself skips — so it must not consume budget either; only
+  // `planning_needed` (a genuine new escalation is written) and the generic `actOnCard`
+  // outcomes (`shipped`/`escalated`/`stopped` — real work happened) increment `worked`.
+  const attempted = new Set<string>();
+  let worked = 0;
+  const limit = resolved.maxCards ?? Infinity;
+
+  // D5′ park-and-continue: loop until either no progressable card remains (`done`) or the
+  // `--max-cards` budget (`worked`, above) is spent. `attempted` alone bounds how many times
+  // the loop can tick even when `worked` never reaches `limit` (e.g. every remaining card is
+  // `escalation_pending`) — see `filteredNextCard`'s doc comment (Warchief ruling W-F2) for
+  // why that must be structural, not incidental.
+  while (worked < limit) {
+    if (isStopRequested(stopFilePathOf(resolved), io)) {
+      break;
+    }
+
+    const nc = filteredNextCard(state, resolved, io, attempted);
+    if (nc.kind === 'done') break;
+
+    const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
+
+    if (nc.kind === 'planning_needed') {
+      attempted.add(nc.cardId);
+      const outcome = await escalateCard(ctx, 'planning_needed', `Missing on disk: ${nc.missing.join(', ')}`);
+      processed.push(outcome);
+      worked += 1;
+      continue;
+    }
+
+    const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(resolved), io);
+
+    if (phase.kind === 'escalation_pending') {
+      // D5′: an unanswered escalation from a PRIOR run — nothing to do this pass but park
+      // it (see the `CardOutcome.escalation_pending` doc) and move to the next card. Marks
+      // `attempted` (never re-select it this pass) but NOT `worked` (no budget spent — see
+      // the audit-fix comment above `attempted`'s declaration).
+      attempted.add(nc.cardId);
+      processed.push({ kind: 'escalation_pending', cardId: nc.cardId, escalationPath: phase.escalationPath });
+      continue;
+    }
+
+    const outcome = await actOnCard(ctx, phase);
+    attempted.add(nc.cardId);
+    processed.push(outcome);
+    worked += 1;
+    // D5′: `escalated`/`stopped` no longer `break` the pass — the next tick naturally
+    // re-derives the next progressable card (excluding this one, now `attempted`) via
+    // `filteredNextCard`/`nextCard`'s own blocked-cascade reconciliation (W6).
+  }
+
+  return { exitCode: computeExitCode(processed), processed };
+}
+
+/** The main loop, spec §D2/§D4/§D5′ tied together: acquire the single-instance lock → STOP-file
+ * check → retry any pending state commit → repeatedly derive-and-act on the next card, PARKING
+ * (never exiting) on an escalation or a `stopped` session — D5′'s amendment of the original
+ * exit-on-escalation D5. The pass stops only when no progressable card remains (`done`) or the
+ * `--max-cards` budget is spent — counted by cards actually WORKED this pass (`shipped` /
+ * `escalated` / `stopped`), never by a card merely PARKED on a prior run's escalation file
+ * (Warchief audit fix: dedup/termination and the operator's work budget are different
+ * questions — see the `attempted`/`worked` split at this function's loop, below). A STOP file
+ * is still honored between cards (finishes the in-flight card only, never aborts one mid-flight).
+ * `--dry-run` short-circuits to `runDryRun` before any of this (no lock, no writes, no session —
+ * see `runDryRun`'s own doc comment for why that is zero side effects BY CONSTRUCTION, not
+ * merely by intent). */
+export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopResult> {
+  if (config.dryRun) {
+    return runDryRun(config, io);
+  }
+
+  const lockResult = acquireLock(io);
+  if (!lockResult.ok) {
+    return { exitCode: EXIT_LOCKED, processed: [], message: lockResult.reason };
+  }
+
+  try {
+    const stopped = startupStopResult(config, io);
+    if (stopped) return stopped;
+
+    const resolved = await resolveRunContext(config, io);
+    await retryPendingCommit(resolved, io);
+
+    const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
+    const result = await runPass(state, resolved, io);
+    // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
+    // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable
+    // card) — that tick never reaches `actOnCard`/`escalateCard`/`shipCard`, so the mutation
+    // would otherwise never be flushed via `persistLocalState`, and the file on disk would keep
+    // reporting that card's stale pre-reconciliation status (e.g. `staged`) forever, even though
+    // it is genuinely blocked behind an unanswered escalation. One `persistLocalState` call
+    // here, on every normal (non-dry-run, non-locked) return, closes that gap for good — state
+    // was definitely loaded and may have been mutated by this point, and `serializeState`'s
+    // byte-identical round-trip means a pass with no reconciliation to flush just rewrites the
+    // same bytes (harmless, no spurious diff).
+    persistLocalState(state, resolved, io);
+    return result;
+  } finally {
+    releaseLock(io);
+  }
+}

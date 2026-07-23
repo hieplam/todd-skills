@@ -51,16 +51,6 @@ export interface CampaignState {
   cards: Record<string, Card>;
 }
 
-/** io seam for nextCard's disk checks (D5 PLANNING_NEEDED detection). state.ts never calls
- * `fs` directly — every world-touching check is injected through this. */
-export interface StateIO {
-  /** The target repo root that `spec`/`plan` paths are resolved against (an input, per
-   * spec §2 — never hardcoded). */
-  repoRoot: string;
-  /** Returns true if the given (already-resolved) path exists on disk. */
-  fileExists(resolvedPath: string): boolean;
-}
-
 export interface NextCardOptions {
   /** Include `escalated` cards as eligible "next" candidates (`--include-escalated`). */
   includeEscalated?: boolean;
@@ -85,6 +75,61 @@ export interface CardResult {
 }
 
 export type NextCardResult = NoCardResult | PlanningNeededResult | CardResult;
+
+/** §D6/§D5 — the shape of the files a state commit is allowed to touch. Homed in the
+ * kernel (not `ports/ports.ts`) because it is used by 2+ modules (`core/loop/commit-guard.ts`'s
+ * `toCommitFileList`/`commitState`, and `ports.ts`'s own `PendingCommit`) — lesson L5:
+ * anything used by 2+ modules lives in the kernel. Exactly two named, single-purpose fields
+ * (never a bare `string[]` a caller could smuggle an arbitrary path into);
+ * `core/loop/commit-guard.ts`'s `assertStateOrEscalationPath` additionally asserts every path
+ * ends in `.json`/`.md` at runtime. */
+export interface StateCommitFiles {
+  /** The campaign state JSON path (relative to repoRoot) — always included. */
+  statePath: string;
+  /** An escalation markdown path (relative to repoRoot) — only present when this commit
+   * records an escalation. */
+  escalationPath?: string;
+}
+
+/** The orchestrator's (`core/loop/`) full config, assembled by `cli/main.ts`'s `parseArgs`
+ * from CLI flags. Homed in the kernel (not `core/loop/run-loop.ts`) because every
+ * `core/loop/*` module needs it — `phase.ts`, `lock.ts`, and `commit-guard.ts` would
+ * otherwise have to import it from the orchestrator's own entry module, a type-only cycle. */
+export interface RunLoopConfig {
+  /** `--repo` */
+  repoRoot: string;
+  /** `--state`, relative to repoRoot */
+  statePath: string;
+  /** `--escalations-dir`, relative to repoRoot */
+  escalationsDir: string;
+  /** `--answers`, relative to repoRoot */
+  answersPath: string;
+  /** `--logs-dir` */
+  logsDir: string;
+  /** `--model` */
+  model: string;
+  /** `--session-timeout`, in ms */
+  sessionTimeoutMs?: number;
+  /** `--cards` */
+  cardsFilter?: string[];
+  /** `--max-cards` */
+  maxCards?: number;
+  /** `--include-escalated` */
+  includeEscalated: boolean;
+  /** `--dry-run` */
+  dryRun: boolean;
+}
+
+/** `RunLoopConfig` plus everything `core/loop/run-loop.ts`'s `resolveRunContext` loads
+ * through the io seam before a pass starts (the base branch, the committed --answers
+ * rulings, the committed brief template) — threaded through `core/loop/card-actions.ts` and
+ * `core/loop/commit-guard.ts` too, so it lives in the kernel alongside `RunLoopConfig`
+ * rather than in any one of those sibling modules. */
+export interface ResolvedConfig extends RunLoopConfig {
+  baseBranch: string;
+  answersContent: string;
+  briefTemplate: string;
+}
 
 /** Process exit codes — the runner's shared vocabulary, homed in the kernel so leaf modules
  * (report.ts) import them from here, never from the orchestrator (lesson L5: anything used
