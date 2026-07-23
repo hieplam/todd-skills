@@ -164,10 +164,13 @@ describe('structural contract', () => {
   // Skinner audit (2026-07-24), restoring the old flat suite's hardened strength: banning the
   // SPECIFIER STRING itself, in any quote/import form (dynamic `import()`, `require()`,
   // side-effect imports — not just static `from '...'`), over comment-stripped,
-  // `import type`-stripped source. `core/loop.ts`/`core/loop/**` (the orchestrator) are exempt
-  // — its own submodules legitimately import each other and adapters/other-adapters legitimately
-  // import each other too (adapter-path rule is core-only, per the original test's own scope).
-  test('adapter/orchestrator specifiers appear in core (non-orchestrator) and adapter files only inside import type, in any form', () => {
+  // `import type`-stripped source. The old suite swept the adapter-path ban over EVERY core
+  // file except run.ts — including loop.ts itself — so the orchestrator directory
+  // (`core/loop.ts` + `core/loop/**`) is NOT exempt from the adapter-path half of this check;
+  // it is exempt only from the orchestrator-path half (its own submodules legitimately import
+  // each other). Adapters are likewise exempt from the adapter-path half only (adapters
+  // legitimately import other adapters), never from the orchestrator-path half.
+  test('adapter/orchestrator specifiers appear in core and adapter files only inside import type, in any form', () => {
     for (const f of CORE_FILES) {
       if (isOrchestrator(f)) continue;
       const bad = relativeStringLiteralsOf(f)
@@ -179,6 +182,16 @@ describe('structural contract', () => {
       const bad = relativeStringLiteralsOf(f)
         .map((s) => resolveLocalImport(f, s))
         .filter(isOrchestrator);
+      expect({ file: f, bad }).toEqual({ file: f, bad: [] });
+    }
+  });
+
+  test('the orchestrator (core/loop.ts + core/loop/**) never references an adapter, in any form', () => {
+    for (const f of CORE_FILES) {
+      if (!isOrchestrator(f)) continue;
+      const bad = relativeStringLiteralsOf(f)
+        .map((s) => resolveLocalImport(f, s))
+        .filter(isAdapterPath);
       expect({ file: f, bad }).toEqual({ file: f, bad: [] });
     }
   });
