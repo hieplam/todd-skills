@@ -65,5 +65,7 @@ describe('structural contract', () => {
   test('brief.ts is pure: no node:fs import', () => {
     expect(allImportsOf('brief.ts').filter((s) => WORLD.includes(s))).toEqual([]);
   });
-  test.todo('run.ts is pure wiring: no node:fs / node:child_process import', () => {}); // Task 5
+  test('run.ts is pure wiring: no node:fs / node:child_process import', () => {
+    expect(allImportsOf('run.ts').filter((s) => WORLD.includes(s))).toEqual([]);
+  });
 });
