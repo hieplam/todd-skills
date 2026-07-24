@@ -387,6 +387,7 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     }
     // Default fallbacks for common read-only/mutating calls not explicitly scripted.
     if (cmd[0] === 'git' && cmd[1] === 'symbolic-ref') return ok('origin/master\n');
+    if (cmd[0] === 'git' && cmd[1] === 'rev-parse') return ok('basesha0\n');
     if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view') return fail('no pull requests found');
     if (cmd[0] === 'git' && cmd[1] === 'worktree') return ok('');
     if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('');
@@ -524,6 +525,46 @@ describe('runLoop — full happy path over two cards', () => {
 
     // Lock acquired then released.
     expect(calls.some(() => true)).toBe(true);
+  });
+});
+
+describe('runLoop — records branch + baseSha (handoff Fix 5)', () => {
+  // Regression guard for a REAL campaign failure (least-effort-5, 2026-07-24): card C1's work
+  // merged cleanly as PR #144, but `branch`/`baseSha` were never written to state.json, so
+  // verifyShipped could not run its worktreeAndBranchGone or schemaGuard checks and escalated
+  // `verify_failed_twice` on an already-shipped card. A false escalation costs a whole card's
+  // session AND one of the two auto-answer rounds the campaign is allowed.
+  test('a shipped card records the branch (from its PR) and the baseSha it was cut from', async () => {
+    // branch: null is what the runner README prescribes at Stage-A authoring time ("null at
+    // authoring time — this is exactly what makes the D4 resume matrix classify a freshly-
+    // authored card `fresh`"), and it is what campaign least-effort-5's real state.json had.
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } })),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'git' && cmd[1] === 'rev-parse') return ok('base15ha\n');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view') return ok(JSON.stringify({ headRefName: 'feature/RecordedBranch' }));
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'rev-list') return ok('deadbee parent1 parent2');
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'diff') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'worktree') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('');
+          if (cmd[0] === 'git') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr') return ok('https://example.invalid/o/r/pull/900\n');
+          return null;
+        },
+      ],
+      spawnQueue: [() => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1'))],
+    });
+
+    await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    expect(finalState.cards.C1.baseSha).toBe('base15ha');
+    expect(finalState.cards.C1.branch).toBe('feature/RecordedBranch');
   });
 });
 

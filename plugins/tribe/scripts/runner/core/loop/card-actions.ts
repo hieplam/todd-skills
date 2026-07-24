@@ -263,12 +263,64 @@ export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<Se
   return runSession({ brief }, sessionConfig, freshIO);
 }
 
+/** Records the commit the card's work is being cut from, BEFORE its session spawns — the
+ * schemaGuard check diffs `baseSha..origin/master`, so a card that never recorded one can
+ * never be verified. Crash-safe (persisted immediately) and idempotent: a resumed card keeps
+ * the base it originally started from rather than silently re-basing onto a moved master. */
+export async function recordBaseSha(ctx: CardCtx): Promise<void> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
+  if (card.baseSha) return;
+
+  const result = await io.exec(['git', 'rev-parse', `origin/${resolved.baseBranch}`], {
+    cwd: resolved.repoRoot,
+  });
+  const sha = result.stdout.trim();
+  if (result.exitCode !== 0 || sha.length === 0) return;
+
+  card.baseSha = sha;
+  card.updatedAt = io.now();
+  persistLocalState(state, resolved, io);
+}
+
+/** Records the card's branch by asking its PR what it was — the only authority on the name,
+ * since the executor session picks the branch itself and never reports it back.
+ *
+ * Without this, `verifyShipped`'s worktreeAndBranchGone check has nothing to check and the
+ * card escalates `verify_failed_twice` even though its PR merged cleanly (observed for real on
+ * campaign least-effort-5's C1, PR #144). Best-effort by design: a failed lookup leaves
+ * `branch` null exactly as before, so this can only ever add information, never break a card
+ * that would otherwise have shipped. */
+export async function recordBranchFromPr(ctx: CardCtx): Promise<void> {
+  const { cardId, state, resolved, io } = ctx;
+  const card = state.cards[cardId];
+  if (card.branch || card.pr == null) return;
+
+  const result = await io.exec(['gh', 'pr', 'view', String(card.pr), '--json', 'headRefName'], {
+    cwd: resolved.repoRoot,
+  });
+  if (result.exitCode !== 0) return;
+
+  let headRefName: unknown;
+  try {
+    headRefName = (JSON.parse(result.stdout) as { headRefName?: unknown }).headRefName;
+  } catch {
+    return;
+  }
+  if (typeof headRefName !== 'string' || headRefName.length === 0) return;
+
+  card.branch = headRefName;
+  card.updatedAt = io.now();
+  persistLocalState(state, resolved, io);
+}
+
 export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOutcome> {
   const { cardId, state, resolved, io } = ctx;
   const card = state.cards[cardId];
 
   if (phase.kind === 'verify_only') {
     card.pr = phase.pr;
+    await recordBranchFromPr(ctx);
     const verifyConfig: VerifyConfig = {
       repoRoot: resolved.repoRoot,
       schemaLockPaths: state.schemaLockPaths,
@@ -285,10 +337,12 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     await performRevertAndRedo(ctx);
   }
 
+  await recordBaseSha(ctx);
   const sessionResult = await runCardSession(ctx, phase);
 
   if (sessionResult.outcome === 'shipped') {
     card.pr = sessionResult.pr ?? card.pr;
+    await recordBranchFromPr(ctx);
     const verifyConfig: VerifyConfig = {
       repoRoot: resolved.repoRoot,
       schemaLockPaths: state.schemaLockPaths,
