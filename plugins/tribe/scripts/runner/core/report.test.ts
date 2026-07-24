@@ -558,6 +558,8 @@ describe('writeReport — reflects persisted state even when the state-commit PR
       clearPendingCommit: () => {},
       spawnSession: (_params: SpawnSessionParams) => messages(shippedMessages(41, 'deadbee', 'sess-c1')),
       appendLog: () => {},
+      ensureDir: () => {},
+      writeFileAtomic: () => {},
     };
 
     const config: RunLoopConfig = {
@@ -655,6 +657,8 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
         throw new Error('no session should ever be spawned in this test — B is only reconciled, never attempted');
       },
       appendLog: () => {},
+      ensureDir: () => {},
+      writeFileAtomic: () => {},
     };
 
     const config: RunLoopConfig = {

@@ -362,6 +362,8 @@ interface MockLoopIoResult {
   spawnBriefs: string[];
   lockCalls: string[];
   pendingCommitCalls: string[];
+  ensuredDirs: string[];
+  atomicWrites: Array<{ path: string; content: string }>;
 }
 
 function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
@@ -372,6 +374,8 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
   const spawnBriefs: string[] = [];
   const lockCalls: string[] = [];
   const pendingCommitCalls: string[] = [];
+  const ensuredDirs: string[] = [];
+  const atomicWrites: Array<{ path: string; content: string }> = [];
   let lock = opts.lock ?? null;
   let pendingCommit = opts.pendingCommit ?? null;
   const spawnQueue = [...(opts.spawnQueue ?? [])];
@@ -447,9 +451,15 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
       return next(params);
     }),
     appendLog: mock(() => {}),
+    ensureDir: mock((p: string) => {
+      ensuredDirs.push(p);
+    }),
+    writeFileAtomic: mock((p: string, content: string) => {
+      atomicWrites.push({ path: p, content });
+    }),
   };
 
-  return { io, calls, writtenFiles, spawnBriefs, lockCalls, pendingCommitCalls };
+  return { io, calls, writtenFiles, spawnBriefs, lockCalls, pendingCommitCalls, ensuredDirs, atomicWrites };
 }
 
 function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
