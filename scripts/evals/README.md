@@ -104,3 +104,93 @@ Each case with `--mode both` spends 4 `claude -p` calls (2 executors + 2 graders
 executor calls have full tool access — they really do the task, so a slow/tool-heavy
 case can run minutes and real tokens. Pin `--exec-model`/`--grader-model` to a cheap
 model and use `--eval-id` to scope a smoke pass before running the full suite.
+
+---
+
+## Prompt-tuning mode: A/B one prompt against itself
+
+The with/without benchmark above answers *"does this agent beat vanilla Claude?"*. Editing an
+agent's prompt asks a different question — *"did my edit change how it behaves?"* — and that
+needs the **same cases run against two versions of the same prompt**. Three pieces do that.
+
+### 1. `prompt_size.py` — the objective metric
+
+What you are trying to move. Bytes and lines are exact; the token column is an explicitly
+labelled estimate (no local tokenizer, no network call), which is fine because trimming steers
+on *deltas and rank order*, not absolute token counts.
+
+```bash
+scripts/evals/prompt_size.py                        # current tribe agents
+scripts/evals/prompt_size.py --baseline plugins/tribe/agents --candidate /tmp/cand/agents
+```
+
+### 2. `--agents-dir` — the A/B axis
+
+`run_evals.py` used to read agents only from `<plugin>/agents`. Point it at a candidate copy to
+run the identical cases against edited prompts:
+
+```bash
+cp -r plugins/tribe/agents /tmp/cand-agents
+# ... trim /tmp/cand-agents/warchief.md ...
+
+scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json \
+  --mode with_skill --runs 3 --jobs 5 --exec-model sonnet \
+  --agents-dir /tmp/cand-agents --label trimmed \
+  --out-dir scripts/evals/runs/trimmed
+```
+
+Each `benchmark.json` records a **sha256 + char count per subject prompt**, so a comparison can
+prove the two runs really measured different text rather than trusting the `--label`.
+
+### 3. `compare.py` — the regression tripwire
+
+```bash
+scripts/evals/compare.py \
+  --baseline scripts/evals/baselines/<name>/benchmark.json \
+  --candidate scripts/evals/runs/trimmed/benchmark.json
+```
+
+It reports prompt-size delta and pass rate **per agent** (a suite-wide average would bury one
+agent's regression under twenty unrelated passes), and splits losses into two buckets that must
+not be conflated:
+
+| Bucket | Meaning | Exit |
+|---|---|---|
+| `CONFIRMED` | passed **every** baseline run, failed **every** candidate run | **1** |
+| `UNSTABLE` | flipped, but inconsistently across runs | 0, always printed |
+
+At `--runs 1` every flip is `UNSTABLE` by construction — one sample cannot separate a regression
+from model variance. Use `--runs 3` before trusting a trim.
+
+### Baselines are checked in
+
+`runs/` is git-ignored (regenerable), but a reference `benchmark.json` under
+`scripts/evals/baselines/` **is** committed — a trim needs a stable "before", and re-measuring
+the baseline every time would let both sides of the comparison drift at once.
+
+## Two harness bugs this mode required fixing
+
+Both produced **false FAILs** — harness artifacts scored as agent defects. Any regression signal
+read off the suite before these fixes was unreliable.
+
+1. **`case["files"]` was parsed but never written to disk.** A case whose prompt named a file ran
+   against an empty directory; the agent correctly reported `BLOCKED`, and the grader scored that
+   FAIL against a rubric describing behavior on a real file. `materialize_files()` now writes
+   fixtures (with a path-traversal guard) before the executor starts.
+2. **The executor ran under the default permission mode.** Under `-p` there is no way to answer an
+   approval prompt, so **every write was denied** — one observed executor even tried `dd` to get
+   around it before giving up. `--permission-mode` (default `bypassPermissions`) fixes it.
+
+> **Security note on the default.** `bypassPermissions` gives each executor unattended tool access.
+> Every executor runs in a fresh `mkdtemp` scratch dir that the harness deletes afterwards, with
+> user-scope settings and MCP servers already excluded — so the blast radius is that throwaway
+> directory. If that trade is wrong for your machine, pass `--permission-mode default`, and expect
+> every fixture-carrying case to fail spuriously.
+
+Verified end-to-end: eval 2 went **FAIL -> PASS** on identical prompt text once both were fixed.
+
+## Speed
+
+`--jobs N` (default 4) runs executions concurrently — they are independent subprocesses in
+separate temp dirs. Serially a 30-case suite is over an hour, which is slow enough that a gate
+stops getting run.

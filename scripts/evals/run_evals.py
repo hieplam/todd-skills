@@ -79,6 +79,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures as cf
+import hashlib
 import json
 import os
 import re
@@ -145,7 +147,8 @@ def parse_frontmatter(path: Path) -> tuple[dict, str]:
 def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
                 agents_json: dict | None = None, agent_name: str | None = None,
                 tools: str | None = None, safe_mode: bool = False,
-                isolate_user_scope: bool = False) -> dict:
+                isolate_user_scope: bool = False,
+                permission_mode: str | None = None) -> dict:
     """Run one isolated `claude -p` process and return its parsed result.
 
     Returns a dict with at least: ok (bool), events (list, may be empty on
@@ -173,6 +176,19 @@ def run_claude(prompt: str, cwd: Path, timeout: int, model: str | None = None,
         cmd += ["--agent", agent_name]
     if tools is not None:
         cmd += ["--tools", tools]
+    if permission_mode:
+        # Without this the executor runs under the default permission mode, where
+        # `-p` (non-interactive) cannot surface an approval prompt and therefore
+        # DENIES every write. Observed directly: an executor read its fixture
+        # fine, then had every Write blocked, tried `dd` to get around it, and
+        # reported BLOCKED — which the grader scored as a behavioral FAIL. That
+        # is a harness artifact masquerading as an agent defect, and it would
+        # silently corrupt any regression signal read off this suite.
+        #
+        # Every executor runs in a fresh mkdtemp scratch dir that this script
+        # deletes in run_case's finally block, with user-scope settings/MCP
+        # already excluded, so the blast radius is that throwaway directory.
+        cmd += ["--permission-mode", permission_mode]
     if safe_mode:
         # Disables CLAUDE.md, skills, plugins, hooks, MCP servers, custom
         # commands/agents — i.e. everything installed at user/project scope
@@ -396,11 +412,49 @@ def build_agents_payload(agent_fields: dict, agent_body: str) -> dict:
     return {name: {"description": description, "prompt": agent_body.strip()}}
 
 
+def materialize_files(scratch: Path, files: list) -> list[str]:
+    """Write a case's `files` fixtures into the scratch cwd before the executor runs.
+
+    The evals.json schema has always documented a per-case `files` list, but the
+    runner never read it — so a case whose prompt names a file ("in
+    UserRepository.cs, add GetByEmail...") ran against an EMPTY directory. The
+    agent then correctly reports BLOCKED (the file it was told to edit does not
+    exist) and the grader scores that FAIL, because the rubric describes the
+    behavior on a real file. That is a harness artifact scored as a behavioral
+    failure — exactly the kind of false negative that makes a regression signal
+    unreadable when this suite is used as a prompt-tuning gate.
+
+    Accepts either {"path": ..., "content": ...} entries or a bare
+    {"<path>": "<content>"} mapping. Paths are confined to the scratch dir.
+    """
+    written: list[str] = []
+    for entry in files or []:
+        if isinstance(entry, dict) and "path" in entry:
+            pairs = [(entry["path"], entry.get("content", ""))]
+        elif isinstance(entry, dict):
+            pairs = list(entry.items())
+        else:
+            continue
+        for rel, content in pairs:
+            dest = (scratch / rel).resolve()
+            # Never let a fixture path escape the scratch dir (../../etc).
+            if not str(dest).startswith(str(scratch.resolve())):
+                raise ValueError(f"fixture path escapes scratch dir: {rel}")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(content)
+            written.append(rel)
+    return written
+
+
 def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | None,
              configuration: str, timeout: int, exec_model: str | None,
-             grader_model: str | None, out_dir: Path, verbose: bool, run_idx: int = 0) -> dict:
+             grader_model: str | None, out_dir: Path, verbose: bool, run_idx: int = 0,
+             permission_mode: str | None = None) -> dict:
     scratch = Path(tempfile.mkdtemp(prefix="todd-skills-eval-"))
     try:
+        fixtures = materialize_files(scratch, case.get("files"))
+        if verbose and fixtures:
+            print(f"    [{configuration}] fixtures: {', '.join(fixtures)}", file=sys.stderr)
         agents_json = None
         agent_name = None
         skill_name = None
@@ -430,6 +484,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             agents_json=agents_json, agent_name=agent_name,
             safe_mode=(configuration == "without_skill"),
             isolate_user_scope=(configuration == "with_skill"),
+            permission_mode=permission_mode,
         )
         if not exec_run["ok"]:
             return {"error": exec_run["error"], "configuration": configuration}
@@ -555,11 +610,52 @@ def discover_evals_json() -> list[Path]:
     return sorted((REPO_ROOT / "plugins").glob("**/evals/evals.json"))
 
 
-def derive_kind_and_dirs(evals_path: Path, declared_kind: str | None) -> tuple[str, Path | None, Path | None]:
+def subject_digests(kind: str, cases: list[dict], agents_dir: Path | None,
+                     skill_dir: Path | None) -> dict:
+    """sha256 + size of each subject file this run measures, for attribution.
+
+    Recorded in benchmark.json so `compare.py` can assert that two runs really
+    did measure different prompt text (and report by how much it shrank),
+    instead of trusting a --label.
+    """
+    out: dict[str, dict] = {}
+    if kind == "agent" and agents_dir:
+        names = sorted({c["agent"] for c in cases if "agent" in c})
+        paths = [(n, agents_dir / f"{n}.md") for n in names]
+    elif kind == "skill" and skill_dir:
+        paths = [(skill_dir.name, skill_dir / "SKILL.md")]
+    else:
+        return out
+    for name, path in paths:
+        if not path.exists():
+            out[name] = {"error": f"missing: {display_path(path)}"}
+            continue
+        raw = path.read_bytes()
+        out[name] = {
+            "sha256": hashlib.sha256(raw).hexdigest()[:16],
+            "chars": len(raw),
+            "lines": raw.count(b"\n") + 1,
+        }
+    return out
+
+
+def derive_kind_and_dirs(evals_path: Path, declared_kind: str | None,
+                          agents_dir_override: Path | None = None,
+                          skill_dir_override: Path | None = None) -> tuple[str, Path | None, Path | None]:
+    """Resolve which directory the case's subject (agent .md / skill dir) is read from.
+
+    The overrides are what make this suite an A/B harness rather than only a
+    with/without one. Sibling `--agents-dir` copies of the SAME agents let one
+    invocation measure a candidate (trimmed) prompt against the identical cases
+    the committed prompt was measured on, so `compare.py` can attribute a
+    pass-rate delta to the prompt edit and nothing else. Without an override the
+    layout convention is unchanged: agents live at <plugin>/agents, a skill at
+    <skill-dir>.
+    """
     kind = declared_kind or "skill"
     if kind == "agent":
-        return kind, None, evals_path.parent.parent / "agents"
-    return kind, evals_path.parent.parent, None
+        return kind, None, agents_dir_override or evals_path.parent.parent / "agents"
+    return kind, skill_dir_override or evals_path.parent.parent, None
 
 
 def main() -> int:
@@ -573,6 +669,22 @@ def main() -> int:
     ap.add_argument("--exec-model", default=None, help="Model for the executor (default: user's configured model)")
     ap.add_argument("--grader-model", default=None, help="Model for the grader (default: same as --exec-model)")
     ap.add_argument("--out-dir", default=None, help="Output root (default: scripts/evals/runs/<timestamp>)")
+    ap.add_argument("--agents-dir", default=None,
+                    help="Read agent .md files from here instead of <plugin>/agents (kind: agent). "
+                         "Point at a candidate copy to A/B a prompt edit against the same cases.")
+    ap.add_argument("--skill-dir", default=None,
+                    help="Read the skill from here instead of the evals.json's parent (kind: skill).")
+    ap.add_argument("--label", default=None,
+                    help="Name for this variant, recorded in benchmark.json (e.g. 'baseline', 'trimmed'). "
+                         "compare.py reports it so a benchmark self-identifies which prompt it measured.")
+    ap.add_argument("--permission-mode", default="bypassPermissions",
+                    help="Permission mode for the EXECUTOR (default: bypassPermissions). Executors run in a\n"
+                         "fresh temp dir this script deletes afterwards; the default is what lets a case\n"
+                         "carrying `files` fixtures actually write. Pass 'default' to restore prompting\n"
+                         "(note: under -p that DENIES writes, so fixture cases will fail spuriously).")
+    ap.add_argument("--jobs", type=int, default=4,
+                    help="Concurrent claude -p executions (default: 4). Jobs are independent\n"
+                         "subprocesses in separate temp dirs; raise for a faster full-suite pass.")
     ap.add_argument("--dry-run", action="store_true", help="List what would run; make no claude -p calls")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
@@ -594,16 +706,25 @@ def main() -> int:
     out_root = Path(args.out_dir) if args.out_dir else REPO_ROOT / "scripts" / "evals" / "runs" / timestamp
 
     all_runs: list[dict] = []
+    jobs: list[dict] = []
     # Anything appended here means "the harness itself failed to execute a case as
     # intended" (missing evals.json, missing agent file, claude CLI error, bad JSON,
     # timeout, ...) as distinct from "a case ran and was graded FAIL on its merits" —
     # see the exit-code decision at the end of main().
     setup_errors: list[str] = []
     total_cases_matched = 0
+    agents_dir_override = Path(args.agents_dir).resolve() if args.agents_dir else None
+    skill_dir_override = Path(args.skill_dir).resolve() if args.skill_dir else None
+
     metadata = {
         "timestamp": timestamp,
+        "label": args.label or "(unlabeled)",
         "runs_per_configuration": args.runs,
+        "jobs": args.jobs,
         "exec_model": args.exec_model or "(default)",
+        "grader_model": args.grader_model or args.exec_model or "(default)",
+        "permission_mode": args.permission_mode,
+        "agents_dir": display_path(agents_dir_override) if agents_dir_override else "(default)",
         "evals_run": [],
     }
 
@@ -615,43 +736,77 @@ def main() -> int:
             continue
         data = json.loads(evals_path.read_text())
         skill_name = data["skill_name"]
-        kind, skill_dir, agents_dir = derive_kind_and_dirs(evals_path, data.get("kind"))
+        kind, skill_dir, agents_dir = derive_kind_and_dirs(
+            evals_path, data.get("kind"), agents_dir_override, skill_dir_override)
         cases = [c for c in data["evals"] if wanted_ids is None or c["id"] in wanted_ids]
         total_cases_matched += len(cases)
+        # Digest the exact subject text each case will run against. A pass-rate
+        # delta between two benchmarks is only attributable to a prompt edit if
+        # you can show the prompts actually differed — these hashes are that
+        # proof, and they also catch the silent no-op of A/B-ing a candidate
+        # directory that was never actually edited.
         metadata["evals_run"].append({"skill_name": skill_name, "kind": kind,
                                         "evals_json": display_path(evals_path),
+                                        "subjects": subject_digests(kind, cases, agents_dir, skill_dir),
                                         "case_ids": [c["id"] for c in cases]})
 
         print(f"== {skill_name} ({kind}) — {len(cases)} case(s) from {display_path(evals_path)} ==")
 
         for case in cases:
-            print(f"  eval {case['id']}: {case['name']}")
             for configuration in configurations:
                 # For agent evals, without_skill means "no persona at all" — still a
                 # meaningful baseline (does a vanilla Claude do the right thing
                 # anyway?), so it stays in the default `both` mode, not skipped.
                 if args.dry_run:
+                    print(f"  eval {case['id']}: {case['name']}")
                     print(f"    [dry-run] would execute {configuration}")
                     continue
                 for run_idx in range(args.runs):
-                    out_dir = out_root / skill_name
-                    result = run_case(
-                        case, kind, skill_dir, agents_dir, configuration,
-                        timeout=args.timeout, exec_model=args.exec_model,
-                        grader_model=args.grader_model or args.exec_model,
-                        out_dir=out_dir, verbose=args.verbose, run_idx=run_idx,
-                    )
-                    if "error" in result:
-                        msg = (f"{skill_name} eval {case['id']} ({case['name']}) "
-                               f"[{configuration}]: {result['error']}")
-                        print(f"    [{configuration}] ERROR: {result['error']}", file=sys.stderr)
-                        setup_errors.append(msg)
-                        continue
-                    result["run_number"] = run_idx + 1
-                    result["skill_name"] = skill_name
-                    all_runs.append(result)
-                    verdict = "PASS" if result["result"]["passed"] else "FAIL"
-                    print(f"    [{configuration}] {verdict}  "
+                    jobs.append({"case": case, "kind": kind, "skill_dir": skill_dir,
+                                  "agents_dir": agents_dir, "configuration": configuration,
+                                  "run_idx": run_idx, "skill_name": skill_name,
+                                  "out_dir": out_root / skill_name})
+
+    # Each job is an independent `claude -p` subprocess writing to its own scratch
+    # temp dir and its own output path, so they share no state and can overlap.
+    # Serially, a 30-case suite at ~2.5 min/case is over an hour — slow enough that
+    # nobody re-runs it, which is how a regression gate quietly stops being used.
+    def execute(job: dict) -> tuple[dict, dict]:
+        result = run_case(
+            job["case"], job["kind"], job["skill_dir"], job["agents_dir"],
+            job["configuration"], timeout=args.timeout, exec_model=args.exec_model,
+            grader_model=args.grader_model or args.exec_model,
+            out_dir=job["out_dir"], verbose=args.verbose, run_idx=job["run_idx"],
+            permission_mode=args.permission_mode,
+        )
+        return job, result
+
+    if jobs:
+        jobs_n = max(1, args.jobs)
+        print(f"\nRunning {len(jobs)} execution(s) with {jobs_n} concurrent job(s)...\n")
+        completed = 0
+        with cf.ThreadPoolExecutor(max_workers=jobs_n) as pool:
+            for job, result in pool.map(execute, jobs):
+                completed += 1
+                case, configuration = job["case"], job["configuration"]
+                skill_name = job["skill_name"]
+                prefix = f"  [{completed}/{len(jobs)}] eval {case['id']}: {case['name']}"
+                if "error" in result:
+                    msg = (f"{skill_name} eval {case['id']} ({case['name']}) "
+                           f"[{configuration}]: {result['error']}")
+                    print(f"{prefix}\n    [{configuration}] ERROR: {result['error']}",
+                          file=sys.stderr)
+                    setup_errors.append(msg)
+                    continue
+                result["run_number"] = job["run_idx"] + 1
+                result["skill_name"] = skill_name
+                # Carried so compare.py can roll pass-rate up per agent —
+                # a trim regresses ONE agent's prompt, and a suite-wide
+                # average would dilute that agent's regression below notice.
+                result["agent"] = case.get("agent")
+                all_runs.append(result)
+                verdict = "PASS" if result["result"]["passed"] else "FAIL"
+                print(f"{prefix}\n    [{configuration}] {verdict}  "
                           f"{result['result']['time_seconds']}s  {result['result']['tokens']} tokens")
 
     # Zero cases matched at all (e.g. a --eval-id that names no real case, or every
