@@ -10,7 +10,7 @@ import type { VerifyConfig, VerifyIO, VerifyResult } from '../verify.ts';
 import type { CommitStateAndMergeResult } from '../github.ts';
 import { runSession } from '../session.ts';
 import type { RunSessionConfig, SessionIO, SessionResult } from '../session.ts';
-import { executorBrief } from '../brief.ts';
+import { executorBrief, reportPathFor } from '../brief.ts';
 import type { BriefCard, BriefState } from '../brief.ts';
 import type { CardPhase } from './phase.ts';
 import { buildStateDigest, findWorktreePathForBranch } from './phase.ts';
@@ -247,6 +247,7 @@ export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<Se
       toBriefState(state),
       `${digest}\n\n---\n\n${resolved.answersContent}`,
       resolved.briefTemplate,
+      reportPathFor(resolved.homeDir, cardId),
     );
     const freshIO = buildSessionIOForCard(ctx);
     return runSession({ brief }, sessionConfig, freshIO);
@@ -258,7 +259,13 @@ export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<Se
     phase.kind === 'fresh' && phase.digest
       ? `${phase.digest}\n\n---\n\n${resolved.answersContent}`
       : resolved.answersContent;
-  const brief = executorBrief(toBriefCard(cardId, card), toBriefState(state), answersContent, resolved.briefTemplate);
+  const brief = executorBrief(
+    toBriefCard(cardId, card),
+    toBriefState(state),
+    answersContent,
+    resolved.briefTemplate,
+    reportPathFor(resolved.homeDir, cardId),
+  );
   const freshIO = buildSessionIOForCard(ctx);
   return runSession({ brief }, sessionConfig, freshIO);
 }
