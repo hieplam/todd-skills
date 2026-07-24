@@ -72,4 +72,47 @@ check "(e) live-lock refusal exit 1" "$rc_e" "1"
 [[ -f "$repo/.claude/state/camp1/reports/C1.md" ]] && ok "(e) file not moved under live lock" || bad "(e) file not moved under live lock"
 rm -f "$repo/docs/x/camp1/.runner.lock"
 
+# --- tracked reports: the index must follow the files ---------------------------------
+# Cases (a)-(e) above never `git add` their fixture, so they only ever exercise UNTRACKED
+# reports. The real migration moved reports that were committed — leaving the index still
+# listing paths that no longer exist on disk.
+seed_tracked(){
+  mkdir -p "$repo/.claude/state/camp2/reports"
+  printf '# report C2\ncommitted\n' > "$repo/.claude/state/camp2/reports/C2.md"
+  git_c "$repo" add .claude/state/camp2/reports/C2.md
+  git_c "$repo" commit -qm "add camp2 report"
+}
+tracked(){ git -C "$repo" ls-files --error-unmatch "$1" >/dev/null 2>&1; }
+
+# (f) dry-run leaves the index alone
+seed_tracked
+bash "$SCRIPT" "$repo" --campaign camp2 --dry-run >/dev/null 2>&1
+tracked .claude/state/camp2/reports/C2.md && ok "(f) dry-run leaves the index untouched" \
+  || bad "(f) dry-run leaves the index untouched"
+
+# (g) real run un-tracks the moved report and tells the owner what to commit
+out_g="$(bash "$SCRIPT" "$repo" --campaign camp2 2>&1)"; rc_g="$?"
+check "(g) tracked-report run exit 0" "$rc_g" "0"
+[[ -f "$home/campaigns/camp2/reports/C2.md" ]] && ok "(g) tracked report moved to campaign home" \
+  || bad "(g) tracked report moved to campaign home"
+tracked .claude/state/camp2/reports/C2.md && bad "(g) moved report is no longer tracked" \
+  || ok "(g) moved report is no longer tracked"
+staged="$(git -C "$repo" diff --cached --name-status -- .claude/state/camp2 | head -1)"
+check "(g) deletion is staged, ready to commit" "$staged" "D	.claude/state/camp2/reports/C2.md"
+echo "$out_g" | grep -q 'un-tracked from git' && ok "(g) reports what it un-tracked" \
+  || bad "(g) reports what it un-tracked (got: $out_g)"
+echo "$out_g" | grep -q 'next: git' && ok "(g) prints the follow-up commit" \
+  || bad "(g) prints the follow-up commit (got: $out_g)"
+
+# (h) a conflicted slug keeps its tracking — its files are still on disk and still git's
+# `|| true`: with (g)'s de-track absent there is nothing staged and commit exits 1, which
+# under `set -e` would abort the run instead of reporting the failures below.
+git_c "$repo" commit -qm "stop tracking camp2 reports" >/dev/null 2>&1 || true
+seed_tracked
+mkdir -p "$home/campaigns/camp2/reports"
+printf 'occupied\n' > "$home/campaigns/camp2/reports/C2.md"
+set +e; bash "$SCRIPT" "$repo" --campaign camp2 >/dev/null 2>&1; set -e
+tracked .claude/state/camp2/reports/C2.md && ok "(h) conflicted slug stays tracked" \
+  || bad "(h) conflicted slug stays tracked"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"; [[ "$FAIL" -eq 0 ]]
