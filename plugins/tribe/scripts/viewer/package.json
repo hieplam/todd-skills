@@ -1,0 +1,16 @@
+{
+  "name": "tribe-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only, refresh-based status viewer for tribe campaign runners (scans ~/.tribe, server-renders HTML; zero writes).",
+  "scripts": {
+    "test": "bun test",
+    "check": "tsc --noEmit && bun test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}
