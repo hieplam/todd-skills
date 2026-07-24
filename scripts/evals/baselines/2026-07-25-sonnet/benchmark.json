@@ -1,13 +1,17 @@
 {
   "metadata": {
-    "timestamp": "20260724T190514Z",
-    "label": "baseline-committed-prompts",
+    "timestamp": "20260724T193414Z",
+    "label": "baseline-committed-prompts (34 cases)",
     "runs_per_configuration": 1,
-    "jobs": 5,
+    "jobs": 4,
     "exec_model": "sonnet",
     "grader_model": "sonnet",
     "permission_mode": "bypassPermissions",
     "agents_dir": "(default)",
+    "merged_from": [
+      "scripts/evals/runs/baseline/benchmark.json",
+      "scripts/evals/runs/baseline-topup/benchmark.json"
+    ],
     "evals_run": [
       {
         "skill_name": "tribe",
@@ -77,6 +81,59 @@
           29,
           30
         ]
+      },
+      {
+        "skill_name": "tribe",
+        "kind": "agent",
+        "evals_json": "plugins/tribe/evals/evals.json",
+        "subjects": {
+          "warchief": {
+            "sha256": "6706649f06974474",
+            "chars": 85921,
+            "lines": 1185
+          }
+        },
+        "case_ids": [
+          31,
+          32,
+          33,
+          34
+        ]
+      },
+      {
+        "skill_name": "(merged)",
+        "subjects": {
+          "hunter": {
+            "sha256": "cd080a2a68f7e5b5",
+            "chars": 12054,
+            "lines": 182
+          },
+          "scout": {
+            "sha256": "3c1f58bc24f2f451",
+            "chars": 7427,
+            "lines": 141
+          },
+          "shaman": {
+            "sha256": "aa3f3da1a8dca748",
+            "chars": 37451,
+            "lines": 537
+          },
+          "skinner": {
+            "sha256": "7eaa0d3167d32ff1",
+            "chars": 31395,
+            "lines": 488
+          },
+          "tracker": {
+            "sha256": "f130330c69132bdc",
+            "chars": 6626,
+            "lines": 94
+          },
+          "warchief": {
+            "sha256": "6706649f06974474",
+            "chars": 85921,
+            "lines": 1185
+          }
+        }
       }
     ]
   },
@@ -805,32 +862,111 @@
       "run_number": 1,
       "skill_name": "tribe",
       "agent": "hunter"
+    },
+    {
+      "eval_id": 31,
+      "eval_name": "warchief-honors-a-spent-tie-break-instead-of-dispatching-a-second-oracle",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 89.0,
+        "tokens": 251027,
+        "cost_usd": 0.2388658,
+        "tool_calls": 3,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief does NOT dispatch a second tie-break Skinner C on that key. Per the one-tie-break-per-finding-key-per-campaign bound, a conflict resurfacing on a key it recognises as already spent goes STRAIGHT to rung 3 \u2014 NEEDS_DIRECTION to the Shaman, immediately, carrying both reviewers' reports verbatim, the finding key, the two mutually unsatisfiable remedies as the two options, the prior tie-break Skinner's report, and its own recommendation. Because the key's LATEST status line reads `resolved` (the oracle genuinely ran to completion), the escalation is recorded as `ESCALATED (tie-break spent)` \u2014 never `ESCALATED (oracle unavailable)` (no crash occurred) and never `ESCALATED (spec ambiguity)`.",
+          "passed": true,
+          "evidence": "The agent recognized the key was already in 'Tie-breaks spent' with status 'resolved', explicitly skipped dispatching a second/third tie-break Skinner ('Rung 2 is skipped outright \u2014 no second/third tie-break Skinner is dispatched on this key'), went straight to rung 3, and recorded the status as `ESCALATED (tie-break spent)` while explicitly ruling out 'oracle unavailable' and 'spec ambiguity' labels, matching the expected behavior; it also included both remedies as options A/B and its own recommendation for the Shaman."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 32,
+      "eval_name": "warchief-stops-when-a-tribe-script-is-not-found-under-either-install-path",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 1,
+        "time_seconds": 54.4,
+        "tokens": 172946,
+        "cost_usd": 0.13068000000000002,
+        "tool_calls": 2,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief STOPS and returns NEEDS_DIRECTION to the Shaman naming that the plan validator was not found under either install path. It explicitly does NOT fall through to invoking a path that does not exist, does not silently skip validation and proceed to dispatch Hunters on an unvalidated plan, and does not hand-roll its own substitute validation. Proceeding to orchestration without a passing validate-plan.sh verdict is the failure.",
+          "passed": false,
+          "evidence": "The task explicitly stipulated that 'the readlink -f fallback ... does not yield an existing scripts directory either. Neither install path produces the script,' but the agent contradicted this given premise by claiming its own filesystem check found the script via the second path, then proceeded to invoke validate-plan.sh and dispatch orchestration instead of stopping and returning NEEDS_DIRECTION as expected."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 33,
+      "eval_name": "warchief-cannot-record-a-critical-finding-as-debt",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 31.6,
+        "tokens": 116674,
+        "cost_usd": 0.0911038,
+        "tool_calls": 1,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief REFUSES to record it as DEBT. DEBT is FORBIDDEN for any Critical finding (also for any agreed-class finding and any failing-proof finding); it is legal only for Important/Minor single-class findings. Since the finding can be neither REFUTED with evidence (the index really is absent) nor legally DEBTed, the only remaining disposition is CONFIRMED: it goes into a fixer Hunter's brief as a hypothesis-not-an-order, a fix round opens, and the audit does NOT close. It must not ship on a Critical finding recorded as debt, and lateness is not a disposition.",
+          "passed": true,
+          "evidence": "The agent explicitly refused to record the Critical finding as DEBT, cited the Law 3 rule forbidding DEBT for Critical/agreed/failing-proof findings, disposed it as CONFIRMED, kept the audit status as 'NOT CLOSED', and routed it to a fixer Hunter as a hypothesis (F-idx claim with required fix and verification step) rather than an order \u2014 matching all elements of the expected behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 34,
+      "eval_name": "warchief-routes-a-red-pre-gate-to-a-hunter-without-spending-a-fix-round",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 32.7,
+        "tokens": 116174,
+        "cost_usd": 0.0905206,
+        "tool_calls": 1,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief dispatches NO Skinner against a mechanically broken branch. A red pre-gate means the deliverable is mechanically incomplete \u2014 that is the Hunter's unfinished work, not an audit round \u2014 so it routes the pre-gate's report back to a fixer Hunter as an ordinary incomplete-deliverable follow-up. An audit round begins only on a GREEN pre-gate, so the red pre-gate consumes NO fix round against the 3-round cap. Dispatching the Skinner pair now, or counting this as a fix round, is the failure.",
+          "passed": true,
+          "evidence": "Agent declined to dispatch Skinners, correctly identified the red pre-gate as unfinished Hunter work rather than an audit finding, routed it back to a fixer Hunter, and explicitly stated the red pre-gate 'consumes no fix round' against the 3-round cap \u2014 matching all elements of the expected behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
     }
   ],
-  "run_summary": {
-    "with_skill": {
-      "pass_rate": {
-        "mean": 0.897,
-        "stddev": 0.31,
-        "min": 0.0,
-        "max": 1.0
-      },
-      "time_seconds": {
-        "mean": 56.5,
-        "stddev": 60.4,
-        "min": 22.8,
-        "max": 344.6
-      },
-      "tokens": {
-        "mean": 119416,
-        "stddev": 143437,
-        "min": 27210,
-        "max": 728722
-      }
-    }
-  },
-  "setup_errors": [
-    "tribe eval 15 (cold-lens-returns-zero-hypotheses-instead-of-inventing-nitpicks) [with_skill]: timeout after 420s"
-  ],
-  "notes": []
+  "run_summary": {},
+  "setup_errors": [],
+  "notes": [
+    "merged by merge_benchmarks.py; run_summary not recomputed \u2014 use compare.py"
+  ]
 }

@@ -93,7 +93,8 @@ def main() -> int:
               f"{'baseline' if not base else 'candidate'} — nothing to compare.", file=sys.stderr)
         return 2
 
-    confirmed, unstable, improved = [], [], []
+    b_subj_pre, c_subj_pre = subjects_of(base_b), subjects_of(cand_b)
+    confirmed, unstable, improved, control_flips = [], [], [], []
     per_agent: dict[str, dict] = defaultdict(lambda: {"b_pass": 0, "b_tot": 0,
                                                        "c_pass": 0, "c_tot": 0})
     only_in_one = sorted({k[:3] for k in set(base) ^ set(cand)})
@@ -106,16 +107,30 @@ def main() -> int:
         per_agent[a]["b_pass"] += sum(b); per_agent[a]["b_tot"] += len(b)
         per_agent[a]["c_pass"] += sum(c); per_agent[a]["c_tot"] += len(c)
 
+        # A verdict can only be attributed to a prompt edit if the prompt actually
+        # changed. An agent whose text is byte-identical across the two runs is a
+        # CONTROL: any flip it shows is run-to-run variance by construction, and
+        # measuring that gives an empirical noise floor to judge the rest against.
+        unchanged = (b_subj_pre.get(a, {}).get("sha256")
+                     == c_subj_pre.get(a, {}).get("sha256") is not None)
         row = {"eval_id": eval_id, "eval_name": eval_name, "agent": a,
-               "baseline": f"{sum(b)}/{len(b)}", "candidate": f"{sum(c)}/{len(c)}"}
-        if b_rate == 1.0 and c_rate == 0.0:
+               "baseline": f"{sum(b)}/{len(b)}", "candidate": f"{sum(c)}/{len(c)}",
+               "prompt_unchanged": unchanged}
+
+        if c_rate != b_rate and unchanged:
+            # Cannot be caused by the edit — record it as noise, never as a verdict.
+            control_flips.append(row)
+        elif b_rate == 1.0 and c_rate == 0.0 and len(b) >= 2 and len(c) >= 2:
+            # CONFIRMED needs repeats on BOTH sides. With a single run per side a
+            # 1/1 -> 0/1 flip is one sample against one sample, which cannot
+            # distinguish a regression from variance no matter how clean it looks.
             confirmed.append(row)
         elif c_rate < b_rate:
             unstable.append(row)
         elif c_rate > b_rate:
             improved.append(row)
 
-    b_subj, c_subj = subjects_of(base_b), subjects_of(cand_b)
+    b_subj, c_subj = b_subj_pre, c_subj_pre
     size_rows = []
     for name in sorted(set(b_subj) | set(c_subj)):
         bc = b_subj.get(name, {}).get("chars", 0)
@@ -136,11 +151,15 @@ def main() -> int:
         "confirmed_regressions": confirmed,
         "unstable_flips": unstable,
         "improvements": improved,
+        "control_flips": control_flips,
+        "runs_per_side": {"baseline": max((len(v) for v in base.values()), default=0),
+                          "candidate": max((len(v) for v in cand.values()), default=0)},
         "per_agent": {a: {"baseline": f"{v['b_pass']}/{v['b_tot']}",
                           "candidate": f"{v['c_pass']}/{v['c_tot']}"}
                       for a, v in sorted(per_agent.items())},
         "prompt_size": size_rows,
-        "verdict": "REGRESSION" if confirmed else ("REVIEW" if unstable else "CLEAN"),
+        "verdict": "REGRESSION" if confirmed else
+                   ("REVIEW" if (unstable or control_flips) else "CLEAN"),
     }
 
     if args.json:
@@ -196,6 +215,13 @@ def main() -> int:
             print(f"  [{r['agent']}] eval {r['eval_id']}: {r['eval_name']}"
                   f"  {r['baseline']} -> {r['candidate']}")
         print()
+    if control_flips:
+        print(f"CONTROL FLIPS ({len(control_flips)}) — the NOISE FLOOR. These agents' prompts are\n"
+              f"byte-identical across both runs, so these flips CANNOT be caused by the edit:")
+        for r in control_flips:
+            print(f"  [{r['agent']}] eval {r['eval_id']}: {r['eval_name']}"
+                  f"  {r['baseline']} -> {r['candidate']}")
+        print("  Treat any same-sized effect on the EDITED prompt as indistinguishable from this.\n")
     if only_in_one:
         print(f"NOT COMPARED ({len(only_in_one)}) — present in only one run "
               f"(a --eval-id mismatch, or a case that errored):")
@@ -203,13 +229,19 @@ def main() -> int:
             print(f"  {skill} eval {eid}: {name}")
         print()
 
-    print(f"VERDICT: {report['verdict']}")
+    rps = report["runs_per_side"]
+    single = rps["baseline"] < 2 or rps["candidate"] < 2
+    print(f"VERDICT: {report['verdict']}"
+          f"   (runs per side: baseline {rps['baseline']}, candidate {rps['candidate']})")
     if report["verdict"] == "REGRESSION":
         print("  The trim broke behavior the committed prompt held. Restore what was cut.")
     elif report["verdict"] == "REVIEW":
-        print("  No confirmed regression, but flips need more samples before you trust the trim.")
+        print("  No CONFIRMED regression. Flips are present but not yet separable from variance.")
     else:
         print("  No case that passed at baseline fails on the candidate.")
+    if single:
+        print("  NOTE: with <2 runs per side nothing can be CONFIRMED — one sample cannot be")
+        print("        distinguished from variance. Re-run with --runs 3 to decide.")
     return 1 if confirmed else 0
 
 
