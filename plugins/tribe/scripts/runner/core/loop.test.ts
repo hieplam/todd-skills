@@ -469,6 +469,9 @@ function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
     escalationsDir: 'escalations',
     answersPath: 'answers.md',
     logsDir: '/logs',
+    homeDir: '/th',
+    runId: 'fixture-run',
+    argv: [],
     model: 'fixture-model',
     includeEscalated: false,
     dryRun: false,
@@ -689,6 +692,67 @@ describe('runLoop — STOP file', () => {
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.processed).toEqual([]);
     expect(io.spawnSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('runLoop — run record write (Task 2, spec §4/§5.2)', () => {
+  test('run record is written after lock acquisition, into <home>/runs/<runId>/run.json', async () => {
+    const { io, ensuredDirs, atomicWrites } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '',
+      stopFile: true,
+    });
+
+    await runLoop(baseLoopConfig({ homeDir: '/th/campaigns/camp', runId: 'r-1' }), io);
+
+    expect(ensuredDirs).toContain('/th/campaigns/camp/runs/r-1');
+    expect(ensuredDirs).toContain('/th/campaigns/camp/reports');
+    const write = atomicWrites.find((w) => w.path === '/th/campaigns/camp/runs/r-1/run.json');
+    expect(write).toBeDefined();
+    const record = JSON.parse(write!.content);
+    expect(record.runId).toBe('r-1');
+    expect(record.endedAt).toBeNull();
+  });
+
+  test('EXIT_LOCKED writes no run record (refused start creates no artifacts)', async () => {
+    const { io, atomicWrites } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '',
+      lock: { pid: 111, startedAt: '2026-07-15T00:00:00Z' },
+      processAlive: true,
+    });
+
+    const result = await runLoop(baseLoopConfig({ homeDir: '/th/campaigns/camp', runId: 'r-1' }), io);
+
+    expect(result.exitCode).toBe(EXIT_LOCKED);
+    expect(atomicWrites).toHaveLength(0);
+  });
+
+  test('--dry-run writes no run record and creates no directories', async () => {
+    const { io, ensuredDirs, atomicWrites } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '',
+    });
+
+    await runLoop(baseLoopConfig({ dryRun: true, homeDir: '/th/campaigns/camp', runId: 'r-1' }), io);
+
+    expect(atomicWrites).toHaveLength(0);
+    expect(ensuredDirs).toHaveLength(0);
+  });
+
+  test('a run-record write failure does not kill the pass', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '',
+      stopFile: true,
+    });
+    io.writeFileAtomic = (() => {
+      throw new Error('disk full');
+    }) as LoopIO['writeFileAtomic'];
+
+    const result = await runLoop(baseLoopConfig({ homeDir: '/th', runId: 'r-1' }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK); // the run still completes normally
   });
 });
 

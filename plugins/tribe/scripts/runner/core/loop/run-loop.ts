@@ -5,6 +5,7 @@ import type { CampaignState, NextCardResult, ResolvedConfig, RunLoopConfig } fro
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from '../types.ts';
 import { loadState, nextCard } from '../state.ts';
 import { BRIEF_TEMPLATE_PATH } from '../brief.ts';
+import { buildRunRecord, reportsDirOf, runDirOf, runRecordPathOf, serializeRunRecord } from '../run-record.ts';
 import type { LoopIO, StateIO } from '../../ports/ports.ts';
 import { acquireLock, isStopRequested, releaseLock, stopFilePathOf } from './lock.ts';
 import { deriveCardPhase, derivePhaseConfigOf, type CardPhase } from './phase.ts';
@@ -235,6 +236,21 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
   }
 
   try {
+    // Spec §4/§5.2: the run record is written the moment the lock is held — never on a
+    // refused start, never on --dry-run (which returned above, before the lock). Failures
+    // are swallowed: observability exhaust must never kill a campaign run (spec §9); the
+    // record's absence is itself the viewer-visible signal.
+    try {
+      io.ensureDir(runDirOf(config.homeDir, config.runId));
+      io.ensureDir(reportsDirOf(config.homeDir));
+      io.writeFileAtomic(
+        runRecordPathOf(config.homeDir, config.runId),
+        serializeRunRecord(buildRunRecord(config, io)),
+      );
+    } catch {
+      // See comment above.
+    }
+
     const stopped = startupStopResult(config, io);
     if (stopped) return stopped;
 
