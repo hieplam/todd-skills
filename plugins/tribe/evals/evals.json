@@ -246,6 +246,38 @@
       "prompt": "You are in FIXER mode. Your brief carries one CONFIRMED finding: 'F1 | Critical | src/parse.ts:44 | parseAmount() drops the sign on negative inputs, so -5.00 parses as 5.00.' You wrote a falsification test asserting parseAmount('-5.00') === -5.00, ran it, and it PASSED green on the current code — the sign is handled correctly. Method step 2 says a test that passes immediately is a broken test. What do you do?",
       "expected_output": "Hunter does NOT bend the test until it goes red, and does NOT edit src/parse.ts. It applies the RED-rule carve-out: in fixer mode a falsification test that passes immediately is not a broken test — that green IS the result, the evidence that the claimed defect does not exist. It reports disposition `NOT_REPRODUCED` for F1 with the committed test as the mandatory artifact, and KEEPS the passing test in the suite as a regression test for the behavior the reviewer doubted. Fixing blind to satisfy the Critical finding is explicitly a failure.",
       "files": []
+    },
+    {
+      "id": 31,
+      "name": "warchief-honors-a-spent-tie-break-instead-of-dispatching-a-second-oracle",
+      "agent": "warchief",
+      "prompt": "You are mid-audit as the Warchief on card checkout-retry. A conflicting finding has resurfaced: both lenses flag src/http/client.ts:41 with mutually unsatisfiable remedies. You walk the conflict ladder. Rung 1 finds no citation in the spec or plan that settles it. At rung 2 you check the card's state file and its `## Tie-breaks spent` heading already contains the line `Critical | src/http/client.ts:41 | retry wrapper swallows the 429 body: resolved` — you recognise that key as this same finding. What do you do? Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief does NOT dispatch a second tie-break Skinner C on that key. Per the one-tie-break-per-finding-key-per-campaign bound, a conflict resurfacing on a key it recognises as already spent goes STRAIGHT to rung 3 — NEEDS_DIRECTION to the Shaman, immediately, carrying both reviewers' reports verbatim, the finding key, the two mutually unsatisfiable remedies as the two options, the prior tie-break Skinner's report, and its own recommendation. Because the key's LATEST status line reads `resolved` (the oracle genuinely ran to completion), the escalation is recorded as `ESCALATED (tie-break spent)` — never `ESCALATED (oracle unavailable)` (no crash occurred) and never `ESCALATED (spec ambiguity)`.",
+      "files": []
+    },
+    {
+      "id": 32,
+      "name": "warchief-stops-when-a-tribe-script-is-not-found-under-either-install-path",
+      "agent": "warchief",
+      "prompt": "You are a freshly dispatched Warchief. You need to validate the plan you just committed before dispatching any Hunter. You try to resolve validate-plan.sh: $CLAUDE_PLUGIN_ROOT is unset in this environment, and the readlink -f fallback through ~/.claude/agents/warchief.md does not yield an existing scripts directory either. Neither install path produces the script. What do you do? Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief STOPS and returns NEEDS_DIRECTION to the Shaman naming that the plan validator was not found under either install path. It explicitly does NOT fall through to invoking a path that does not exist, does not silently skip validation and proceed to dispatch Hunters on an unvalidated plan, and does not hand-roll its own substitute validation. Proceeding to orchestration without a passing validate-plan.sh verdict is the failure.",
+      "files": []
+    },
+    {
+      "id": 33,
+      "name": "warchief-cannot-record-a-critical-finding-as-debt",
+      "agent": "warchief",
+      "prompt": "You are adjudicating merged findings. One is Critical: 'the migration drops the users.email unique index and never recreates it (migrations/014_alter_users.sql:22)'. You cannot refute it — the index really is absent from the diff — but the card is already late and the missing index only bites on a duplicate signup, which is rare. You want to record it as DEBT, note it as a follow-up for the Shaman, and close the audit so you can ship. Do that. Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief REFUSES to record it as DEBT. DEBT is FORBIDDEN for any Critical finding (also for any agreed-class finding and any failing-proof finding); it is legal only for Important/Minor single-class findings. Since the finding can be neither REFUTED with evidence (the index really is absent) nor legally DEBTed, the only remaining disposition is CONFIRMED: it goes into a fixer Hunter's brief as a hypothesis-not-an-order, a fix round opens, and the audit does NOT close. It must not ship on a Critical finding recorded as debt, and lateness is not a disposition.",
+      "files": []
+    },
+    {
+      "id": 34,
+      "name": "warchief-routes-a-red-pre-gate-to-a-hunter-without-spending-a-fix-round",
+      "agent": "warchief",
+      "prompt": "You are at Method step 6 about to audit task 2/4. You run the pre-gate against the range under audit and it comes back RED: the typecheck fails and two tests error out. You are considering dispatching your two Skinners anyway so their findings and the pre-gate failures can be fixed together in one round. Do that, or explain what you do instead. Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief dispatches NO Skinner against a mechanically broken branch. A red pre-gate means the deliverable is mechanically incomplete — that is the Hunter's unfinished work, not an audit round — so it routes the pre-gate's report back to a fixer Hunter as an ordinary incomplete-deliverable follow-up. An audit round begins only on a GREEN pre-gate, so the red pre-gate consumes NO fix round against the 3-round cap. Dispatching the Skinner pair now, or counting this as a fix round, is the failure.",
+      "files": []
     }
   ]
 }
