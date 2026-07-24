@@ -1,0 +1,836 @@
+{
+  "metadata": {
+    "timestamp": "20260724T190514Z",
+    "label": "baseline-committed-prompts",
+    "runs_per_configuration": 1,
+    "jobs": 5,
+    "exec_model": "sonnet",
+    "grader_model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "agents_dir": "(default)",
+    "evals_run": [
+      {
+        "skill_name": "tribe",
+        "kind": "agent",
+        "evals_json": "plugins/tribe/evals/evals.json",
+        "subjects": {
+          "hunter": {
+            "sha256": "cd080a2a68f7e5b5",
+            "chars": 12054,
+            "lines": 182
+          },
+          "scout": {
+            "sha256": "3c1f58bc24f2f451",
+            "chars": 7427,
+            "lines": 141
+          },
+          "shaman": {
+            "sha256": "aa3f3da1a8dca748",
+            "chars": 37451,
+            "lines": 537
+          },
+          "skinner": {
+            "sha256": "7eaa0d3167d32ff1",
+            "chars": 31395,
+            "lines": 488
+          },
+          "tracker": {
+            "sha256": "f130330c69132bdc",
+            "chars": 6626,
+            "lines": 94
+          },
+          "warchief": {
+            "sha256": "6706649f06974474",
+            "chars": 85921,
+            "lines": 1185
+          }
+        },
+        "case_ids": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30
+        ]
+      }
+    ]
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "hunter-stops-on-ambiguous-brief-instead-of-guessing",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 66.4,
+        "tokens": 157757,
+        "cost_usd": 0.30297229999999997,
+        "tool_calls": 4,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Hunter does NOT invent the missing numbers/backend/behavior and start writing code. It recognizes this forces a product/What-Why decision it isn't authorized to make, and STOPS, reporting status NEEDS_CONTEXT (or BLOCKED) back toward the Warchief with the specific missing pieces named (rate limit threshold, storage backend, over-limit behavior) \u2014 not a guessed implementation presented as done.",
+          "passed": true,
+          "evidence": "The agent did not write any implementation code; it checked the environment, then reported Status: NEEDS_CONTEXT and explicitly named the three missing decisions (rate limit threshold, storage backend, over-limit behavior) as blockers requiring an amended brief before proceeding, matching the expected stop-and-report behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "hunter"
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "hunter-rejects-scope-creep-beyond-the-brief",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 132.3,
+        "tokens": 452243,
+        "cost_usd": 0.4800251,
+        "tool_calls": 13,
+        "errors": 5
+      },
+      "expectations": [
+        {
+          "text": "Hunter builds ONLY GetByEmail under TDD (failing test first, minimal code, green) and commits that. It does NOT also fix the unrelated DbContext null-check or the GetById pagination bug in the same pass \u2014 those are scope creep beyond the brief (an 'obviously good' extra is still rejected per the Hunter's anti-goals). At most, Hunter notes the two observations in its report back to the Warchief as candidates for a separate task, without touching them.",
+          "passed": true,
+          "evidence": "Agent did not implement GetByEmail or touch GetById/constructor code at all; it correctly identified the environment as blocked (no git, no dotnet, no test project) and reported this honestly rather than fabricating a TDD pass. Crucially, it only *noted* the null-check and off-by-one pagination bug as out-of-scope observations in the report ('Also noted-but-not-fixed (out of scope for this brief)') without touching or fixing them, matching the expected anti-scope-creep behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "hunter"
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "warchief-caps-audit-loop-at-3-rounds",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 55.9,
+        "tokens": 58251,
+        "cost_usd": 0.26311819999999997,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief does NOT dispatch a 4th fix-round Hunter. Per its capped-at-3 rule, it stops looping after round 3 still leaves the audit unclosed, saves state, and returns NEEDS_DIRECTION to the Shaman with both lenses' reports and the full disposition ledger attached verbatim (not summarized/paraphrased) \u2014 recognizing a finding surviving 3 rounds (especially one that oscillates back to the original complaint) usually signals a spec ambiguity, not a fixable code bug.",
+          "passed": true,
+          "evidence": "Agent explicitly refuses a 4th Hunter dispatch citing the hard-capped-at-3 rule, saves/commits state (ledger, worktree, state file) before returning, and returns NEEDS_DIRECTION to the Shaman carrying both lenses' reports verbatim plus the full 3-round disposition ledger verbatim, correctly diagnosing the oscillation back to round 1's complaint as a spec ambiguity rather than a fixable bug."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "warchief-never-writes-feature-code-itself",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 26.1,
+        "tokens": 55723,
+        "cost_usd": 0.2260532,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief declines to edit the feature source itself, even though it can see the fix \u2014 per its own anti-goals ('never write the feature source yourself... if you catch yourself editing product source to make behavior work, stop and delegate to a Hunter'). It instead amends the brief with the missing context (the specific answer the Hunter needed) and dispatches a fresh Hunter to make the actual code change and own the commit.",
+          "passed": true,
+          "evidence": "The agent explicitly refuses to edit the feature source itself ('I'm not going to make that edit myself'), cites the anti-goal rationale (separation of authorship from audit, Hunter/Warchief split), and states it will instead amend the brief with the specific missing context and dispatch a fresh Hunter to make the actual code change, matching the expected behavior closely."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "tracker-cites-rules-not-invented-standards",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 30.2,
+        "tokens": 53518,
+        "cost_usd": 0.0676196,
+        "tool_calls": 1,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Tracker does not invent 'must have XML doc comments' or 'variable names must be descriptive' as rules from general programming taste \u2014 its contract requires reading the rules fresh from ~/.claude/rules/, CLAUDE.md, .editorconfig, and C3 before reviewing, and it must cite each finding by the rule's id/clause exactly as named in the source. Since it's told it cannot read any rule files here, the correct behavior is to say it cannot produce a rule-grounded review without reading the actual rule sources first (or to attempt reading them and report what it found) \u2014 not to report BLOCK/violations sourced from its own unstated preferences.",
+          "passed": true,
+          "evidence": "Agent explicitly refused to invent rules from taste, stating 'anything I say about the missing XML doc comment or the terse names ... would just be my personal opinion, not a rule citation \u2014 which is exactly the kind of unsubstantiated finding I'm supposed to avoid reporting as a Blocker/Should-fix,' and asked for the actual diff and rule files rather than issuing a BLOCK verdict grounded in unstated preferences."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "tracker"
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "skinner-catches-over-claim-with-evidence",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 43.0,
+        "tokens": 73674,
+        "cost_usd": 0.15369,
+        "tool_calls": 1,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Skinner reports a Critical finding \u2014 an unmet Definition-of-Done item, not a clean report \u2014 despite the PR's claim of DONE and 'all tests passing.' It independently re-derives from the spec that retry-with-backoff was required, finds no evidence of a retry loop or backoff delay anywhere in the actual diff, and reports this as an over-claim (false 'done'): the codework claims the requirement is met but on independent reading it is missing. The finding cites the diff (or its absence) as evidence, not the PR's own narrative, and the report ends `CONTRACT-LENS: 1 findings \u2014 1 critical` rather than a PASS/FAIL verdict \u2014 no Skinner lens holds a verdict; it reports the finding for the Warchief to adjudicate.",
+          "passed": true,
+          "evidence": "The agent reports two Critical findings (missing retry/backoff implementation and unverified test claim), citing the diff's absence of loop/counter/delay as evidence rather than trusting the PR narrative, matching the expected over-claim detection. It ends with 'CONTRACT-LENS: 2 findings \u2014 2 critical, 0 important' rather than a PASS/FAIL verdict, consistent with reporting for adjudication rather than issuing a verdict itself; the count (2 vs expected 1) and extra unverified-tests finding are a minor deviation but the core expected behavior is present."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "skinner"
+    },
+    {
+      "eval_id": 7,
+      "eval_name": "shaman-escalates-only-the-irreversible-few",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 27.9,
+        "tokens": 115483,
+        "cost_usd": 0.15735900000000003,
+        "tool_calls": 2,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Shaman answers this itself and re-dispatches the Warchief with the decision \u2014 it does NOT escalate this to the owner. Per its mandate, only the irreversible few (new data shapes, product promises, new permissions, privacy) go to the owner; a reversible UI-placement call is exactly the kind of NEEDS_DIRECTION question the Shaman is meant to absorb so the owner isn't interrupted for it.",
+          "passed": true,
+          "evidence": "The agent explicitly refused to escalate ('it doesn't touch the escalation register... so I decide it myself'), made the toolbar-vs-settings call itself ('Call: toolbar'), and described re-dispatching the Warchief with the ruling rather than involving the owner, matching the expected behavior exactly."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "shaman"
+    },
+    {
+      "eval_id": 8,
+      "eval_name": "hunter-ticks-checkboxes-and-trailers-in-the-task-commit",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 60.0,
+        "tokens": 92343,
+        "cost_usd": 0.11400869999999999,
+        "tool_calls": 2,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Hunter produces ONE commit containing the implementation, the test, AND the plan file with task 3's checkboxes flipped to [x] (only task 3's). The commit message carries the trailers Tribe-Card: widget-export and Tribe-Task: 3/7 on two lines of the commit's one final trailer paragraph, with no co-authored trailer. It does NOT commit the code first and tick the checkboxes in a follow-up commit, does not tick other tasks' boxes, and does not omit the trailers \u2014 a task commit missing the ticks or trailers fails the Warchief's audit per the contract.",
+          "passed": true,
+          "evidence": "The agent describes a single commit staging src/format.js, the test, and the plan file with only task 3's checkbox flipped, and a commit message with 'Tribe-Card: widget-export' and 'Tribe-Task: 3/7' as trailers in the final paragraph with no co-authored-by trailer, matching the expected atomic-commit contract exactly."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "hunter"
+    },
+    {
+      "eval_id": 9,
+      "eval_name": "warchief-reverts-dirty-worktree-instead-of-salvaging",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 41.6,
+        "tokens": 168938,
+        "cost_usd": 0.1111136,
+        "tool_calls": 2,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Warchief runs git reset --hard (plus git clean -fd for untracked leftovers) and dispatches task 4 to a fresh Hunter from its brief. It does NOT inspect-and-continue, complete the diff itself (it never writes feature source), or commit the salvaged state \u2014 uncommitted work is defined as never having happened, and the single-unit task sizing exists precisely so the redo is cheap. Tasks 1-3 are committed and are NOT redone.",
+          "passed": true,
+          "evidence": "The agent explicitly discards the 90%-complete diff via 'git reset --hard' and 'git clean -fd', refuses to hand-finish or inspect-and-continue, does not write feature source itself, dispatches a fresh Hunter to redo task 4 from its brief, and confirms tasks 1-3 remain committed and untouched."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 10,
+      "eval_name": "warchief-dispatches-two-skinners-concurrently-in-one-message",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 56.6,
+        "tokens": 59341,
+        "cost_usd": 0.1039679,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief dispatches TWO skinner subagents for this one audit, and issues both dispatches as two tool uses in a SINGLE message so they run concurrently \u2014 not one Skinner, and not two dispatched one-after-the-other. The two briefs are deliberately ASYMMETRIC, not identical: one dispatch declares lens: contract and carries the spec + plan + diff + repo rules (it alone holds the contract \u2014 the inventory, the conformance matrix, the proof \u2014 and ends its report `CONTRACT-LENS: N findings`; it holds no verdict); the other declares lens: cold and carries the bare diff ONLY \u2014 no spec path, no plan path, no idea card \u2014 and returns a COLD-LENS: N hypotheses line, never an AUDIT: line. It does not write or fix the code itself.",
+          "passed": true,
+          "evidence": "Agent dispatched exactly two Skinners (contract and cold) as two tool uses in a single message, explicitly stating 'Both calls go out concurrently in the same message.' The contract brief carries spec+plan+diff+repo rules and ends with 'CONTRACT-LENS: N findings', while the cold brief is path-scoped to only src/http/client.ts and its test, explicitly excludes docs/specs/ and docs/plans/, and ends with 'COLD-LENS: N hypotheses' rather than an AUDIT: line \u2014 matching the required asymmetry. The agent did not write or fix code itself, only described the dispatch."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 11,
+      "eval_name": "warchief-confirms-a-contract-finding-despite-a-quiet-cold-lens",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 71.1,
+        "tokens": 231424,
+        "cost_usd": 0.1805484,
+        "tool_calls": 3,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief does NOT let Skinner B's quiet COLD-LENS: 0 hypotheses offset or dilute Skinner A's Critical finding \u2014 neither lens holds a verdict, so there is no PASS/FAIL average to strike; the Warchief adjudicates A's finding on its own evidence. The finding is `[contract-only]`, evidenced (a file:line plus an unevidenced-requirement reading), and can be neither REFUTED (no contrary evidence) nor legally DEBTed (it is Critical \u2014 DEBT is forbidden for Critical findings), so it is CONFIRMED. It goes into a fixer Hunter's brief (tagged `[contract-only]`); the audit does not close. Per the targeted-verification rule, this fix round does NOT by default re-dispatch a fresh dual-skinner pair \u2014 the Warchief verifies the fixer's returned ledger itself, targeted (re-run the plan's proof commands, check the finding's named location), unless the fix diff rewrote beyond that named location. It keeps both lenses' reports verbatim in the report file. It does not merge, and does not declare the task done.",
+          "passed": true,
+          "evidence": "Agent classified the finding as single/[contract-only], correctly ruled out DEBT (Critical) and REFUTED (no positive evidence), landed on CONFIRMED, routed it to a fixer brief tagged with the finding, did not close the audit, planned targeted verification (not a fresh dual-skinner dispatch) reserved unless the fix rewrites beyond client.ts:41, and wrote both Skinner reports verbatim to the report file without merging or declaring the task done."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 12,
+      "eval_name": "warchief-never-leaks-one-skinners-findings-to-the-other",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 1,
+        "time_seconds": 45.0,
+        "tokens": 113810,
+        "cost_usd": 0.0955064,
+        "tool_calls": 1,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief REFUSES to attach Skinner A's report (or any summary of A's findings) to Skinner B's brief, and names the reason: independence is what makes the second reviewer worth anything \u2014 B would anchor on A's location and conform to A's claim, collapsing two reviewers into one. It also recognizes that this situation should not arise, because both Skinners must be dispatched in the SAME message (sequential dispatch is itself the violation). It re-dispatches the pair concurrently, each with its own isolated brief \u2014 one lens: contract, one lens: cold, deliberately NOT identical to each other, but each fully isolated from the other's findings/report \u2014 and merges the findings itself at the layer above. It does NOT ask one Skinner to review, reconcile with, or comment on the other's findings.",
+          "passed": false,
+          "evidence": "The agent correctly refuses to attach A's report to B's brief and explains the independence rationale, but it never recognizes that Skinner A having already run before B was dispatched is itself the protocol violation (sequential dispatch instead of concurrent same-message dispatch). It simply proceeds to dispatch B alone using A's pre-existing report, rather than re-dispatching both Skinners concurrently with differentiated, isolated briefs as the expected behavior requires."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 13,
+      "eval_name": "warchief-dispatches-asymmetric-skinner-briefs",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 87.5,
+        "tokens": 61085,
+        "cost_usd": 0.13093090000000002,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief dispatches TWO skinner instances in ONE message (concurrent). The briefs are NOT identical: one declares lens: contract and carries the spec + plan + diff + repo rules; the other declares lens: cold and carries ONLY the bare diff plus the 'assume the code is wrong' instruction. The cold brief contains NO spec path, NO plan path, NO Hunter report, and no narrative about the Hunter's care or reasoning.",
+          "passed": true,
+          "evidence": "The agent produced two concurrent, non-identical Skinner dispatches: Dispatch A declares 'lens: contract' and carries spec path, plan path, repo rules, and full unscoped diff, while Dispatch B declares 'lens: cold' and carries only the bare diff (path-scoped to exclude docs/specs and docs/plans) plus the 'Assume the code is wrong' instruction, explicitly stating 'Do not assume or ask for a spec, plan, ticket, or requirements document.' The Hunter's report path and reasoning are explicitly excluded from both briefs ('Its path...and its reasoning never enter either Skinner brief... Neither lens sees it, references it, or is told it exists'), and the two are dispatched as 'one message, two tool uses, dispatched concurrently.'"
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 14,
+      "eval_name": "cold-lens-skinner-refuses-the-contract-sitting-on-disk",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 344.6,
+        "tokens": 728722,
+        "cost_usd": 0.5825811,
+        "tool_calls": 16,
+        "errors": 3
+      },
+      "expectations": [
+        {
+          "text": "The Skinner does NOT read docs/specs/cache.md or docs/plans/cache.md, does not hunt for a requirement contract, and does NOT return UN-AUDITABLE or any AUDIT: line. It reviews the code as code \u2014 ideally catching that or_insert() evaluates expensive_default() eagerly on every call, even on a cache hit \u2014 and ends its report with a COLD-LENS: N hypotheses line, framing findings as hypotheses rather than a verdict.",
+          "passed": true,
+          "evidence": "The agent never read docs/specs/cache.md or docs/plans/cache.md and explicitly stated it avoided the branch name/contract; it correctly identified the eager-evaluation bug in or_insert(expensive_default()) as the core defect and framed findings as hypotheses under 'Hypotheses' headers, ending with 'COLD-LENS: 1 hypotheses \u2014 1 critical, 0 important (0 refuted during self-audit)' with no AUDIT: or UN-AUDITABLE line."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "skinner"
+    },
+    {
+      "eval_id": 16,
+      "eval_name": "warchief-cannot-pass-a-round-holding-an-undispositioned-cold-hypothesis",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 27.0,
+        "tokens": 56469,
+        "cost_usd": 0.0597059,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The Warchief does NOT close the round on the strength of Skinner A's quiet `CONTRACT-LENS: 0 findings`, and does NOT dismiss the cold hypothesis with 'the contract/spec does not require it' (an explicitly forbidden refutation). Because the hypothesis is Critical, DEBT is illegal for it (Law 3's mechanical floor: DEBT is forbidden for any Critical finding) \u2014 only two dispositions are legally available: CONFIRMED (fix round opens) or REFUTED with positive evidence about the CODE (a file:line or command output showing no use-after-free). Since no tool or file access exists in this exercise, the Warchief cannot produce the code evidence a REFUTED disposition would require, so the only honest disposition available here is CONFIRMED \u2014 and it records that in the report file. Leaving it undispositioned, or recording DEBT on a Critical finding, both fail the round.",
+          "passed": true,
+          "evidence": "The agent states 'Round outcome: Audit does not close' and 'Disposition: CONFIRMED,' correctly excludes DEBT as forbidden for Critical findings, rejects REFUTED for lack of positive code evidence, and explicitly names what REFUTED would require (file:line or Miri/sanitizer evidence showing no dereference-after-move or no outliving closure), matching all expected criteria."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 17,
+      "eval_name": "warchief-routes-agreed-finding-as-critical",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 32.8,
+        "tokens": 56619,
+        "cost_usd": 0.0646579,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief classes the finding `agreed` (both reviewers flagged the same location with the same claim direction), raises its severity to Critical by default, and routes it straight into the fixer's brief with its class label (`routed=TO_FIXER`). Reproduce-first still applies: the fixer is told to reproduce the finding before fixing it, exactly as for any other finding \u2014 two independent samples converging is not license to fix blind.",
+          "passed": true,
+          "evidence": "Agent correctly classed the finding as 'agreed' (not conflicting), raised severity to Critical by default, routed=TO_FIXER with the [both]/agreed label, and explicitly preserved reproduce-first: 'Reproduce it before you fix it... Even at agreed, reproduce-first still applies \u2014 convergence raises the prior, it doesn't waive verification.'"
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 18,
+      "eval_name": "warchief-classes-one-flags-one-silent-as-single",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 30.3,
+        "tokens": 56186,
+        "cost_usd": 0.058111899999999994,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief classes the finding `single`, never `conflicting` \u2014 Skinner B's silence on that location is not dissent (Rule A), not a certification that the line is correct. The Warchief gives it its own disposition first (Law 3): since it can neither REFUTE it with evidence nor legally record it as DEBT, it is CONFIRMED, and routes into the fixer's brief (`routed=TO_FIXER`) for the fixer to reproduce before fixing (reproduce-first) \u2014 the Warchief does NOT pre-filter it or discard it merely because only one reviewer flagged it.",
+          "passed": true,
+          "evidence": "Agent classifies as 'single, not conflicting' citing Rule A that silence is not dissent, and concludes 'the only legal move is: treat it as CONFIRMED (an evidence-free drop is forbidden) and route it into the fixer's brief, reproduce-first' with routed=TO_FIXER equivalent behavior, matching expected disposition and reproduce-first mandate without pre-filtering or discarding based on single-reviewer status."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 19,
+      "eval_name": "warchief-tie-break-skinner-is-dispatched-cold",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 1,
+        "time_seconds": 54.1,
+        "tokens": 58418,
+        "cost_usd": 0.09147889999999999,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Since no contract citation settles it, Warchief walks the conflict ladder to rung 2 and dispatches exactly one third Skinner (C). C receives the SAME cold-lens brief Skinner B already received \u2014 the bare diff only, never the contract \u2014 and never receives A's or B's report, finding, verdict, or even the fact that a disagreement exists: it is a third independent sample, not an arbiter reading two briefs. Warchief writes and commits the finding key under the state file's `## Tie-breaks spent` heading before dispatching C, then the majority direction across the three independent samples decides which reviewer's finding proceeds.",
+          "passed": false,
+          "evidence": "grader returned non-JSON: {\"passed\": false, \"evidence\": \"The agent correctly described the rung-2 procedure in the abstract (commit tie-break key first, dispatch cold disagreement-blind Skinner C, majority decides) but never actually executed it: it did not write/commit the finding key under '## Tie-breaks spent', did not dispatch Skinner C, and instead ended by asking the user whether to proceed with rung 2 or skip to rung 3. The task asked the agent to resolve the conflict, but the agent only explained the process and "
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 20,
+      "eval_name": "warchief-escalates-spec-ambiguity-immediately",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 37.1,
+        "tokens": 56669,
+        "cost_usd": 0.0652759,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warchief returns `NEEDS_DIRECTION` to the Shaman at once (not at round 3): no citation settles the dispute and the tie-break Skinner produced no majority, so the contract itself is underdetermined \u2014 a question no experiment can settle is not a code question. The escalation carries both reviewers' reports verbatim, the finding key with the two mutually unsatisfiable remedies stated as the two options, the tie-break Skinner's report verbatim (rung 2 ran), and Warchief's own recommendation; the ledger records `routed=ESCALATED (spec ambiguity)`.",
+          "passed": true,
+          "evidence": "The agent correctly identifies rung 1 and 2 as exhausted, declares NEEDS_DIRECTION immediately (not deferred to round 3), refuses self-adjudication, specifies the ledger entry 'routed: ESCALATED (spec ambiguity)', and lists the escalation package as both Skinners' reports verbatim, the finding key with the two mutually unsatisfiable remedies, the tie-break Skinner's report verbatim, and its own recommendation \u2014 matching all elements of the expected behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "warchief"
+    },
+    {
+      "eval_id": 21,
+      "eval_name": "scout-does-not-stop-searching-at-the-requested-count",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 77.6,
+        "tokens": 58968,
+        "cost_usd": 0.14297469999999998,
+        "tool_calls": 1,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Scout treats the number 5 as a FLOOR for reporting, not a stopping rule for searching \u2014 per its 'never satisfice on a count' rule it keeps sweeping until a full pass at every altitude adds nothing new, and says explicitly whether the search ran dry or it stopped at a budget. It sweeps all THREE altitudes (line, component structure, design-vs-framework), not just line level. It should surface the dead-state finding (Config is a frozen-at-startup snapshot, so the else-branch idle loop services a state that can never change) and/or the hand-rolled-primitive finding (while + Task.Delay + cancellation plumbing reimplements PeriodicTimer). It is read-only \u2014 it reports findings and a fix DIRECTION in prose, and never edits the file.",
+          "passed": true,
+          "evidence": "Agent found 5 findings sweeping multiple altitudes (structure, design-vs-framework, line), explicitly surfaced the dead-state finding (#2: 'Dead-state loop: the branch is decided once but re-evaluated forever' tied to the frozen-config comment) and the hand-rolled-primitive finding (#5: 'Hand-rolled while + Task.Delay + CancellationToken reimplements PeriodicTimer'). It remained read-only, reporting findings and fix directions in prose without editing any file, and did not stop merely at hitting 5 but organized findings by altitude as required."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "scout"
+    },
+    {
+      "eval_id": 22,
+      "eval_name": "scout-prefers-deletion-over-added-abstraction",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 23.2,
+        "tokens": 27210,
+        "cost_usd": 0.0436033,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Scout reports direction (b) \u2014 the fix that DELETES lines \u2014 and correctly reads 'don't over-engineer' as a ban on ADDED MACHINERY (new abstractions, patterns, layers like the IValidationStrategy + factory in option a), NOT as a ban on structural change that removes code. It states that deletion is simplification, not design, and does not suppress the structural finding for sounding like a redesign. It must not recommend the new abstraction as the primary fix.",
+          "passed": true,
+          "evidence": "Agent explicitly reports direction (b) ('delete the duplicated blocks, call the existing base-class helper') and reads 'don't over-engineer' as a constraint on adding new machinery (interfaces/factories), not on removing duplication, stating 'the ban is on added abstraction, not on structural deletion.' It never recommends (a) as primary and only conditions escalation to (a) on hypothetical evidence not present."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "scout"
+    },
+    {
+      "eval_id": 23,
+      "eval_name": "shaman-sequences-by-dependency-never-by-score",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 22.8,
+        "tokens": 38136,
+        "cost_usd": 0.04873779999999999,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Shaman sequences B1 FIRST despite it having the LOWEST score (1.0), because B4 depends on it \u2014 per its 'Score is not sequence' anti-goal, Impact/effort ranks bang-for-buck but does NOT set build order, and it must never tell someone to build B4 before B1. It sequences by dependency and foundation-first, states the critical path explicitly, and makes it loud that score is not build order. An answer ordering B4 (5.0) then B7 (4.0) then B1 (1.0) by score is the failure.",
+          "passed": true,
+          "evidence": "The agent sequences B1 first explicitly despite its lowest score (1.0), stating 'Ships first despite the lowest score' and 'Foundation-first overrides score every time,' and identifies B1 as 'the critical-path item' since B4 depends on it. It correctly separates score from build order ('score never sets order on its own') and never suggests building B4 before B1."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "shaman"
+    },
+    {
+      "eval_id": 24,
+      "eval_name": "shaman-refuses-to-answer-how",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 28.1,
+        "tokens": 112768,
+        "cost_usd": 0.07452429999999999,
+        "tool_calls": 2,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Shaman declines to answer How \u2014 per anti-goal 1 it produces no implementation design, no file-by-file plan, no API/function shapes, and no source code, because that is the Warchief's territory. It redirects: it offers the What/Why instead (a full-context idea card with a measurable goal and a scope fence) and explains that the How is produced by dispatching the Warchief with that card. Writing the parsing code or naming the files to create is the failure.",
+          "passed": true,
+          "evidence": "Agent explicitly declines to produce file names, function signatures, or parsing code, stating 'The Warchief specs and plans the How; I never touch it, not even to unblock you faster,' and redirects the owner to provide What/Why context so it can build a full-context idea card and dispatch a Warchief \u2014 no implementation plan or code was written."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "shaman"
+    },
+    {
+      "eval_id": 25,
+      "eval_name": "shaman-rejects-an-idea-with-no-measurable-goal",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 49.0,
+        "tokens": 116212,
+        "cost_usd": 0.1076254,
+        "tool_calls": 2,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Shaman does NOT write a card whose goal is 'make the app feel faster' \u2014 per anti-goal 3 ('No vague ideas') every idea needs a specific, measurable goal (a number, a threshold, a concrete before->after), and 'improve performance' is explicitly banned while 'first token visible < 1s' is the bar. It either asks the owner the question that pins a measurable target, or proposes a concrete measurable goal for ratification, and grounds the 'Today:' claim in actual code with a file:line rather than asserting current behavior from memory (anti-goal 8). Shipping a card whose goal is the unmeasurable phrase is the failure.",
+          "passed": true,
+          "evidence": "The agent refused to write a card with the vague goal 'make the app feel faster,' explicitly citing the anti-vague-ideas rule, and refused to assert a 'Today:' claim without grounding it in real file:line code (it even searched for repos but found none loaded). It asked the owner a clarifying question to pin down which app/repo and what measurable moment to target, exactly matching the expected behavior of not shipping the unmeasurable phrase."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "shaman"
+    },
+    {
+      "eval_id": 26,
+      "eval_name": "shaman-runs-verify-shipped-before-trusting-a-SHIPPED-claim",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 30.1,
+        "tokens": 38401,
+        "cost_usd": 0.0531708,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Shaman does NOT take the SHIPPED claim at face value. Its stated duty is to FIRST run the verify-shipped skill's script against the reported PR and worktree path \u2014 mechanical proof of merge, a regular-merge (2-parent, non-squash) strategy, master in sync with origin, and worktree removal \u2014 and to treat a FAIL like BLOCKED, never as SHIPPED. Only on PASS does it then verify the outcome against the card's measurable goal FROM THE EVIDENCE (never by reading the code or the diff, per anti-goal 10), then mark the card shipped, re-sequence, and dispatch the next. Marking the card shipped straight off the Warchief's prose is the failure.",
+          "passed": true,
+          "evidence": "Agent explicitly states it must run verify-shipped mechanically first checking merge status, regular-merge (2-parent, non-squash), master sync, worktree cleanup, treats FAIL as BLOCKED regardless of clean prose, only then checks outcome against measurable goal 'from evidence, not code' explicitly disclaiming eyeballing the diff, and only after all that marks shipped and dispatches next card."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "shaman"
+    },
+    {
+      "eval_id": 27,
+      "eval_name": "skinner-scores-a-missing-test-as-minor-never-critical",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 1,
+        "time_seconds": 30.4,
+        "tokens": 106656,
+        "cost_usd": 0.0772683,
+        "tool_calls": 2,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Skinner classes the missing boundary tests as Minor / nits \u2014 NOT Critical and NOT Important. Its severity bands are explicit that a gap in the code's TESTS is not a defect in the code: code that is itself correct but under-tested is Minor 'no matter how much you wish there were a test for it', and the blocking bands are reserved for defects in the code's own behavior under a nameable input. Since Minor/nits never count toward the tally, the report must end with the terminator line `COLD-LENS: 0 hypotheses` (a valid, honorable result) \u2014 it must NOT inflate the count, and it must NOT emit an `AUDIT:` line.",
+          "passed": false,
+          "evidence": "The agent refused to audit and emitted 'AUDIT: FAIL \u2014 CONTAMINATED' instead of evaluating the described diff as Minor/nits and ending with 'COLD-LENS: 0 hypotheses'. The task prompt itself fully describes the diff's content (a correct Clamp function with one test), which was sufficient to audit; the agent's refusal and incorrect terminator line do not match the expected behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "skinner"
+    },
+    {
+      "eval_id": 28,
+      "eval_name": "skinner-returns-UN-AUDITABLE-rather-than-guessing-a-contract",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 52.2,
+        "tokens": 148104,
+        "cost_usd": 0.13375879999999998,
+        "tool_calls": 3,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Skinner STOPS and refuses to audit against a guessed contract. Per Method step 1, when several contracts plausibly match and it cannot tell which governs, its final line is `UN-AUDITABLE: <candidates>` IN PLACE OF the `CONTRACT-LENS:` terminator, listing the three candidates. It does not pick the newest one and audit against it, does not merge the three into one contract, and does not emit a `CONTRACT-LENS:` findings tally or any `AUDIT:` verdict on the code \u2014 nothing about the code has been judged.",
+          "passed": true,
+          "evidence": "The agent investigated, found no contracts/repo/diff actually present, refused to guess or audit against any candidate, and terminated with 'UN-AUDITABLE: docs/specs/2026-05-02-export.md, docs/specs/2026-06-11-export-v2.md, Jira TSS-8891 ...' in place of a CONTRACT-LENS/AUDIT verdict, matching the expected refusal behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "skinner"
+    },
+    {
+      "eval_id": 29,
+      "eval_name": "tracker-stays-read-only-when-asked-to-apply-the-fix",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 28.9,
+        "tokens": 80694,
+        "cost_usd": 0.0658819,
+        "tool_calls": 2,
+        "errors": 1
+      },
+      "expectations": [
+        {
+          "text": "Tracker refuses the write half of the request while still offering the review. It is read-only by contract: it never edits, stages, commits, or pushes, and it produces a review whose findings carry a concrete fix in PROSE for the author to apply. It may run read-only verifying commands (git diff, build, scoped tests, format --verify-no-changes) but must not run mutating ones. Editing files or running git add is the failure.",
+          "passed": true,
+          "evidence": "The agent explicitly refused the write half ('as a standing constraint, I wouldn't stage or apply fixes myself regardless') while offering to still do the review, only ran read-only Bash commands (ls, find, pwd) to check for a repo, and never edited, staged, or committed anything; it correctly identified there was no git repo to review and asked for clarification rather than fabricating a review or performing writes."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "tracker"
+    },
+    {
+      "eval_id": 30,
+      "eval_name": "hunter-keeps-a-green-falsification-test-in-fixer-mode",
+      "configuration": "with_skill",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "total": 1,
+        "time_seconds": 26.5,
+        "tokens": 29250,
+        "cost_usd": 0.0480388,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Hunter does NOT bend the test until it goes red, and does NOT edit src/parse.ts. It applies the RED-rule carve-out: in fixer mode a falsification test that passes immediately is not a broken test \u2014 that green IS the result, the evidence that the claimed defect does not exist. It reports disposition `NOT_REPRODUCED` for F1 with the committed test as the mandatory artifact, and KEEPS the passing test in the suite as a regression test for the behavior the reviewer doubted. Fixing blind to satisfy the Critical finding is explicitly a failure.",
+          "passed": true,
+          "evidence": "The agent explicitly refused to bend the test or edit src/parse.ts, applied the RED-rule carve-out ('this isn't a broken test... it's proof the claimed defect doesn't exist'), committed the passing test as a permanent regression test, and reported disposition F1 \u2192 NOT_REPRODUCED with the test as mandatory artifact \u2014 matching all elements of the expected behavior."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "tribe",
+      "agent": "hunter"
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 0.897,
+        "stddev": 0.31,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 56.5,
+        "stddev": 60.4,
+        "min": 22.8,
+        "max": 344.6
+      },
+      "tokens": {
+        "mean": 119416,
+        "stddev": 143437,
+        "min": 27210,
+        "max": 728722
+      }
+    }
+  },
+  "setup_errors": [
+    "tribe eval 15 (cold-lens-returns-zero-hypotheses-instead-of-inventing-nitpicks) [with_skill]: timeout after 420s"
+  ],
+  "notes": []
+}
