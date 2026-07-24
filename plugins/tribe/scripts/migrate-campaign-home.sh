@@ -3,6 +3,12 @@
 # worker reports into the per-repo campaign home (~/.tribe/<key>/campaigns/<slug>/reports).
 # Idempotent; refuses to touch a campaign whose .runner.lock holds a live pid.
 # Never re-derives the ~/.tribe key itself — always via tribe-home.sh (W1).
+#
+# The reports this moves were COMMITTED, so moving the files alone leaves the index
+# claiming they still exist — a working tree full of unexplained deletions that the
+# next `git status` reader has to reverse-engineer. Sibling migrate-state.sh already
+# closes that loop (`git rm -r --cached` + the commit to run); this does the same.
+# Does not commit — a migration decides where files live, never what lands in history.
 set -euo pipefail
 
 usage() {
@@ -33,6 +39,7 @@ STATE_ROOT="$REPO/.claude/state"
 
 failed=0
 touched_campaigns=()
+detracked_campaigns=()
 
 is_pid_alive() {
   local pid="$1"
@@ -100,6 +107,14 @@ for slugdir in "$STATE_ROOT"/*/; do
   touched_campaigns+=("$slug")
 
   if [[ "$DRY_RUN" -ne 1 && "$slug_had_conflict" -eq 0 ]]; then
+    # Index still lists the moved reports; drop them so it matches the disk.
+    # --cached only: the files are already gone from the worktree, and a plain
+    # `git rm` would fail on the missing paths. A conflicted slug keeps its
+    # tracking — some of its files are still on disk and still belong to git.
+    if git -C "$REPO" ls-files --error-unmatch ".claude/state/$slug/reports" >/dev/null 2>&1; then
+      git -C "$REPO" rm -r --cached -q ".claude/state/$slug/reports"
+      detracked_campaigns+=("$slug")
+    fi
     rmdir "$reports_src" 2>/dev/null || true
     rmdir "$STATE_ROOT/$slug" 2>/dev/null || true
   fi
@@ -107,5 +122,10 @@ done
 
 echo "migrate-campaign-home: summary — campaigns touched: ${touched_campaigns[*]:-none}"
 echo "migrate-campaign-home: reminder — old session logs were caller-chosen (--logs-dir) and are NOT auto-migrated; move them by hand if wanted"
+
+if [[ "${#detracked_campaigns[@]}" -gt 0 ]]; then
+  echo "migrate-campaign-home: un-tracked from git: ${detracked_campaigns[*]}"
+  echo "next: git -C '$REPO' commit -m 'chore(tribe): stop tracking campaign reports (moved to ~/.tribe)'"
+fi
 
 exit "$failed"
