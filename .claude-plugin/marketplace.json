@@ -40,11 +40,6 @@
       "description": "Animate one still image into a long, seamlessly-looping video with music (e.g. game key-art → 1-hour ambient YouTube loop) via sine-driven Remotion effects: halos, auras, particles, breathing."
     },
     {
-      "name": "verify-shipped",
-      "source": "./plugins/verify-shipped",
-      "description": "Mechanically verify the tribe's Definition of Done: PR merged, squash strategy, master in sync with origin, worktree removed."
-    },
-    {
       "name": "explaining",
       "source": "./plugins/explaining",
       "description": "Two eval-proven rules (term discipline + grounding) that make explanatory prose readable without the writer's context; rule candidates that lost or regressed in the isolated A/B eval are excluded."

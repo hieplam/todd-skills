@@ -43,12 +43,11 @@ them.
 
 | Plugin | Kind | What it does |
 | --- | --- | --- |
-| `tribe` | agents | Six agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, plus Tracker and Skinner reviewers and the read-only Scout code-analyzer). Questions flow up as statuses, decisions flow down as cards and briefs. |
+| `tribe` | agents + skills | Six agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, plus Tracker and Skinner reviewers and the read-only Scout code-analyzer). Questions flow up as statuses, decisions flow down as cards and briefs. Ships the `orchestrate-campaign` and `verify-shipped` skills (the latter mechanically verifies a SHIPPED claim against GitHub and git). |
 | `research-to-blog` | agents | Turn a session insight or a bare topic into a bilingual EN+VI research note and published blog posts. |
 | `splitting-plans` | skills | Split a large plan into isolated, dependency-aware sub-plans for parallel subagents. |
 | `check-diff-coverage` | skills | Measure uncovered diff vs main and drive a remediation loop (.NET, Go). |
 | `refactor-for-testability` | skills | Reshape untestable code before changing its behaviour. |
-| `verify-shipped` | skills | Mechanically verify a SHIPPED claim against GitHub and git. |
 | `workflow-journal` | skills | Render each Workflow run to a readable Markdown record. |
 | `simple-image-video` | skills | Animate a still image into a short video. |
 | `explaining` | skills | Two eval-proven writing rules (term discipline + grounding) for explanatory prose; refuted rule candidates excluded by A/B data. |
