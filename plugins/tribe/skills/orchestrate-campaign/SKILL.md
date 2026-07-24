@@ -46,6 +46,11 @@ campaign's own docs — never invent or reuse a value from a previous campaign:
 | `<escalations-dir>` | Where escalation files are written, relative to `<target-repo>`. |
 | `<campaign-slug>` | The campaign's own identifier, used inside the state file. |
 
+`--home` (below) is **computed**, never one of the placeholders above: it is always
+`"$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>"` — `tribe-home.sh`
+is the only place that knows the `~/.tribe` key derivation (wall W1: this skill never re-derives
+it, and never types a literal `~/.tribe/...` path).
+
 If you catch yourself writing a real repo name, a real path, or a real model name into this
 skill's own instructions (as opposed to a value you filled into a live invocation), stop — that
 value belongs in the campaign's own docs, not here.
@@ -185,6 +190,7 @@ cannot finish it.
      --model <model> \
      --answers <answers-path> \
      --escalations-dir <escalations-dir> \
+     --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
      --dry-run
    ```
 
@@ -198,7 +204,8 @@ cannot finish it.
      --state <state-path> \
      --model <model> \
      --answers <answers-path> \
-     --escalations-dir <escalations-dir>
+     --escalations-dir <escalations-dir> \
+     --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>"
    ```
 
    The harness notifies you when a background command exits — treat that notification itself as
@@ -217,6 +224,7 @@ cannot finish it.
 | `--model` | yes | Executor model tier. |
 | `--answers` | yes | Path to the rulings file, relative to `--repo`. |
 | `--escalations-dir` | yes | Path to the escalations directory, relative to `--repo`. |
+| `--home` | yes | The campaign's machine-local operational home — always computed as `"$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>"`, **never** typed literally (`tribe-home.sh` is the only place that knows the `~/.tribe` key derivation). |
 | `--logs-dir` | no | Session log destination. |
 | `--session-timeout` | no | Wall-clock abort per executor session. |
 | `--dry-run` | no | Derive and print the next action with zero side effects. |
@@ -224,7 +232,7 @@ cannot finish it.
 | `--max-cards` | no | Stop after processing this many cards this run. |
 | `--include-escalated` | no | Reconsider a card whose escalation file already exists. |
 
-The five required flags have **no default** — omitting any of them is a usage error, not a value
+The six required flags have **no default** — omitting any of them is a usage error, not a value
 worth guessing.
 
 | Exit code | Meaning |
@@ -270,10 +278,13 @@ On every exit notification where the report shows `pending` cards:
      --model <model> \
      --answers <answers-path> \
      --escalations-dir <escalations-dir> \
+     --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
      --cards <answered-card-id>,<...>,<not-reached-card-id>,<...> \
      --include-escalated
    ```
-   (`$runner_dir` — resolved once in Stage B; re-use it here rather than re-resolving.)
+   (`$runner_dir` — resolved once in Stage B; re-use it here rather than re-resolving. `--home`
+   resolves to the SAME campaign home every time — it is re-computed rather than cached because
+   `tribe-home.sh` is a pure function of `<target-repo>`, so this is not a fresh value.)
 
 3. **Track `autoAnswerRounds` per card and enforce the cap of 2** (wall W7). Before answering an
    escalation, check that card's `autoAnswerRounds` in the latest report: if it is already `2`,

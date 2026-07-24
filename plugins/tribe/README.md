@@ -147,7 +147,44 @@ bun plugins/tribe/scripts/runner/run.ts --repo <target-repo> --state <path> --mo
 ```
 
 See [`scripts/runner/README.md`](scripts/runner/README.md) for the full inputs table, resume
-semantics, escalation workflow, and known limitations.
+semantics, escalation workflow, and known limitations. Every real (non-`--dry-run`) invocation
+now also requires `--home <campaign-home>` and records a `run.json` under it (see that README's
+"Run record" section) — this is what the status viewer below reads.
+
+---
+
+## Status viewer
+
+[`scripts/viewer/`](scripts/viewer/) is a read-only, refresh-based web page — a sibling
+capability to the runner, same stack (bun + TS), zero client JS — that scans `~/.tribe` and
+answers at a glance: which campaigns exist, is each runner's process actually alive right now,
+per-card status, pending escalations, and the current session's log tail. It never writes
+anything (no lock, no state, no `gh`/`git`); every "refresh" in a browser is simply a fresh scan.
+Start it with:
+
+```sh
+bun plugins/tribe/scripts/viewer/serve.ts [--tribe-root <dir>] [--port <n>]
+```
+
+`--tribe-root` defaults to `$HOME/.tribe`; `--port` defaults to `4321`. It binds `127.0.0.1`
+only. Then open `http://127.0.0.1:<port>` (or `curl` it) and refresh to re-poll.
+
+## Migrating pre-existing worker reports
+
+Before this effort, campaign worker reports were written to the target repo's own
+`.claude/state/<campaign>/reports/` — the exact machine-local exhaust the tribe's own convention
+says should never live in a git working tree. [`scripts/migrate-campaign-home.sh`](scripts/migrate-campaign-home.sh)
+moves any such pre-existing reports into the new `~/.tribe/<repo-key>/campaigns/<campaign>/reports/`
+home (via `tribe-home.sh`, never its own key derivation), refusing to overwrite an existing
+destination file and refusing to touch a campaign whose `.runner.lock` is held by a live pid:
+
+```sh
+bash plugins/tribe/scripts/migrate-campaign-home.sh <target-repo> [--campaign <slug>] [--dry-run]
+```
+
+Old session logs (caller-chosen via `--logs-dir`) are **not** migrated — there is no
+deterministic source path to scan; the script prints a reminder listing every campaign it
+touched so they can be moved by hand if wanted.
 
 ---
 

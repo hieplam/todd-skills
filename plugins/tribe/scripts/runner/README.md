@@ -29,16 +29,69 @@ All paths below that are relative are relative to `--repo` unless noted otherwis
 | `--model` | yes | Executor model tier passed to each spawned session. |
 | `--answers` | yes | Path (relative to `--repo`) to the committed rulings file embedded in every executor brief. |
 | `--escalations-dir` | yes | Path (relative to `--repo`) where escalation files are written. |
-| `--logs-dir` | no | Session log destination. Default: `logs/` next to the state file (i.e. the state file's own directory + `logs`). |
+| `--home` | yes | The campaign's machine-local operational home (absolute, or resolved against `cwd`) — where this invocation's `run.json` record and (by default) its session logs are written. Matches the `~/.tribe/<repo-key>/campaigns/<campaign-slug>` convention (see "Run record" below), but this script never derives that key itself — the caller (normally `orchestrate-campaign`, via `tribe-home.sh`) computes it and passes it in (stateless-capability wall: this is an environment-specific value, not a value worth guessing). |
+| `--logs-dir` | no | Session log destination. Default: `<home>/runs/<run-id>/logs/` (i.e. this invocation's own run directory under `--home`). Explicit `--logs-dir` overrides. |
 | `--session-timeout` | no | Wall-clock abort per executor session. Accepts `<n>ms`, `<n>s`, `<n>m`, `<n>h`, or a plain millisecond integer (e.g. `3h`, `30m`, `90s`, `5000ms`, `5000`). Default: `3h`. |
 | `--dry-run` | no | Derive and print the next action with **zero side effects** — no lock, no writes, no session, no report file (see the report contract below). |
 | `--cards` | no | Comma-separated list of card ids — restricts the loop to only these ids, in the state's own `sequence` order. Default: the full sequence. |
 | `--max-cards` | no | Positive integer — stop after WORKING this many cards in this run (a card actually `shipped`/`escalated`/`stopped` this pass — see D5′ below; a card merely parked on a prior run's escalation, or skipped as `blocked`, does not consume this budget). Default: unbounded (run until `done` or the budget is spent — an escalation no longer stops the run, see D5′). |
 | `--include-escalated` | no | Bypass the escalation-file short-circuit for a card the human has already ruled on, and let `nextCard`/`deriveCardPhase` reconsider it. This is exactly the flag the Stage C round-trip re-triggers with (spec §O6). |
 
-`--repo`, `--state`, `--model`, `--answers`, and `--escalations-dir` have **no default** —
-this is deliberate (the stateless-capability wall): omitting any of them is a usage error,
-not a value worth guessing.
+`--repo`, `--state`, `--model`, `--answers`, `--escalations-dir`, and `--home` have **no
+default** — this is deliberate (the stateless-capability wall): omitting any of them is a
+usage error, not a value worth guessing.
+
+## Run record
+
+Every non-`--dry-run` invocation records itself under `--home` the moment the single-instance
+lock (below) is acquired — this is the machine-local audit trail the status viewer
+(`plugins/tribe/scripts/viewer/`) reads to answer "is this campaign's runner actually alive right
+now?" without any shell forensics.
+
+```
+<home>/
+  reports/<cardId>.md            per-CARD worker reports (written by `brief.ts`'s `reportPathFor`;
+                                  survive across runs — never cleared by this runner)
+  runs/<run-id>/
+    run.json                     this invocation's run record (schema below)
+    logs/…                       this invocation's session logs (default --logs-dir)
+```
+
+`<run-id>` is generated fresh per invocation (`generateRunId`, `core/run-record.ts`): an ISO
+timestamp with `:`/`.` mapped to `-`, plus a random hex suffix (e.g.
+`2026-07-24T06-13-59-000Z-a1b2`) — collision-safe at human trigger rates, never reused across
+runs. `run.json` is written **atomically** (temp file + rename) right after the lock is
+acquired, with `endedAt`/`exitCode`/`reason` all `null` (in flight), and finalized (those three
+fields filled in) on every exit path that writes `campaign-report.json` (see the report contract
+below) — including the best-effort `error` path. It is never deleted: `runs/` is the campaign's
+full machine-local history. A run.json left with `endedAt: null` whose `pid` is no longer alive
+is exactly how the viewer detects a crash. A refused start (`EXIT_LOCKED`) writes nothing — same
+symmetry as the report contract: a refused process never creates artifacts. `--dry-run` also
+writes nothing (it returns before the lock is ever acquired).
+
+`run.json` schema (v1, `RunRecord` in `core/run-record.ts`):
+
+```json
+{
+  "v": 1,
+  "runId": "2026-07-24T06-13-59-000Z-a1b2",
+  "pid": 27542,
+  "startedAt": "2026-07-24T06:13:59.771Z",
+  "repo": "/abs/path/to/target-repo",
+  "statePath": "/abs/path/to/state.json",
+  "answersPath": "/abs/path/to/answers.md",
+  "escalationsDir": "/abs/path/to/escalations",
+  "logsDir": "/abs/path/to/home/runs/<run-id>/logs",
+  "argv": ["--cards", "C1,C2", "--max-cards", "1"],
+  "endedAt": null,
+  "exitCode": null,
+  "reason": null
+}
+```
+
+`statePath`/`answersPath`/`escalationsDir` are recorded **absolute** (resolved against
+`--repo`) — a reader of `run.json` never has to re-derive them relative to anything. `argv` is
+the raw `process.argv.slice(2)` this invocation was started with.
 
 ## State file schema
 
@@ -178,6 +231,7 @@ bun plugins/tribe/scripts/runner/run.ts \
   --model <model> \
   --answers <path-to-answers.md> \
   --escalations-dir <path-to-escalations-dir> \
+  --home <path-to-campaign-home> \
   --dry-run
 ```
 
@@ -192,6 +246,7 @@ bun plugins/tribe/scripts/runner/run.ts \
   --model <model> \
   --answers <path-to-answers.md> \
   --escalations-dir <path-to-escalations-dir> \
+  --home <path-to-campaign-home> \
   --cards <card-id> --max-cards 1
 ```
 
@@ -438,6 +493,13 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
 
 ## Known limitations
 
+- **Run-record (`run.json`) write/finalize failures are silent by design.** Both the initial
+  write (right after the lock is acquired) and the end-of-run finalize are wrapped in a
+  best-effort `try`/`catch` that swallows any error (`core/loop/run-loop.ts`,
+  `cli/main.ts`'s `tryFinalizeRunRecord`) — same rationale as the report contract: observability
+  exhaust must never fail a campaign run (spec §9). A caller relying on `run.json` for liveness
+  should treat its absence, or a permanently-unfinalized record with a dead pid, as informative
+  rather than assume every invocation always produces one.
 - **`verifyWithRetry` retries with zero delay.** The D3 verify-shipped check is attempted
   twice back-to-back with no sleep between attempts (`loop.ts`). This catches a transient
   `gh`/network blip on the *second* call, but it will **not** catch a check that is still

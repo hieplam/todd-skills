@@ -3,7 +3,7 @@
 // modules receive it as the injected `io` parameter and never import these primitives
 // themselves (purity wall — enforced by structure.test.ts; ESLint layer deferred per Amendment A3).
 import { dirname, join } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import type { ExecResult, LockInfo, LoopIO, PendingCommit, RunLoopConfig } from '../core/loop.ts';
 import type { SessionMessage, SpawnSessionParams } from '../core/session.ts';
@@ -77,6 +77,15 @@ export function buildRealIo(config: RunLoopConfig): LoopIO {
     appendLog: (logPath, line) => {
       mkdirSync(dirname(logPath), { recursive: true });
       writeFileSync(logPath, `${line}\n`, { flag: 'a' });
+    },
+
+    ensureDir: (resolvedPath) => {
+      mkdirSync(resolvedPath, { recursive: true });
+    },
+    writeFileAtomic: (resolvedPath, content) => {
+      const tmp = `${resolvedPath}.tmp-${process.pid}`;
+      writeFileSync(tmp, content);
+      renameSync(tmp, resolvedPath);
     },
   };
 }

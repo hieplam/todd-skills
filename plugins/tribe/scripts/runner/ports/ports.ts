@@ -51,6 +51,12 @@ export interface PendingCommitPort {
 export interface SessionSpawnPort {
   spawnSession(params: SpawnSessionParams): AsyncIterable<SessionMessage>;
 }
+export interface RunHomePort {
+  /** mkdir -p semantics; idempotent. */
+  ensureDir(resolvedPath: string): void;
+  /** Crash-safe write: temp file in the same directory, then rename (spec §4). */
+  writeFileAtomic(resolvedPath: string, content: string): void;
+}
 
 // ---------------------------------------------------------------------------------------
 // ExecResult — unified. Previously defined TWICE, identically, in core/verify.ts and
@@ -217,4 +223,5 @@ export interface LoopIO
     ProcessPort,
     LockStorePort,
     PendingCommitPort,
-    SessionSpawnPort {}
+    SessionSpawnPort,
+    RunHomePort {}

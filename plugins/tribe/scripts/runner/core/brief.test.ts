@@ -3,7 +3,7 @@
 // neutral (no repo names, no campaign-specific values) — the stateless-capability wall.
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { BRIEF_TEMPLATE_PATH, executorBrief } from './brief.ts';
+import { BRIEF_TEMPLATE_PATH, executorBrief, reportPathFor } from './brief.ts';
 import type { BriefCard, BriefState } from './brief.ts';
 
 const TEMPLATE = readFileSync(BRIEF_TEMPLATE_PATH, 'utf8');
@@ -27,6 +27,11 @@ function fixtureState(overrides: Partial<BriefState> = {}): BriefState {
 }
 
 const FIXTURE_ANSWERS = '## 2026-01-01 -- sample ruling\n\nUse the neutral fixture path for all future sessions.\n';
+
+/** Spec §5.3: the report path is injected by the caller (composed from `resolved.homeDir` via
+ * `reportPathFor`, Task 2/3) — never derived here from the campaign name, and never
+ * `.claude/state/...`. */
+const FIXTURE_REPORT_PATH = '/th/campaigns/sample-campaign/reports/C7.md';
 
 const EXPECTED_BRIEF = `# Executor Brief — card C7 (sample-campaign)
 
@@ -90,7 +95,7 @@ forbidden for this campaign — the merge commit must carry both parents.
 ## Worker reports
 
 Every dispatched worker (Hunter, Skinner) writes its report to:
-.claude/state/sample-campaign/reports/C7.md
+${FIXTURE_REPORT_PATH}
 
 ## Answers (committed rulings — read before escalating)
 
@@ -112,38 +117,50 @@ No other terminal line is a valid signal.
 
 describe('executorBrief', () => {
   test('renders the committed template with card/state substitutions and the embedded answers content (snapshot)', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE);
+    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
     expect(rendered).toBe(EXPECTED_BRIEF);
   });
 
   test('embeds the answers file content verbatim so a past ruling reaches every future session', () => {
     const distinctiveRuling = '## ruling\n\nAlways use the neutral fixture, never a real repo name.\n';
-    const rendered = executorBrief(fixtureCard(), fixtureState(), distinctiveRuling, TEMPLATE);
+    const rendered = executorBrief(fixtureCard(), fixtureState(), distinctiveRuling, TEMPLATE, FIXTURE_REPORT_PATH);
     expect(rendered).toContain(distinctiveRuling);
   });
 
   test('never squash: the regular-merge order is explicit', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE);
+    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
     expect(rendered).toContain('gh pr merge --merge');
     expect(rendered).toContain('NEVER squash');
   });
 
   test('states the anti-livelock wall — the 2026-07-17 incident killed 6 workers without it', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE);
+    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
     expect(rendered).toContain('Your session ends the instant you stop calling tools');
     expect(rendered).toContain('timeout: 600000');
     expect(rendered).toContain('run_in_background: false');
   });
 
   test('renders a distinct brief per card id and per campaign (no hardcoded values)', () => {
+    const otherReportPath = '/th/campaigns/other-campaign/reports/X9.md';
     const rendered = executorBrief(
       fixtureCard({ id: 'X9', spec: 'docs/superpowers/specs/x9.md', plan: 'docs/superpowers/plans/x9.md' }),
       fixtureState({ campaign: 'other-campaign', ownerOnlyEscalations: [] }),
       FIXTURE_ANSWERS,
       TEMPLATE,
+      otherReportPath,
     );
     expect(rendered).toContain('card X9 (other-campaign)');
-    expect(rendered).toContain('.claude/state/other-campaign/reports/X9.md');
+    expect(rendered).toContain(otherReportPath);
     expect(rendered).toContain('(none declared for this campaign)');
+  });
+
+  test('reportPathFor composes <home>/reports/<cardId>.md — no .claude/state anywhere (spec §5.3)', () => {
+    expect(reportPathFor('/th/campaigns/camp', 'C1')).toBe('/th/campaigns/camp/reports/C1.md');
+  });
+
+  test('executorBrief substitutes the injected report path into {{REPORT_PATH}}', () => {
+    const brief = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
+    expect(brief).toContain(FIXTURE_REPORT_PATH);
+    expect(brief).not.toContain('.claude/state');
   });
 });
