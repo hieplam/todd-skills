@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- **Implementer:** dispatch each implementation/fix task to the `hunter` subagent — never a generic implementer.
 - **TDD non-negotiable:** every task writes the failing test first, watches it fail, then implements (repo global rule `test-first.md`).
 - **Stateless-capability wall (W1):** no `~/.tribe`, repo path, or campaign value hardcoded in the runner or viewer core; every environment value is a CLI input. `tribe-home.sh` is the ONLY key-derivation source.
 - **`--dry-run` stays zero-side-effects by construction** — no lock, no run.json, no directory creation.
@@ -288,7 +289,7 @@ ensureDir: (p: string) => { calls.ensuredDirs.push(p); },
 writeFileAtomic: (p: string, c: string) => { calls.atomicWrites.push({ path: p, content: c }); },
 ```
 
-- [ ] **Step 6: Full check + commit**
+- [ ] **Step 6: Commit**
 
 Run: `bun run check` — Expected: tsc clean, all tests pass (172 baseline + 5 new).
 
@@ -536,9 +537,9 @@ export function executorBrief(card: BriefCard, state: BriefState, answersContent
 
 - [ ] **Step 4: Run the full suite** — `bun run check` — Expected: PASS (card-actions suites compile against the new arity via their `resolved` fixtures from Task 2).
 
-- [ ] **Step 5: Grep-gate then commit**
+- [ ] **Step 5: Commit**
 
-Run: `grep -rn "\.claude/state" plugins/tribe/scripts/runner/` — Expected: **no code matches** (comments referencing history are fine only in `brief.ts`'s doc comment above).
+Grep-gate first. Run: `grep -rn "\.claude/state" plugins/tribe/scripts/runner/` — Expected: **no code matches** (comments referencing history are fine only in `brief.ts`'s doc comment above).
 
 ```bash
 git add core/brief.ts core/brief.test.ts core/loop/card-actions.ts
@@ -608,12 +609,14 @@ export function renderPage(statuses: CampaignStatus[], meta: { tribeRoot: string
 **Render rules to test:** every dynamic string HTML-escaped (test with a `campaign` named `<script>alert(1)</script>`); page contains the honest-labeling header line "Read-only view of on-disk state. GitHub is authority for PR/merge truth."; a `crashed` campaign renders the badge text `CRASHED`; STOP renders a banner; a `cards: {error}` snapshot renders the error panel and still renders the liveness badge; tail lines inside `<pre>`.
 
 - [ ] **Step 1: Write failing `derive.test.ts`** — fixture snapshots as plain literals covering: running (live pid), crashed (unfinalized + dead pid), exited-with-report (blockedOn threading), never_run, unreadable state (`stateRaw: '{not json'`), escalation parsing, sort order. Assert full `CampaignStatus` literals where practical.
-- [ ] **Step 2: `bun test` → FAIL** (module missing).
+- [ ] **Step 2: Run to verify failure** — `bun test core/derive.test.ts` — Expected: FAIL (module `./derive.ts` missing).
 - [ ] **Step 3: Implement `core/derive.ts`** (pure; ~120 lines; no imports beyond `./model.ts`).
-- [ ] **Step 4: `bun test core/derive.test.ts` → PASS.**
-- [ ] **Step 5: Write failing `render.test.ts`** per the render rules above (string-contains assertions against `renderPage` output).
-- [ ] **Step 6: Implement `core/render.ts`** — one exported `renderPage`, private `escapeHtml` (`&<>"'`), inline `<style>` block, no external assets (self-contained page).
-- [ ] **Step 7: `bun run check` (viewer) → PASS. Commit:**
+- [ ] **Step 4: Run to verify pass** — `bun test core/derive.test.ts` — Expected: PASS (all fixture cases).
+- [ ] **Step 5: Write failing `render.test.ts`** per the render rules above (string-contains assertions against `renderPage` output). Run: `bun test core/render.test.ts` — Expected: FAIL (module `./render.ts` missing).
+- [ ] **Step 6: Implement `core/render.ts`** — one exported `renderPage`, private `escapeHtml` (`&<>"'`), inline `<style>` block, no external assets (self-contained page). Run: `bun test core/render.test.ts` — Expected: PASS.
+- [ ] **Step 7: Commit**
+
+Run: `cd plugins/tribe/scripts/viewer && bun run check` — Expected: tsc clean, all tests PASS.
 
 ```bash
 git add plugins/tribe/scripts/viewer
@@ -674,7 +677,9 @@ console.log(`tribe viewer: http://127.0.0.1:${port} (root: ${tribeRoot}) — rea
 ```
 
 - [ ] **Step 6: Manual smoke** — `bun serve.ts --tribe-root <the adapter test's temp tree> --port 4399` + `curl -s 127.0.0.1:4399 | grep -c CRASHED` — Expected: ≥1. Record the transcript in the task report.
-- [ ] **Step 7: `bun run check` → PASS. Commit:**
+- [ ] **Step 7: Commit**
+
+Run: `cd plugins/tribe/scripts/viewer && bun run check` — Expected: tsc clean, all tests PASS.
 
 ```bash
 git add plugins/tribe/scripts/viewer
@@ -697,8 +702,8 @@ git commit -m "feat(viewer): tribe-root scan adapter + 127.0.0.1 refresh server 
 
 - [ ] **Step 1: Write the failing test script.** Harness: `mktemp -d`; `export HOME="$TMP/home"`; fixture repo `git init`; seed `.claude/state/camp1/reports/C1.md`. Cases: (a) `--dry-run` moves nothing, prints the would-move line; (b) real run moves the file to `$HOME/.tribe/<key>/campaigns/camp1/reports/C1.md` and empties the source; (c) re-run is a no-op exit 0 (idempotent); (d) destination pre-seeded with different content → `CONFLICT`, exit 1, source untouched; (e) live lock: write `docs/x/camp1/.runner.lock` containing `{"pid":$$,...}` → refusal, exit 1, file not moved. Run: `bash scripts/tests/test-migrate-campaign-home.sh` — Expected: FAIL (script missing).
 - [ ] **Step 2: Implement the script** (`set -euo pipefail`, pid extraction via `grep -o '"pid":[0-9]*' | grep -o '[0-9]*'` — no jq dependency).
-- [ ] **Step 3: Test → PASS.** Also run `bash scripts/tests/test-migrate-state.sh` to prove the sibling still passes.
-- [ ] **Step 4: Commit:**
+- [ ] **Step 3: Run to verify pass** — `bash scripts/tests/test-migrate-campaign-home.sh` — Expected: PASS (all cases a-e). Also run `bash scripts/tests/test-migrate-state.sh` — Expected: PASS (sibling script still passes, untouched).
+- [ ] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/scripts/migrate-campaign-home.sh plugins/tribe/scripts/tests/test-migrate-campaign-home.sh
@@ -717,12 +722,12 @@ git commit -m "feat(tribe): migrate old .claude/state worker reports into the ca
 - Verify: `install.sh` — confirm nothing new needs linking (viewer/migration are repo-invoked); record the verification in the task report. If that assumption is wrong, add the linking and update this plan's Global Constraints note in the same commit.
 
 - [ ] **Step 1: Make the doc edits above.** Every claim written into the README must be verified against the merged code, not this plan (the README's own standard: "verified against the code, not asserted from memory").
-- [ ] **Step 2: Doc-consistency gate** — `grep -rn "\.claude/state" plugins/tribe/ | grep -v tests` returns only the migration script + its docs (the old location may be referenced there as the *source* being migrated), and `grep -n "home" plugins/tribe/scripts/runner/README.md` shows the required-flag row.
+- [ ] **Step 2: Doc-consistency gate** — Run: `grep -rn "\.claude/state" plugins/tribe/ | grep -v tests` — Expected: only the migration script + its docs appear (the old location may be referenced there as the *source* being migrated). Run: `grep -n "home" plugins/tribe/scripts/runner/README.md` — Expected: shows the required-flag row.
 - [ ] **Step 3: Live smoke (spec §10 — the runner README's own discipline: mocked tests validate logic, not invocations).** In a disposable target repo (or a scoped `--cards <id> --max-cards 1 --dry-run` first against a fixture campaign):
-  1. Real runner invocation with `--home "$($PWD/plugins/tribe/scripts/tribe-home.sh <fixture-repo>)/campaigns/smoke"` → assert `run.json` exists with `endedAt` non-null after exit, `reports/` dir exists.
-  2. `--dry-run` → assert **nothing** was created under the home (`find <home> -newer <marker>` empty).
-  3. Start the viewer against the real `~/.tribe` → browser/`curl` shows the smoke campaign with an `EXITED` badge; paste the HTML snippet into the task report.
-- [ ] **Step 4: Commit:**
+  1. Real runner invocation with `--home "$($PWD/plugins/tribe/scripts/tribe-home.sh <fixture-repo>)/campaigns/smoke"` — Expected: `run.json` exists with `endedAt` non-null after exit, `reports/` dir exists.
+  2. `--dry-run` — Expected: **nothing** created under the home (`find <home> -newer <marker>` empty).
+  3. Start the viewer against the real `~/.tribe` — Expected: browser/`curl` shows the smoke campaign with an `EXITED` badge; paste the HTML snippet into the task report.
+- [ ] **Step 4: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/README.md plugins/tribe/skills/orchestrate-campaign/SKILL.md plugins/tribe/README.md .c3/c3-2-plugins/c3-215-tribe.md
