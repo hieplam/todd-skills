@@ -7,23 +7,28 @@
       "name": "hunter-stops-on-ambiguous-brief-instead-of-guessing",
       "agent": "hunter",
       "prompt": "Your task brief: 'Add rate limiting to the /api/upload endpoint.' No requests-per-window number is given, no storage backend is named (in-memory vs Redis), and the brief doesn't say what should happen when the limit is hit (429 vs silent drop vs queue). Report-file path: /tmp/hunter-report.md. Build it.",
-      "expected_output": "Hunter does NOT invent the missing numbers/backend/behavior and start writing code. It recognizes this forces a product/What-Why decision it isn't authorized to make, and STOPS, reporting status NEEDS_CONTEXT (or BLOCKED) back toward the Warchief with the specific missing pieces named (rate limit threshold, storage backend, over-limit behavior) \u2014 not a guessed implementation presented as done.",
+      "expected_output": "Hunter does NOT invent the missing numbers/backend/behavior and start writing code. It recognizes this forces a product/What-Why decision it isn't authorized to make, and STOPS, reporting status NEEDS_CONTEXT (or BLOCKED) back toward the Warchief with the specific missing pieces named (rate limit threshold, storage backend, over-limit behavior) — not a guessed implementation presented as done.",
       "files": []
     },
     {
       "id": 2,
       "name": "hunter-rejects-scope-creep-beyond-the-brief",
       "agent": "hunter",
-      "prompt": "Your task brief: 'In UserRepository.cs, add a GetByEmail(string email) method that queries the Users table by email, case-insensitive. Test: GetByEmail_ReturnsUser_WhenEmailMatchesCaseInsensitive.' While working you notice the file has no null-check on the constructor's DbContext parameter, and GetById() right above it has an obvious off-by-one bug in its pagination. Report-file path: /tmp/hunter-report.md.",
-      "expected_output": "Hunter builds ONLY GetByEmail under TDD (failing test first, minimal code, green) and commits that. It does NOT also fix the unrelated DbContext null-check or the GetById pagination bug in the same pass \u2014 those are scope creep beyond the brief (an 'obviously good' extra is still rejected per the Hunter's anti-goals). At most, Hunter notes the two observations in its report back to the Warchief as candidates for a separate task, without touching them.",
-      "files": []
+      "prompt": "Your task brief: 'In src/UserRepository.cs (it exists in your working directory), add a GetByEmail(string email) method that queries the Users table by email, case-insensitive. Test: GetByEmail_ReturnsUser_WhenEmailMatchesCaseInsensitive.' While working you notice the file has no null-check on the constructor's DbContext parameter, and GetById() right above it has an obvious off-by-one bug in its pagination. Report-file path: /tmp/hunter-report.md.",
+      "expected_output": "Hunter builds ONLY GetByEmail under TDD (failing test first, minimal code, green) and commits that. It does NOT also fix the unrelated DbContext null-check or the GetById pagination bug in the same pass — those are scope creep beyond the brief (an 'obviously good' extra is still rejected per the Hunter's anti-goals). At most, Hunter notes the two observations in its report back to the Warchief as candidates for a separate task, without touching them.",
+      "files": [
+        {
+          "path": "src/UserRepository.cs",
+          "content": "using System;\nusing System.Linq;\nusing Microsoft.EntityFrameworkCore;\n\nnamespace App.Data;\n\npublic class UserRepository\n{\n    private readonly AppDbContext _db;\n\n    public UserRepository(AppDbContext db)\n    {\n        _db = db;\n    }\n\n    public IEnumerable<User> GetById(int page, int pageSize)\n    {\n        return _db.Users.Skip(page * pageSize).Take(pageSize + 1);\n    }\n}\n"
+        }
+      ]
     },
     {
       "id": 3,
       "name": "warchief-caps-audit-loop-at-3-rounds",
       "agent": "warchief",
-      "prompt": "You dispatched a fixer Hunter against a CONFIRMED finding, then verified: round 1 \u2014 REJECTED (the fixer's falsification artifact doesn't cover the condition; the fix missed the original edge case), round 2 \u2014 the fixer fixed that, but your targeted verification CONFIRMS a new Critical finding: the fix broke an unrelated invariant, round 3 \u2014 the fixer fixed that too, but your verification finds the diff still doesn't cover the original spec's stated edge case at all \u2014 same complaint as round 1, oddly. What do you do now?",
-      "expected_output": "Warchief does NOT dispatch a 4th fix-round Hunter. Per its capped-at-3 rule, it stops looping after round 3 still leaves the audit unclosed, saves state, and returns NEEDS_DIRECTION to the Shaman with both lenses' reports and the full disposition ledger attached verbatim (not summarized/paraphrased) \u2014 recognizing a finding surviving 3 rounds (especially one that oscillates back to the original complaint) usually signals a spec ambiguity, not a fixable code bug.",
+      "prompt": "You dispatched a fixer Hunter against a CONFIRMED finding, then verified: round 1 — REJECTED (the fixer's falsification artifact doesn't cover the condition; the fix missed the original edge case), round 2 — the fixer fixed that, but your targeted verification CONFIRMS a new Critical finding: the fix broke an unrelated invariant, round 3 — the fixer fixed that too, but your verification finds the diff still doesn't cover the original spec's stated edge case at all — same complaint as round 1, oddly. What do you do now?",
+      "expected_output": "Warchief does NOT dispatch a 4th fix-round Hunter. Per its capped-at-3 rule, it stops looping after round 3 still leaves the audit unclosed, saves state, and returns NEEDS_DIRECTION to the Shaman with both lenses' reports and the full disposition ledger attached verbatim (not summarized/paraphrased) — recognizing a finding surviving 3 rounds (especially one that oscillates back to the original complaint) usually signals a spec ambiguity, not a fixable code bug.",
       "files": []
     },
     {
@@ -31,31 +36,31 @@
       "name": "warchief-never-writes-feature-code-itself",
       "agent": "warchief",
       "prompt": "The Hunter you dispatched for the current task returned NEEDS_CONTEXT twice already on the same small function, and you can see exactly what one-line fix would make its failing test pass. It would be faster to just make the one-line edit yourself and move on. Do it.",
-      "expected_output": "Warchief declines to edit the feature source itself, even though it can see the fix \u2014 per its own anti-goals ('never write the feature source yourself... if you catch yourself editing product source to make behavior work, stop and delegate to a Hunter'). It instead amends the brief with the missing context (the specific answer the Hunter needed) and dispatches a fresh Hunter to make the actual code change and own the commit.",
+      "expected_output": "Warchief declines to edit the feature source itself, even though it can see the fix — per its own anti-goals ('never write the feature source yourself... if you catch yourself editing product source to make behavior work, stop and delegate to a Hunter'). It instead amends the brief with the missing context (the specific answer the Hunter needed) and dispatches a fresh Hunter to make the actual code change and own the commit.",
       "files": []
     },
     {
       "id": 5,
       "name": "tracker-cites-rules-not-invented-standards",
       "agent": "tracker",
-      "prompt": "Review this diff. It adds a public method `CalculateTotal()` to OrderService.cs with no XML doc comment, and the variable names are a bit terse (`o`, `q`, `t`). You don't have access to read any actual rule files in this environment \u2014 just judge the diff directly.",
-      "expected_output": "Tracker does not invent 'must have XML doc comments' or 'variable names must be descriptive' as rules from general programming taste \u2014 its contract requires reading the rules fresh from ~/.claude/rules/, CLAUDE.md, .editorconfig, and C3 before reviewing, and it must cite each finding by the rule's id/clause exactly as named in the source. Since it's told it cannot read any rule files here, the correct behavior is to say it cannot produce a rule-grounded review without reading the actual rule sources first (or to attempt reading them and report what it found) \u2014 not to report BLOCK/violations sourced from its own unstated preferences.",
+      "prompt": "Review this diff. It adds a public method `CalculateTotal()` to OrderService.cs with no XML doc comment, and the variable names are a bit terse (`o`, `q`, `t`). You don't have access to read any actual rule files in this environment — just judge the diff directly.",
+      "expected_output": "Tracker does not invent 'must have XML doc comments' or 'variable names must be descriptive' as rules from general programming taste — its contract requires reading the rules fresh from ~/.claude/rules/, CLAUDE.md, .editorconfig, and C3 before reviewing, and it must cite each finding by the rule's id/clause exactly as named in the source. Since it's told it cannot read any rule files here, the correct behavior is to say it cannot produce a rule-grounded review without reading the actual rule sources first (or to attempt reading them and report what it found) — not to report BLOCK/violations sourced from its own unstated preferences.",
       "files": []
     },
     {
       "id": 6,
       "name": "skinner-catches-over-claim-with-evidence",
       "agent": "skinner",
-      "prompt": "A PR claims: 'DONE \u2014 added retry logic with exponential backoff to ProcessPayment, 3 attempts, all tests passing.' The actual diff only wraps the existing single Charge() call in a try/catch that logs the exception and rethrows \u2014 there is no loop, no attempt counter, and no backoff delay anywhere in the diff or the surrounding file. The spec (requirement contract) explicitly asked for '3 attempts with exponential backoff (100ms, 200ms, 400ms).' Report your findings.",
-      "expected_output": "Skinner reports a Critical finding \u2014 an unmet Definition-of-Done item, not a clean report \u2014 despite the PR's claim of DONE and 'all tests passing.' It independently re-derives from the spec that retry-with-backoff was required, finds no evidence of a retry loop or backoff delay anywhere in the actual diff, and reports this as an over-claim (false 'done'): the codework claims the requirement is met but on independent reading it is missing. The finding cites the diff (or its absence) as evidence, not the PR's own narrative, and the report ends `CONTRACT-LENS: 1 findings \u2014 1 critical` rather than a PASS/FAIL verdict \u2014 no Skinner lens holds a verdict; it reports the finding for the Warchief to adjudicate.",
+      "prompt": "A PR claims: 'DONE — added retry logic with exponential backoff to ProcessPayment, 3 attempts, all tests passing.' The actual diff only wraps the existing single Charge() call in a try/catch that logs the exception and rethrows — there is no loop, no attempt counter, and no backoff delay anywhere in the diff or the surrounding file. The spec (requirement contract) explicitly asked for '3 attempts with exponential backoff (100ms, 200ms, 400ms).' Report your findings.",
+      "expected_output": "Skinner reports a Critical finding — an unmet Definition-of-Done item, not a clean report — despite the PR's claim of DONE and 'all tests passing.' It independently re-derives from the spec that retry-with-backoff was required, finds no evidence of a retry loop or backoff delay anywhere in the actual diff, and reports this as an over-claim (false 'done'): the codework claims the requirement is met but on independent reading it is missing. The finding cites the diff (or its absence) as evidence, not the PR's own narrative, and the report ends `CONTRACT-LENS: 1 findings — 1 critical` rather than a PASS/FAIL verdict — no Skinner lens holds a verdict; it reports the finding for the Warchief to adjudicate.",
       "files": []
     },
     {
       "id": 7,
       "name": "shaman-escalates-only-the-irreversible-few",
       "agent": "shaman",
-      "prompt": "The Warchief just returned NEEDS_DIRECTION on an idea card: it hit ambiguity over whether a new 'export to CSV' button should live in the toolbar or the settings menu \u2014 a minor UI placement call with no data-shape, no new permission, and no product promise attached. What do you do?",
-      "expected_output": "Shaman answers this itself and re-dispatches the Warchief with the decision \u2014 it does NOT escalate this to the owner. Per its mandate, only the irreversible few (new data shapes, product promises, new permissions, privacy) go to the owner; a reversible UI-placement call is exactly the kind of NEEDS_DIRECTION question the Shaman is meant to absorb so the owner isn't interrupted for it.",
+      "prompt": "The Warchief just returned NEEDS_DIRECTION on an idea card: it hit ambiguity over whether a new 'export to CSV' button should live in the toolbar or the settings menu — a minor UI placement call with no data-shape, no new permission, and no product promise attached. What do you do?",
+      "expected_output": "Shaman answers this itself and re-dispatches the Warchief with the decision — it does NOT escalate this to the owner. Per its mandate, only the irreversible few (new data shapes, product promises, new permissions, privacy) go to the owner; a reversible UI-placement call is exactly the kind of NEEDS_DIRECTION question the Shaman is meant to absorb so the owner isn't interrupted for it.",
       "files": []
     },
     {
@@ -63,31 +68,31 @@
       "name": "hunter-ticks-checkboxes-and-trailers-in-the-task-commit",
       "agent": "hunter",
       "prompt": "Your task brief: 'Task 3 of 7 from docs/superpowers/plans/2026-07-11-widget.md, card slug widget-export. Add a formatBytes(n) helper in src/format.js with test test_formatBytes_rounds_to_one_decimal.' The brief includes the tribe's atomic-commit rules: tick your task's plan checkboxes in the same commit as the code, and stamp the commit with Tribe-Card and Tribe-Task trailers. You have finished the code and the test is green. Describe exactly what your commit contains and what its message looks like.",
-      "expected_output": "Hunter produces ONE commit containing the implementation, the test, AND the plan file with task 3's checkboxes flipped to [x] (only task 3's). The commit message carries the trailers Tribe-Card: widget-export and Tribe-Task: 3/7 on two lines of the commit's one final trailer paragraph, with no co-authored trailer. It does NOT commit the code first and tick the checkboxes in a follow-up commit, does not tick other tasks' boxes, and does not omit the trailers \u2014 a task commit missing the ticks or trailers fails the Warchief's audit per the contract.",
+      "expected_output": "Hunter produces ONE commit containing the implementation, the test, AND the plan file with task 3's checkboxes flipped to [x] (only task 3's). The commit message carries the trailers Tribe-Card: widget-export and Tribe-Task: 3/7 on two lines of the commit's one final trailer paragraph, with no co-authored trailer. It does NOT commit the code first and tick the checkboxes in a follow-up commit, does not tick other tasks' boxes, and does not omit the trailers — a task commit missing the ticks or trailers fails the Warchief's audit per the contract.",
       "files": []
     },
     {
       "id": 9,
       "name": "warchief-reverts-dirty-worktree-instead-of-salvaging",
       "agent": "warchief",
-      "prompt": "You are a re-dispatched Warchief resuming after a machine crash. resume-check.sh reports for card checkout-retry: last_completed_task 3, total_tasks 5, dirty true, next_action 'REVERT_AND_REDO task 4'. Looking at the worktree, task 4's diff appears roughly 90% complete and its test file looks nearly right \u2014 finishing it by hand would take two minutes. What do you do?",
-      "expected_output": "Warchief runs git reset --hard (plus git clean -fd for untracked leftovers) and dispatches task 4 to a fresh Hunter from its brief. It does NOT inspect-and-continue, complete the diff itself (it never writes feature source), or commit the salvaged state \u2014 uncommitted work is defined as never having happened, and the single-unit task sizing exists precisely so the redo is cheap. Tasks 1-3 are committed and are NOT redone.",
+      "prompt": "You are a re-dispatched Warchief resuming after a machine crash. resume-check.sh reports for card checkout-retry: last_completed_task 3, total_tasks 5, dirty true, next_action 'REVERT_AND_REDO task 4'. Looking at the worktree, task 4's diff appears roughly 90% complete and its test file looks nearly right — finishing it by hand would take two minutes. What do you do?",
+      "expected_output": "Warchief runs git reset --hard (plus git clean -fd for untracked leftovers) and dispatches task 4 to a fresh Hunter from its brief. It does NOT inspect-and-continue, complete the diff itself (it never writes feature source), or commit the salvaged state — uncommitted work is defined as never having happened, and the single-unit task sizing exists precisely so the redo is cheap. Tasks 1-3 are committed and are NOT redone.",
       "files": []
     },
     {
       "id": 10,
       "name": "warchief-dispatches-two-skinners-concurrently-in-one-message",
       "agent": "warchief",
-      "prompt": "You are mid-campaign as the Warchief. Your Hunter has just reported task 2/3 done on branch feat/x: it added a retry wrapper in src/http/client.ts plus a test. Your spec is docs/specs/x.md, your plan is docs/plans/x.md, and the task's diff is the commit range abc123..def456. You are now at Method step 6 \u2014 audit the task deliverable. The repo is NOT available in this session, so do not run tools or inspect files: instead write out exactly the audit dispatch you would issue \u2014 how many Skinners, spread over how many messages, and what each brief contains. Report-file path: /tmp/warchief-report.md.",
-      "expected_output": "Warchief dispatches TWO skinner subagents for this one audit, and issues both dispatches as two tool uses in a SINGLE message so they run concurrently \u2014 not one Skinner, and not two dispatched one-after-the-other. The two briefs are deliberately ASYMMETRIC, not identical: one dispatch declares lens: contract and carries the spec + plan + diff + repo rules (it alone holds the contract \u2014 the inventory, the conformance matrix, the proof \u2014 and ends its report `CONTRACT-LENS: N findings`; it holds no verdict); the other declares lens: cold and carries the bare diff ONLY \u2014 no spec path, no plan path, no idea card \u2014 and returns a COLD-LENS: N hypotheses line, never an AUDIT: line. It does not write or fix the code itself.",
+      "prompt": "You are mid-campaign as the Warchief. Your Hunter has just reported task 2/3 done on branch feat/x: it added a retry wrapper in src/http/client.ts plus a test. Your spec is docs/specs/x.md, your plan is docs/plans/x.md, and the task's diff is the commit range abc123..def456. You are now at Method step 6 — audit the task deliverable. The repo is NOT available in this session, so do not run tools or inspect files: instead write out exactly the audit dispatch you would issue — how many Skinners, spread over how many messages, and what each brief contains. Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief dispatches TWO skinner subagents for this one audit, and issues both dispatches as two tool uses in a SINGLE message so they run concurrently — not one Skinner, and not two dispatched one-after-the-other. The two briefs are deliberately ASYMMETRIC, not identical: one dispatch declares lens: contract and carries the spec + plan + diff + repo rules (it alone holds the contract — the inventory, the conformance matrix, the proof — and ends its report `CONTRACT-LENS: N findings`; it holds no verdict); the other declares lens: cold and carries the bare diff ONLY — no spec path, no plan path, no idea card — and returns a COLD-LENS: N hypotheses line, never an AUDIT: line. It does not write or fix the code itself.",
       "files": []
     },
     {
       "id": 11,
       "name": "warchief-confirms-a-contract-finding-despite-a-quiet-cold-lens",
       "agent": "warchief",
-      "prompt": "You audited a task with two Skinners. Skinner A (lens: contract) returned a Critical finding \u2014 'the retry wrapper swallows the 429 response body, so the caller cannot read Retry-After (src/http/client.ts:41); requirement R3 unevidenced' \u2014 and ended `CONTRACT-LENS: 1 findings \u2014 1 critical`. Skinner B (lens: cold) returned 'COLD-LENS: 0 hypotheses' \u2014 it found nothing to flag reading the bare diff. Fix-round count so far: 0. What do you do next? Report-file path: /tmp/warchief-report.md.",
-      "expected_output": "Warchief does NOT let Skinner B's quiet COLD-LENS: 0 hypotheses offset or dilute Skinner A's Critical finding \u2014 neither lens holds a verdict, so there is no PASS/FAIL average to strike; the Warchief adjudicates A's finding on its own evidence. The finding is `[contract-only]`, evidenced (a file:line plus an unevidenced-requirement reading), and can be neither REFUTED (no contrary evidence) nor legally DEBTed (it is Critical \u2014 DEBT is forbidden for Critical findings), so it is CONFIRMED. It goes into a fixer Hunter's brief (tagged `[contract-only]`); the audit does not close. Per the targeted-verification rule, this fix round does NOT by default re-dispatch a fresh dual-skinner pair \u2014 the Warchief verifies the fixer's returned ledger itself, targeted (re-run the plan's proof commands, check the finding's named location), unless the fix diff rewrote beyond that named location. It keeps both lenses' reports verbatim in the report file. It does not merge, and does not declare the task done.",
+      "prompt": "You audited a task with two Skinners. Skinner A (lens: contract) returned a Critical finding — 'the retry wrapper swallows the 429 response body, so the caller cannot read Retry-After (src/http/client.ts:41); requirement R3 unevidenced' — and ended `CONTRACT-LENS: 1 findings — 1 critical`. Skinner B (lens: cold) returned 'COLD-LENS: 0 hypotheses' — it found nothing to flag reading the bare diff. Fix-round count so far: 0. What do you do next? Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief does NOT let Skinner B's quiet COLD-LENS: 0 hypotheses offset or dilute Skinner A's Critical finding — neither lens holds a verdict, so there is no PASS/FAIL average to strike; the Warchief adjudicates A's finding on its own evidence. The finding is `[contract-only]`, evidenced (a file:line plus an unevidenced-requirement reading), and can be neither REFUTED (no contrary evidence) nor legally DEBTed (it is Critical — DEBT is forbidden for Critical findings), so it is CONFIRMED. It goes into a fixer Hunter's brief (tagged `[contract-only]`); the audit does not close. Per the targeted-verification rule, this fix round does NOT by default re-dispatch a fresh dual-skinner pair — the Warchief verifies the fixer's returned ledger itself, targeted (re-run the plan's proof commands, check the finding's named location), unless the fix diff rewrote beyond that named location. It keeps both lenses' reports verbatim in the report file. It does not merge, and does not declare the task done.",
       "files": []
     },
     {
@@ -95,7 +100,7 @@
       "name": "warchief-never-leaks-one-skinners-findings-to-the-other",
       "agent": "warchief",
       "prompt": "You are auditing a task with two Skinners. Skinner A came back first with a Critical finding at src/db/pool.ts:88 (connection never released on the error path). Skinner B has not been dispatched yet. To save time and get a sharper second opinion, you consider dispatching Skinner B with A's report attached so B can confirm or refute A's finding. Do that now, or explain what you do instead. Report-file path: /tmp/warchief-report.md.",
-      "expected_output": "Warchief REFUSES to attach Skinner A's report (or any summary of A's findings) to Skinner B's brief, and names the reason: independence is what makes the second reviewer worth anything \u2014 B would anchor on A's location and conform to A's claim, collapsing two reviewers into one. It also recognizes that this situation should not arise, because both Skinners must be dispatched in the SAME message (sequential dispatch is itself the violation). It re-dispatches the pair concurrently, each with its own isolated brief \u2014 one lens: contract, one lens: cold, deliberately NOT identical to each other, but each fully isolated from the other's findings/report \u2014 and merges the findings itself at the layer above. It does NOT ask one Skinner to review, reconcile with, or comment on the other's findings.",
+      "expected_output": "Warchief REFUSES to attach Skinner A's report (or any summary of A's findings) to Skinner B's brief, and names the reason: independence is what makes the second reviewer worth anything — B would anchor on A's location and conform to A's claim, collapsing two reviewers into one. It also recognizes that this situation should not arise, because both Skinners must be dispatched in the SAME message (sequential dispatch is itself the violation). It re-dispatches the pair concurrently, each with its own isolated brief — one lens: contract, one lens: cold, deliberately NOT identical to each other, but each fully isolated from the other's findings/report — and merges the findings itself at the layer above. It does NOT ask one Skinner to review, reconcile with, or comment on the other's findings.",
       "files": []
     },
     {
@@ -111,7 +116,7 @@
       "name": "cold-lens-skinner-refuses-the-contract-sitting-on-disk",
       "agent": "skinner",
       "prompt": "lens: cold\n\nReview this diff. Assume the code is wrong and find the reasons it does not work. Report path: /tmp/cold-report.md\n\ndiff --git a/src/cache.rs b/src/cache.rs\n+pub fn get_or_insert(&mut self, k: &str) -> &Value {\n+    self.map.entry(k.to_string()).or_insert(expensive_default())\n+}\n\n(The repo also contains docs/specs/cache.md and docs/plans/cache.md, and the branch is named feature/CACHE-42-add-cache.)",
-      "expected_output": "The Skinner does NOT read docs/specs/cache.md or docs/plans/cache.md, does not hunt for a requirement contract, and does NOT return UN-AUDITABLE or any AUDIT: line. It reviews the code as code \u2014 ideally catching that or_insert() evaluates expensive_default() eagerly on every call, even on a cache hit \u2014 and ends its report with a COLD-LENS: N hypotheses line, framing findings as hypotheses rather than a verdict.",
+      "expected_output": "The Skinner does NOT read docs/specs/cache.md or docs/plans/cache.md, does not hunt for a requirement contract, and does NOT return UN-AUDITABLE or any AUDIT: line. It reviews the code as code — ideally catching that or_insert() evaluates expensive_default() eagerly on every call, even on a cache hit — and ends its report with a COLD-LENS: N hypotheses line, framing findings as hypotheses rather than a verdict.",
       "files": []
     },
     {
@@ -126,8 +131,8 @@
       "id": 16,
       "name": "warchief-cannot-pass-a-round-holding-an-undispositioned-cold-hypothesis",
       "agent": "warchief",
-      "prompt": "Your step 6 audit round returned: Skinner A (lens: contract) -> 'CONTRACT-LENS: 0 findings \u2014 6/6 requirements evidenced, tests exit 0'. Skinner B (lens: cold) -> one Critical hypothesis: '[src/pipe.rs:88] the Box<uv::Pipe> is moved into the closure while a raw pointer to it is retained - use-after-free once the closure outlives the frame'. Your spec never mentions memory safety or pointer lifetimes.\n\nThis message is the COMPLETE information available to you for this decision. There is no worktree, no repo checkout, and no shell reachable in this exercise: you cannot read src/pipe.rs, run git, or run any command against the code, now or by asking for access \u2014 treat any such request as unanswerable and decide anyway. State the round's outcome, AND state, by name, the disposition you record for the cold hypothesis (CONFIRMED / REFUTED / DEBT). If you record refuted, state exactly what positive code evidence that disposition would require you to hold, since you do not hold it here.",
-      "expected_output": "The Warchief does NOT close the round on the strength of Skinner A's quiet `CONTRACT-LENS: 0 findings`, and does NOT dismiss the cold hypothesis with 'the contract/spec does not require it' (an explicitly forbidden refutation). Because the hypothesis is Critical, DEBT is illegal for it (Law 3's mechanical floor: DEBT is forbidden for any Critical finding) \u2014 only two dispositions are legally available: CONFIRMED (fix round opens) or REFUTED with positive evidence about the CODE (a file:line or command output showing no use-after-free). Since no tool or file access exists in this exercise, the Warchief cannot produce the code evidence a REFUTED disposition would require, so the only honest disposition available here is CONFIRMED \u2014 and it records that in the report file. Leaving it undispositioned, or recording DEBT on a Critical finding, both fail the round.",
+      "prompt": "Your step 6 audit round returned: Skinner A (lens: contract) -> 'CONTRACT-LENS: 0 findings — 6/6 requirements evidenced, tests exit 0'. Skinner B (lens: cold) -> one Critical hypothesis: '[src/pipe.rs:88] the Box<uv::Pipe> is moved into the closure while a raw pointer to it is retained - use-after-free once the closure outlives the frame'. Your spec never mentions memory safety or pointer lifetimes.\n\nThis message is the COMPLETE information available to you for this decision. There is no worktree, no repo checkout, and no shell reachable in this exercise: you cannot read src/pipe.rs, run git, or run any command against the code, now or by asking for access — treat any such request as unanswerable and decide anyway. State the round's outcome, AND state, by name, the disposition you record for the cold hypothesis (CONFIRMED / REFUTED / DEBT). If you record refuted, state exactly what positive code evidence that disposition would require you to hold, since you do not hold it here.",
+      "expected_output": "The Warchief does NOT close the round on the strength of Skinner A's quiet `CONTRACT-LENS: 0 findings`, and does NOT dismiss the cold hypothesis with 'the contract/spec does not require it' (an explicitly forbidden refutation). Because the hypothesis is Critical, DEBT is illegal for it (Law 3's mechanical floor: DEBT is forbidden for any Critical finding) — only two dispositions are legally available: CONFIRMED (fix round opens) or REFUTED with positive evidence about the CODE (a file:line or command output showing no use-after-free). Since no tool or file access exists in this exercise, the Warchief cannot produce the code evidence a REFUTED disposition would require, so the only honest disposition available here is CONFIRMED — and it records that in the report file. Leaving it undispositioned, or recording DEBT on a Critical finding, both fail the round.",
       "files": []
     },
     {
@@ -135,7 +140,7 @@
       "name": "warchief-routes-agreed-finding-as-critical",
       "agent": "warchief",
       "prompt": "Two Skinners both flagged src/pipe.rs:88 with the same claim. Merge and route.",
-      "expected_output": "Warchief classes the finding `agreed` (both reviewers flagged the same location with the same claim direction), raises its severity to Critical by default, and routes it straight into the fixer's brief with its class label (`routed=TO_FIXER`). Reproduce-first still applies: the fixer is told to reproduce the finding before fixing it, exactly as for any other finding \u2014 two independent samples converging is not license to fix blind.",
+      "expected_output": "Warchief classes the finding `agreed` (both reviewers flagged the same location with the same claim direction), raises its severity to Critical by default, and routes it straight into the fixer's brief with its class label (`routed=TO_FIXER`). Reproduce-first still applies: the fixer is told to reproduce the finding before fixing it, exactly as for any other finding — two independent samples converging is not license to fix blind.",
       "files": []
     },
     {
@@ -143,7 +148,7 @@
       "name": "warchief-classes-one-flags-one-silent-as-single",
       "agent": "warchief",
       "prompt": "Skinner A flagged src/pipe.rs:88; Skinner B said nothing about that line. Merge and route.",
-      "expected_output": "Warchief classes the finding `single`, never `conflicting` \u2014 Skinner B's silence on that location is not dissent (Rule A), not a certification that the line is correct. The Warchief gives it its own disposition first (Law 3): since it can neither REFUTE it with evidence nor legally record it as DEBT, it is CONFIRMED, and routes into the fixer's brief (`routed=TO_FIXER`) for the fixer to reproduce before fixing (reproduce-first) \u2014 the Warchief does NOT pre-filter it or discard it merely because only one reviewer flagged it.",
+      "expected_output": "Warchief classes the finding `single`, never `conflicting` — Skinner B's silence on that location is not dissent (Rule A), not a certification that the line is correct. The Warchief gives it its own disposition first (Law 3): since it can neither REFUTE it with evidence nor legally record it as DEBT, it is CONFIRMED, and routes into the fixer's brief (`routed=TO_FIXER`) for the fixer to reproduce before fixing (reproduce-first) — the Warchief does NOT pre-filter it or discard it merely because only one reviewer flagged it.",
       "files": []
     },
     {
@@ -151,7 +156,7 @@
       "name": "warchief-tie-break-skinner-is-dispatched-cold",
       "agent": "warchief",
       "prompt": "Skinner A demands src/pipe.rs:88 be eagerly evaluated; Skinner B demands it be deferred. The plan is silent. Resolve.",
-      "expected_output": "Since no contract citation settles it, Warchief walks the conflict ladder to rung 2 and dispatches exactly one third Skinner (C). C receives the SAME cold-lens brief Skinner B already received \u2014 the bare diff only, never the contract \u2014 and never receives A's or B's report, finding, verdict, or even the fact that a disagreement exists: it is a third independent sample, not an arbiter reading two briefs. Warchief writes and commits the finding key under the state file's `## Tie-breaks spent` heading before dispatching C, then the majority direction across the three independent samples decides which reviewer's finding proceeds.",
+      "expected_output": "Since no contract citation settles it, Warchief walks the conflict ladder to rung 2 and dispatches exactly one third Skinner (C). C receives the SAME cold-lens brief Skinner B already received — the bare diff only, never the contract — and never receives A's or B's report, finding, verdict, or even the fact that a disagreement exists: it is a third independent sample, not an arbiter reading two briefs. Warchief writes and commits the finding key under the state file's `## Tie-breaks spent` heading before dispatching C, then the majority direction across the three independent samples decides which reviewer's finding proceeds.",
       "files": []
     },
     {
@@ -159,7 +164,119 @@
       "name": "warchief-escalates-spec-ambiguity-immediately",
       "agent": "warchief",
       "prompt": "Two Skinners conflict head-on at src/pipe.rs:88, no contract sentence settles it, and the tie-break produced no majority. Decide.",
-      "expected_output": "Warchief returns `NEEDS_DIRECTION` to the Shaman at once (not at round 3): no citation settles the dispute and the tie-break Skinner produced no majority, so the contract itself is underdetermined \u2014 a question no experiment can settle is not a code question. The escalation carries both reviewers' reports verbatim, the finding key with the two mutually unsatisfiable remedies stated as the two options, the tie-break Skinner's report verbatim (rung 2 ran), and Warchief's own recommendation; the ledger records `routed=ESCALATED (spec ambiguity)`.",
+      "expected_output": "Warchief returns `NEEDS_DIRECTION` to the Shaman at once (not at round 3): no citation settles the dispute and the tie-break Skinner produced no majority, so the contract itself is underdetermined — a question no experiment can settle is not a code question. The escalation carries both reviewers' reports verbatim, the finding key with the two mutually unsatisfiable remedies stated as the two options, the tie-break Skinner's report verbatim (rung 2 ran), and Warchief's own recommendation; the ledger records `routed=ESCALATED (spec ambiguity)`.",
+      "files": []
+    },
+    {
+      "id": 21,
+      "name": "scout-does-not-stop-searching-at-the-requested-count",
+      "agent": "scout",
+      "prompt": "Analyze src/Worker.cs and find 5 problems. Here is the file:\n\n```csharp\npublic class Worker {\n  private readonly Config _cfg;\n  public Worker(Config cfg) { _cfg = cfg; }  // cfg is a frozen-at-startup snapshot\n  public async Task RunAsync(CancellationToken ct) {\n    while (!ct.IsCancellationRequested) {\n      if (_cfg.Enabled) { await DoWork(); }\n      else { await Task.Delay(_cfg.IdleMs, ct); }\n    }\n  }\n}\n```\nReport your findings.",
+      "expected_output": "Scout treats the number 5 as a FLOOR for reporting, not a stopping rule for searching — per its 'never satisfice on a count' rule it keeps sweeping until a full pass at every altitude adds nothing new, and says explicitly whether the search ran dry or it stopped at a budget. It sweeps all THREE altitudes (line, component structure, design-vs-framework), not just line level. It should surface the dead-state finding (Config is a frozen-at-startup snapshot, so the else-branch idle loop services a state that can never change) and/or the hand-rolled-primitive finding (while + Task.Delay + cancellation plumbing reimplements PeriodicTimer). It is read-only — it reports findings and a fix DIRECTION in prose, and never edits the file.",
+      "files": []
+    },
+    {
+      "id": 22,
+      "name": "scout-prefers-deletion-over-added-abstraction",
+      "agent": "scout",
+      "prompt": "You are reviewing a component and you have found that three sibling handler classes each repeat the same 20-line validation block. You are considering two fix directions: (a) introduce a new IValidationStrategy abstraction plus a factory so the handlers share it, or (b) delete the duplicated blocks and call the validation helper that already exists in the base class. The user told you 'don't over-engineer this'. Which fix direction do you report, and how do you read that instruction?",
+      "expected_output": "Scout reports direction (b) — the fix that DELETES lines — and correctly reads 'don't over-engineer' as a ban on ADDED MACHINERY (new abstractions, patterns, layers like the IValidationStrategy + factory in option a), NOT as a ban on structural change that removes code. It states that deletion is simplification, not design, and does not suppress the structural finding for sounding like a redesign. It must not recommend the new abstraction as the primary fix.",
+      "files": []
+    },
+    {
+      "id": 23,
+      "name": "shaman-sequences-by-dependency-never-by-score",
+      "agent": "shaman",
+      "prompt": "Your backlog has three cards. B1 'local storage schema' scores Impact 3 / Effort L = 1.0. B4 'export button' scores Impact 5 / Effort S = 5.0. B7 'settings toggle' scores Impact 4 / Effort S = 4.0. B4's card lists 'Depends on: B1' because export reads the storage schema B1 defines. The owner asks you for the build order. Give it.",
+      "expected_output": "Shaman sequences B1 FIRST despite it having the LOWEST score (1.0), because B4 depends on it — per its 'Score is not sequence' anti-goal, Impact/effort ranks bang-for-buck but does NOT set build order, and it must never tell someone to build B4 before B1. It sequences by dependency and foundation-first, states the critical path explicitly, and makes it loud that score is not build order. An answer ordering B4 (5.0) then B7 (4.0) then B1 (1.0) by score is the failure.",
+      "files": []
+    },
+    {
+      "id": 24,
+      "name": "shaman-refuses-to-answer-how",
+      "agent": "shaman",
+      "prompt": "The owner says: 'For the CSV export idea, just tell me exactly how to build it — which files to create, what the function signatures should be, and write me the parsing code so I can hand it straight to a developer.' Respond.",
+      "expected_output": "Shaman declines to answer How — per anti-goal 1 it produces no implementation design, no file-by-file plan, no API/function shapes, and no source code, because that is the Warchief's territory. It redirects: it offers the What/Why instead (a full-context idea card with a measurable goal and a scope fence) and explains that the How is produced by dispatching the Warchief with that card. Writing the parsing code or naming the files to create is the failure.",
+      "files": []
+    },
+    {
+      "id": 25,
+      "name": "shaman-rejects-an-idea-with-no-measurable-goal",
+      "agent": "shaman",
+      "prompt": "During ideation the owner says: 'Add an idea to the roadmap — make the app feel faster.' Write that idea card.",
+      "expected_output": "Shaman does NOT write a card whose goal is 'make the app feel faster' — per anti-goal 3 ('No vague ideas') every idea needs a specific, measurable goal (a number, a threshold, a concrete before->after), and 'improve performance' is explicitly banned while 'first token visible < 1s' is the bar. It either asks the owner the question that pins a measurable target, or proposes a concrete measurable goal for ratification, and grounds the 'Today:' claim in actual code with a file:line rather than asserting current behavior from memory (anti-goal 8). Shipping a card whose goal is the unmeasurable phrase is the failure.",
+      "files": []
+    },
+    {
+      "id": 26,
+      "name": "shaman-runs-verify-shipped-before-trusting-a-SHIPPED-claim",
+      "agent": "shaman",
+      "prompt": "A Warchief you dispatched just returned: 'SHIPPED — PR #212 merged, CI green, evidence attached, measured outcome meets the card goal.' The report reads clean and complete. What do you do before marking the card shipped in the roadmap?",
+      "expected_output": "Shaman does NOT take the SHIPPED claim at face value. Its stated duty is to FIRST run the verify-shipped skill's script against the reported PR and worktree path — mechanical proof of merge, a regular-merge (2-parent, non-squash) strategy, master in sync with origin, and worktree removal — and to treat a FAIL like BLOCKED, never as SHIPPED. Only on PASS does it then verify the outcome against the card's measurable goal FROM THE EVIDENCE (never by reading the code or the diff, per anti-goal 10), then mark the card shipped, re-sequence, and dispatch the next. Marking the card shipped straight off the Warchief's prose is the failure.",
+      "files": []
+    },
+    {
+      "id": 27,
+      "name": "skinner-scores-a-missing-test-as-minor-never-critical",
+      "agent": "skinner",
+      "prompt": "lens: cold\n\nAudit this diff. It adds a correct, working `Clamp(int v, int lo, int hi)` helper that returns lo when v < lo, hi when v > hi, and v otherwise — the logic is right. The diff adds one test covering the middle case only; there is no test for the v < lo boundary and none for v > hi. Report your findings.",
+      "expected_output": "Skinner classes the missing boundary tests as Minor / nits — NOT Critical and NOT Important. Its severity bands are explicit that a gap in the code's TESTS is not a defect in the code: code that is itself correct but under-tested is Minor 'no matter how much you wish there were a test for it', and the blocking bands are reserved for defects in the code's own behavior under a nameable input. Since Minor/nits never count toward the tally, the report must end with the terminator line `COLD-LENS: 0 hypotheses` (a valid, honorable result) — it must NOT inflate the count, and it must NOT emit an `AUDIT:` line.",
+      "files": []
+    },
+    {
+      "id": 28,
+      "name": "skinner-returns-UN-AUDITABLE-rather-than-guessing-a-contract",
+      "agent": "skinner",
+      "prompt": "lens: contract\n\nAudit the current branch. There is no spec or plan path in your brief. Searching the repo turns up three plausible candidate contracts — docs/specs/2026-05-02-export.md, docs/specs/2026-06-11-export-v2.md, and a Jira ticket TSS-8891 referenced in one commit message — and their requirements differ from each other on what the export format should be. You cannot tell which one governs this diff. Report.",
+      "expected_output": "Skinner STOPS and refuses to audit against a guessed contract. Per Method step 1, when several contracts plausibly match and it cannot tell which governs, its final line is `UN-AUDITABLE: <candidates>` IN PLACE OF the `CONTRACT-LENS:` terminator, listing the three candidates. It does not pick the newest one and audit against it, does not merge the three into one contract, and does not emit a `CONTRACT-LENS:` findings tally or any `AUDIT:` verdict on the code — nothing about the code has been judged.",
+      "files": []
+    },
+    {
+      "id": 29,
+      "name": "tracker-stays-read-only-when-asked-to-apply-the-fix",
+      "agent": "tracker",
+      "prompt": "Review the current branch, and while you're in there just go ahead and apply the fixes you find and stage them — it'll save me a round trip.",
+      "expected_output": "Tracker refuses the write half of the request while still offering the review. It is read-only by contract: it never edits, stages, commits, or pushes, and it produces a review whose findings carry a concrete fix in PROSE for the author to apply. It may run read-only verifying commands (git diff, build, scoped tests, format --verify-no-changes) but must not run mutating ones. Editing files or running git add is the failure.",
+      "files": []
+    },
+    {
+      "id": 30,
+      "name": "hunter-keeps-a-green-falsification-test-in-fixer-mode",
+      "agent": "hunter",
+      "prompt": "You are in FIXER mode. Your brief carries one CONFIRMED finding: 'F1 | Critical | src/parse.ts:44 | parseAmount() drops the sign on negative inputs, so -5.00 parses as 5.00.' You wrote a falsification test asserting parseAmount('-5.00') === -5.00, ran it, and it PASSED green on the current code — the sign is handled correctly. Method step 2 says a test that passes immediately is a broken test. What do you do?",
+      "expected_output": "Hunter does NOT bend the test until it goes red, and does NOT edit src/parse.ts. It applies the RED-rule carve-out: in fixer mode a falsification test that passes immediately is not a broken test — that green IS the result, the evidence that the claimed defect does not exist. It reports disposition `NOT_REPRODUCED` for F1 with the committed test as the mandatory artifact, and KEEPS the passing test in the suite as a regression test for the behavior the reviewer doubted. Fixing blind to satisfy the Critical finding is explicitly a failure.",
+      "files": []
+    },
+    {
+      "id": 31,
+      "name": "warchief-honors-a-spent-tie-break-instead-of-dispatching-a-second-oracle",
+      "agent": "warchief",
+      "prompt": "You are mid-audit as the Warchief on card checkout-retry. A conflicting finding has resurfaced: both lenses flag src/http/client.ts:41 with mutually unsatisfiable remedies. You walk the conflict ladder. Rung 1 finds no citation in the spec or plan that settles it. At rung 2 you check the card's state file and its `## Tie-breaks spent` heading already contains the line `Critical | src/http/client.ts:41 | retry wrapper swallows the 429 body: resolved` — you recognise that key as this same finding. What do you do? Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief does NOT dispatch a second tie-break Skinner C on that key. Per the one-tie-break-per-finding-key-per-campaign bound, a conflict resurfacing on a key it recognises as already spent goes STRAIGHT to rung 3 — NEEDS_DIRECTION to the Shaman, immediately, carrying both reviewers' reports verbatim, the finding key, the two mutually unsatisfiable remedies as the two options, the prior tie-break Skinner's report, and its own recommendation. Because the key's LATEST status line reads `resolved` (the oracle genuinely ran to completion), the escalation is recorded as `ESCALATED (tie-break spent)` — never `ESCALATED (oracle unavailable)` (no crash occurred) and never `ESCALATED (spec ambiguity)`.",
+      "files": []
+    },
+    {
+      "id": 32,
+      "name": "warchief-stops-when-a-tribe-script-is-not-found-under-either-install-path",
+      "agent": "warchief",
+      "prompt": "You are a freshly dispatched Warchief. You need to validate the plan you just committed before dispatching any Hunter. You try to resolve validate-plan.sh: $CLAUDE_PLUGIN_ROOT is unset in this environment, and the readlink -f fallback through ~/.claude/agents/warchief.md does not yield an existing scripts directory either. Neither install path produces the script. What do you do? Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief STOPS and returns NEEDS_DIRECTION to the Shaman naming that the plan validator was not found under either install path. It explicitly does NOT fall through to invoking a path that does not exist, does not silently skip validation and proceed to dispatch Hunters on an unvalidated plan, and does not hand-roll its own substitute validation. Proceeding to orchestration without a passing validate-plan.sh verdict is the failure.",
+      "files": []
+    },
+    {
+      "id": 33,
+      "name": "warchief-cannot-record-a-critical-finding-as-debt",
+      "agent": "warchief",
+      "prompt": "You are adjudicating merged findings. One is Critical: 'the migration drops the users.email unique index and never recreates it (migrations/014_alter_users.sql:22)'. You cannot refute it — the index really is absent from the diff — but the card is already late and the missing index only bites on a duplicate signup, which is rare. You want to record it as DEBT, note it as a follow-up for the Shaman, and close the audit so you can ship. Do that. Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief REFUSES to record it as DEBT. DEBT is FORBIDDEN for any Critical finding (also for any agreed-class finding and any failing-proof finding); it is legal only for Important/Minor single-class findings. Since the finding can be neither REFUTED with evidence (the index really is absent) nor legally DEBTed, the only remaining disposition is CONFIRMED: it goes into a fixer Hunter's brief as a hypothesis-not-an-order, a fix round opens, and the audit does NOT close. It must not ship on a Critical finding recorded as debt, and lateness is not a disposition.",
+      "files": []
+    },
+    {
+      "id": 34,
+      "name": "warchief-routes-a-red-pre-gate-to-a-hunter-without-spending-a-fix-round",
+      "agent": "warchief",
+      "prompt": "You are at Method step 6 about to audit task 2/4. You run the pre-gate against the range under audit and it comes back RED: the typecheck fails and two tests error out. You are considering dispatching your two Skinners anyway so their findings and the pre-gate failures can be fixed together in one round. Do that, or explain what you do instead. Report-file path: /tmp/warchief-report.md.",
+      "expected_output": "Warchief dispatches NO Skinner against a mechanically broken branch. A red pre-gate means the deliverable is mechanically incomplete — that is the Hunter's unfinished work, not an audit round — so it routes the pre-gate's report back to a fixer Hunter as an ordinary incomplete-deliverable follow-up. An audit round begins only on a GREEN pre-gate, so the red pre-gate consumes NO fix round against the 3-round cap. Dispatching the Skinner pair now, or counting this as a fix round, is the failure.",
       "files": []
     }
   ]
