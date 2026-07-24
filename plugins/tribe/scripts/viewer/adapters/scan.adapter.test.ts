@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, statSync, truncateSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scanTribeRoot } from './scan.adapter.ts';
+import { scanTribeRoot, processKillProbe, readTailBytes } from './scan.adapter.ts';
 import { deriveStatus } from '../core/derive.ts';
 
 /** Always-false probe — only campaign B (below) supplies a real always-true probe via
@@ -226,5 +226,113 @@ describe('scanTribeRoot', () => {
   test('nonexistent tribe-root: no throw, empty result', () => {
     const snapshots = scanTribeRoot('/nonexistent/tribe/root/path', deadProbe, '2026-07-24T06:13:59.000Z');
     expect(snapshots).toEqual([]);
+  });
+
+  test('F2 regression: newer run with null sibling paths is "latest" — badge reflects it, body is NOT silently backfilled from an older run', () => {
+    // An OLDER run with full sibling paths + real state data, and a NEWER run (later
+    // `startedAt`) whose `run.json` parses fine but simply omits statePath/escalationsDir/
+    // logsDir. Before the fix, `latestParsedRun`'s eligibility filter skipped the newer run
+    // (no sibling paths) and picked the older one for body content, while `latestRunOf` in
+    // `core/derive.ts` (unfiltered) picked the newer one for the liveness badge — a mismatch
+    // between what the badge says and what the page body shows.
+    const root = mkdtempSync(join(tmpdir(), 'tribe-viewer-f2-'));
+    const repoKey = 'repo';
+    const campaignsDir = join(root, repoKey, 'campaigns');
+    const home = join(campaignsDir, 'camp');
+    mkdirSync(home, { recursive: true });
+
+    const targetRepo = mkdtempSync(join(tmpdir(), 'tribe-viewer-f2-target-'));
+    const statePath = join(targetRepo, 'state.json');
+    writeFileSync(
+      statePath,
+      JSON.stringify({ sequence: ['C1'], cards: { C1: { status: 'shipped', pr: null, updatedAt: null, dependsOn: [] } } }),
+    );
+
+    writeRunJson(join(home, 'runs', '2026-07-01T00-00-00-000Z-old'), {
+      runId: '2026-07-01T00-00-00-000Z-old',
+      startedAt: '2026-07-01T00:00:00.000Z',
+      pid: 111,
+      endedAt: '2026-07-01T00:10:00.000Z',
+      exitCode: 0,
+      reason: 'done',
+      statePath,
+      escalationsDir: null,
+      logsDir: null,
+    });
+    writeRunJson(join(home, 'runs', '2026-07-24T00-00-00-000Z-new'), {
+      runId: '2026-07-24T00-00-00-000Z-new',
+      startedAt: '2026-07-24T00:00:00.000Z',
+      pid: 222,
+      endedAt: '2026-07-24T00:05:00.000Z',
+      exitCode: 1,
+      reason: 'escalations_pending',
+      // No statePath/escalationsDir/logsDir at all — the mismatch trigger.
+    });
+
+    const snapshots = scanTribeRoot(root, deadProbe, '2026-07-24T06:00:00.000Z');
+    const snap = snapshots.find((s) => s.campaignSlug === 'camp');
+    expect(snap).toBeDefined();
+
+    const status = deriveStatus(snap!);
+    // Badge (liveness) must reflect the NEWER run.
+    expect(status.liveness).toEqual({
+      kind: 'exited',
+      reason: 'escalations_pending',
+      exitCode: 1,
+      endedAt: '2026-07-24T00:05:00.000Z',
+      runId: '2026-07-24T00-00-00-000Z-new',
+    });
+    // Body content must NOT be silently backfilled from the older run: the actual latest run
+    // has no paths, so state/report/escalations/log all read as null/empty — never the older
+    // run's 'shipped' state.
+    expect(snap!.stateRaw).toBeNull();
+    expect(status.cards).toEqual([]);
+  });
+});
+
+describe('processKillProbe', () => {
+  test('F4 regression: EPERM (pid exists, signalling forbidden) is reported ALIVE, not dead', () => {
+    // On macOS/Linux, pid 1 (init/launchd) exists but a non-root caller cannot signal it —
+    // process.kill(1, 0) throws EPERM, never ESRCH. A genuinely dead pid throws ESRCH instead.
+    let sawEPERM = false;
+    try {
+      process.kill(1, 0);
+    } catch (err) {
+      const code: string = (err as NodeJS.ErrnoException).code ?? '';
+      sawEPERM = code === 'EPERM';
+      // If this sandbox doesn't reproduce EPERM on pid 1 (e.g. running as root), the whole
+      // premise for this regression test doesn't hold here — surface that clearly.
+      expect(['EPERM', 'ESRCH']).toContain(code);
+    }
+    expect(sawEPERM).toBe(true);
+
+    // A pid that genuinely does not exist must still be reported dead.
+    expect(processKillProbe(999999)).toBe(false);
+    // A pid that exists but can't be signalled (EPERM) must be reported ALIVE.
+    expect(processKillProbe(1)).toBe(true);
+  });
+});
+
+describe('readTailBytes', () => {
+  test('F3 regression: stale sizeBytes (file shrank after stat) never leaks NUL bytes into the tail', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tribe-viewer-f3-'));
+    const path = join(dir, 'session.log');
+    writeFileSync(path, 'x'.repeat(1000));
+    // Capture the size BEFORE the file shrinks — mirrors a stale `statTail` result from just
+    // before a concurrent log rotation/truncation.
+    const staleSizeBytes = statSync(path).size;
+    expect(staleSizeBytes).toBe(1000);
+    truncateSync(path, 100); // simulate the concurrent shrink between stat and read
+
+    const scanErrors: string[] = [];
+    const lines = readTailBytes(path, staleSizeBytes, scanErrors);
+    expect(lines).not.toBeNull();
+    const joined = lines!.join('\n');
+    expect(joined.length).toBe(100); // honestly shorter, not NUL-padded to the stale 1000
+    for (const line of lines!) {
+      for (let i = 0; i < line.length; i++) {
+        expect(line.codePointAt(i)).not.toBe(0);
+      }
+    }
   });
 });

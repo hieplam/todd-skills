@@ -1,8 +1,8 @@
 // Filesystem/process adapter for the viewer (spec §7). This is the ONLY viewer file — besides
 // `serve.ts`, its composition-root caller — that imports `node:fs`/`node:path`/`node:os`.
 // Every read here is a plain read: `readdirSync`/`statSync`/`readFileSync`/`openSync`+`readSync`,
-// and the liveness "probe" injected by the caller is `process.kill(pid, 0)` — signal 0 sends no
-// signal, it only asks the kernel "does this pid exist" (a read, never an actual kill). The
+// and the liveness probe (`processKillProbe`, below) is `process.kill(pid, 0)` — signal 0 sends
+// no signal, it only asks the kernel "does this pid exist" (a read, never an actual kill). The
 // viewer never writes, deletes, renames, or locks anything, anywhere (spec §2 non-goals).
 //
 // Read failures are individually fault-isolated (spec §9): a single unreadable/corrupt artifact
@@ -19,6 +19,21 @@ import type { CampaignSnapshot, RunView } from '../core/model.ts';
 
 const TAIL_BYTES = 65536;
 const TAIL_LINE_COUNT = 40;
+
+/** Liveness probe: `process.kill(pid, 0)` sends no signal, it only asks the kernel whether
+ * `pid` exists. Node/POSIX distinguish two failure modes that a blanket `catch { return false }`
+ * would conflate: `ESRCH` means the pid genuinely does not exist (dead); `EPERM` means the pid
+ * DOES exist but the caller lacks permission to signal it (e.g. owned by a different uid) — that
+ * is a LIVE process, not a dead one, so it must return `true`, not `false`. Any other error is
+ * treated conservatively as "not alive". */
+export function processKillProbe(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return isErrnoException(err) && err.code === 'EPERM';
+  }
+}
 
 /** One parsed `run.json`, kept alongside the paths only the adapter needs (to locate the
  * latest run's sibling state/report/escalations) — these paths are deliberately NOT part of
@@ -149,12 +164,22 @@ function readRunJson(runDir: string, probe: (pid: number) => boolean): ParsedRun
   };
 }
 
-/** Picks the successfully-parsed run with the max `startedAt` (mirrors `core/derive.ts`'s own
- * `latestRunOf` tie-break); a run whose `run.json` failed to parse has no paths to contribute,
- * so it can never be "latest" for the purposes of reading sibling artifacts. */
+/** Picks the run with the max `view.startedAt` across ALL parsed runs — no eligibility
+ * pre-filter — so this selects the exact same run as `core/derive.ts`'s `latestRunOf` (which
+ * reduces over `snapshot.runs` unfiltered). This identity matters: `deriveStatus`'s liveness
+ * badge is built from `latestRunOf`, while `scanCampaign` below reads state/report/escalations/
+ * logs from whatever `latestParsedRun` returns here — if the two ever disagreed, the page would
+ * render a badge from one run and body content from a different, older run with nothing on the
+ * page indicating the mismatch. A run whose `run.json` failed to read/parse gets
+ * `view.startedAt: ''` (the lexicographic minimum, see `readRunJson`), so it can never win a
+ * max-`startedAt` comparison against any run with a real ISO timestamp — the "corrupt run
+ * contributes no paths" property this used to enforce via an explicit filter is already
+ * guaranteed by the natural sort, with no extra condition needed. A run with a real, later
+ * `startedAt` but null sibling paths (e.g. a `run.json` that simply omits them) IS "latest" here
+ * on purpose; `scanCampaign`'s per-field null guards below then correctly read nothing rather
+ * than silently falling back to an older run's data. */
 function latestParsedRun(runs: ParsedRun[]): ParsedRun | null {
   return runs.reduce<ParsedRun | null>((best, run) => {
-    if (run.statePath === null && run.escalationsDir === null && run.logsDir === null) return best;
     if (best === null || run.view.startedAt > best.view.startedAt) return run;
     return best;
   }, null);
@@ -171,27 +196,37 @@ function readOptionalFile(path: string, scanErrors: string[]): string | null {
   }
 }
 
-/** Reads the last `TAIL_BYTES` of `path` via `openSync`/`readSync` at `max(0, size - TAIL_BYTES)`
- * — never a whole-file read, so a multi-GB log costs one bounded read (spec §7). */
-function tailFile(path: string, scanErrors: string[]): { sizeBytes: number; mtimeIso: string; tailLines: string[] } | null {
-  let sizeBytes: number;
-  let mtimeIso: string;
+/** Probes `path`'s current size/mtime. Missing file -> `null` (normal, not an error); any other
+ * stat failure -> `scanErrors` entry. Split out from `tailFile` below purely so a regression
+ * test can feed a deliberately STALE `sizeBytes` straight into `readTailBytes` — reproducing
+ * "the file shrank between stat and read" (e.g. a concurrent log rotation) with real fs calls
+ * and no OS-level race timing required. */
+function statTail(path: string, scanErrors: string[]): { sizeBytes: number; mtimeIso: string } | null {
   try {
     const st = statSync(path);
-    sizeBytes = st.size;
-    mtimeIso = st.mtime.toISOString();
+    return { sizeBytes: st.size, mtimeIso: st.mtime.toISOString() };
   } catch (err) {
     if (!isMissing(err)) scanErrors.push(`stat ${path}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
+}
 
+/** Reads the last `min(sizeBytes, TAIL_BYTES)` bytes of `path` via `openSync`/`readSync` at
+ * `max(0, sizeBytes - TAIL_BYTES)` — never a whole-file read, so a multi-GB log costs one
+ * bounded read (spec §7). `sizeBytes` is normally a just-taken `statTail` result, but if it is
+ * STALE (the file shrank since it was measured), `readSync`'s actual return value can be LESS
+ * than the requested `length` — this captures that return value and slices the buffer to it
+ * before decoding, so a shrunk file's tail renders honestly (shorter) instead of NUL-padded
+ * (`Buffer.alloc` zero-fills the buffer's un-filled remainder otherwise). */
+export function readTailBytes(path: string, sizeBytes: number, scanErrors: string[]): string[] | null {
   const start = Math.max(0, sizeBytes - TAIL_BYTES);
   const length = sizeBytes - start;
   const buffer = Buffer.alloc(length);
+  let bytesRead: number;
   try {
     const fd = openSync(path, 'r');
     try {
-      readSync(fd, buffer, 0, length, start);
+      bytesRead = readSync(fd, buffer, 0, length, start);
     } finally {
       closeSync(fd);
     }
@@ -200,9 +235,16 @@ function tailFile(path: string, scanErrors: string[]): { sizeBytes: number; mtim
     return null;
   }
 
-  const lines = buffer.toString('utf8').split('\n');
-  const tailLines = lines.slice(Math.max(0, lines.length - TAIL_LINE_COUNT));
-  return { sizeBytes, mtimeIso, tailLines };
+  const lines = buffer.subarray(0, bytesRead).toString('utf8').split('\n');
+  return lines.slice(Math.max(0, lines.length - TAIL_LINE_COUNT));
+}
+
+function tailFile(path: string, scanErrors: string[]): { sizeBytes: number; mtimeIso: string; tailLines: string[] } | null {
+  const stat = statTail(path, scanErrors);
+  if (stat === null) return null;
+  const tailLines = readTailBytes(path, stat.sizeBytes, scanErrors);
+  if (tailLines === null) return null;
+  return { sizeBytes: stat.sizeBytes, mtimeIso: stat.mtimeIso, tailLines };
 }
 
 /** Newest-mtime file directly under `logsDir` (missing dir / no files -> `null`, the normal
