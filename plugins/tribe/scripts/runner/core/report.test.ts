@@ -528,6 +528,10 @@ describe('writeReport — reflects persisted state even when the state-commit PR
         if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks')
           return { stdout: JSON.stringify([{ name: 'ci', bucket: 'pass' }]), stderr: '', exitCode: 0 };
         if (cmd[0] === 'git' && cmd[1] === 'diff') return { stdout: '', stderr: '', exitCode: 0 };
+        // baseSha/branch recording (handoff Fix 5) — incidental to what this test asserts.
+        if (cmd[0] === 'git' && cmd[1] === 'rev-parse') return { stdout: 'basesha0\n', stderr: '', exitCode: 0 };
+        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view')
+          return { stdout: '', stderr: 'no pull requests found', exitCode: 1 };
         if (cmd[0] === 'git' && cmd[1] === 'fetch') return { stdout: '', stderr: '', exitCode: 0 };
         if (cmd[0] === 'git' && cmd[1] === 'checkout') return { stdout: '', stderr: '', exitCode: 0 };
         if (cmd[0] === 'git' && cmd[1] === 'add') return { stdout: '', stderr: '', exitCode: 0 };
