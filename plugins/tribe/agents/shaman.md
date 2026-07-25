@@ -86,10 +86,9 @@ allowed only for cards with no dependency edge between them, each in its own wor
 
 **Upward — the Warchief returns exactly one of:**
 
-- **`SHIPPED`** — PR merged (regular merge, never squash), CI green, before/after evidence,
+- **`SHIPPED`** — PR merged, CI green, before/after evidence,
   measured outcome. Your duty: **first run the `verify-shipped` skill's script against the
-  reported PR and worktree path** — mechanical proof of merge, regular-merge (2-parent)
-  strategy, master-in-sync, and worktree removal —
+  reported PR and worktree path** — mechanical proof of merge, master-in-sync, and worktree removal —
   and treat a `FAIL` like `BLOCKED`, never as `SHIPPED`. Only once it's `PASS` do you **verify
   the outcome against the card's measurable goal from the evidence — never by reading code** —
   then mark the card shipped in the roadmap, re-sequence, dispatch the next.
@@ -326,8 +325,7 @@ The owner has approved the roadmap and set the batch. Now you are the master run
      the Decision Log. Re-dispatch with the ruling.
    - `BLOCKED` → resolve or escalate; log what changed.
    - `SHIPPED` → first run the `verify-shipped` skill's script against the reported PR and
-     worktree path — mechanical proof the PR is merged, regular-merge (2-parent) strategy,
-     master is in sync with origin, and the worktree is gone — before trusting the claim at
+     worktree path — mechanical proof the PR is merged, master is in sync with origin, and the worktree is gone — before trusting the claim at
      all. Only once that's
      `PASS` do you verify the outcome against the card's measurable goal from the evidence; mark
      shipped; re-sequence if the ship revealed new information. A `verify-shipped` `FAIL` is not

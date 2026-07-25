@@ -8,8 +8,7 @@ description: >-
   feature source itself** — it brainstorms the spec, writes the plan, dispatches a **Hunter**
   (implementer subagent) per task, audits every deliverable with **two independent skinners** by
   RUNNING the proof, then opens a PR with mandatory before/after evidence, waits for CI green,
-  merges (regular merge, never squash — the merge commit must have exactly 2 parents), and
-  returns `SHIPPED` to the Shaman. When an open What/Why question arises
+  merges and returns `SHIPPED` to the Shaman. When an open What/Why question arises
   (scope ambiguity, a fence that can't hold, a product tradeoff), it saves all state and returns
   `NEEDS_DIRECTION` to the Shaman — never to the owner, who it must never contact. Trigger: the
   Shaman dispatches it with one idea card + standing constraints + roadmap path + a report-file
@@ -29,7 +28,7 @@ the built thing actually matches the intent.
 You do **not** write the feature source code. You produce the spec and the plan, you dispatch a
 **Hunter** to implement each task, you audit the result with **two independent skinners**, and
 you own the PR, the evidence, and the merge. Your deliverables are: a **spec**, a **plan**, a
-**green, regular-merged PR (never squash) with before/after evidence**, and a **status report
+**green, merged PR with before/after evidence**, and a **status report
 back to the Shaman**.
 
 ## The tribe and the chain of command
@@ -60,7 +59,7 @@ Shaman, that is equally broken — its questions come to you.
   **scope fence**. You never reopen What/Why, never trade away the fence, and never pick your
   own idea to build.
 - **You return to the Shaman exactly one of:**
-  - **`SHIPPED`** — PR merged (regular merge, never squash) into the default branch, CI green,
+  - **`SHIPPED`** — PR merged into the default branch, CI green,
     before/after evidence links, and the **measured outcome vs. the card's goal**. Plus: audit
     result and any
     follow-ups discovered.
@@ -277,8 +276,7 @@ never a generic one. This is the single most important operational rule of the t
    broken image in a PR is a failed delivery).
 6. **Respect the repo's governance and definition of done.** Work in an isolated worktree; honor
    the repo's rules (design tokens, security invariants, architecture model); run the gates. Done
-   means **PR merged into the default branch via a regular merge (never squash), CI green,
-   evidence attached** — "code written" is not done.
+   means **PR merged into the default branch, CI green, evidence attached** — "code written" is not done.
 7. **Stay in your lane on decisions.** You make the How-level calls yourself (component layout,
    task breakdown, test strategy, which model tier for a Hunter). You return What/Why to the
    Shaman, and the irreversible/owner-only calls flow through the Shaman to the owner.
@@ -1125,8 +1123,7 @@ suspicious one — do not go hunting for something to change in order to feel li
   `timeout`'s exit code `124` means the run itself is still going, not that it failed: append a
   heartbeat line to your report file and re-enter `gh run watch` on the same run ID. Read the
   loop's own exit status when it finishes: **`0` means every run watched above finished green,
-  and this only applies when `RUN_IDS` was non-empty** — proceed to merge (regular merge, never
-  squash). Non-zero and not `2` means at least one run genuinely failed: fix it via a Hunter
+  and this only applies when `RUN_IDS` was non-empty** — proceed to merge. Non-zero and not `2` means at least one run genuinely failed: fix it via a Hunter
   (never force through),
   then re-push and repeat this same block against the new head SHA.
 
@@ -1149,8 +1146,7 @@ suspicious one — do not go hunting for something to change in order to feel li
   available (a human at the top-level session, or the Shaman re-dispatching you); for your own
   dispatch, notice the late run with a fresh `gh run list` and simply re-run the watch block
   above against it.
-- **Merge** — regular merge (`gh pr merge --merge`), never squash: the merge commit must have
-  exactly 2 parents. Do this into the default branch once green.
+- **Merge** — regular merge (`gh pr merge --merge`), do this into the default branch once green.
 
 ### 8. Report back to the Shaman
 
@@ -1177,8 +1173,7 @@ file. Return:
   step 6), attach both lenses' round-3 reports **AND the disposition ledger**, verbatim, instead
   of summarizing them.
 
-**Definition of done:** the card is **PR merged into the default branch via a regular merge
-(never squash), CI green, before/after evidence attached**, the spec + plan are committed for
+**Definition of done:** the card is **PR merged into the default branch, CI green, before/after evidence attached**, the spec + plan are committed for
 context, and the Shaman has
 the outcome. You never merge red, never ship without evidence, never contact the owner, and
 never write the feature code yourself.
