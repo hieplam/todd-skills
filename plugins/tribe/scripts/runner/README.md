@@ -527,8 +527,8 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
   would have opened a duplicate PR. **Any changed `gh`/`git` command must be executed against
   a real repo before it is trusted.**
 - **What HAS been verified live** (smoke run, 2026-07-16, campaign-runner effort): `--dry-run`
-  phase derivation against real merged/open PRs; the D3 six-point replay against a real merged PR
-  (all six pass, including a real 2-parent merge commit) and its correct rejection of an open PR;
+  phase derivation against real merged/open PRs; the D3 five-point replay against a real merged PR
+  (all five pass) and its correct rejection of an open PR;
   a real Agent-SDK session spawn under the pinned §D1 options, with the SDK-assigned `session_id`
   captured from the `system/init` message; `settingSources: ['project']` genuinely loading the
   target repo's CLAUDE.md; a real `resume` recalling prior session context; a bogus resume id

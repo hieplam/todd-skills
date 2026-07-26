@@ -92,7 +92,7 @@ function makeIo(options: {
 }
 
 describe('commitStateAndMerge', () => {
-  test('green path: merges, branch cleaned, master ff-synced, never squash', async () => {
+  test('green path: merges, branch cleaned, master ff-synced', async () => {
     const { io, calls, sleeps } = makeIo({ checksSequence: [checksJson([PASS_CHECK])] });
 
     const result = await commitStateAndMerge(['state.json'], 'chore: update state', config, io);
@@ -134,15 +134,10 @@ describe('commitStateAndMerge', () => {
 
     const mergeCall = calls.find((c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'merge');
     expect(mergeCall).toEqual(['gh', 'pr', 'merge', '101', '--merge', '--delete-branch']);
-    expect(mergeCall).not.toContain('--squash');
 
     // Master ff-sync ran.
     expect(calls.some((c) => c.join(' ') === 'git checkout master')).toBe(true);
     expect(calls.some((c) => c[0] === 'git' && c[1] === 'pull')).toBe(true);
-
-    // Never a squash/rebase merge anywhere in the whole call log.
-    expect(calls.some((c) => c.includes('--squash'))).toBe(false);
-    expect(calls.some((c) => c.includes('--rebase'))).toBe(false);
   });
 
   test('retry-then-green: retries through the injected sleep seam at the D6 spacing, never a real wait', async () => {

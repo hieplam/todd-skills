@@ -22,7 +22,7 @@ scope beyond this card.
 
 ## Walls (non-negotiable)
 
-- Merge policy for this campaign is `{{MERGE_POLICY}}` — regular merge order, NEVER squash.
+- Merge policy for this campaign is `{{MERGE_POLICY}}`; land with `gh pr merge --merge`.
 - The target repo's own CLAUDE.md and `.claude/rules` are binding; do not import
   conventions from elsewhere.
 - Owner-only items for this campaign (escalate, never decide): {{OWNER_ONLY_ESCALATIONS}}
@@ -54,8 +54,7 @@ that proves them — paste gate output verbatim into worker reports.
 
 ## Merge order
 
-Land the PR with a REGULAR merge (`gh pr merge --merge`). Squash and rebase merges are
-forbidden for this campaign — the merge commit must carry both parents.
+Land the PR with `gh pr merge --merge`.
 
 ## Worker reports
 

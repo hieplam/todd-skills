@@ -57,10 +57,20 @@ def load(path: Path) -> dict:
 
 
 def index_runs(bench: dict, configuration: str) -> dict[tuple, list[bool]]:
-    """(skill, eval_id, eval_name, agent) -> [passed?] across that case's runs."""
+    """(skill, eval_id, eval_name, agent) -> [passed?] across that case's runs.
+
+    A run whose result is `ungraded` (run_evals.py's grader subprocess failed or
+    returned unparseable JSON — a harness failure, not a verdict) is skipped
+    entirely rather than folded in as `bool(None)` -> False. Reading it as a fail
+    would misattribute a harness outage to the agent/prompt being compared, and
+    could even manufacture a CONFIRMED regression out of a grader hiccup. It is
+    a missing sample, exactly like a case present in only one of the two runs.
+    """
     out: dict[tuple, list[bool]] = defaultdict(list)
     for r in bench.get("runs", []):
         if r.get("configuration") != configuration:
+            continue
+        if r.get("result", {}).get("ungraded"):
             continue
         key = (r.get("skill_name"), r.get("eval_id"), r.get("eval_name"), r.get("agent"))
         out[key].append(bool(r.get("result", {}).get("passed")))

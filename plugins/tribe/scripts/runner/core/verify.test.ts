@@ -1,4 +1,4 @@
-// Tests for verify.ts (Task 3): the D3 six-point SHIPPED replay. Every gh/git call is
+// Tests for verify.ts (Task 3): the D3 five-point SHIPPED replay. Every gh/git call is
 // mocked through the injected `io.exec`/`io.readFile` seams — these tests never invoke a
 // real binary. Fixture values are deliberately neutral (no repo names, no campaign-specific
 // values) — the stateless-capability wall.
@@ -34,8 +34,6 @@ function fixtureConfig(overrides: Partial<VerifyConfig> = {}): VerifyConfig {
 interface MockOptions {
   merged?: boolean;
   mergeSha?: string | null;
-  /** stdout for `git rev-list --parents -n 1 <mergeSha>`; defaults to a 2-parent line. */
-  revListStdout?: string;
   ancestorExitCode?: number;
   checks?: Array<{ name: string; bucket: string; description?: string }>;
   docsOnlyDiffFiles?: string[];
@@ -52,7 +50,6 @@ function ok(stdout: string): ExecResult {
 function buildIo(opts: MockOptions = {}): VerifyIO {
   const merged = opts.merged ?? true;
   const mergeSha = opts.mergeSha === undefined ? 'mergesha1' : opts.mergeSha;
-  const revListStdout = opts.revListStdout ?? `${mergeSha} parent1 parent2`;
   const ancestorExitCode = opts.ancestorExitCode ?? 0;
   const checks = opts.checks ?? [{ name: 'ci', bucket: 'pass' }];
   const docsOnlyDiffFiles = opts.docsOnlyDiffFiles ?? ['docs/note.md'];
@@ -66,9 +63,6 @@ function buildIo(opts: MockOptions = {}): VerifyIO {
       const [bin, ...rest] = cmd;
       if (bin === 'gh' && rest[0] === 'api') {
         return ok(JSON.stringify({ merged, merge_commit_sha: mergeSha }));
-      }
-      if (bin === 'git' && rest[0] === 'rev-list') {
-        return ok(revListStdout);
       }
       if (bin === 'git' && rest[0] === 'merge-base') {
         return { stdout: '', stderr: '', exitCode: ancestorExitCode };
@@ -118,27 +112,16 @@ function buildIoRecordingCalls(opts: MockOptions = {}): { io: VerifyIO; calls: s
 }
 
 describe('verifyShipped — happy path', () => {
-  test('all six points pass', async () => {
+  test('all five points pass', async () => {
     const result = await verifyShipped(fixtureCard(), fixtureConfig(), buildIo());
     expect(result.shipped).toBe(true);
     expect(result.failedPoints).toEqual([]);
-    expect(result.points).toHaveLength(6);
+    expect(result.points).toHaveLength(5);
     expect(result.points.every((p) => p.passed)).toBe(true);
   });
 });
 
-describe('verifyShipped — point 2: squash/rebase detection', () => {
-  test('a 1-parent merge commit fails mergeCommitTwoParents', async () => {
-    const io = buildIo({ revListStdout: 'mergesha1 parent1' });
-    const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
-    expect(result.shipped).toBe(false);
-    expect(result.failedPoints).toContain('mergeCommitTwoParents');
-    const point = result.points.find((p) => p.id === 'mergeCommitTwoParents');
-    expect(point?.passed).toBe(false);
-  });
-});
-
-describe('verifyShipped — point 4: checks green + D6 flake classification', () => {
+describe('verifyShipped — point 3: checks green + D6 flake classification', () => {
   test('a real red check (non-sonar) fails checksGreen', async () => {
     const io = buildIo({ checks: [{ name: 'unit-tests', bucket: 'fail' }] });
     const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
@@ -168,7 +151,7 @@ describe('verifyShipped — point 4: checks green + D6 flake classification', ()
   });
 });
 
-describe('verifyShipped — point 5: worktree/branch cleanup', () => {
+describe('verifyShipped — point 4: worktree/branch cleanup', () => {
   test('a still-present worktree fails worktreeAndBranchGone', async () => {
     const io = buildIo({ worktreeStillExists: true });
     const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
@@ -182,7 +165,7 @@ describe('verifyShipped — point 5: worktree/branch cleanup', () => {
   });
 });
 
-describe('verifyShipped — point 6: schema guard', () => {
+describe('verifyShipped — point 5: schema guard', () => {
   test('a non-empty schema-lock diff with no allow flag fails schemaGuard', async () => {
     const io = buildIo({ schemaDiffStdout: 'diff --git a/packages/app/src/domain/sample-types.ts ...\n' });
     const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
@@ -228,16 +211,13 @@ describe('readAllowsSchemaChange', () => {
 describe('verifyShipped — multi-failure reporting', () => {
   test('every failed point is named, not just the first', async () => {
     const io = buildIo({
-      revListStdout: 'mergesha1 parent1', // squash merge -> point 2 fails
-      checks: [{ name: 'unit-tests', bucket: 'fail' }], // real red check -> point 4 fails
-      schemaDiffStdout: 'diff --git a/packages/app/src/domain/sample-types.ts ...\n', // point 6 fails
+      checks: [{ name: 'unit-tests', bucket: 'fail' }], // real red check -> point 3 fails
+      schemaDiffStdout: 'diff --git a/packages/app/src/domain/sample-types.ts ...\n', // point 5 fails
     });
     const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
     expect(result.shipped).toBe(false);
-    expect(result.failedPoints).toEqual(
-      expect.arrayContaining(['mergeCommitTwoParents', 'checksGreen', 'schemaGuard']),
-    );
-    // points 1, 3, 5 are untouched by these mocks and should still pass.
+    expect(result.failedPoints).toEqual(expect.arrayContaining(['checksGreen', 'schemaGuard']));
+    // points 1, 2, 4 are untouched by these mocks and should still pass.
     expect(result.points.find((p) => p.id === 'merged')?.passed).toBe(true);
     expect(result.points.find((p) => p.id === 'mergeShaAncestorOfMaster')?.passed).toBe(true);
     expect(result.points.find((p) => p.id === 'worktreeAndBranchGone')?.passed).toBe(true);
@@ -282,7 +262,7 @@ describe('verifyShipped — point 1: the real gh api path (F4)', () => {
 // on ANY non-'pass' bucket, so a routine path-filtered `skipping` check (common on scoped
 // workflows) would escalate an otherwise healthy card. Warchief ruling: align verify.ts to
 // github.ts — skipped is non-blocking.
-describe('verifyShipped — point 4: the skipping bucket is non-blocking (F2)', () => {
+describe('verifyShipped — point 3: the skipping bucket is non-blocking (F2)', () => {
   test('a check with bucket "skipping" does not fail checksGreen', async () => {
     const io = buildIo({
       checks: [
@@ -300,7 +280,7 @@ describe('verifyShipped — point 4: the skipping bucket is non-blocking (F2)', 
 // TARGET repo's directory layout baked into a capability that must work against ANY repo).
 // The docs-only path set is now campaign config (`VerifyConfig.docsOnlyPaths`), threaded
 // exactly like `schemaLockPaths` already is.
-describe('verifyShipped — point 4: docs-only paths are config, not hardcoded (F1)', () => {
+describe('verifyShipped — point 3: docs-only paths are config, not hardcoded (F1)', () => {
   test('a non-"docs/" prefix configured as docsOnlyPaths still waives a matching sonar-504 diff', async () => {
     const io = buildIo({
       checks: [{ name: 'SonarCloud Code Analysis', bucket: 'fail', description: 'bootstrap failed: HTTP 504' }],

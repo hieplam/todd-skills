@@ -160,8 +160,8 @@ export function toBriefState(state: CampaignState): BriefState {
 }
 
 export const CONTINUE_PR_OPEN_PROMPT =
-  "Resume this card: check the open PR's CI status and complete the merge sequence if green " +
-  '(a regular merge, never squash), then report the terminal SHIPPED/NEEDS_DIRECTION line.';
+  "Resume this card: check the open PR's CI status and complete the merge sequence if green, " +
+  'then report the terminal SHIPPED/NEEDS_DIRECTION line.';
 export const CONTINUE_BRANCH_PROMPT =
   'Resume this card from your existing branch/worktree: continue implementing the plan, then ' +
   'report the terminal SHIPPED/NEEDS_DIRECTION line.';

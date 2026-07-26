@@ -374,6 +374,21 @@ transcript/final message supports your verdict"}}
 
 def grade(prompt: str, expected_output: str, transcript: str, final_result: str,
           cwd: Path, timeout: int, model: str | None) -> dict:
+    """Grade one executor transcript against expected_output.
+
+    Returns one of two shapes, and callers must branch on which:
+      - graded:   {"passed": bool, "evidence": str}
+      - ungraded: {"ungraded": True, "evidence": str}  -- no "passed" key at all
+
+    UNGRADED means the *harness* failed to produce a verdict (the grader
+    subprocess errored/timed out, or its reply couldn't be parsed as JSON —
+    including a truncated reply cut off mid-object) — never that the agent's
+    behavior was judged and found wanting. Collapsing that into `passed: False`
+    (the previous behavior) scores a harness failure as an agent failure, which
+    silently corrupts any pass-rate read off this suite. Every caller of grade()
+    must treat "ungraded" as a third outcome, excluded from pass/total
+    denominators, not as a synonym for FAIL.
+    """
     grader_prompt = GRADER_INSTRUCTIONS.format(
         prompt=prompt, expected_output=expected_output,
         transcript=transcript[:20000] or "(no assistant output captured)",
@@ -389,7 +404,7 @@ def grade(prompt: str, expected_output: str, transcript: str, final_result: str,
     run = run_claude(grader_prompt, cwd=cwd, timeout=timeout, model=model, tools="",
                       isolate_user_scope=True)
     if not run["ok"]:
-        return {"passed": False, "evidence": f"grader failed to run: {run['error']}"}
+        return {"ungraded": True, "evidence": f"grader failed to run: {run['error']}"}
 
     parsed = extract_metrics(run)
     text = parsed["final_result"].strip()
@@ -399,7 +414,7 @@ def grade(prompt: str, expected_output: str, transcript: str, final_result: str,
         verdict = json.loads(text)
         return {"passed": bool(verdict.get("passed")), "evidence": str(verdict.get("evidence", ""))}
     except (json.JSONDecodeError, AttributeError):
-        return {"passed": False, "evidence": f"grader returned non-JSON: {text[:500]}"}
+        return {"ungraded": True, "evidence": f"grader returned non-JSON: {text[:500]}"}
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +425,34 @@ def build_agents_payload(agent_fields: dict, agent_body: str) -> dict:
     name = agent_fields.get("name", "eval-agent")
     description = agent_fields.get("description") or f"Role under test: {name}."
     return {name: {"description": description, "prompt": agent_body.strip()}}
+
+
+def resolve_exec_model(exec_model: str | None, agent_fields: dict | None) -> str | None:
+    """Resolve the model an agent-kind case's EXECUTOR runs on.
+
+    A single global `--exec-model` used to be the only way to pick the executor
+    model, so every agent-kind case ran on whatever one model the caller chose —
+    even though production dispatches each agent on the model its own frontmatter
+    declares (e.g. `plugins/tribe/agents/warchief.md` declares `model: opus`).
+    Benchmarking warchief.md on sonnet measures a model production never runs it
+    on, so a regression conclusion drawn from that run would not transfer.
+
+    Precedence: an explicit `--exec-model` always wins (keeps a cheap smoke pass
+    possible without touching every agent's frontmatter). Otherwise, read the
+    subject agent's frontmatter `model:` field (already parsed for the
+    `--agents` payload by build_agents_payload's caller): a concrete value
+    (`opus`/`sonnet`/`haiku`) is returned to be passed as `--model`; `inherit`
+    (Claude Code's own frontmatter convention for "use the caller's model") or a
+    missing key returns None, meaning "pass no --model flag, use the harness
+    default" — the same behavior as today when no model can be resolved at all.
+    """
+    if exec_model:
+        return exec_model
+    if agent_fields:
+        fm_model = agent_fields.get("model")
+        if fm_model and fm_model != "inherit":
+            return fm_model
+    return None
 
 
 def materialize_files(scratch: Path, files: list) -> list[str]:
@@ -458,6 +501,10 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         agents_json = None
         agent_name = None
         skill_name = None
+        # Per-agent frontmatter resolution only applies to kind: "agent" cases —
+        # a skill's SKILL.md frontmatter has no equivalent production-model
+        # concept, so a skill case's executor model is exec_model, unchanged.
+        resolved_model = exec_model
 
         if kind == "skill":
             fields, _ = parse_frontmatter(skill_dir / "SKILL.md")
@@ -470,6 +517,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             if not agent_path.exists():
                 return {"error": f"no agent file at {agent_path}"}
             fields, body = parse_frontmatter(agent_path)
+            resolved_model = resolve_exec_model(exec_model, fields)
             if configuration == "with_skill":
                 agents_json = build_agents_payload(fields, body)
                 agent_name = fields.get("name", agent_key)
@@ -480,7 +528,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             print(f"    [{configuration}] executing (timeout={timeout}s)...", file=sys.stderr)
 
         exec_run = run_claude(
-            case["prompt"], cwd=scratch, timeout=timeout, model=exec_model,
+            case["prompt"], cwd=scratch, timeout=timeout, model=resolved_model,
             agents_json=agents_json, agent_name=agent_name,
             safe_mode=(configuration == "without_skill"),
             isolate_user_scope=(configuration == "with_skill"),
@@ -514,16 +562,30 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         metrics_json = {**parsed["metrics"]}
         (run_dir / "metrics.json").write_text(json.dumps(metrics_json, indent=2))
 
-        grading_json = {
-            "expectations": [
-                {"text": case["expected_output"], "passed": verdict["passed"], "evidence": verdict["evidence"]}
-            ],
-            "summary": {
+        # UNGRADED (grader subprocess failed, or its reply was unparseable/truncated)
+        # is a harness failure, not an agent failure: it must never masquerade as a
+        # fake "passed": false. A case whose only run is ungraded therefore reports
+        # total: 0 (excluded from the pass/total denominator) plus an "ungraded"
+        # count, rather than a FAIL nobody actually observed.
+        is_ungraded = bool(verdict.get("ungraded"))
+        if is_ungraded:
+            expectation = {"text": case["expected_output"], "ungraded": True,
+                           "evidence": verdict["evidence"]}
+            summary = {"passed": 0, "failed": 0, "ungraded": 1, "total": 0, "pass_rate": 0.0}
+        else:
+            expectation = {"text": case["expected_output"], "passed": verdict["passed"],
+                           "evidence": verdict["evidence"]}
+            summary = {
                 "passed": 1 if verdict["passed"] else 0,
                 "failed": 0 if verdict["passed"] else 1,
+                "ungraded": 0,
                 "total": 1,
                 "pass_rate": 1.0 if verdict["passed"] else 0.0,
-            },
+            }
+
+        grading_json = {
+            "expectations": [expectation],
+            "summary": summary,
             "execution_metrics": metrics_json,
             "timing": {
                 "executor_duration_seconds": exec_run["wall_seconds"],
@@ -540,12 +602,14 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             "result": {
                 "pass_rate": grading_json["summary"]["pass_rate"],
                 "passed": grading_json["summary"]["passed"],
-                "total": 1,
+                "ungraded": grading_json["summary"]["ungraded"],
+                "total": grading_json["summary"]["total"],
                 "time_seconds": round(exec_run["wall_seconds"], 1),
                 "tokens": parsed["total_tokens"],
                 "cost_usd": parsed["total_cost_usd"],
                 "tool_calls": metrics_json["total_tool_calls"],
                 "errors": metrics_json["errors_encountered"],
+                "model": resolved_model or "(default)",
             },
             "expectations": grading_json["expectations"],
         }
@@ -571,17 +635,28 @@ def stddev(xs: list[float]) -> float:
 def summarize_configuration(runs: list[dict]) -> dict:
     if not runs:
         return {}
-    pass_rates = [r["result"]["pass_rate"] for r in runs]
+    # An ungraded run (grader subprocess failed / returned unparseable JSON) has
+    # pass_rate/passed fields that are placeholders, not a verdict — averaging them
+    # in would silently drag pass_rate toward 0.0 for a case the grader never
+    # actually judged. Exclude ungraded runs from the pass_rate stats entirely and
+    # report their count instead; time/tokens are still real measured cost (the
+    # executor ran fine — only the grading step failed), so those keep all runs.
+    graded = [r for r in runs if not r["result"].get("ungraded")]
+    ungraded_count = len(runs) - len(graded)
     times = [r["result"]["time_seconds"] for r in runs]
     tokens = [r["result"]["tokens"] for r in runs]
-    return {
-        "pass_rate": {"mean": round(mean(pass_rates), 3), "stddev": round(stddev(pass_rates), 3),
-                       "min": min(pass_rates), "max": max(pass_rates)},
+    summary = {
         "time_seconds": {"mean": round(mean(times), 1), "stddev": round(stddev(times), 1),
                           "min": min(times), "max": max(times)},
         "tokens": {"mean": round(mean(tokens)), "stddev": round(stddev(tokens)),
                     "min": min(tokens), "max": max(tokens)},
+        "ungraded": ungraded_count,
     }
+    if graded:
+        pass_rates = [r["result"]["pass_rate"] for r in graded]
+        summary["pass_rate"] = {"mean": round(mean(pass_rates), 3), "stddev": round(stddev(pass_rates), 3),
+                                 "min": min(pass_rates), "max": max(pass_rates)}
+    return summary
 
 
 def fmt_delta(with_val: float, without_val: float) -> str:
@@ -805,7 +880,10 @@ def main() -> int:
                 # average would dilute that agent's regression below notice.
                 result["agent"] = case.get("agent")
                 all_runs.append(result)
-                verdict = "PASS" if result["result"]["passed"] else "FAIL"
+                if result["result"].get("ungraded"):
+                    verdict = "UNGRADED"
+                else:
+                    verdict = "PASS" if result["result"]["passed"] else "FAIL"
                 print(f"{prefix}\n    [{configuration}] {verdict}  "
                           f"{result['result']['time_seconds']}s  {result['result']['tokens']} tokens")
 
@@ -830,7 +908,11 @@ def main() -> int:
         run_summary["with_skill"] = with_summary
     if without_summary:
         run_summary["without_skill"] = without_summary
-    if with_summary and without_summary:
+    # A configuration whose runs were ALL ungraded has no "pass_rate" key at all
+    # (summarize_configuration only computes it over graded runs) — guard the delta
+    # so an all-ungraded leg reports no misleading pass_rate delta instead of a
+    # KeyError.
+    if with_summary and without_summary and "pass_rate" in with_summary and "pass_rate" in without_summary:
         run_summary["delta"] = {
             "pass_rate": fmt_delta(with_summary["pass_rate"]["mean"], without_summary["pass_rate"]["mean"]),
             "time_seconds": fmt_delta(with_summary["time_seconds"]["mean"], without_summary["time_seconds"]["mean"]),

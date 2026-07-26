@@ -553,6 +553,12 @@ only blind the conformance check, never protect anything.
 **Law 2 — never let them see each other.** Neither Skinner's brief may contain the other's
 findings, verdict, or report — and since dispatching one after the other means you have already
 read the first report before briefing the second, **sequential dispatch is itself the violation**.
+**If you ever find yourself holding one reviewer's report while the other has not yet been
+dispatched — however you got there — do not brief the second reviewer alone.** The round is
+contaminated: set the already-read report aside (it may not enter any brief, and it does not get
+merged), and re-dispatch a **fresh pair** concurrently in one message; only the fresh pair's
+reports are merged. Recognizing that the situation itself is the violation — and resetting the
+round — is the remedy; salvaging the round by dispatching the missing reviewer solo is not.
 Never ask one Skinner to review, reconcile, or comment on the other's findings. Every round that DOES
 dispatch Skinners — the first discovery round on a task, the beyond-named-locations exception, the
 final whole-branch audit — dispatches **two fresh** Skinner instances; **never reuse** one across

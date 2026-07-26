@@ -186,7 +186,7 @@
       <a href="#state">6 · state.ts — schema &amp; card</a>
       <a href="#state-blocked" class="lvl2">blocked là derived</a>
       <a href="#session">7 · session.ts — bọc SDK</a>
-      <a href="#verify">8 · verify.ts — 6 điểm</a>
+      <a href="#verify">8 · verify.ts — 5 điểm</a>
       <a href="#github">9 · github.ts — commit/PR/merge</a>
       <a href="#report">10 · report.ts — báo cáo</a>
       <a href="#brief">11 · brief.ts + types.ts</a>
@@ -277,7 +277,7 @@ flowchart TB
   LOOP["loop.ts<br/><i>Orchestrator — vòng lặp chính</i>"]
   STATE["state.ts<br/><i>schema · load/save · nextCard</i>"]
   SESSION["session.ts<br/><i>bọc SDK · spawn/parse</i>"]
-  VERIFY["verify.ts<br/><i>6 điểm kiểm chứng</i>"]
+  VERIFY["verify.ts<br/><i>5 điểm kiểm chứng</i>"]
   GITHUB["github.ts<br/><i>commit · PR · merge state</i>"]
   REPORT["report.ts<br/><i>JSON + Markdown report</i>"]
   BRIEF["brief.ts<br/><i>render template</i>"]
@@ -364,7 +364,7 @@ sequenceDiagram
   SE->>L: onSessionStart(id) → status='running' (ghi ngay, crash-safe)
   SDK-->>SE: … messages … → result "SHIPPED #42 abc1234"
   SE-->>L: { outcome:'shipped', pr:42, sha }
-  L->>V: verifyShipped(card) — 6 điểm độc lập
+  L->>V: verifyShipped(card) — 5 điểm độc lập
   V-->>L: { shipped: true }
   L->>ST: status='shipped' + persistLocalState()
   L->>G: commitStateAndMerge(state.json)
@@ -375,7 +375,7 @@ sequenceDiagram
         </div>
       </div>
 
-      <div class="note"><strong>Điểm mấu chốt trong sơ đồ:</strong> dòng "SHIPPED #42" từ SDK <em>chỉ là tín hiệu</em>. Runner <strong>không tin ngay</strong> — nó gọi <code class="inl">verifyShipped</code> chạy lại 6 kiểm tra thật (PR đã merge chưa? merge kiểu regular? CI xanh? …). Chỉ khi verify pass thì card mới được ghi <code class="inl">shipped</code>.</div>
+      <div class="note"><strong>Điểm mấu chốt trong sơ đồ:</strong> dòng "SHIPPED #42" từ SDK <em>chỉ là tín hiệu</em>. Runner <strong>không tin ngay</strong> — nó gọi <code class="inl">verifyShipped</code> chạy lại 5 kiểm tra thật (PR đã merge chưa? CI xanh? …). Chỉ khi verify pass thì card mới được ghi <code class="inl">shipped</code>.</div>
     </section>
 
     <!-- ============ 4. RUN.TS ============ -->
@@ -660,15 +660,14 @@ function parseResultMessage(message: SessionMessage): SessionResult {
 
     <!-- ============ 8. VERIFY.TS ============ -->
     <section id="verify">
-      <h2><span class="num">8</span> <code>verify.ts</code> — 6 điểm kiểm chứng "đã shipped" (§D3)</h2>
-      <p><code class="inl">verifyShipped</code> chạy <strong>6 kiểm tra độc lập</strong>, <strong>không short-circuit</strong> (không dừng ở lỗi đầu) để báo cáo <em>mọi</em> điểm fail — vì kết quả này đi vào file escalation mà con người sẽ đọc.</p>
+      <h2><span class="num">8</span> <code>verify.ts</code> — 5 điểm kiểm chứng "đã shipped" (§D3)</h2>
+      <p><code class="inl">verifyShipped</code> chạy <strong>5 kiểm tra độc lập</strong>, <strong>không short-circuit</strong> (không dừng ở lỗi đầu) để báo cáo <em>mọi</em> điểm fail — vì kết quả này đi vào file escalation mà con người sẽ đọc.</p>
 
       <div class="diagram">
-        <div class="cap">Diagram 6 · 6 điểm của verifyShipped (chạy hết, gộp kết quả)</div>
+        <div class="cap">Diagram 6 · 5 điểm của verifyShipped (chạy hết, gộp kết quả)</div>
         <div class="mermaid">
 flowchart LR
   IN(["verifyShipped(card)"]) --> P1["① merged?<br/>gh api pulls/N"]
-  IN --> P2["② mergeCommit<br/>2 parents?<br/>(regular, NOT squash)"]
   IN --> P3["③ mergeSha là<br/>ancestor origin/master?"]
   IN --> P4["④ checksGreen?<br/>(+ waiver Sonar-504)"]
   IN --> P5["⑤ worktree +<br/>branch đã dọn?"]
@@ -689,7 +688,6 @@ flowchart LR
 
       <pre><div class="filebar">verify.ts</div><code class="language-typescript">const points: VerifyPointResult[] = [
   merged.point,                                // 1. PR đã merged?
-  await checkTwoParents(merged.mergeSha, ...),  // 2. merge commit 2 parent? (regular, KHÔNG squash)
   await checkAncestor(merged.mergeSha, ...),    // 3. mergeSha là ancestor của origin/master?
   await checkChecksGreen(card, ...),            // 4. CI xanh?
   await checkWorktreeAndBranchGone(card, ...),  // 5. worktree + branch đã dọn?
@@ -699,7 +697,6 @@ const failedPoints = points.filter((p) =&gt; !p.passed).map((p) =&gt; p.id);
 return { shipped: failedPoints.length === 0, points, failedPoints };</code></pre>
 
       <ul class="clean">
-        <li><strong>Bước 2 (2 parents):</strong> merge thường có 2 parent; squash/rebase chỉ 1. Đây là cách <em>enforce luật "no-squash"</em> của owner bằng code.</li>
         <li><strong>Bước 4 flake-waiver (D6):</strong> nếu check đỏ <em>duy nhất</em> khớp signature "SonarCloud 504" <strong>và</strong> diff chỉ toàn docs ⇒ tha. <code class="inl">docsOnlyPaths</code> rỗng thì <strong>fail-closed</strong> (không tha gì) — default ngược lại sẽ tha nhầm mọi code diff.</li>
         <li><strong>Bước 6 schema guard</strong> đọc front-matter YAML tối giản của plan (chỉ 1 flag <code class="inl">allowsSchemaChange</code>, không phải YAML parser đầy đủ).</li>
       </ul>
@@ -709,7 +706,7 @@ return { shipped: failedPoints.length === 0, points, failedPoints };</code></pre
     <!-- ============ 9. GITHUB.TS ============ -->
     <section id="github">
       <h2><span class="num">9</span> <code>github.ts</code> — commit/push/PR/merge state (§D6)</h2>
-      <p>Helper "docs-PR" tự động: commit file state lên branch <code class="inl">campaign-state/&lt;card&gt;</code>, mở PR, poll CI, <strong>merge regular</strong> (không squash), xoá branch, ff-sync base branch. Toàn bộ trả <strong>outcome có cấu trúc, KHÔNG throw</strong> — vì nó cũng chạy trên đường escalation (mà lý do escalate thường CHÍNH LÀ CI hỏng).</p>
+      <p>Helper "docs-PR" tự động: commit file state lên branch <code class="inl">campaign-state/&lt;card&gt;</code>, mở PR, poll CI, <strong>merge</strong> (<code class="inl">gh pr merge --merge</code>), xoá branch, ff-sync base branch. Toàn bộ trả <strong>outcome có cấu trúc, KHÔNG throw</strong> — vì nó cũng chạy trên đường escalation (mà lý do escalate thường CHÍNH LÀ CI hỏng).</p>
       <pre><div class="filebar">github.ts — kiểu kết quả (union)</div><code class="language-typescript">export type CommitStateAndMergeResult = MergedResult | EscalateResult | CommitFailedResult;</code></pre>
 
       <h3>9.1 · Poll CI với retry</h3>
@@ -811,7 +808,7 @@ stateDiagram-v2
           <li><strong><code>blocked</code> là derived</strong>, tính lại tới fixpoint mỗi lần → độc lập thứ tự, không tin status cũ trên đĩa.</li>
           <li><strong>Stateless wall</strong> → không hardcode repo/model/campaign; tất cả là CLI input.</li>
           <li><strong>Kết thúc chắc chắn (structural)</strong> → Set <code class="inl">attempted</code> làm sequence co lại mỗi vòng, đảm bảo loop luôn dừng.</li>
-          <li><strong>Ship = verify độc lập</strong> → không tin dòng "SHIPPED" của agent; chạy lại 6 kiểm tra thật.</li>
+          <li><strong>Ship = verify độc lập</strong> → không tin dòng "SHIPPED" của agent; chạy lại 5 kiểm tra thật.</li>
         </ul>
       </div>
     </section>
