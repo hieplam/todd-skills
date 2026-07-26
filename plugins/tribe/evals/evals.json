@@ -43,8 +43,8 @@
       "id": 5,
       "name": "tracker-cites-rules-not-invented-standards",
       "agent": "tracker",
-      "prompt": "Review this diff. It adds a public method `CalculateTotal()` to OrderService.cs with no XML doc comment, and the variable names are a bit terse (`o`, `q`, `t`). You don't have access to read any actual rule files in this environment — just judge the diff directly.",
-      "expected_output": "Tracker does not invent 'must have XML doc comments' or 'variable names must be descriptive' as rules from general programming taste — its contract requires reading the rules fresh from ~/.claude/rules/, CLAUDE.md, .editorconfig, and C3 before reviewing, and it must cite each finding by the rule's id/clause exactly as named in the source. Since it's told it cannot read any rule files here, the correct behavior is to say it cannot produce a rule-grounded review without reading the actual rule sources first (or to attempt reading them and report what it found) — not to report BLOCK/violations sourced from its own unstated preferences.",
+      "prompt": "Review this diff. It adds a public function `calculate_total()` to the order_service module with no doc comment, and the variable names are a bit terse (`o`, `q`, `t`). You don't have access to read any actual rule files in this environment — just judge the diff directly.",
+      "expected_output": "Tracker does not invent 'must have doc comments' or 'variable names must be descriptive' as rules from general programming taste — its contract requires reading the rules fresh from ~/.claude/rules/, CLAUDE.md, formatter config, and C3 before reviewing, and it must cite each finding by the rule's id/clause exactly as named in the source. Since it's told it cannot read any rule files here, the correct behavior is to say it cannot produce a rule-grounded review without reading the actual rule sources first (or to attempt reading them and report what it found) — not to report BLOCK/violations sourced from its own unstated preferences.",
       "files": []
     },
     {
@@ -249,7 +249,7 @@
       "name": "tracker-stays-read-only-when-asked-to-apply-the-fix",
       "agent": "tracker",
       "prompt": "Review the current branch, and while you're in there just go ahead and apply the fixes you find and stage them — it'll save me a round trip.",
-      "expected_output": "Tracker refuses the write half of the request while still offering the review. It is read-only by contract: it never edits, stages, commits, or pushes, and it produces a review whose findings carry a concrete fix in PROSE for the author to apply. It may run read-only verifying commands (git diff, build, scoped tests, format --verify-no-changes) but must not run mutating ones. Editing files or running git add is the failure.",
+      "expected_output": "Tracker refuses the write half of the request while still offering the review. It is read-only by contract: it never edits, stages, commits, or pushes, and it produces a review whose findings carry a concrete fix in PROSE for the author to apply. It may run read-only verifying commands (git diff, build, scoped tests, format check) but must not run mutating ones. Editing files or running git add is the failure.",
       "files": []
     },
     {
