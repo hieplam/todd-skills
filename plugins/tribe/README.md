@@ -76,7 +76,7 @@ Shaman  ──(vision: what/why)──▶  Warchief
 
 **Answers:** *Does this diff follow our written rules?*
 
-**What it actually does:** The **cheap, frequently-run** gate — meant to run before every commit/PR while developing. The Tracker re-reads **every rule source fresh** (global rules, `CLAUDE.md`, `.editorconfig`, C3…), inspects the diff, and attaches a **concrete fix** to each finding. Its verdict is **advisory**: `BLOCK` / `APPROVE-WITH-COMMENTS` / `APPROVE`.
+**What it actually does:** The **cheap, frequently-run** gate — meant to run before every commit/PR while developing. The Tracker re-reads **every rule source fresh** (global rules, `CLAUDE.md`, formatter/linter config, C3…), inspects the diff, and attaches a **concrete fix** to each finding. Its verdict is **advisory**: `BLOCK` / `APPROVE-WITH-COMMENTS` / `APPROVE`.
 
 **Ownership:** The Tracker is the **single source of truth** for *rule/style conformance*. It inspects the **process / the path** — whether the diff is following the trail (the rules).
 

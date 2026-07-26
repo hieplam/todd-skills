@@ -359,11 +359,11 @@ that satisfies it. Adversarially:
 ### 5. Run the proof
 
 Execute the plan's exact per-task verification commands AND the spec's Testing section:
-unit/e2e tests, `tsc --noEmit`, lint, `format:check`, build, any `grep` assertions,
+unit/e2e tests, a typecheck, lint, a format check, build, any `grep` assertions,
 `c3 check`. If the contract names no commands (a Jira ticket or PR description usually
 doesn't), run the repo's standard proof instead: full build, the complete test suite,
 and lint/format check, discovered from the repo's own config (CI workflow, Makefile,
-`package.json` scripts, `.sln`). Capture pass/fail + key output. A claimed result you did
+task-runner manifest scripts, build manifest). Capture pass/fail + key output. A claimed result you did
 not personally reproduce is **unverified**. Run only _verifying_ commands — never
 mutating ones.
 
