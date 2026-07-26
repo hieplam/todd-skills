@@ -219,6 +219,11 @@ subprocess that happened to time out.
 `scripts/evals/baselines/` **is** committed — a trim needs a stable "before", and re-measuring
 the baseline every time would let both sides of the comparison drift at once.
 
+**The current comparison root is `scripts/evals/baselines/2026-07-26-prod-models/`** (3 runs
+per case, production models, UNGRADED-aware — see its README for the noise floor and
+known-invalid cases). `2026-07-25-sonnet/` is retained as history only: 1 run per case means
+`compare.py` can never emit CONFIRMED against it, and it predates the case rewrites.
+
 ## Two harness bugs this mode required fixing
 
 Both produced **false FAILs** — harness artifacts scored as agent defects. Any regression signal
