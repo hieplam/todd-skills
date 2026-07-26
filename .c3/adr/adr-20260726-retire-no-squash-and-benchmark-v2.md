@@ -1,6 +1,6 @@
 ---
 id: adr-20260726-retire-no-squash-and-benchmark-v2
-c3-seal: ab5bea3c0012e76595c9d40e72ee299b813e0eeaa70517729a826f4c6ceec0cb
+c3-seal: 7fe15b942d923e08c10dd601205f61f28c3ccf9661623a3d0b125d665ff08c2e
 title: retire-no-squash-and-benchmark-v2
 type: adr
 goal: 'Retire the no-squash-merge rule from every live enforcing surface in this repo — the owner has ruled (2026-07-26) that merge shape is an implementation detail with no bearing on their goal ("miễn là PR được merge"): prompts should carry guidance and goals, not enforce implementation details other than anti-goals. Simultaneously, make the tribe prompt benchmark a valid baseline instrument: fix the two remaining measurement defects (grader truncation fail-closed as FAIL; executor model ignoring agent frontmatter) and repair the four invalid eval cases (19, 26, 27, 32) plus write the case-12 remedy into warchief.md — so that a 3-run baseline v2 can be recorded that `compare.py`''s CONFIRMED tripwire can actually fire against.'
@@ -99,9 +99,20 @@ Two arms, one work order, ratified by the owner in session on 2026-07-26:
 
 | Check | Result |
 | --- | --- |
-| cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit | pending |
-| bash plugins/verify-shipped/skills/verify-shipped/scripts/verify-shipped.sh against PR #54 → PASS, 3 checks | pending |
-| scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json --dry-run lists 34 cases | pending |
-| python3 -c probe: truncated grader text → {"status": "UNGRADED"} not passed: False | pending |
-| grep -rn "squash | PARENT_COUNT |
-| c3 check after c3 change apply | pending |
+| cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit | pass — 209 tests, 0 fail; tsc clean |
+| bash plugins/verify-shipped/skills/verify-shipped/scripts/verify-shipped.sh against PR #54 → PASS, 3 checks | pass — verdict PASS, exactly 3 checks |
+| scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json --dry-run lists 34 cases | pass — 34 unique ids |
+| python3 -c probe: truncated grader text → UNGRADED, never passed:False | pass — probe green |
+| grep sweep: zero live squash / PARENT_COUNT / mergeCommitTwoParents enforcement hits outside docs history and baselines | pass — 0 hits |
+| c3 check after c3 change apply | pending — apply blocked by upstream c3x defect (check/repair prune pending unit material; apply reports "no material"); material committed, follow-up filed |
+
+## Verification
+
+| Check | Result |
+| --- | --- |
+| cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit | pass — 209 tests, 0 fail; tsc clean |
+| bash plugins/verify-shipped/skills/verify-shipped/scripts/verify-shipped.sh against PR #54 → PASS, 3 checks | pass — verdict PASS, exactly 3 checks |
+| scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json --dry-run lists 34 cases | pass — 34 unique ids |
+| python3 -c probe: truncated grader text → UNGRADED, never passed:False | pass — probe green |
+| grep sweep: zero live squash / PARENT_COUNT / mergeCommitTwoParents enforcement hits outside docs history and baselines | pass — 0 hits |
+| c3 check after c3 change apply | pending — apply blocked by upstream c3x defect (check/repair prune pending unit material; apply reports "no material"); material committed, follow-up filed |
