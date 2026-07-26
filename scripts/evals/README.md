@@ -66,6 +66,30 @@ every `with_skill` grading verdict of transcript/tool-call evidence. A second, t
 (the grader) scores the transcript against `expected_output` and writes `grading.json`
 with evidence. Everything rolls up into one `benchmark.json` per invocation.
 
+### UNGRADED: a harness failure is not an agent failure
+
+Grading is itself a `claude -p` subprocess call, and that call can fail the same way any
+subprocess can: it can time out, exit non-zero, or hand back a reply that isn't valid
+JSON (including one cut off mid-object — a truncated reply). When that happens the
+*harness* failed to produce a verdict — nothing about the agent's actual behavior was
+judged. Scoring that as `passed: false` would silently corrupt every pass-rate read off
+the suite, so `grade()` reports a third outcome instead: `{"ungraded": true, "evidence":
+"<why>"}`.
+
+An ungraded run is excluded from the pass/total denominator wherever results roll up:
+
+- a case's own `result` dict reports `"total": 0` (not `1`) with `"ungraded": 1` when
+  its only run was ungraded — never a fake `"passed": 0` read as a FAIL;
+- its `grading.json` expectation entry carries `"ungraded": true` instead of
+  `"passed": false`;
+- the per-configuration roll-up in `benchmark.json`'s `run_summary` (`with_skill` /
+  `without_skill`) computes `pass_rate` only over graded runs and reports the excluded
+  count as `"ungraded"` alongside it;
+- `compare.py` (below) treats an ungraded run as a **missing sample** — the same
+  treatment as a case present on only one side of a comparison — never as a fail; folding
+  it in as a fail could manufacture a `CONFIRMED` regression out of nothing but a grader
+  hiccup.
+
 This only reads skill/agent files and shells out to `claude -p` in a scratch temp
 directory per case — it never edits a skill's or agent's runtime files.
 
@@ -89,6 +113,27 @@ Key flags: `--mode {both,with_skill,without_skill}`, `--runs N` (repeats per
 configuration, for variance), `--timeout SECONDS` (per `claude -p` call), `--exec-model`
 / `--grader-model` (default: your configured model — pin to something cheap for a smoke
 pass), `--eval-id 1,3` (restrict to specific case ids).
+
+**Executor model resolution (`kind: "agent"` cases only).** An explicit `--exec-model`
+used to be the *only* way to pick the executor's model, so every agent-kind case ran on
+whatever one model the caller chose — even though production dispatches each agent on
+the model its own frontmatter names (e.g. `plugins/tribe/agents/warchief.md` declares
+`model: opus`). Benchmarking `warchief.md` on `sonnet` measures a model production never
+runs it on, so any regression conclusion drawn from that run would not transfer.
+Precedence, highest first:
+
+1. **`--exec-model`**, if given — overrides everything (still the way to run a cheap
+   smoke pass on `haiku` without touching any agent's frontmatter).
+2. **The subject agent's frontmatter `model:` value** — a concrete value (`opus`,
+   `sonnet`, `haiku`) is passed to the executor as `--model`.
+3. **`inherit`** (Claude Code's own frontmatter convention for "use the caller's model"),
+   or a missing `model:` key — resolves to the harness default (no `--model` flag passed
+   at all), same as giving no model today.
+
+The model actually used is recorded per run in `result.model` in `benchmark.json`, so a
+benchmark is self-describing about which model each case ran on. `--grader-model` is
+unaffected by any of this — the grader's model is always either `--grader-model` or,
+failing that, `--exec-model`/default, exactly as before.
 
 Output lands in `scripts/evals/runs/<UTC-timestamp>/` by default (git-ignored —
 reproducible from `evals.json` + this script, not checked in), or under `--out-dir PATH`
@@ -161,6 +206,12 @@ not be conflated:
 
 At `--runs 1` every flip is `UNSTABLE` by construction — one sample cannot separate a regression
 from model variance. Use `--runs 3` before trusting a trim.
+
+An `ungraded` run (see UNGRADED above) is never one of these two runs of `[true, false, ...]`
+per case — `compare.py` drops it before pairing baseline against candidate, the same as a case
+present on only one side of the comparison. Treating it as a fail instead could manufacture a
+`CONFIRMED` regression (or hide a real one inside `UNSTABLE`) out of nothing but a grader
+subprocess that happened to time out.
 
 ### Baselines are checked in
 
