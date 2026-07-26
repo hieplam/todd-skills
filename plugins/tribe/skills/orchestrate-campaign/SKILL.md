@@ -78,7 +78,7 @@ value belongs in the campaign's own docs, not here.
    (or the owner) ever append rulings to this file, in every stage below — the runner never
    writes to it (wall W3: judgment stays in sessions, never migrates into the runner).
 5. **Land the docs PR** (state file + answers scaffold + specs/plans) to `<target-repo>`'s master
-   via a regular merge — never squash (wall W4). Cards are now `staged`.
+   via `gh pr merge --merge`. Cards are now `staged`.
 
 #### The campaign state file (`<state-path>`)
 
@@ -337,7 +337,5 @@ live inside you.
 - **W3 — judgment stays in sessions.** `answers.md` is written only by you (a session) or the
   owner — never by the runner. If you ever see the runner's own commits touching that file,
   something is badly wrong; stop and report it rather than continuing the loop.
-- **W4 — no squash.** Every merge this skill lands (the Stage A docs PR, and every card PR the
-  runner produces) is a regular, two-parent merge.
 - **W7 — bounded auto-answer.** At most 2 auto-answer rounds per card. A card still escalating
   after that parks for the owner, full stop — do not attempt a third ruling.

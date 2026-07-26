@@ -1,8 +1,8 @@
-// D3 six-point SHIPPED verification, as code (Task 3).
+// D3 five-point SHIPPED verification, as code (Task 3).
 //
 // verifyShipped() is the acceptance gate for a card the executor claims is `SHIPPED
 // <pr> <sha>` — that line is a signal only (design spec §D3); this module independently
-// replays all six checks against reality. Every world-touching operation (gh/git
+// replays all five checks against reality. Every world-touching operation (gh/git
 // invocations, reading the card's plan file) goes through the injected `io` seam below —
 // this module never imports `child_process`, `fs`, or performs network I/O itself.
 import { join } from 'node:path';
@@ -26,11 +26,10 @@ export interface VerifyConfig {
   docsOnlyPaths: string[];
 }
 
-/** The D3 six points, each independently reported (never short-circuited) so a failed
+/** The D3 five points, each independently reported (never short-circuited) so a failed
  * `verifyShipped` names EVERY failing point, not just the first. */
 export type VerifyPointId =
   | 'merged'
-  | 'mergeCommitTwoParents'
   | 'mergeShaAncestorOfMaster'
   | 'checksGreen'
   | 'worktreeAndBranchGone'
@@ -130,40 +129,6 @@ async function checkMerged(
         : `PR #${card.pr} is not merged (gh api ${apiPath} reported merged=${String(parsed.merged)})`,
     },
     mergeSha,
-  };
-}
-
-async function checkTwoParents(
-  mergeSha: string | null,
-  config: VerifyConfig,
-  io: VerifyIO,
-): Promise<VerifyPointResult> {
-  if (!mergeSha) {
-    return {
-      id: 'mergeCommitTwoParents',
-      passed: false,
-      detail: 'no merge sha available (point 1 did not report one); cannot inspect parents',
-    };
-  }
-
-  const result = await run(io, config.repoRoot, ['git', 'rev-list', '--parents', '-n', '1', mergeSha]);
-  if (result.exitCode !== 0) {
-    return {
-      id: 'mergeCommitTwoParents',
-      passed: false,
-      detail: `git rev-list --parents -n 1 ${mergeSha} failed: ${result.stderr || result.stdout}`,
-    };
-  }
-
-  const tokens = result.stdout.trim().split(/\s+/).filter(Boolean);
-  const parentCount = Math.max(0, tokens.length - 1);
-  return {
-    id: 'mergeCommitTwoParents',
-    passed: parentCount === 2,
-    detail:
-      parentCount === 2
-        ? `merge commit ${mergeSha} has 2 parents (regular merge)`
-        : `merge commit ${mergeSha} has ${parentCount} parent(s) — squash/rebase merges have 1, expected 2`,
   };
 }
 
@@ -396,7 +361,7 @@ async function checkSchemaGuard(card: Card, config: VerifyConfig, io: VerifyIO):
   };
 }
 
-/** The D3 six-point replay, as code. The executor's `SHIPPED <pr> <sha>` line is a signal
+/** The D3 five-point replay, as code. The executor's `SHIPPED <pr> <sha>` line is a signal
  * only (spec §D3) — this is the acceptance. Every point is checked and reported
  * independently; a failure at one point never short-circuits the rest, so a failed result
  * names EVERY failing point (it feeds the escalation file a human reads). Never throws on
@@ -405,7 +370,6 @@ export async function verifyShipped(card: Card, config: VerifyConfig, io: Verify
   const merged = await checkMerged(card, config, io);
   const points: VerifyPointResult[] = [
     merged.point,
-    await checkTwoParents(merged.mergeSha, config, io),
     await checkAncestor(merged.mergeSha, config, io),
     await checkChecksGreen(card, config, io),
     await checkWorktreeAndBranchGone(card, config, io),

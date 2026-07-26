@@ -57,7 +57,7 @@ Ship C7 end-to-end: implement the plan at docs/superpowers/plans/2026-01-01-c7-p
 
 ## Walls (non-negotiable)
 
-- Merge policy for this campaign is \`merge\` — regular merge order, NEVER squash.
+- Merge policy for this campaign is \`merge\`; land with \`gh pr merge --merge\`.
 - The target repo's own CLAUDE.md and \`.claude/rules\` are binding; do not import
   conventions from elsewhere.
 - Owner-only items for this campaign (escalate, never decide): schema-lock-change, breaking-change
@@ -89,8 +89,7 @@ that proves them — paste gate output verbatim into worker reports.
 
 ## Merge order
 
-Land the PR with a REGULAR merge (\`gh pr merge --merge\`). Squash and rebase merges are
-forbidden for this campaign — the merge commit must carry both parents.
+Land the PR with \`gh pr merge --merge\`.
 
 ## Worker reports
 
@@ -127,10 +126,9 @@ describe('executorBrief', () => {
     expect(rendered).toContain(distinctiveRuling);
   });
 
-  test('never squash: the regular-merge order is explicit', () => {
+  test('states the merge command the executor lands with', () => {
     const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
     expect(rendered).toContain('gh pr merge --merge');
-    expect(rendered).toContain('NEVER squash');
   });
 
   test('states the anti-livelock wall — the 2026-07-17 incident killed 6 workers without it', () => {

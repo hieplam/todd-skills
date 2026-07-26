@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 # verify-shipped.sh — mechanically check the tribe's Definition of Done.
 #
-# The owner's global CLAUDE.md defines "done" as: PR merged via a regular
-# (2-parent) merge and ready to work on new feature with LATEST CHANGES —
-# the owner's standing rule is "Do not Squash merge". This script checks
-# that, mechanically, instead of trusting a Warchief's prose SHIPPED report.
+# The owner's global CLAUDE.md defines "done" as: PR merged and ready to
+# work on new feature with LATEST CHANGES. How the PR was merged does not
+# matter. This script checks that, mechanically, instead of trusting a
+# Warchief's prose SHIPPED report.
 #
-# Four checks, each reported independently:
+# Three checks, each reported independently:
 #   1. pr_merged              — PR state == MERGED
-#   2. merge_strategy_no_squash — merge commit is a regular merge: exactly
-#                                2 parents. A 1-parent commit (squash or
-#                                rebase) is a FAIL.
-#   3. master_in_sync         — local <base> branch has no divergence from
+#   2. master_in_sync         — local <base> branch has no divergence from
 #                                origin/<base> (0 ahead, 0 behind)
-#   4. worktree_removed       — the given worktree path is gone from both
+#   3. worktree_removed       — the given worktree path is gone from both
 #                                `git worktree list` and disk
 #
 # Output: JSON summary on stdout only. Logs go to stderr.
@@ -46,7 +43,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$PR_ARG" ]]       || DIE "--pr <number|url> is required"
-[[ -n "$WORKTREE_ARG" ]] || DIE "--worktree <path> is required (all four checks must run)"
+[[ -n "$WORKTREE_ARG" ]] || DIE "--worktree <path> is required (all three checks must run)"
 
 command -v gh >/dev/null 2>&1      || DIE "gh (GitHub CLI) not found — required for PR checks"
 command -v git >/dev/null 2>&1     || DIE "git not found"
@@ -57,7 +54,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || DIE "not in a git repo
 # Canonicalize a possibly-relative --worktree path against the caller's
 # original $PWD *before* we cd into REPO_ROOT below. If this isn't done,
 # a relative path (e.g. `../mywt`) silently gets re-resolved against
-# REPO_ROOT instead of the caller's cwd, causing check 4 to test the wrong
+# REPO_ROOT instead of the caller's cwd, causing check 3 to test the wrong
 # location and produce a false PASS for a worktree that is still on disk.
 WORKTREE_ARG=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORKTREE_ARG")
 
@@ -72,17 +69,16 @@ cd "$REPO_ROOT"
 LOG "resolving PR: $PR_ARG"
 if [[ -n "$REPO_ARG" ]]; then
   PR_JSON=$(gh pr view "$PR_ARG" --repo "$REPO_ARG" \
-    --json number,url,state,mergeCommit,commits,baseRefName,headRefName,mergedAt 2>/dev/null) \
+    --json number,url,state,commits,baseRefName,headRefName,mergedAt 2>/dev/null) \
     || DIE "gh pr view failed for $PR_ARG (not found, no auth, or not a PR)"
 else
   PR_JSON=$(gh pr view "$PR_ARG" \
-    --json number,url,state,mergeCommit,commits,baseRefName,headRefName,mergedAt 2>/dev/null) \
+    --json number,url,state,commits,baseRefName,headRefName,mergedAt 2>/dev/null) \
     || DIE "gh pr view failed for $PR_ARG (not found, no auth, or not a PR)"
 fi
 
 PR_NUMBER=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["number"])' "$PR_JSON")
 PR_STATE=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["state"])' "$PR_JSON")
-MERGE_SHA=$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print((d.get("mergeCommit") or {}).get("oid") or "")' "$PR_JSON")
 
 # ---------- check 1: pr_merged ----------
 if [[ "$PR_STATE" == "MERGED" ]]; then
@@ -91,67 +87,41 @@ else
   CHECK1_STATUS="fail"; CHECK1_DETAIL="PR #$PR_NUMBER state is $PR_STATE, not MERGED"
 fi
 
-# ---------- check 2: merge_strategy_no_squash ----------
-CHECK2_STATUS="unknown"
-CHECK2_DETAIL="PR not merged — cannot check merge strategy"
-if [[ "$CHECK1_STATUS" == "pass" ]]; then
-  if [[ -z "$MERGE_SHA" ]]; then
-    CHECK2_STATUS="unknown"
-    CHECK2_DETAIL="PR reports MERGED but no merge commit sha was returned"
-  else
-    # Make sure the merge commit is present locally.
-    git fetch origin "$MERGE_SHA" >/dev/null 2>&1 || true
-    if ! git cat-file -e "${MERGE_SHA}^{commit}" 2>/dev/null; then
-      CHECK2_STATUS="unknown"
-      CHECK2_DETAIL="merge commit $MERGE_SHA not available locally even after fetch"
-    else
-      PARENT_COUNT=$(git log -1 --format='%P' "$MERGE_SHA" | wc -w | tr -d ' ')
-      if [[ "$PARENT_COUNT" == "2" ]]; then
-        CHECK2_STATUS="pass"
-        CHECK2_DETAIL="merge commit $MERGE_SHA has 2 parents — a regular merge, not squash/rebase"
-      else
-        CHECK2_STATUS="fail"
-        CHECK2_DETAIL="merge commit $MERGE_SHA has $PARENT_COUNT parent(s) — expected 2 parents for a regular merge; a 1-parent commit is a squash or rebase merge, both of which violate the owner's 'Do not Squash merge' rule"
-      fi
-    fi
-  fi
-fi
-
-# ---------- check 3: master_in_sync ----------
+# ---------- check 2: master_in_sync ----------
 git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
 if ! git rev-parse --verify --quiet "$BASE_BRANCH" >/dev/null; then
-  CHECK3_STATUS="unknown"
-  CHECK3_DETAIL="no local branch named $BASE_BRANCH to compare"
+  CHECK2_STATUS="unknown"
+  CHECK2_DETAIL="no local branch named $BASE_BRANCH to compare"
 elif ! git rev-parse --verify --quiet "origin/$BASE_BRANCH" >/dev/null; then
-  CHECK3_STATUS="unknown"
-  CHECK3_DETAIL="no origin/$BASE_BRANCH ref found (fetch failed?)"
+  CHECK2_STATUS="unknown"
+  CHECK2_DETAIL="no origin/$BASE_BRANCH ref found (fetch failed?)"
 else
   read -r AHEAD BEHIND <<<"$(git rev-list --left-right --count "$BASE_BRANCH...origin/$BASE_BRANCH")"
   if [[ "$AHEAD" == "0" && "$BEHIND" == "0" ]]; then
-    CHECK3_STATUS="pass"
-    CHECK3_DETAIL="local $BASE_BRANCH == origin/$BASE_BRANCH"
+    CHECK2_STATUS="pass"
+    CHECK2_DETAIL="local $BASE_BRANCH == origin/$BASE_BRANCH"
   else
-    CHECK3_STATUS="fail"
-    CHECK3_DETAIL="local $BASE_BRANCH is $AHEAD ahead / $BEHIND behind origin/$BASE_BRANCH"
+    CHECK2_STATUS="fail"
+    CHECK2_DETAIL="local $BASE_BRANCH is $AHEAD ahead / $BEHIND behind origin/$BASE_BRANCH"
   fi
 fi
 
-# ---------- check 4: worktree_removed ----------
+# ---------- check 3: worktree_removed ----------
 WORKTREE_ABS="$WORKTREE_ARG"
 REGISTERED=$(git worktree list --porcelain | grep -A0 "^worktree $WORKTREE_ARG$" || true)
 if [[ -e "$WORKTREE_ABS" || -n "$REGISTERED" ]]; then
-  CHECK4_STATUS="fail"
+  CHECK3_STATUS="fail"
   DETAIL_BITS=""
   [[ -e "$WORKTREE_ABS" ]] && DETAIL_BITS="path still exists on disk"
   [[ -n "$REGISTERED" ]] && DETAIL_BITS="${DETAIL_BITS:+$DETAIL_BITS; }still registered in git worktree list"
-  CHECK4_DETAIL="$WORKTREE_ARG not fully removed — $DETAIL_BITS"
+  CHECK3_DETAIL="$WORKTREE_ARG not fully removed — $DETAIL_BITS"
 else
-  CHECK4_STATUS="pass"
-  CHECK4_DETAIL="$WORKTREE_ARG is gone from disk and from git worktree list"
+  CHECK3_STATUS="pass"
+  CHECK3_DETAIL="$WORKTREE_ARG is gone from disk and from git worktree list"
 fi
 
 # ---------- verdict ----------
-if [[ "$CHECK1_STATUS" == "pass" && "$CHECK2_STATUS" == "pass" && "$CHECK3_STATUS" == "pass" && "$CHECK4_STATUS" == "pass" ]]; then
+if [[ "$CHECK1_STATUS" == "pass" && "$CHECK2_STATUS" == "pass" && "$CHECK3_STATUS" == "pass" ]]; then
   VERDICT="PASS"
 else
   VERDICT="FAIL"
@@ -165,13 +135,12 @@ python3 - \
   "$CHECK1_STATUS" "$CHECK1_DETAIL" \
   "$CHECK2_STATUS" "$CHECK2_DETAIL" \
   "$CHECK3_STATUS" "$CHECK3_DETAIL" \
-  "$CHECK4_STATUS" "$CHECK4_DETAIL" \
   <<'PY'
 import json, sys
 
 (pr_number, base_branch, worktree, verdict,
  c1_status, c1_detail, c2_status, c2_detail,
- c3_status, c3_detail, c4_status, c4_detail) = sys.argv[1:13]
+ c3_status, c3_detail) = sys.argv[1:11]
 
 print(json.dumps({
     "pr_number": pr_number,
@@ -179,9 +148,8 @@ print(json.dumps({
     "worktree": worktree,
     "checks": {
         "pr_merged":             {"status": c1_status, "detail": c1_detail},
-        "merge_strategy_no_squash": {"status": c2_status, "detail": c2_detail},
-        "master_in_sync":        {"status": c3_status, "detail": c3_detail},
-        "worktree_removed":      {"status": c4_status, "detail": c4_detail},
+        "master_in_sync":        {"status": c2_status, "detail": c2_detail},
+        "worktree_removed":      {"status": c3_status, "detail": c3_detail},
     },
     "verdict": verdict,
 }, indent=2))

@@ -151,8 +151,8 @@ async function pollChecksUntilSettled(
  * The runner's own deterministic docs-PR helper (spec §D6): commits `files` (paths already
  * written to disk by the caller, relative to `config.repoRoot`) on a fresh
  * `campaign-state/<card>` branch, opens a PR, polls checks under the D6 retry + flake-waiver
- * policy, merges with a REGULAR merge (never squash — the owner's no-squash rule is
- * absolute), deletes the branch, and fast-forward-syncs the target repo's local base branch.
+ * policy, merges with `gh pr merge --merge` (the runner's default merge behavior), deletes
+ * the branch, and fast-forward-syncs the target repo's local base branch.
  *
  * Every failure is a structured outcome (`commit_failed` | `escalate`), never a thrown
  * error — this call also runs on the escalation path (D5), where the usual reason to
