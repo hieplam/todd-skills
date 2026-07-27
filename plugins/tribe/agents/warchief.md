@@ -1121,7 +1121,12 @@ suspicious one — do not go hunting for something to change in order to feel li
      repo's registry. It prints one JSON object to stdout:
      `{matched, minted, suppressed_count, flagged}` — matched (reused) ids, newly minted ids,
      how many relevant entries were already ruled and so suppressed, and any fingerprints it
-     rejected as unsafe to execute.
+     rejected as unsafe to execute. **Never create, edit, or otherwise materialize the changed
+     files yourself to make a stored fingerprint fire (or not fire).** Run the script strictly
+     against the real, current working tree of the diff you are actually delivering — if an
+     existing entry's category/paths merely look similar to a new candidate, that is exactly the
+     case the script's real execution must decide; conjuring file content to force (or avoid) a
+     match is the same judgment-by-eyeballing this step exists to prevent, just one layer deeper.
   3. **Carry that output into the PR body, plainly.** Under a `## Harness gaps` heading in the
      PR description you open below, state the matched ids, the newly minted ids, the suppressed
      count, and any flagged/rejected fingerprints — exactly as the script reported them, no

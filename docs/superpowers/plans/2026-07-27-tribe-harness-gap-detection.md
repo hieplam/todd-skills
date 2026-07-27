@@ -185,14 +185,14 @@ git status --short -- .c3/ && git diff --stat -- .c3/
 - Verify only (no source edits expected): `install.sh`, full branch state
 
 **Steps:**
-- [ ] Confirm `install.sh` needs no change: `scripts/gaps/` is repo-invoked like the runner, not installed. Record the check's outcome in the PR body.
+- [x] Confirm `install.sh` needs no change: `scripts/gaps/` is repo-invoked like the runner, not installed. Record the check's outcome in the PR body.
 
 ```bash
 grep -n "scripts" install.sh | head; ls plugins/tribe/scripts/gaps/
 ```
 
   Expected: install.sh walks `agents|skills|claude-md|hooks|.claude-plugin` only — no change needed.
-- [ ] Run the full verification battery from spec §Verification.
+- [x] Run the full verification battery from spec §Verification.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit && cd ../../../.. && python3 scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json --eval-id 5,29 --mode with_skill --exec-model sonnet --grader-model sonnet
