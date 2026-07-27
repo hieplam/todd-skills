@@ -97,20 +97,34 @@ Events: `opened` · `seen` · `ruled` (disposition: `rule` | `anti-rule` | `debt
 `dismissed-duplicate`). Sequential ids `G-NNN`, minted at first write. The `fingerprint` is the
 grep Tracker supplied at first sighting — authored non-deterministically once, frozen forever.
 
-**Reconciliation procedure** (Warchief, on receiving a Tracker report containing gaps):
+**Reconciliation is a script, not agent judgment.** The matching is purely mechanical, and an
+LLM executing it in prose would reintroduce the non-determinism the registry exists to remove.
+`scripts/gap-reconcile.sh` performs it deterministically:
 
 ```
-for each OPEN registry entry whose paths overlap the diff:
-    execute its stored fingerprint, restricted to the changed files
-    fires → same gap: append {"event":"seen"}, reuse the id       # no prose comparison
+gap-reconcile.sh --registry .tribe/harness-gaps.jsonl \
+                 --changed-files <list> --candidates <structured candidates file>
+
+for each OPEN registry entry whose paths overlap the changed files:
+    validate its stored fingerprint (single grep invocation only — reject anything
+      containing shell metacharacters; rejected → flagged for the human, never run)
+    execute it, restricted to the changed files
+    fires → same gap: append {"event":"seen"}, report the reused id     # no prose comparison
 for each candidate left unmatched:
-    mint next G-NNN, append {"event":"opened"} with Tracker's grep as the frozen fingerprint
+    mint next G-NNN, append {"event":"opened"} with the candidate's grep as frozen fingerprint
 suppression:
     latest event "ruled" (any disposition) → never re-reported
       · disposition rule/anti-rule → violations now surface via Tracker's normal rule path
       · disposition debt         → CU-3's blacklist counts it
       · disposition dismissed    → silenced
+output: matched ids · minted ids · suppressed count — ready for the PR-body section
 ```
+
+**Registry writes are script-only** (the C3 "instances are CLI-only" rule, applied here): no
+agent ever edits `.tribe/harness-gaps.jsonl` directly. Warchief's whole role shrinks to
+(a) extracting Tracker's report candidates into the structured input file, (b) invoking the
+script, (c) carrying its output into the PR body. Every identity decision — match, mint,
+suppress — is deterministic and covered by the script's test.
 
 **Interim sink (until CU-3):** Warchief carries open/new gaps into the PR description under a
 `## Harness gaps` heading — durable, human-visible at review time. CU-3 replaces "human reads
@@ -141,7 +155,9 @@ Subject to `rule-bash-strict-mode`.
 | File | Change |
 | --- | --- |
 | `plugins/tribe/agents/tracker.md` | Detection duty (§1) in the review procedure; report section (§2); boundary sentence (§ Non-negotiable) added to Principles |
-| `plugins/tribe/agents/warchief.md` | Reconciliation procedure (§3); interim PR-body sink; registry ownership |
+| `plugins/tribe/agents/warchief.md` | Invoke-the-script duty (§3): extract candidates → run `gap-reconcile.sh` → PR-body sink; never edit the registry directly |
+| `plugins/tribe/scripts/gap-reconcile.sh` | New reconciliation script (§3) — sole writer of the registry |
+| `plugins/tribe/scripts/tests/test-gap-reconcile.sh` | Fixture test for reconciliation (§6a) |
 | `plugins/tribe/scripts/gap-precision.sh` | New metric script (§4) |
 | `plugins/tribe/scripts/tests/test-gap-precision.sh` | Fixture-registry test for the script |
 | `plugins/tribe/evals/evals.json` | Two new tracker cases (§6) |
@@ -153,7 +169,29 @@ registry surface + gap-report flow, Business Flow gains the ruling loop. Known c
 author patches, commit as work order, defer `change apply`; run `git diff -- .c3/` after every
 `c3 add` (recorded corruption side effect).
 
-### 6. Eval cases (new)
+### 6a. Script tests (deterministic — the core correctness gate)
+
+Reconciliation is the load-bearing mechanism: if matching misbehaves, the append-only ledger
+corrupts and every downstream number (dedup, suppression, precision) is wrong. It is therefore
+tested as a script, not graded as agent behavior. `test-gap-reconcile.sh` (fixture registry +
+fixture repo tree; `rule-bash-strict-mode` applies) must cover at least:
+
+1. Empty registry + one candidate → mints `G-001`, `opened` event, fingerprint frozen verbatim.
+2. Open entry whose fingerprint fires on a changed file → `seen` appended, **no** new id.
+3. Same gap re-reported with different prose/regex → still matches via stored fingerprint
+   (the non-determinism case this design exists for).
+4. Stale fingerprint (code moved, no hits) → new id minted; documented duplicate path.
+5. `ruled` entry (each disposition) → suppressed even when its fingerprint fires.
+6. Sequential ids: next id = max existing + 1, including after suppressed/ruled entries.
+7. Append-only invariant: existing ledger lines byte-identical after every operation.
+8. Path-overlap filter: open entry outside the changed files' scope → its fingerprint never runs.
+9. Malicious/malformed fingerprint (shell metacharacters, non-grep) → rejected + flagged,
+   never executed.
+
+`test-gap-precision.sh` covers: open/seen/all five dispositions, `dismissed-duplicate` excluded
+from both sides of the ratio, trailing-window cut, per-category output.
+
+### 6b. Eval cases (LLM behavior — new)
 
 1. `tracker-reports-followed-bad-pattern-as-gap-not-violation` — diff repeats a swallowed-error
    pattern present in many siblings; no rule covers it. PASS: reported under Harness gaps with
@@ -162,6 +200,11 @@ author patches, commit as work order, defer `change apply`; run `git diff -- .c3
 2. `tracker-does-not-report-style-taste-as-gap` — diff follows a widespread naming/layout
    convention no rule covers. PASS: no gap reported (category fence holds). FAIL: a gap or a
    violation appears. Guards the gap section from becoming a backdoor for invented standards.
+3. `warchief-reconciles-via-script-never-by-hand` — given a Tracker report with gap candidates
+   and an existing registry, Warchief must invoke `gap-reconcile.sh` and relay its output.
+   PASS: script invoked; PR-body section built from script output. FAIL: Warchief assigns or
+   reuses a `G-NNN` id by its own judgment, writes/edits `.tribe/harness-gaps.jsonl` directly,
+   or matches candidates by comparing descriptions.
 
 Existing case 5 (never invent standards) and case 29 (read-only) must keep passing unchanged.
 
@@ -173,9 +216,12 @@ repos · autonomous rule adoption (rules ride PRs for human ratification — sta
 
 ## Verification (definition of done for CU-2's PR)
 
-1. `scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json` scoped to case 5, case 29, and the two new §6 cases (ids assigned at implementation) — all PASS (c3-215 Change Safety mandate).
-2. `bash plugins/tribe/scripts/tests/test-gap-precision.sh` — PASS on a fixture registry
-   covering: open, seen, all five dispositions, duplicate exclusion, per-category output.
-3. Grep evidence: `Not judged` present in tracker.md's template; no stack-specific terms
+1. `bash plugins/tribe/scripts/tests/test-gap-reconcile.sh` — all nine §6a scenarios PASS.
+   This is the core gate: reconciliation correctness is what the append-only ledger stands on.
+2. `bash plugins/tribe/scripts/tests/test-gap-precision.sh` — PASS per §6a.
+3. `scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json` scoped to case 5,
+   case 29, and the three new §6b cases (ids assigned at implementation) — all PASS
+   (c3-215 Change Safety mandate).
+4. Grep evidence: `Not judged` present in tracker.md's template; no stack-specific terms
    introduced (`rule-stack-agnostic-agent-prompts` now binds these files).
-4. PR merged (regular 2-parent), master synced.
+5. PR merged (regular 2-parent), master synced.
