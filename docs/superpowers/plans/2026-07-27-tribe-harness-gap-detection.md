@@ -143,17 +143,17 @@ grep -niE 'c#|dotnet|npm |pytest|cargo ' plugins/tribe/agents/tracker.md; grep -
 - Modify: `plugins/tribe/README.md`, `plugins/tribe/claude-md/review-agents.md`
 
 **Steps:**
-- [ ] Add the Warchief duty per spec §3: on a Tracker report containing harness gaps — (a) extract candidates into the structured JSON file, (b) invoke `gap-reconcile.ts` (resolved from the plugin root, never the shell cwd), (c) carry the script's output into the PR description under a `## Harness gaps` heading. State verbatim: Warchief never edits `.tribe/harness-gaps.jsonl` directly, never mints or matches ids by judgment.
-- [ ] Append the three spec §6b eval cases to `plugins/tribe/evals/evals.json` following the existing fixture shape (kind "agent", per-case `agent` field, prompt + expected_output): `tracker-reports-followed-bad-pattern-as-gap-not-violation`, `tracker-does-not-report-style-taste-as-gap`, `warchief-reconciles-via-script-never-by-hand`. Use stack-neutral scenario content.
-- [ ] Update the Tracker/Warchief blurbs in `plugins/tribe/README.md` and `plugins/tribe/claude-md/review-agents.md` to mention gap detection (derived-materials obligation, c3-215).
-- [ ] Validate the fixture parses.
+- [x] Add the Warchief duty per spec §3: on a Tracker report containing harness gaps — (a) extract candidates into the structured JSON file, (b) invoke `gap-reconcile.ts` (resolved from the plugin root, never the shell cwd), (c) carry the script's output into the PR description under a `## Harness gaps` heading. State verbatim: Warchief never edits `.tribe/harness-gaps.jsonl` directly, never mints or matches ids by judgment.
+- [x] Append the three spec §6b eval cases to `plugins/tribe/evals/evals.json` following the existing fixture shape (kind "agent", per-case `agent` field, prompt + expected_output): `tracker-reports-followed-bad-pattern-as-gap-not-violation`, `tracker-does-not-report-style-taste-as-gap`, `warchief-reconciles-via-script-never-by-hand`. Use stack-neutral scenario content.
+- [x] Update the Tracker/Warchief blurbs in `plugins/tribe/README.md` and `plugins/tribe/claude-md/review-agents.md` to mention gap detection (derived-materials obligation, c3-215).
+- [x] Validate the fixture parses.
 
 ```bash
 python3 -c "import json; d=json.load(open('plugins/tribe/evals/evals.json')); print(len(d['cases']) if isinstance(d, dict) and 'cases' in d else 'inspect-shape-ok')"
 ```
 
   Expected: valid JSON, three more cases than before the task.
-- [ ] **Step 5: Commit** — `feat(tribe): warchief reconciles via script; gap eval cases; derived docs`
+- [x] **Step 5: Commit** — `feat(tribe): warchief reconciles via script; gap eval cases; derived docs`
 
 ### Task 6: C3 change-unit (work order)
 

@@ -1098,8 +1098,40 @@ suspicious one — do not go hunting for something to change in order to feel li
 - **Capture before/after evidence** through the repo's real harness (e.g. its e2e/browser
   harness): BEFORE from a base-branch build, AFTER from the branch build. Host it per the repo's
   rules and verify the links resolve.
+- **Reconcile harness gaps, whenever the Tracker report under audit carries any.** This is a
+  standing capability you carry into every card — nothing about it is specific to any one
+  campaign. When the Tracker report you audited (the diff under review, or whichever review fed
+  the pre-gate/Hunter dispatch) contains a `### Harness gaps` section with one or more
+  `HG-candidate` entries:
+  1. **Extract, don't re-author.** Turn each candidate into the structured JSON
+     `gap-reconcile.ts` expects — `[{category, paths, fingerprint, hits, description}, ...]` —
+     by pure mechanical field mapping off Tracker's own report: its `Category` becomes
+     `category`, its `Pattern` line becomes `description`, its `Evidence` grep command becomes
+     `fingerprint` and the hit count it quotes becomes `hits`, its `Diff link` paths become
+     `paths`. Copy Tracker's own words into these fields; never re-author, re-interpret, or
+     re-grep them yourself.
+  2. **Invoke the script — resolved from the plugin root, never the shell cwd.** Resolve
+     `gap-reconcile.ts`'s path exactly the same way you resolve `heartbeat-check.sh`/
+     `validate-plan.sh` above, trying both install mechanisms this repo supports, in order:
+     `dir="${CLAUDE_PLUGIN_ROOT:-}/scripts/gaps"; [ -f "$dir/gap-reconcile.ts" ] ||
+     dir="$(dirname "$(dirname "$(readlink -f ~/.claude/agents/warchief.md)")")/scripts/gaps"`
+     — never invoke it relative to the shell's current working directory. Once resolved, run
+     `bun "$dir/gap-reconcile.ts" --registry .tribe/harness-gaps.jsonl --changed-files
+     <the diff's changed files> --candidates <the JSON file from step 1>` against the target
+     repo's registry. It prints one JSON object to stdout:
+     `{matched, minted, suppressed_count, flagged}` — matched (reused) ids, newly minted ids,
+     how many relevant entries were already ruled and so suppressed, and any fingerprints it
+     rejected as unsafe to execute.
+  3. **Carry that output into the PR body, plainly.** Under a `## Harness gaps` heading in the
+     PR description you open below, state the matched ids, the newly minted ids, the suppressed
+     count, and any flagged/rejected fingerprints — exactly as the script reported them, no
+     editorializing.
+
+  **You never edit `.tribe/harness-gaps.jsonl` directly, and you never mint or match a `G-NNN`
+  id by your own judgment — identity is the script's job alone, every time, mechanically.**
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
-  evidence embedded, the gate results with numbers, and the review outcome.
+  evidence embedded, the gate results with numbers, the review outcome, and the `## Harness gaps`
+  section above when the Tracker report carried any candidates.
 - **Wait for CI green — block, don't poll.** Do not spend turns manually re-checking run status.
   The mechanism is `gh run watch <run-id> --exit-status` — the exact command `research-to-blog`
   uses to block on CI. Warchief targets arbitrary repos that commonly run several workflows
