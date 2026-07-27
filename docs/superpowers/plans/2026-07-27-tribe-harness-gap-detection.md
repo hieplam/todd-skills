@@ -123,17 +123,17 @@ cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 - Modify: `plugins/tribe/agents/tracker.md`
 
 **Steps:**
-- [ ] Add the detection duty to the operating procedure (after the existing review step): report a candidate gap only when ALL four spec §1 conditions hold (diff-anchored; one of the five risk categories — error handling, concurrency/async, resource cleanup, input validation/security, test presence; prevalence ≥ 3 files verified by a quoted grep; no written rule covers it). State explicitly that naming/layout/style can never be a gap.
-- [ ] Add the report section template per spec §2 verbatim structure: `### Harness gaps` heading with the decision menu, per-gap fields (Pattern / Category / Evidence with grep + hit count / Diff link / mandatory `Not judged` line), cap ≤ 3 with the `+N more suppressed` line. Tracker emits candidates only — no `G-NNN` ids, no registry access (it stays read-only and stateless).
-- [ ] Add the boundary sentence to Principles: conventions inform verification and context; only written rules and correctness bugs produce violations — a harness gap is never a Blocker/Should-fix/Optional finding.
-- [ ] Verify no stack-specific terms were introduced and the existing report format/severity ladder is untouched.
+- [x] Add the detection duty to the operating procedure (after the existing review step): report a candidate gap only when ALL four spec §1 conditions hold (diff-anchored; one of the five risk categories — error handling, concurrency/async, resource cleanup, input validation/security, test presence; prevalence ≥ 3 files verified by a quoted grep; no written rule covers it). State explicitly that naming/layout/style can never be a gap.
+- [x] Add the report section template per spec §2 verbatim structure: `### Harness gaps` heading with the decision menu, per-gap fields (Pattern / Category / Evidence with grep + hit count / Diff link / mandatory `Not judged` line), cap ≤ 3 with the `+N more suppressed` line. Tracker emits candidates only — no `G-NNN` ids, no registry access (it stays read-only and stateless).
+- [x] Add the boundary sentence to Principles: conventions inform verification and context; only written rules and correctness bugs produce violations — a harness gap is never a Blocker/Should-fix/Optional finding.
+- [x] Verify no stack-specific terms were introduced and the existing report format/severity ladder is untouched.
 
 ```bash
 grep -niE 'c#|dotnet|npm |pytest|cargo ' plugins/tribe/agents/tracker.md; grep -c "Not judged" plugins/tribe/agents/tracker.md
 ```
 
   Expected: no stack-term hits; `Not judged` count ≥ 1.
-- [ ] **Step 5: Commit** — `feat(tribe): tracker detects harness gaps — report-only, never judged`
+- [x] **Step 5: Commit** — `feat(tribe): tracker detects harness gaps — report-only, never judged`
 
 ### Task 5: Warchief prompt + eval cases + derived materials
 
