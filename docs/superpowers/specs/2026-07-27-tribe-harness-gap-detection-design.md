@@ -99,10 +99,10 @@ grep Tracker supplied at first sighting — authored non-deterministically once,
 
 **Reconciliation is a script, not agent judgment.** The matching is purely mechanical, and an
 LLM executing it in prose would reintroduce the non-determinism the registry exists to remove.
-`scripts/gap-reconcile.sh` performs it deterministically:
+`scripts/gaps/gap-reconcile.ts` (bun) performs it deterministically:
 
 ```
-gap-reconcile.sh --registry .tribe/harness-gaps.jsonl \
+gap-reconcile.ts --registry .tribe/harness-gaps.jsonl \
                  --changed-files <list> --candidates <structured candidates file>
 
 for each OPEN registry entry whose paths overlap the changed files:
@@ -146,20 +146,20 @@ silent-and-constant.
 | Paired read | rules count rising **AND** precision holding — catches a ratchet minting junk rules fast | check at frame review |
 | Pointless flag | gaps `opened` accumulate but `ruled` stays flat → the **sink** is broken (CU-3 gap), not the detector | owner escalation |
 
-`scripts/gap-precision.sh` (new, ~30 lines) computes precision + per-category precision by
+`scripts/gaps/gap-precision.ts` (bun) (new, ~30 lines) computes precision + per-category precision by
 counting registry events — `verify-shipped` style: mechanical, zero trust in agent claims.
-Subject to `rule-bash-strict-mode`.
+Gated by the runner conventions: `bun test` + `bunx tsc --noEmit` (c3-215 Change Safety style). Invoked from the plugin root (resolve-runner.sh pattern), never from the shell cwd.
 
 ### 5. File-change inventory
 
 | File | Change |
 | --- | --- |
 | `plugins/tribe/agents/tracker.md` | Detection duty (§1) in the review procedure; report section (§2); boundary sentence (§ Non-negotiable) added to Principles |
-| `plugins/tribe/agents/warchief.md` | Invoke-the-script duty (§3): extract candidates → run `gap-reconcile.sh` → PR-body sink; never edit the registry directly |
-| `plugins/tribe/scripts/gap-reconcile.sh` | New reconciliation script (§3) — sole writer of the registry |
-| `plugins/tribe/scripts/tests/test-gap-reconcile.sh` | Fixture test for reconciliation (§6a) |
-| `plugins/tribe/scripts/gap-precision.sh` | New metric script (§4) |
-| `plugins/tribe/scripts/tests/test-gap-precision.sh` | Fixture-registry test for the script |
+| `plugins/tribe/agents/warchief.md` | Invoke-the-script duty (§3): extract candidates → run `gap-reconcile.ts` → PR-body sink; never edit the registry directly |
+| `plugins/tribe/scripts/gaps/gap-reconcile.ts` | New reconciliation script (§3) — sole writer of the registry |
+| `plugins/tribe/scripts/gaps/gap-reconcile.test.ts` | Fixture test for reconciliation (§6a) |
+| `plugins/tribe/scripts/gaps/gap-precision.ts` | New metric script (§4) |
+| `plugins/tribe/scripts/gaps/gap-precision.test.ts` | Fixture-registry test for the script |
 | `plugins/tribe/evals/evals.json` | Two new tracker cases (§6) |
 | `plugins/tribe/README.md`, `plugins/tribe/claude-md/review-agents.md` | Derived materials updated to mention gap detection (c3-215 Derived Materials obligation) |
 | `install.sh` | Only if a new top-level artifact class appears (script is under existing `scripts/`; verify, likely no-op) |
@@ -173,8 +173,8 @@ author patches, commit as work order, defer `change apply`; run `git diff -- .c3
 
 Reconciliation is the load-bearing mechanism: if matching misbehaves, the append-only ledger
 corrupts and every downstream number (dedup, suppression, precision) is wrong. It is therefore
-tested as a script, not graded as agent behavior. `test-gap-reconcile.sh` (fixture registry +
-fixture repo tree; `rule-bash-strict-mode` applies) must cover at least:
+tested as a script, not graded as agent behavior. `gap-reconcile.test.ts` (fixture registry +
+fixture repo tree; bun test) must cover at least:
 
 1. Empty registry + one candidate → mints `G-001`, `opened` event, fingerprint frozen verbatim.
 2. Open entry whose fingerprint fires on a changed file → `seen` appended, **no** new id.
@@ -188,7 +188,7 @@ fixture repo tree; `rule-bash-strict-mode` applies) must cover at least:
 9. Malicious/malformed fingerprint (shell metacharacters, non-grep) → rejected + flagged,
    never executed.
 
-`test-gap-precision.sh` covers: open/seen/all five dispositions, `dismissed-duplicate` excluded
+`gap-precision.test.ts` covers: open/seen/all five dispositions, `dismissed-duplicate` excluded
 from both sides of the ratio, trailing-window cut, per-category output.
 
 ### 6b. Eval cases (LLM behavior — new)
@@ -201,7 +201,7 @@ from both sides of the ratio, trailing-window cut, per-category output.
    convention no rule covers. PASS: no gap reported (category fence holds). FAIL: a gap or a
    violation appears. Guards the gap section from becoming a backdoor for invented standards.
 3. `warchief-reconciles-via-script-never-by-hand` — given a Tracker report with gap candidates
-   and an existing registry, Warchief must invoke `gap-reconcile.sh` and relay its output.
+   and an existing registry, Warchief must invoke `gap-reconcile.ts` and relay its output.
    PASS: script invoked; PR-body section built from script output. FAIL: Warchief assigns or
    reuses a `G-NNN` id by its own judgment, writes/edits `.tribe/harness-gaps.jsonl` directly,
    or matches candidates by comparing descriptions.
@@ -216,9 +216,9 @@ repos · autonomous rule adoption (rules ride PRs for human ratification — sta
 
 ## Verification (definition of done for CU-2's PR)
 
-1. `bash plugins/tribe/scripts/tests/test-gap-reconcile.sh` — all nine §6a scenarios PASS.
+1. `cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit` — all nine §6a scenarios PASS, types clean.
    This is the core gate: reconciliation correctness is what the append-only ledger stands on.
-2. `bash plugins/tribe/scripts/tests/test-gap-precision.sh` — PASS per §6a.
+2. `gap-precision.test.ts` — PASS per §6a (same bun test run).
 3. `scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json` scoped to case 5,
    case 29, and the three new §6b cases (ids assigned at implementation) — all PASS
    (c3-215 Change Safety mandate).
