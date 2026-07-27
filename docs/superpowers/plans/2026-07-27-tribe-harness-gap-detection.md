@@ -199,11 +199,11 @@ cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit && cd ../../../..
 ```
 
   Expected: bun suite green, types clean, eval cases 5 and 29 PASS; then run the three new cases by their assigned ids the same way — PASS. If any red: stop and fix before PR.
-- [ ] Push the branch and open the PR (title `feat(tribe): tracker harness-gap detection (CU-2)`; body: problem, spec/plan links, verification evidence, install.sh check outcome, and the required footer). **Do not merge — merging is owner-only.**
+- [x] Push the branch and open the PR (title `feat(tribe): tracker harness-gap detection (CU-2)`; body: problem, spec/plan links, verification evidence, install.sh check outcome, and the required footer). **Do not merge — merging is owner-only.**
 
 ```bash
 git push -u origin cu2-harness-gap-detection && gh pr create --title "feat(tribe): tracker harness-gap detection (CU-2)" --body-file -
 ```
 
   Expected: PR URL printed; PR open with checks green; no merge performed.
-- [ ] **Step 4: Commit** — `chore(tribe): CU-2 verification evidence` (only if evidence files were added; otherwise record evidence in the PR body and make this a no-op commit check — an empty task-closing commit is not required)
+- [x] **Step 4: Commit** — `chore(tribe): CU-2 verification evidence` (only if evidence files were added; otherwise record evidence in the PR body and make this a no-op commit check — an empty task-closing commit is not required) — no evidence files were added; verification output is recorded in PR #59's body instead, so no-op per this step's own instruction.
