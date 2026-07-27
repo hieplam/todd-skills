@@ -76,22 +76,22 @@ cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 - Create: `plugins/tribe/scripts/gaps/gap-reconcile.test.ts`
 
 **Steps:**
-- [ ] Write failing tests covering ALL nine spec §6a scenarios, using a temp-dir fixture registry and fixture repo tree per test. Scenario 3 (same gap, different prose/regex → matches via stored fingerprint) and scenario 7 (append-only: pre-existing ledger bytes unchanged after every operation — compare full file prefix byte-for-byte) are the load-bearing ones. Scenario 9: a fingerprint that is not a single `grep` invocation, or contains any of `; | & $ ( ) > < \` `, is rejected with a flagged report line and **never executed**.
+- [x] Write failing tests covering ALL nine spec §6a scenarios, using a temp-dir fixture registry and fixture repo tree per test. Scenario 3 (same gap, different prose/regex → matches via stored fingerprint) and scenario 7 (append-only: pre-existing ledger bytes unchanged after every operation — compare full file prefix byte-for-byte) are the load-bearing ones. Scenario 9: a fingerprint that is not a single `grep` invocation, or contains any of `; | & $ ( ) > < \` `, is rejected with a flagged report line and **never executed**.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test gap-reconcile.test.ts
 ```
 
   Expected: nine failing tests.
-- [ ] Implement the CLI per spec §3: `bun gap-reconcile.ts --registry <path> --changed-files <comma-list> --candidates <json-file>`. Candidates file: JSON array of `{category, paths, fingerprint, hits, description}`. Algorithm: filter OPEN entries by path overlap with changed files → validate + execute each stored fingerprint restricted to changed files (`Bun.spawn`, no shell) → fires ⇒ append `seen`; unmatched candidates ⇒ mint id + append `opened`; latest-event `ruled` ⇒ suppressed. Output (stdout, JSON): `{matched: [], minted: [], suppressed_count, flagged: []}`.
-- [ ] Run the check command.
+- [x] Implement the CLI per spec §3: `bun gap-reconcile.ts --registry <path> --changed-files <comma-list> --candidates <json-file>`. Candidates file: JSON array of `{category, paths, fingerprint, hits, description}`. Algorithm: filter OPEN entries by path overlap with changed files → validate + execute each stored fingerprint restricted to changed files (`Bun.spawn`, no shell) → fires ⇒ append `seen`; unmatched candidates ⇒ mint id + append `opened`; latest-event `ruled` ⇒ suppressed. Output (stdout, JSON): `{matched: [], minted: [], suppressed_count, flagged: []}`.
+- [x] Run the check command.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 ```
 
   Expected: all nine scenarios pass, types clean.
-- [ ] **Step 4: Commit** — `feat(tribe): gap-reconcile CLI — deterministic identity, sole registry writer`
+- [x] **Step 4: Commit** — `feat(tribe): gap-reconcile CLI — deterministic identity, sole registry writer`
 
 ### Task 3: Precision CLI (`gap-precision.ts`)
 
