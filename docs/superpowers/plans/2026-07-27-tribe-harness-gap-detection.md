@@ -52,22 +52,22 @@ plugins/tribe/claude-md/review-agents.md  MOD  same, condensed
 - Create: `plugins/tribe/scripts/gaps/ledger.test.ts`
 
 **Steps:**
-- [ ] Write failing tests for the event schema and fold logic per spec §3: event lines are `opened` (id, category, paths, fingerprint, hits_at_detection, first_seen_pr) · `seen` (id, pr, hits_now) · `ruled` (id, disposition ∈ rule | anti-rule | debt | dismissed | dismissed-duplicate, ref). Fold: latest event per id defines status. Minting: next id = `G-` + zero-padded(max existing numeric + 1), counting ALL ids including ruled ones. Serialization: one compact JSON object per line, newline-terminated.
+- [x] Write failing tests for the event schema and fold logic per spec §3: event lines are `opened` (id, category, paths, fingerprint, hits_at_detection, first_seen_pr) · `seen` (id, pr, hits_now) · `ruled` (id, disposition ∈ rule | anti-rule | debt | dismissed | dismissed-duplicate, ref). Fold: latest event per id defines status. Minting: next id = `G-` + zero-padded(max existing numeric + 1), counting ALL ids including ruled ones. Serialization: one compact JSON object per line, newline-terminated.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test ledger.test.ts
 ```
 
   Expected: tests fail (module not yet implemented).
-- [ ] Implement `ledger.ts` as a pure module — no `fs`, no `child_process` imports (parsing/folding/minting only; IO lives in the CLI files).
-- [ ] Run the check command.
+- [x] Implement `ledger.ts` as a pure module — no `fs`, no `child_process` imports (parsing/folding/minting only; IO lives in the CLI files).
+- [x] Run the check command.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 ```
 
   Expected: all ledger tests pass, types clean.
-- [ ] **Step 4: Commit** — `feat(tribe): gaps ledger module — typed events, fold, minting`
+- [x] **Step 4: Commit** — `feat(tribe): gaps ledger module — typed events, fold, minting`
 
 ### Task 2: Reconciliation CLI (`gap-reconcile.ts`)
 
