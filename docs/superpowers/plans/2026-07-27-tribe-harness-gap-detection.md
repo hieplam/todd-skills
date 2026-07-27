@@ -100,22 +100,22 @@ cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 - Create: `plugins/tribe/scripts/gaps/gap-precision.test.ts`
 
 **Steps:**
-- [ ] Write failing tests per spec §4 and §6a: within the trailing window (default 20) of `ruled` gaps ordered by ledger position, precision = ruled(rule ∪ anti-rule ∪ debt) ÷ ruled(all), with `dismissed-duplicate` excluded from both sides; still-open gaps never enter the ratio; per-category breakdown emitted alongside the overall number.
+- [x] Write failing tests per spec §4 and §6a: within the trailing window (default 20) of `ruled` gaps ordered by ledger position, precision = ruled(rule ∪ anti-rule ∪ debt) ÷ ruled(all), with `dismissed-duplicate` excluded from both sides; still-open gaps never enter the ratio; per-category breakdown emitted alongside the overall number.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test gap-precision.test.ts
 ```
 
   Expected: failing tests.
-- [ ] Implement `bun gap-precision.ts --registry <path> [--window 20]` reusing `ledger.ts` for parsing/folding. Output (stdout, JSON): `{window, ruled_considered, precision, per_category: {}}`.
-- [ ] Run the check command.
+- [x] Implement `bun gap-precision.ts --registry <path> [--window 20]` reusing `ledger.ts` for parsing/folding. Output (stdout, JSON): `{window, ruled_considered, precision, per_category: {}}`.
+- [x] Run the check command.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 ```
 
   Expected: full suite green, types clean.
-- [ ] **Step 4: Commit** — `feat(tribe): gap-precision CLI — computed metric, never claimed`
+- [x] **Step 4: Commit** — `feat(tribe): gap-precision CLI — computed metric, never claimed`
 
 ### Task 4: Tracker prompt — detection duty + report section
 
