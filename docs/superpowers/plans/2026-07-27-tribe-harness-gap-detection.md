@@ -161,7 +161,7 @@ python3 -c "import json; d=json.load(open('plugins/tribe/evals/evals.json')); pr
 - Create: `.c3/adr/` ADR for this change-unit; patches under `.c3/changes/<adr-id>/`
 
 **Steps:**
-- [ ] Define the `c3` handle and author the ADR to its canvas: `c3 schema adr` first (read REJECT IF), then `c3 add adr` with slug `harness-gap-detection`, body via `--file`.
+- [x] Define the `c3` handle and author the ADR to its canvas: `c3 schema adr` first (read REJECT IF), then `c3 add adr` with slug `harness-gap-detection`, body via `--file`.
 
 ```bash
 c3() { C3X_MODE=agent bash /Users/home/.claude/plugins/cache/c3-skill-marketplace/c3-skill/11.0.0/skills/c3/bin/c3x.sh "$@"; }
@@ -169,15 +169,15 @@ c3 schema adr
 ```
 
   Expected: ADR canvas contract rendered; ADR created without check errors.
-- [ ] Immediately audit for the recorded `c3 add` corruption side effect and revert any stray changes.
+- [x] Immediately audit for the recorded `c3 add` corruption side effect and revert any stray changes.
 
 ```bash
 git status --short -- .c3/ && git diff --stat -- .c3/
 ```
 
   Expected: only the new ADR file appears; anything else is reverted with `git checkout -- <path>` before proceeding.
-- [ ] Author patches in `.c3/changes/<adr-id>/` against c3-215 (base anchors via `c3 read c3-215 --section <name> --cite`): Contract section gains the gap-report flow + registry surface (`scripts/gaps/gap-reconcile.ts`, script-only writes, `.tribe/harness-gaps.jsonl` in target repos); Business Flow gains the ruling loop (gap → rule / anti-rule / debt / dismissed). Commit patches as the work order; **do not run `c3 change apply`** (known c3x v11.0.0 defect — patches land when the CLI is fixed).
-- [ ] **Step 4: Commit** — `docs(c3): ADR + change-unit patches for harness-gap detection (work order, apply deferred)`
+- [x] Author patches in `.c3/changes/<adr-id>/` against c3-215 (base anchors via `c3 read c3-215 --section <name> --cite`): Contract section gains the gap-report flow + registry surface (`scripts/gaps/gap-reconcile.ts`, script-only writes, `.tribe/harness-gaps.jsonl` in target repos); Business Flow gains the ruling loop (gap → rule / anti-rule / debt / dismissed). Commit patches as the work order; **do not run `c3 change apply`** (known c3x v11.0.0 defect — patches land when the CLI is fixed).
+- [x] **Step 4: Commit** — `docs(c3): ADR + change-unit patches for harness-gap detection (work order, apply deferred)`
 
 ### Task 7: Final verification + PR
 
