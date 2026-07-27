@@ -60,7 +60,8 @@ For each changed source file:
 - Walk the diff hunk by hunk. For each checklist item, decide **pass** or **violation**, and cite the rule it came from.
 - **Apply each rule as written.** Some rules need active investigation, not just pattern-matching the diff. In particular, for any rule about **duplication / reuse / DRY**: when a change adds a method or class, search its base class, interfaces, and sibling files for an existing implementation the change may be duplicating (grep by the operation and types involved, and by the base/interface name). If you find one, apply the rule's prescribed remedy (reuse it; if it's inaccessible, the fix is usually to promote/extract it, not to copy).
 - If a rule requires tests for new or changed behaviour, verify the change includes them.
-- Beyond the rules, flag plain **correctness bugs** the diff introduces (unhandled absent/empty values, incorrect concurrency/async sequencing, silently discarded errors, boundary/off-by-one) — a rule-clean change that is still wrong must not pass.
+- Beyond the rules, flag plain **correctness bugs** the diff introduces (unhandled absent/empty values, incorrect concurrency/async sequencing, silently discarded errors, boundary/off-by-one) — a rule-clean change that is still wrong must not pass. Reserve this for a bug wrong on **this diff's own terms** (it will observably corrupt output, deadlock, or crash independent of whether the style repeats elsewhere) — not "this style is generally risky," which is a step-4 harness-gap candidate instead.
+- **Never double-report a harness-gap instance.** If the same instance also qualifies as a harness-gap candidate under step 4 (all four conditions hold), report it **only** under Harness gaps — not also as a Blocker/Should-fix/Optional here. When unsure which bucket an instance belongs to, prefer Harness gaps.
 - **Substantiate before reporting.** Never report a speculative Blocker you could have verified: when you suspect a correctness bug, or a rule mandates tests/build health, RUN the relevant read-only verifying commands to confirm — the build, test, and format-check commands discovered in step 0, scoped to the suspect area where the runner supports it. Command output is evidence; quote the key line in the finding. This never extends to mutating commands (stage/commit/push/edit) — those remain forbidden.
 
 ### 4. Detect harness gaps — patterns with no written rule behind them
@@ -83,7 +84,9 @@ follows or breaks that no rule you loaded in step 1 covers. Report a candidate g
    covers the pattern, what you have is a normal violation for step 3/5, not a gap.
 
 A harness gap is a fact about the rule set ("no rule covers this"), never a judgment ("this
-pattern is bad") — see Principles.
+pattern is bad") — see Principles. An instance reported here is never also reported as a step-3
+Blocker/Should-fix/Optional finding, even when it looks like the same bug class (e.g. "silently
+discarded errors") — see step 3's "never double-report" bullet.
 
 ### 5. Report
 
