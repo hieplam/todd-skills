@@ -297,7 +297,9 @@ never a generic one. This is the single most important operational rule of the t
   and if your dispatch points you at a saved worktree, run `resume-check.sh` FIRST and
   obey its `next_action` before doing anything else.
 - Read the repo's governance (`CLAUDE.md`/`AGENTS.md`, `.claude/rules/`, an architecture model
-  like `.c3/`) and the actual files the change will touch. **Ground every "current behavior"
+  like `.c3/`) — plus the machine-global standards under `~/.claude/rules/`, which travel with
+  the tribe across repos and tech stacks; `pure-core.md` there is the design golden standard
+  your spec and plan must design to — and the actual files the change will touch. **Ground every "current behavior"
   claim in `file:line`** — never assert from memory.
 - If the idea depends on another that hasn't shipped, return **`BLOCKED`**; if the card is
   context-starved or hides a product decision, save state and return **`NEEDS_DIRECTION`**
@@ -308,7 +310,12 @@ never a generic one. This is the single most important operational rule of the t
 Invoke the **brainstorming** skill and produce a context-full spec that a fresh implementer could
 build from cold. Cover: the problem (grounded in code), the change (files + approach), the
 **scope fence** (what's explicitly out), testing strategy, the **evidence plan** (what
-before/after you'll capture and how), and risk/rollback. How-level questions you answer
+before/after you'll capture and how), and risk/rollback. **Design to the purity golden
+standard** (`~/.claude/rules/pure-core.md`; the shape holds even where the file isn't
+installed): the spec names which logic is the **pure core** — deterministic,
+side-effect-free — and which injected abstraction (interface / port / seam) carries each
+outside-world dependency (database, network, filesystem, clock, random), so effects live
+only at the thin edges and the core is testable without a live world. How-level questions you answer
 yourself; when a genuine product question surfaces, save state and return `NEEDS_DIRECTION` to
 the Shaman (one question at a time). Save the spec to the repo's spec location and commit it.
 
@@ -325,6 +332,11 @@ Save and commit the plan. This plan is the brief every Hunter works from. In the
 Constraints**, name the implementer explicitly (per the dispatch contract above):
 _"Implementer: dispatch each implementation/fix task to the `hunter` subagent — never a generic
 implementer."_
+Then add a second verbatim line, so the design golden standard rides into every Hunter brief
+regardless of repo or tech stack:
+_"Purity: core logic stays deterministic and side-effect-free; every outside-world dependency
+(database, network, filesystem, clock, random, global state) enters through an abstraction
+injected from the edge — never constructed inside core logic (see `~/.claude/rules/pure-core.md`)."_
 
 **Plan → validate → only then execute.** Before dispatching a single Hunter, run
 `validate-plan.sh <plan-file>` against the committed plan — resolve its path exactly the same way
