@@ -15,7 +15,9 @@
 #   - agents/*.md      -> $CLAUDE_DIR/agents/<file>
 #   - skills/<name>/   -> $CLAUDE_DIR/skills/<name>
 #   - install.sh       -> executed as a post-install hook (CLAUDE_DIR is passed through);
-#                         claude-md/ holds snippets consumed by such hooks
+#                         claude-md/ holds snippets consumed by such hooks;
+#                         rules/ holds machine-global rule files such hooks link
+#                         into $CLAUDE_DIR/rules/
 #   - evals/           -> dev-tooling fixtures for scripts/evals/run_evals.py; intentionally
 #                         not symlinked into $CLAUDE_DIR (not runtime content), no warning
 #   - already linked to this repo  -> skipped (idempotent)
@@ -107,7 +109,9 @@ install_plugin() {
   for d in "$dir"/*/; do
     name="$(basename "$d")"
     case "$name" in
-      agents|skills|claude-md|hooks|.claude-plugin) ;;
+      # rules/ holds machine-global rule files; the plugin's own install.sh hook
+      # links them into $CLAUDE_DIR/rules/, so the root installer skips silently.
+      agents|skills|claude-md|hooks|rules|.claude-plugin) ;;
       # scripts/ holds validator scripts invoked from the repo checkout
       # directly (not symlinked); intentionally not installed, skip silently.
       scripts) ;;

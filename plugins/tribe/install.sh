@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# install.sh — tribe plugin post-install hook.
+# install.sh — tribe plugin post-install hook. Two jobs:
 #
-# Appends each guidance snippet in claude-md/ to the global CLAUDE.md if not
-# already present. Idempotent: a snippet's first line (its section heading) is
-# the presence marker — if that exact line exists in CLAUDE.md, the snippet is
-# skipped.
+# 1. Symlinks each machine-global rule file in rules/ into $CLAUDE_DIR/rules/,
+#    where reviewers (tracker, skinner) read every *.md fresh on each run.
+#    Symlink — not copy — so the repo stays the single source of truth.
+#    Idempotent: an already-correct link is skipped; a conflicting real file is
+#    backed up to <name>.bak.<epoch> first (same behavior as the root installer).
+#
+# 2. Appends each guidance snippet in claude-md/ to the global CLAUDE.md if not
+#    already present. Idempotent: a snippet's first line (its section heading) is
+#    the presence marker — if that exact line exists in CLAUDE.md, the snippet is
+#    skipped.
 #
 # The first line alone is not a sufficient guard. When a snippet grows a NEW
 # top-level heading above an existing section, the marker misses against a
@@ -23,6 +29,27 @@ PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 TARGET="$CLAUDE_DIR/CLAUDE.md"
 
+# --- rules/ -> $CLAUDE_DIR/rules/ (symlinked machine-global rule files) ------
+if [ -d "$PLUGIN_DIR/rules" ]; then
+  mkdir -p "$CLAUDE_DIR/rules"
+  for rule in "$PLUGIN_DIR/rules"/*.md; do
+    [ -e "$rule" ] || continue
+    dst="$CLAUDE_DIR/rules/$(basename "$rule")"
+    if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$rule" ]; then
+      printf '  ok      rules/%s (already linked)\n' "$(basename "$rule")"
+      continue
+    fi
+    if [ -e "$dst" ] || [ -L "$dst" ]; then
+      bak="$dst.bak.$(date +%s)"
+      mv "$dst" "$bak"
+      printf 'WARN: rules/%s: existing target backed up to %s\n' "$(basename "$rule")" "$bak" >&2
+    fi
+    ln -s "$rule" "$dst"
+    printf '  linked  rules/%s -> %s\n' "$(basename "$rule")" "$dst"
+  done
+fi
+
+# --- claude-md/ -> appended to $CLAUDE_DIR/CLAUDE.md -------------------------
 [ -d "$PLUGIN_DIR/claude-md" ] || exit 0
 
 mkdir -p "$CLAUDE_DIR"

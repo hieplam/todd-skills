@@ -319,7 +319,9 @@ contract is the assignment, and `UN-AUDITABLE` never applies. See "Lens mode" ab
 
 - Read root `CLAUDE.md`, any nested `CLAUDE.md` covering the touched directories,
   `~/.claude/CLAUDE.md`, and `AGENTS.md` / `GEMINI.md` if present.
-- Read every `.claude/rules/*.md`.
+- Read every `.claude/rules/*.md`, and every machine-global rule under `~/.claude/rules/*.md`
+  (honour each file's `paths:` frontmatter; `pure-core.md` there is the tribe's design golden
+  standard — its own severity guide says which purity findings gate done-ness).
 - If a `.c3/` directory exists and the `c3` CLI is available: run `c3 lookup <file>` for each
   changed file (owning component + enforced rules + refs) and `c3 check` (docs valid). Treat
   the listed rules as MUST-obey. If the CLI is absent, read the `.c3/` markdown directly

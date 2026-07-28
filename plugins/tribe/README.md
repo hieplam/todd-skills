@@ -132,6 +132,31 @@ This split is **encoded right into the metaphor**: *a tracker naturally walks th
 
 ---
 
+## Design golden standard: pure core, impure edges
+
+The tribe carries **one cross-stack design philosophy** into every codebase it works in:
+core logic (calculation, decisions, flow control) stays **pure** — deterministic,
+side-effect-free — and every outside-world dependency (database, network, filesystem,
+clock, random) enters only through an abstraction injected from the edge. The canonical
+text, with the golden pattern and the reviewer severity guide, is
+[`rules/pure-core.md`](rules/pure-core.md).
+
+Delivery is deliberately **file-based, not prompt-based**, so it works in any repo on the
+machine regardless of tech stack:
+
+| Who | When it engages the standard | How it gets it |
+|---|---|---|
+| 🪓 Warchief | Writing the spec (names the pure core + seams) and the plan (verbatim Purity line in Global Constraints) | Reads `~/.claude/rules/` at intake (Method step 1) |
+| 🏹 Hunter | Building every task | Inherits the plan's Global Constraints Purity line in its brief |
+| 👣 Tracker | Every review | Already reads every `~/.claude/rules/*.md` fresh — zero prompt change needed |
+| 🔪 Skinner | The final done-ness audit | Loads `~/.claude/rules/*.md` in its governance step |
+
+The plugin's `install.sh` hook symlinks `rules/*.md` into `~/.claude/rules/` (idempotent,
+backs up conflicting files), so the repo stays the single source of truth
+(test: `scripts/tests/test-install-rules.sh`).
+
+---
+
 ## Campaign runner
 
 Alongside the six agents, the plugin ships a **stateless capability script** —
