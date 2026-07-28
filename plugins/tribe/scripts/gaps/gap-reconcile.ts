@@ -1,0 +1,279 @@
+// gap-reconcile.ts — deterministic reconciliation CLI (Task 2, spec §3 "Gap registry &
+// reconciliation"). Sole writer of `.tribe/harness-gaps.jsonl`: matches by EXECUTING each open
+// entry's frozen fingerprint (never by comparing prose/regex — spec §3's non-determinism
+// rationale), mints ids for genuinely new candidates, and never touches a `ruled` id.
+//
+// CLI contract:
+//   bun gap-reconcile.ts --registry <path> --changed-files <comma-list> --candidates <json-file>
+//
+// IO (fs reads/writes, `grep` execution via Bun.spawn) lives here, never in ledger.ts — ledger.ts
+// stays a pure module (parse/fold/mint/serialize only).
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import {
+  foldToLatestStatus,
+  mintNextId,
+  parseLedger,
+  serializeEvent,
+  type GapEvent,
+  type OpenedEvent,
+  type SeenEvent,
+} from './ledger.ts';
+
+/** Tracker's report candidate, already extracted into structured form by Warchief (spec §3):
+ * `{category, paths, fingerprint, hits, description}`. `pr` is not part of that canonical
+ * shape, but `opened`/`seen` events require a PR number — if the caller happens to attach one
+ * to a candidate, it is used (uniformly, for this whole reconciliation run); otherwise `0`. */
+export interface Candidate {
+  category: string;
+  paths: string[];
+  fingerprint: string;
+  hits: number;
+  description: string;
+  pr?: number;
+}
+
+/** Spec §3 output shape: matched (reused) ids, minted (newly opened) ids, how many relevant
+ * entries were suppressed because they are already `ruled`, and rejected-fingerprint reports. */
+export interface ReconcileResult {
+  matched: string[];
+  minted: string[];
+  suppressed_count: number;
+  flagged: string[];
+}
+
+const BANNED_FINGERPRINT_CHARS = /[;|&$()<>`]/;
+
+interface FingerprintValidation {
+  valid: boolean;
+  reason?: string;
+  tokens?: string[];
+}
+
+/** Splits a fingerprint string into argv tokens, honoring single/double-quoted substrings (the
+ * stored fingerprint is human/LLM-authored shell-command prose, e.g.
+ * `grep -rn 'catch {}' src/handlers/`) — used only to build a real `Bun.spawn` argv, never to
+ * hand the string to a shell. */
+function tokenize(command: string): string[] {
+  const tokens: string[] = [];
+  let i = 0;
+  const n = command.length;
+  while (i < n) {
+    while (i < n && /\s/.test(command[i]!)) i++;
+    if (i >= n) break;
+    let token = '';
+    while (i < n && !/\s/.test(command[i]!)) {
+      const c = command[i]!;
+      if (c === "'" || c === '"') {
+        const quote = c;
+        i++;
+        while (i < n && command[i] !== quote) {
+          token += command[i];
+          i++;
+        }
+        i++; // skip closing quote
+      } else {
+        token += c;
+        i++;
+      }
+    }
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+/** Validates a stored fingerprint (spec §3 / §6a scenario 9): must be a single `grep`
+ * invocation only. Anything containing a shell metacharacter (`; | & $ ( ) > < \``), or whose
+ * command is not literally `grep`, is rejected — flagged for a human, never executed. */
+function validateFingerprint(fingerprint: string): FingerprintValidation {
+  if (BANNED_FINGERPRINT_CHARS.test(fingerprint)) {
+    return { valid: false, reason: 'contains shell metacharacters — rejected, never executed' };
+  }
+  const tokens = tokenize(fingerprint);
+  if (tokens.length < 2 || tokens[0] !== 'grep') {
+    return { valid: false, reason: 'not a single grep invocation — rejected, never executed' };
+  }
+  return { valid: true, tokens };
+}
+
+/** Rebuilds a fingerprint's argv "restricted to the changed files" (spec §3): keeps the
+ * original flags and search pattern, but replaces whatever target path(s) the fingerprint was
+ * originally authored against with `targets` (the changed files overlapping this entry's
+ * paths) — reconciliation never greps the whole tree. */
+function buildRestrictedArgv(tokens: readonly string[], targets: readonly string[]): string[] {
+  const rest = tokens.slice(1);
+  const flags: string[] = [];
+  let idx = 0;
+  while (idx < rest.length && rest[idx]!.startsWith('-')) {
+    flags.push(rest[idx]!);
+    idx++;
+  }
+  const pattern = rest[idx] ?? '';
+  return ['grep', ...flags, pattern, ...targets];
+}
+
+/** Runs a validated grep argv directly via `Bun.spawn` (no shell — argv only, never a
+ * string-interpolated shell command). "Fires" = grep's own matching exit code (0 = match
+ * found); `hits` = number of non-empty output lines, used for `hits_now`. */
+async function runGrep(argv: readonly string[]): Promise<{ fired: boolean; hits: number }> {
+  const proc = Bun.spawn(argv as string[], { stdout: 'pipe', stderr: 'pipe' });
+  const stdout = await new Response(proc.stdout).text();
+  const exitCode = await proc.exited;
+  const hits = stdout.split('\n').filter((line) => line.length > 0).length;
+  return { fired: exitCode === 0, hits };
+}
+
+function normalizeDir(p: string): string {
+  return p.endsWith('/') ? p : `${p}/`;
+}
+
+/** True if path `a` and path `b` overlap — equal, or one is a directory-prefix of the other.
+ * Used both for "entry paths overlap the changed files" (spec §3 step 2/8) and for deciding
+ * whether a candidate represents the same gap as an entry that just fired (category + paths,
+ * never prose/fingerprint — spec §6a scenario 3). */
+function pathsOverlap(a: string, b: string): boolean {
+  if (a === b) return true;
+  return b.startsWith(normalizeDir(a)) || a.startsWith(normalizeDir(b));
+}
+
+function anyPathOverlap(pathsA: readonly string[], pathsB: readonly string[]): boolean {
+  return pathsA.some((a) => pathsB.some((b) => pathsOverlap(a, b)));
+}
+
+/** Runs the full spec §3 reconciliation algorithm against a real registry file and a real
+ * fixture repo tree (fingerprints are executed for real, via `grep`). Sole writer of the
+ * registry: every appended event is written with `appendFileSync` only — pre-existing bytes
+ * are never rewritten, reordered, or reformatted (the append-only invariant, spec §6a
+ * scenario 7). */
+export async function reconcile(options: {
+  registryPath: string;
+  changedFiles: readonly string[];
+  candidates: readonly Candidate[];
+}): Promise<ReconcileResult> {
+  const { registryPath, changedFiles, candidates } = options;
+
+  const registryText = existsSync(registryPath) ? readFileSync(registryPath, 'utf8') : '';
+  const events = parseLedger(registryText);
+
+  // Every id's `opened` event carries its frozen identity (paths/category/fingerprint) — the
+  // latest event per id (which may be a `seen` or `ruled` event, lacking those fields) only
+  // tells us its current status.
+  const openedById = new Map<string, OpenedEvent>();
+  for (const event of events) {
+    if (event.event === 'opened') {
+      openedById.set(event.id, event);
+    }
+  }
+  const latestById = foldToLatestStatus(events);
+
+  // mintNextId must count ALL ids ever minted, including ruled ones (plan Task 1 minting
+  // rule) — openedById already holds every id that ever had an `opened` event, regardless of
+  // its current status, so this is the complete population.
+  const allIds: string[] = [...openedById.keys()];
+
+  const currentPr = candidates.find((c) => typeof c.pr === 'number')?.pr ?? 0;
+
+  const matched: string[] = [];
+  const flagged: string[] = [];
+  const appended: GapEvent[] = [];
+  const firedEntries: OpenedEvent[] = [];
+  let suppressedCount = 0;
+
+  for (const [id, entry] of openedById) {
+    const latest = latestById.get(id);
+    if (latest && latest.event === 'ruled') {
+      // Suppressed (spec §3 step 4): never matched, never re-opened, never reported — it does
+      // not participate below at all, even to be flagged. Still countable as "relevant but
+      // ruled" if it would otherwise have been in scope for this diff.
+      if (anyPathOverlap(entry.paths, changedFiles)) {
+        suppressedCount++;
+      }
+      continue;
+    }
+
+    const overlappingChanged = changedFiles.filter((f) => entry.paths.some((p) => pathsOverlap(p, f)));
+    if (overlappingChanged.length === 0) continue; // spec §6a scenario 8: out of scope, never even validated
+
+    const validation = validateFingerprint(entry.fingerprint);
+    if (!validation.valid) {
+      flagged.push(`${id}: ${validation.reason} (fingerprint: ${entry.fingerprint})`);
+      continue; // spec §6a scenario 9: rejected fingerprints are never executed
+    }
+
+    const argv = buildRestrictedArgv(validation.tokens!, overlappingChanged);
+    const { fired, hits } = await runGrep(argv);
+    if (fired) {
+      const seenEvent: SeenEvent = { id, event: 'seen', pr: currentPr, hits_now: hits };
+      appended.push(seenEvent);
+      matched.push(id);
+      firedEntries.push(entry);
+    }
+  }
+
+  const minted: string[] = [];
+  for (const candidate of candidates) {
+    // A candidate is "left unmatched" (spec §3 step 3) only if no open entry that just fired
+    // already represents it. Matching here is by category + path overlap (both frozen at
+    // `opened` time) — never by comparing the candidate's own drifting prose/fingerprint
+    // against the stored one (spec §6a scenario 3).
+    const alreadyRepresented = firedEntries.some(
+      (entry) => entry.category === candidate.category && anyPathOverlap(entry.paths, candidate.paths),
+    );
+    if (alreadyRepresented) continue;
+
+    const nextId = mintNextId(allIds);
+    const openedEvent: OpenedEvent = {
+      id: nextId,
+      event: 'opened',
+      category: candidate.category,
+      paths: candidate.paths,
+      fingerprint: candidate.fingerprint,
+      hits_at_detection: candidate.hits,
+      first_seen_pr: currentPr,
+    };
+    appended.push(openedEvent);
+    minted.push(nextId);
+    allIds.push(nextId);
+    openedById.set(nextId, openedEvent);
+  }
+
+  if (appended.length > 0) {
+    mkdirSync(dirname(registryPath), { recursive: true });
+    appendFileSync(registryPath, appended.map(serializeEvent).join(''));
+  }
+
+  return { matched, minted, suppressed_count: suppressedCount, flagged };
+}
+
+function parseArgs(argv: readonly string[]): { registry: string; changedFiles: string[]; candidatesPath: string } {
+  const get = (flag: string): string | undefined => {
+    const idx = argv.indexOf(flag);
+    return idx >= 0 ? argv[idx + 1] : undefined;
+  };
+  const registry = get('--registry');
+  const changedFilesArg = get('--changed-files');
+  const candidatesPath = get('--candidates');
+  if (!registry || !changedFilesArg || !candidatesPath) {
+    throw new Error(
+      'Usage: gap-reconcile.ts --registry <path> --changed-files <comma-list> --candidates <json-file>',
+    );
+  }
+  const changedFiles = changedFilesArg
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return { registry, changedFiles, candidatesPath };
+}
+
+/** CLI entrypoint: parses argv, reads the candidates JSON file, reconciles, and prints the
+ * spec §3 output object as a single JSON line on stdout. */
+export async function main(argv: readonly string[] = Bun.argv.slice(2)): Promise<void> {
+  const { registry, changedFiles, candidatesPath } = parseArgs(argv);
+  const candidates = JSON.parse(readFileSync(candidatesPath, 'utf8')) as Candidate[];
+  const result = await reconcile({ registryPath: registry, changedFiles, candidates });
+  console.log(JSON.stringify(result));
+}
+
+if (import.meta.main) {
+  main();
+}
