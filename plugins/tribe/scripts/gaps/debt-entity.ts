@@ -14,6 +14,11 @@ export interface DebtEntity {
   baseline: number;
   status: 'open' | 'closed';
   path: string;
+  /** Optional: the first non-blank line of the `## Description` section (spec §1's "Tracker's
+   * description" body text), used by `debt-backfill.ts` (Task 4) as the issue title's summary.
+   * Absent when the entity carries no `## Description` section at all — kept optional so every
+   * Task 1 fixture and test lacking a Description section still parses unchanged. */
+  description?: string;
 }
 
 /** Thrown when the markdown has no `## Meter` heading at all. */
@@ -106,6 +111,19 @@ function extractMeterDataRow(section: string): string[] | undefined {
   return splitTableRow(dataLines[0]!);
 }
 
+/** Returns the first non-blank line of the `## Description` section, or `undefined` if the
+ * section is absent entirely (Task 4 interface gap: `debt-backfill.ts`'s `issueBody` needs the
+ * pattern one-liner for the issue title without re-parsing the whole body itself). */
+function extractFirstDescriptionLine(markdown: string): string | undefined {
+  const section = extractSection(markdown, 'Description');
+  if (section === undefined) return undefined;
+  const firstLine = section
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  return firstLine;
+}
+
 /** Parses a debt canvas instance's markdown into a `DebtEntity` (plan Task 1 / spec §1).
  * `path` is carried through unchanged for reporting/lookup by the caller. */
 export function parseDebtEntity(markdown: string, path: string): DebtEntity {
@@ -128,6 +146,8 @@ export function parseDebtEntity(markdown: string, path: string): DebtEntity {
     throw new InvalidBaselineError(path, baselineRaw ?? '');
   }
 
+  const description = extractFirstDescriptionLine(markdown);
+
   return {
     id,
     slug,
@@ -137,5 +157,6 @@ export function parseDebtEntity(markdown: string, path: string): DebtEntity {
     baseline,
     status: status === 'closed' ? 'closed' : 'open',
     path,
+    ...(description !== undefined ? { description } : {}),
   };
 }

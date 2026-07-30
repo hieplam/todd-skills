@@ -41,6 +41,7 @@ describe('parseDebtEntity — happy path (plan Task 1 step b)', () => {
       baseline: 9,
       status: 'open',
       path: FIXTURE_PATH,
+      description: 'Tracker found bare catch handlers swallowing errors in the handlers directory.',
     };
     expect(entity).toEqual(expected);
   });
@@ -56,6 +57,32 @@ describe('parseDebtEntity — status (plan Task 1 step c)', () => {
     const entity = parseDebtEntity(fixture, FIXTURE_PATH);
 
     expect(entity.status).toBe('closed');
+  });
+});
+
+describe('parseDebtEntity — description (plan Task 4 interface gap: issueBody needs the first Description line)', () => {
+  test('captures the first non-blank line of the "## Description" section as an optional field', () => {
+    const entity = parseDebtEntity(HAPPY_PATH_FIXTURE, FIXTURE_PATH);
+
+    expect(entity.description).toBe(
+      'Tracker found bare catch handlers swallowing errors in the handlers directory.',
+    );
+  });
+
+  test('is undefined when there is no "## Description" section at all', () => {
+    const fixture = `---
+id: debt-bare-catch-handlers
+---
+
+## Meter
+
+| Check | Anti Rule | Origin Gap | Baseline |
+| --- | --- | --- | --- |
+| grep -rn 'catch {}' src/handlers/ | rule-no-bare-catch | G-007 | 9 |
+`;
+    const entity = parseDebtEntity(fixture, FIXTURE_PATH);
+
+    expect(entity.description).toBeUndefined();
   });
 });
 

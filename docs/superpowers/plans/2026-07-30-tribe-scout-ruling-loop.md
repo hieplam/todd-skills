@@ -142,16 +142,16 @@ cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 - Produces: CLI `bun debt-backfill.ts [--repo <path>] [--ref master] [--gh-bin gh] [--dry-run]`. Exported pure core: `selectMissing(entities: DebtEntity[], issueTexts: string[]): DebtEntity[]` (open entities whose `id` appears in no issue title/body) and `issueBody(entity: DebtEntity): {title: string; body: string}` — title `Tech debt: <first Description line>`; body listing check + baseline, anti-rule, origin gap, the `c3 read <id>` pointer (spec §7 progressive-disclosure link), and the verbatim fix-protocol line: `Fix protocol: run the debt-fix workflow; investigate in that session, not here.` Stdout JSON: `{created: string[], skipped?: 'gh-unavailable'}`.
 
 **Steps:**
-- [ ] Write failing tests for the 4 spec §10a backfill scenarios (pure core tested directly; the `gh` edge via a stub executable): (1) `selectMissing` returns exactly the open entities not mentioned in any issue text, and `issueBody` contains the entity id, check, baseline, anti-rule, origin gap, and fix-protocol line · (2) idempotence: after a first run's issues are added to `issueTexts`, a second `selectMissing` returns `[]` · (3) a `status: closed` entity is never selected · (4) `--gh-bin` pointing at a missing executable → `{created: [], skipped: 'gh-unavailable'}`, exit 0.
-- [ ] Implement: read entities from `--ref` (default `master`) via `listDebtEntities`; fetch existing texts via `<gh-bin> issue list --state all --json title,body --limit 200`; create via `<gh-bin> issue create --title … --body …` per selected entity; `--dry-run` prints the would-create list without spawning create.
-- [ ] Run the check command.
+- [x] Write failing tests for the 4 spec §10a backfill scenarios (pure core tested directly; the `gh` edge via a stub executable): (1) `selectMissing` returns exactly the open entities not mentioned in any issue text, and `issueBody` contains the entity id, check, baseline, anti-rule, origin gap, and fix-protocol line · (2) idempotence: after a first run's issues are added to `issueTexts`, a second `selectMissing` returns `[]` · (3) a `status: closed` entity is never selected · (4) `--gh-bin` pointing at a missing executable → `{created: [], skipped: 'gh-unavailable'}`, exit 0.
+- [x] Implement: read entities from `--ref` (default `master`) via `listDebtEntities`; fetch existing texts via `<gh-bin> issue list --state all --json title,body --limit 200`; create via `<gh-bin> issue create --title … --body …` per selected entity; `--dry-run` prints the would-create list without spawning create.
+- [x] Run the check command.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 ```
 
   Expected: all 4 scenarios pass, suite green, types clean.
-- [ ] **Step 4: Commit** — `feat(tribe): debt-backfill CLI — post-merge issues, idempotent`
+- [x] **Step 4: Commit** — `feat(tribe): debt-backfill CLI — post-merge issues, idempotent`
 
 ### Task 5: Shipped `debt` canvas + install wiring
 
