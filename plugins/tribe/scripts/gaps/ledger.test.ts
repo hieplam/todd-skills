@@ -126,6 +126,45 @@ describe('mintNextId', () => {
   });
 });
 
+describe('RuledEvent.ratified_by (Task 1, spec §2)', () => {
+  test('ratified_by round-trips through parseLedger/serializeEvent when present', () => {
+    const ratified: RuledEvent = {
+      id: 'G-007',
+      event: 'ruled',
+      disposition: 'debt',
+      ref: 'rule-no-bare-catch',
+      ratified_by: 'shaman',
+    };
+
+    const line = serializeEvent(ratified);
+    const [parsed] = parseLedger(line);
+
+    expect(parsed).toEqual(ratified);
+  });
+
+  test('ratified_by accepts both spec-named values (owner|shaman)', () => {
+    for (const ratifier of ['owner', 'shaman'] as const) {
+      const ruled: RuledEvent = {
+        id: 'G-008',
+        event: 'ruled',
+        disposition: 'dismissed',
+        ref: 'not-a-gap',
+        ratified_by: ratifier,
+      };
+      expect(parseLedger(serializeEvent(ruled))).toEqual([ruled]);
+    }
+  });
+
+  test('CU-2 ruled lines without ratified_by still parse unchanged (backward compat)', () => {
+    // ruledFixture (defined above, CU-2 shape) carries no ratified_by field at all.
+    const line = serializeEvent(ruledFixture);
+    const [parsed] = parseLedger(line);
+
+    expect(parsed).toEqual(ruledFixture);
+    expect((parsed as RuledEvent).ratified_by).toBeUndefined();
+  });
+});
+
 describe('serializeEvent', () => {
   test('produces one compact, newline-terminated JSON line per event', () => {
     const line = serializeEvent(openedFixture);

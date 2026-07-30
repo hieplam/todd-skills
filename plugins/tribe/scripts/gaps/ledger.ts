@@ -32,12 +32,16 @@ export interface SeenEvent {
 }
 
 /** Spec §3: a human rules on a gap. `ref` names the artifact the ruling produced
- * (a rule id, an anti-rule id, or a free-form note for `dismissed`/`dismissed-duplicate`). */
+ * (a rule id, an anti-rule id, or a free-form note for `dismissed`/`dismissed-duplicate`).
+ * `ratified_by` (spec §2/§6, CU-3) records who ratified the ruling — `'owner'` in an attended
+ * session, `'shaman'` on the owner's behalf in an unattended campaign. Optional so CU-2 `ruled`
+ * lines (minted before this field existed) still parse unchanged. */
 export interface RuledEvent {
   id: string;
   event: 'ruled';
   disposition: Disposition;
   ref: string;
+  ratified_by?: 'owner' | 'shaman';
 }
 
 /** The three JSONL event kinds, discriminated on `event` (spec §3). */

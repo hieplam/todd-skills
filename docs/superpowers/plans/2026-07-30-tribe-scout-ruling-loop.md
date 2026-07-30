@@ -65,22 +65,22 @@ plugins/tribe/README.md             MOD  blurbs (claude-md/review-agents.md was 
 - Produces: `validateFingerprint(fingerprint: string): { valid: boolean; reason?: string; tokens?: string[] }` and `tokenize(command: string): string[]` from `fingerprint.ts` (same behavior as today's private copies in `gap-reconcile.ts`).
 
 **Steps:**
-- [ ] Write failing tests: (a) `ratified_by` round-trips through `parseLedger`/`serializeEvent` and old `ruled` lines without it still parse; (b) `parseDebtEntity` happy path against a fixture string copied verbatim from the probed instance shape (frontmatter `id: debt-bare-catch-handlers`, no `status:`, Meter row `| grep -rn 'catch {}' src/handlers/ | rule-no-bare-catch | G-007 | 9 |`) yields `{slug: 'bare-catch-handlers', check: "grep -rn 'catch {}' src/handlers/", antiRule: 'rule-no-bare-catch', originGap: 'G-007', baseline: 9, status: 'open'}`; (c) `status: closed` in frontmatter parses as closed; (d) missing Meter / non-numeric Baseline throw named errors; (e) `fingerprint.ts` exports behave identically to the CU-2 private copies (reuse two assertions from existing gap-reconcile tests: metachar rejection, non-grep rejection).
+- [x] Write failing tests: (a) `ratified_by` round-trips through `parseLedger`/`serializeEvent` and old `ruled` lines without it still parse; (b) `parseDebtEntity` happy path against a fixture string copied verbatim from the probed instance shape (frontmatter `id: debt-bare-catch-handlers`, no `status:`, Meter row `| grep -rn 'catch {}' src/handlers/ | rule-no-bare-catch | G-007 | 9 |`) yields `{slug: 'bare-catch-handlers', check: "grep -rn 'catch {}' src/handlers/", antiRule: 'rule-no-bare-catch', originGap: 'G-007', baseline: 9, status: 'open'}`; (c) `status: closed` in frontmatter parses as closed; (d) missing Meter / non-numeric Baseline throw named errors; (e) `fingerprint.ts` exports behave identically to the CU-2 private copies (reuse two assertions from existing gap-reconcile tests: metachar rejection, non-grep rejection).
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test ledger.test.ts debt-entity.test.ts
 ```
 
   Expected: new tests fail (module/fields not implemented).
-- [ ] Implement: `ledger.ts` field, `fingerprint.ts` extraction (update `gap-reconcile.ts` imports), `debt-entity.ts` as a pure module — no `fs`, no `child_process`.
-- [ ] Run the check command.
+- [x] Implement: `ledger.ts` field, `fingerprint.ts` extraction (update `gap-reconcile.ts` imports), `debt-entity.ts` as a pure module — no `fs`, no `child_process`.
+- [x] Run the check command.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 ```
 
   Expected: full suite green including all CU-2 tests (the extraction is behavior-neutral), types clean.
-- [ ] **Step 4: Commit** — `feat(tribe): ratified_by on ruled events; debt-entity parser; shared fingerprint module`
+- [x] **Step 4: Commit** — `feat(tribe): ratified_by on ruled events; debt-entity parser; shared fingerprint module`
 
 ### Task 2: Ruling CLI (`gap-rule.ts`)
 
