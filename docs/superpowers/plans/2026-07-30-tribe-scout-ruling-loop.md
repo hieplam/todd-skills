@@ -271,7 +271,7 @@ python3 -c "import json; d=json.load(open('plugins/tribe/evals/evals.json')); pr
 - Verify only: `install.sh` outcome recorded, full branch state
 
 **Steps:**
-- [ ] Define the `c3` handle, read the ADR contract, author the ADR:
+- [x] Define the `c3` handle, read the ADR contract, author the ADR:
 
 ```bash
 c3() { C3X_MODE=agent bash /Users/home/.claude/plugins/cache/c3-skill-marketplace/c3-skill/11.0.0/skills/c3/bin/c3x.sh "$@"; }
@@ -281,7 +281,7 @@ git status --short -- .c3/ && git diff --stat -- .c3/
 ```
 
   Expected: ADR created; ONLY the new ADR file appears — any stray `.c3/` change is reverted with `git checkout -- <path>` before proceeding (known `c3 add` corruption defect).
-- [ ] Author patches in `.c3/changes/<adr-id>/` against c3-215 (base anchors via `c3 read c3-215 --section <name> --cite`): Contract gains the ruling surface (`gap-rule.ts` sole ruling writer, `debt-count.ts` gate, `debt-backfill.ts`, debt entities at `.c3/documents/debt/`, shipped canvas `canvases/debt.md`); Business Flow gains the closed loop (gap → Scout proposal → owner/Shaman ratification → rule/anti-rule/debt → grandfathered enforcement → burn-down to zero). Commit patches as the work order; **do not run `c3 change apply`**.
+- [x] Author patches in `.c3/changes/<adr-id>/` against c3-215 (base anchors via `c3 read c3-215 --section <name> --cite`): Contract gains the ruling surface (`gap-rule.ts` sole ruling writer, `debt-count.ts` gate, `debt-backfill.ts`, debt entities at `.c3/documents/debt/`, shipped canvas `canvases/debt.md`); Business Flow gains the closed loop (gap → Scout proposal → owner/Shaman ratification → rule/anti-rule/debt → grandfathered enforcement → burn-down to zero). Commit patches as the work order; **do not run `c3 change apply`**.
 - [ ] Run the full verification battery from spec §Verification.
 
 ```bash
