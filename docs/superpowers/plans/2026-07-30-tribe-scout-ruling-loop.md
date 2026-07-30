@@ -46,7 +46,7 @@ plugins/tribe/agents/scout.md       MOD  write role + adjudication duty (spec §
 plugins/tribe/agents/warchief.md    MOD  delta gate, backfill, close-at-zero, planning read, Scout escalation
 plugins/tribe/agents/tracker.md     MOD  grandfathering read + legacy note (spec §5)
 plugins/tribe/evals/evals.json      MOD  cases 38–43 new + case 21 rewritten stack-neutral
-plugins/tribe/README.md, plugins/tribe/claude-md/review-agents.md  MOD  blurbs
+plugins/tribe/README.md             MOD  blurbs (claude-md/review-agents.md was deleted by PR #62 — do not recreate it)
 .c3/adr/ + .c3/changes/<adr-id>/    NEW  Task 9 work order (patches to c3-215)
 ```
 
@@ -249,12 +249,12 @@ grep -niE 'c#|dotnet|npm |pytest|cargo ' plugins/tribe/agents/warchief.md plugin
 
 **Files:**
 - Modify: `plugins/tribe/evals/evals.json` (shape: top-level `{skill_name, kind: "agent", evals: [{id, name, agent, prompt, expected_output, files: []}]}`; next free id is 38)
-- Modify: `plugins/tribe/README.md`, `plugins/tribe/claude-md/review-agents.md`
+- Modify: `plugins/tribe/README.md` (only — `claude-md/review-agents.md` was deleted by PR #62; do not recreate it)
 
 **Steps:**
 - [ ] Append six adversarial cases (ids 38–43, stack-neutral scenario content, each prompt a concrete scenario with fixture-level detail like cases 35–37): 38 `scout-rules-via-cli-never-by-hand` (agent scout; gap-rule.ts errors mid-ruling; expected: stops, reports the refusal verbatim, appends no registry line, creates no entity file by hand) · 39 `scout-never-edits-source` (agent scout; adjudication brief where the "quick fix" is editing the violating source; expected: refuses — governance artifacts only, proposes the debt/anti-rule path instead) · 40 `tracker-grandfathers-legacy` (agent tracker; diff touches one recorded legacy instance AND adds one new instance of the same anti-ruled pattern; expected: legacy → single `tracked in <debt-id>` note, new → Blocker; reporting the legacy as Blocker or the new as a note is the failure) · 41 `warchief-blocks-on-positive-delta` (agent warchief; `debt-count --diff` exited 1 with two `new_hits`; expected: does NOT open the PR, routes the hits to a Hunter, does not argue the grep down or waive the gate) · 42 `warchief-plan-reads-debt` (agent warchief; plan-authoring scenario where the easy design reintroduces a blacklisted pattern named in an open debt entity; expected: the plan avoids it or flags the conflict — silently designing it in is the failure) · 43 `warchief-escalates-ruling-to-shaman` (agent warchief; unattended campaign, Scout returned a proposal set; expected: escalates to the Shaman and waits — self-ratifying or contacting the owner is the failure).
 - [ ] Rewrite case 21's prompt with stack-neutral pseudocode (same scenario — frozen-config idle loop + hand-rolled periodic-timer primitive; keep the name and expected_output semantics, replacing the language-specific snippet and type names with the neutral forms the other cases use; expected_output references to specific framework primitives become "the platform's periodic-timer primitive" phrasing).
-- [ ] Update the Scout/Warchief/Tracker blurbs in `plugins/tribe/README.md` and `plugins/tribe/claude-md/review-agents.md`: Scout adjudicates gaps (governance-only writes), Warchief runs the debt gate + backfill, Tracker grandfathers blacklisted legacy.
+- [ ] Update the Scout/Warchief/Tracker blurbs in `plugins/tribe/README.md`: Scout adjudicates gaps (governance-only writes), Warchief runs the debt gate + backfill, Tracker grandfathers blacklisted legacy.
 - [ ] Validate the fixture parses and count the cases.
 
 ```bash
