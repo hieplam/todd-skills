@@ -43,8 +43,9 @@ Load every rule that could apply to the changed code in this repo. These rule so
 - **Global rules** — read every `*.md` under `~/.claude/rules/`. Do not assume filenames; read whatever is there. Honour each file's `paths:` frontmatter: a rule applies only when its glob matches a changed file (e.g. `paths: ["src/**"]` → files under `src/`). A file with no `paths` applies generally.
 - **Project-scoped rules** — read `CLAUDE.md` and `.claude/CLAUDE.md` if present, anything under the repo's `.claude/rules/`, and any config that encodes standards — formatter, linter, or analyzer configuration, whatever the repo actually has (discovered in step 0).
 - **C3 rules** — if the project uses C3 (`.c3/` exists), read them by invoking the `c3` skill via the Skill tool (its contract, never its internal script paths): ask it to list the rules, bind rules to each changed file, and read each bound rule's full text. Never read `.c3/` files directly, and never hardcode a path into the skill's implementation. Only if the `c3` skill is unavailable in this session, fall back to a repo-installed `c3` CLI on `PATH` (`c3 list` / `c3 lookup <file>` / `c3 read <rule-id> --full`).
+- **Open debt entities (the blacklist)** — read every open entity under `.c3/documents/debt/`, the same read-only way you read C3 rules above (via the `c3` skill/CLI, never by hand-parsing the `.c3/` tree). Each entity's paired anti-rule and its `Check`'s recorded scope names a pattern the tribe has already ruled on and is burning down — a grandfathered instance, not a fresh finding. Closed entities do not count. See step 5 for exactly how this changes what you report.
 
-From the rules you actually read, derive one concrete, checkable item per rule. The rule files and C3 rules are the single source of truth.
+From the rules you actually read, derive one concrete, checkable item per rule. The rule files, C3 rules, and open debt entities are the single source of truth.
 
 ### 2. Get the change under review
 
@@ -93,6 +94,16 @@ discarded errors") — see step 3's "never double-report" bullet.
 
 Output one structured review. Cite each finding's rule by its id/clause **exactly as named in the rule source**. (The block below is a format template — the rule names shown are placeholders, not real rules.)
 
+**Grandfathering: an open debt entity turns a Blocker into a note.** When a diff occurrence
+matches an open debt entity's anti-rule (read in step 1) AND the occurrence is pre-existing
+inside that entity's recorded check scope — the check already counted it before this diff — do
+not report it as a Blocker/Should-fix/Optional finding at all: report it as exactly **one**
+non-blocking line, `tracked in <debt-id>`, never repeated per line and never escalated to a
+Blocker. A genuinely **new** occurrence of the same anti-rule — one this diff introduces, outside
+every open entity's recorded scope — gets no such grace: it is an ordinary anti-rule violation,
+reported as a Blocker (or lower, per the rule's own severity) exactly like any other step-3
+finding.
+
 ```
 ## Review: <PR/branch> — <N files, M findings>
 Verdict: BLOCK / APPROVE-WITH-COMMENTS / APPROVE
@@ -108,6 +119,9 @@ Verdict: BLOCK / APPROVE-WITH-COMMENTS / APPROVE
 
 ### Optional
 - ...
+
+### Tracked debt (grandfathered — never a Blocker)
+- `path/to/file:88` — tracked in `debt-<slug>`
 
 ### Checklist
 | Rule | Result |

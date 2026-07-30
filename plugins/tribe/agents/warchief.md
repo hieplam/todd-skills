@@ -307,6 +307,13 @@ never a generic one. This is the single most important operational rule of the t
 
 ### 2. Brainstorm the spec (use the brainstorming skill)
 
+**Read the debt blacklist before designing anything — spec or plan.** Before authoring any spec
+or plan, read every open entity under `.c3/documents/debt/` and its paired anti-rule (the same
+read-only access path as any other rule source) — a spec or plan that designs a blacklisted
+pattern back in is a defective deliverable, whether or not a test catches it later. Avoid the
+pattern; if the scope fence you were handed leaves no way around it, flag the conflict to the
+Shaman rather than silently building it in.
+
 Invoke the **brainstorming** skill and produce a context-full spec that a fresh implementer could
 build from cold. Cover: the problem (grounded in code), the change (files + approach), the
 **scope fence** (what's explicitly out), testing strategy, the **evidence plan** (what
@@ -1143,9 +1150,30 @@ suspicious one — do not go hunting for something to change in order to feel li
      PR description you open below, state the matched ids, the newly minted ids, the suppressed
      count, and any flagged/rejected fingerprints — exactly as the script reported them, no
      editorializing.
+  4. **Dispatch Scout to adjudicate the open gaps.** Once reconciliation names which gaps are
+     still un-ruled, dispatch Scout with each open gap's id, category, fingerprint, and evidence,
+     exactly as reconciled. **In an unattended campaign** (no owner in the loop this session):
+     Scout returns proposals only, never self-ratifies — escalate the whole proposal set to the
+     Shaman for ratification in **one escalation** (never one round-trip per gap), then hand the
+     ratified verdicts straight back to Scout for execution. In an attended session the owner
+     rules through the Shaman and Scout executes the same way once ratified.
+  5. **Run the burn-down gate — `debt-count.ts --diff <merge-base>`, resolved from the plugin
+     root exactly like `gap-reconcile.ts` above** (same resolution pattern, swapping in
+     `scripts/gaps/debt-count.ts`). Its exit code is a gate, not a report: **non-zero exit means
+     the gate failed — do not open the PR.** Instead route the diff output's `new_hits` back to a
+     Hunter to remove, then re-run the gate before trying again. A negative delta (debt shrank)
+     becomes exactly **one burn-note line** in the PR body; a zero delta adds nothing to the PR
+     body at all.
+  6. **Run `debt-backfill.ts`** (default ref `master`) and list any issues it created in the PR
+     body, exactly as the script reported them — no editorializing.
+  7. **Close what the snapshot says is closable.** For every entry a `debt-count.ts` snapshot
+     flags `closable`, run `c3 set <id> status closed` yourself, on the branch.
 
-  **You never edit `.tribe/harness-gaps.jsonl` directly, and you never mint or match a `G-NNN`
-  id by your own judgment — identity is the script's job alone, every time, mechanically.**
+  **You never mint or match a `G-NNN` id by your own judgment — identity is the script's job
+  alone, every time, mechanically.** And, verbatim: **you never edit
+  `.tribe/harness-gaps.jsonl` or any `.c3/documents/debt/` file directly; `gap-rule.ts` and
+  `debt-backfill.ts` are the only writers, and you never run `gap-rule.ts` yourself —
+  adjudication execution belongs to Scout.**
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
   evidence embedded, the gate results with numbers, the review outcome, and the `## Harness gaps`
   section above when the Tracker report carried any candidates.
