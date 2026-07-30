@@ -1,6 +1,6 @@
 ---
 id: adr-20260727-harness-gap-detection
-c3-seal: 025a2f600d240bb4b74d59973fa22227a432ca4aa75ff1e5255bacbef0644486
+c3-seal: 074f3c39c57e96176645ed7729052012bd49606d82e08e32b785794aefdf84b6
 title: harness-gap-detection
 type: adr
 goal: |-
@@ -131,7 +131,7 @@ reason. The patches land as a work order for a future session with a working CLI
 | --- | --- | --- | --- |
 | rule-bash-strict-mode | No shell script is added or touched by this change-unit's code work (gap-reconcile.ts/gap-precision.ts are bun/TypeScript CLIs, not shell scripts) | rule-bash-strict-mode#n1279@v1:sha256:cf218a707a61ba5ad906d29dec31f9f4eef92e5faeb9db74e3a75451c41c3c1d "Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-d" | N.A - no shell script edited |
 | rule-no-squash-merge | Delivered as one PR per the plan; merge shape (regular, 2-parent) governs whenever it is merged — no agent merges this change-unit's PR, matching the plan's explicit "never merged by any agent" constraint | rule-no-squash-merge#n1311@v1:sha256:2f5ff61964fe9551d508719ff31ed7514dbdbd8d296ff884a7e952a5334fab6a "Every capability in this repo that merges a pull request, or that verifies one was merged," | comply (deferred to merge time, owner-only) |
-| rule-stack-agnostic-agent-prompts | plugins/tribe/agents/tracker.md and warchief.md were edited (Tasks 4-5) to add the gap-detection duties; both edits use stack-neutral language (grep as an illustration only, no toolchain-specific commands) | rule-stack-agnostic-agent-prompts#n1333@v1:sha256:f697b8c251caaeb793d90f13035cf18f9d215e8edd5d9bfbe77fe8814bb98625 "Every agent prompt file in this repo (plugins/*/agents/*.md) stays usable against any" | comply |
+| rule-stack-agnostic-agent-prompts | plugins/tribe/agents/tracker.md and warchief.md were edited (Tasks 4-5) to add the gap-detection duties; both edits use stack-neutral language (grep as an illustration only, no toolchain-specific commands) | rule-stack-agnostic-agent-prompts#n1333@v1:sha256:f697b8c251caaeb793d90f13035cf18f9d215e8edd5d9bfbe77fe8814bb98625 "Every agent prompt file in this repo (plugins//agents/.md) stays usable against any" | comply |
 
 ## Work Breakdown
 

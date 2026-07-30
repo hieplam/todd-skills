@@ -1,6 +1,6 @@
 ---
 id: adr-20260723-runner-purity-wall
-c3-seal: 44aca630394c7d1625867564aa854318e4a2e6dd45a982bdbf325e86c46bfadb
+c3-seal: 45b279cbb3ac64bafadd3931d95243659f5d35a3f7a83f7be497d03235cc135c
 title: runner-purity-wall
 type: adr
 goal: Give the campaign runner an explicit, mechanically enforced structural contract (import purity + import direction + ambient-state seal) so the zero-LLM wall and the seam architecture cannot silently erode.
@@ -41,6 +41,6 @@ The runner grew as 9 flat modules with no written structural contract: `report.t
 | Check | Result |
 | --- | --- |
 | cd plugins/tribe/scripts/runner && bun run check | tsc silent; 185 pass / 0 fail (includes the structural-contract tests) |
-| grep -rln '@anthropic-ai/claude-agent-sdk' plugins/tribe/scripts/runner/*.ts | grep -v test | exactly session.adapter.ts |
+| grep -rln '@anthropic-ai/claude-agent-sdk' plugins/tribe/scripts/runner/*.ts | grep -v test |
 | Audit gate CU1 | 2 independent skinners + tracker; 1 Important finding (guard import-form bypasses) CONFIRMED, fixed in 6c87d4e with reproduce-first proof; merged as PR #46 = 5b2b595 (regular, parents 28e5fb9 69aaac1) |
 | CU2 readability pass | runLoop → flat named steps; CardCtx bundling (card derived, never threaded); derivePhaseConfigOf dedup; maxTurns deleted (runtime-neutral, zero setters). Audit: skinner-D 0C/0I + tracker APPROVE + skinner-C 0C/0I/1minor (report recovered post-limit; SDK-bundle grep proves maxTurns absent==undefined to query()). Merged as PR #47 = 39c3b1d (regular, parents 5b2b595 9a0bf7d); master gate green 185p/0f |

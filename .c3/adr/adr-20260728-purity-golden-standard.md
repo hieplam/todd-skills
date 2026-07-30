@@ -1,6 +1,6 @@
 ---
 id: adr-20260728-purity-golden-standard
-c3-seal: 2d196d69c29f4142b607d8a5ce83baecc27bf4156c3ae1b50924535f8d6d21a3
+c3-seal: d6426c7e875cc82fc8d49813080e9b45c8598e7dbd8fd1ef8f5bb2b3fda48304
 title: purity-golden-standard
 type: adr
 goal: |-
@@ -92,7 +92,7 @@ context outside review/planning moments.
 | --- | --- | --- | --- |
 | rule-bash-strict-mode | Both edited installers and the new test are shell; all keep set -euo pipefail preambles | rule-bash-strict-mode#n1345@v1:sha256:7a8c286269da63a2ba7b7362b72631a2491addb28a1a4266304605106dbaba9a "All shell scripts start with #!/usr/bin/env bash followed by set -euo pipefail." | comply |
 | rule-no-squash-merge | Delivering this ADR merges a PR; the merge must be a regular 2-parent merge | rule-no-squash-merge#n1377@v1:sha256:de99ab791d8de56b2db0a2df30884e92d9f70603716a1384a6965aa0c922273a "A merged PR's merge commit has exactly 2 parents; no capability merges with --squash or" | comply |
-| rule-stack-agnostic-agent-prompts | The new warchief/skinner prompt lines and pure-core.md itself must stay language-neutral; stack names appear only as explicitly-labeled illustrations ("interface + DI (C#/Java), seam (TS/JS), trait object (Rust), protocol (Python/Swift)") | rule-stack-agnostic-agent-prompts#n1399@v1:sha256:a1a20b05de21d6ac887a4e6fcc020b0fde876fc17aed7fabaad35e79ece9cb2e "Agent prompt files (plugins/*/agents/*.md) never hardcode a language name, toolchain command," | comply |
+| rule-stack-agnostic-agent-prompts | The new warchief/skinner prompt lines and pure-core.md itself must stay language-neutral; stack names appear only as explicitly-labeled illustrations ("interface + DI (C#/Java), seam (TS/JS), trait object (Rust), protocol (Python/Swift)") | rule-stack-agnostic-agent-prompts#n1399@v1:sha256:a1a20b05de21d6ac887a4e6fcc020b0fde876fc17aed7fabaad35e79ece9cb2e "Agent prompt files (plugins//agents/.md) never hardcode a language name, toolchain command," | comply |
 
 ## Work Breakdown
 
