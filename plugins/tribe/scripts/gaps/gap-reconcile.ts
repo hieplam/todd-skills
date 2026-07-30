@@ -7,7 +7,8 @@
 //   bun gap-reconcile.ts --registry <path> --changed-files <comma-list> --candidates <json-file>
 //
 // IO (fs reads/writes, `grep` execution via Bun.spawn) lives here, never in ledger.ts — ledger.ts
-// stays a pure module (parse/fold/mint/serialize only).
+// stays a pure module (parse/fold/mint/serialize only). Fingerprint tokenization/validation is
+// its own pure module (`fingerprint.ts`) shared with `gap-rule.ts`/`debt-tree.ts`.
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
@@ -19,6 +20,7 @@ import {
   type OpenedEvent,
   type SeenEvent,
 } from './ledger.ts';
+import { validateFingerprint } from './fingerprint.ts';
 
 /** Tracker's report candidate, already extracted into structured form by Warchief (spec §3):
  * `{category, paths, fingerprint, hits, description}`. `pr` is not part of that canonical
@@ -40,60 +42,6 @@ export interface ReconcileResult {
   minted: string[];
   suppressed_count: number;
   flagged: string[];
-}
-
-const BANNED_FINGERPRINT_CHARS = /[;|&$()<>`]/;
-
-interface FingerprintValidation {
-  valid: boolean;
-  reason?: string;
-  tokens?: string[];
-}
-
-/** Splits a fingerprint string into argv tokens, honoring single/double-quoted substrings (the
- * stored fingerprint is human/LLM-authored shell-command prose, e.g.
- * `grep -rn 'catch {}' src/handlers/`) — used only to build a real `Bun.spawn` argv, never to
- * hand the string to a shell. */
-function tokenize(command: string): string[] {
-  const tokens: string[] = [];
-  let i = 0;
-  const n = command.length;
-  while (i < n) {
-    while (i < n && /\s/.test(command[i]!)) i++;
-    if (i >= n) break;
-    let token = '';
-    while (i < n && !/\s/.test(command[i]!)) {
-      const c = command[i]!;
-      if (c === "'" || c === '"') {
-        const quote = c;
-        i++;
-        while (i < n && command[i] !== quote) {
-          token += command[i];
-          i++;
-        }
-        i++; // skip closing quote
-      } else {
-        token += c;
-        i++;
-      }
-    }
-    tokens.push(token);
-  }
-  return tokens;
-}
-
-/** Validates a stored fingerprint (spec §3 / §6a scenario 9): must be a single `grep`
- * invocation only. Anything containing a shell metacharacter (`; | & $ ( ) > < \``), or whose
- * command is not literally `grep`, is rejected — flagged for a human, never executed. */
-function validateFingerprint(fingerprint: string): FingerprintValidation {
-  if (BANNED_FINGERPRINT_CHARS.test(fingerprint)) {
-    return { valid: false, reason: 'contains shell metacharacters — rejected, never executed' };
-  }
-  const tokens = tokenize(fingerprint);
-  if (tokens.length < 2 || tokens[0] !== 'grep') {
-    return { valid: false, reason: 'not a single grep invocation — rejected, never executed' };
-  }
-  return { valid: true, tokens };
 }
 
 /** Rebuilds a fingerprint's argv "restricted to the changed files" (spec §3): keeps the

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — tribe plugin post-install hook. Two jobs:
+# install.sh — tribe plugin post-install hook. Three jobs:
 #
 # 1. Symlinks each machine-global rule file in rules/ into $CLAUDE_DIR/rules/,
 #    where reviewers (tracker, skinner) read every *.md fresh on each run.
@@ -7,7 +7,12 @@
 #    Idempotent: an already-correct link is skipped; a conflicting real file is
 #    backed up to <name>.bak.<epoch> first (same behavior as the root installer).
 #
-# 2. Appends each guidance snippet in claude-md/ to the global CLAUDE.md if not
+# 2. Symlinks each shipped canvas definition in canvases/ into $CLAUDE_DIR/canvases/,
+#    the same way and for the same reason as rules/ above — so an installed tribe
+#    (e.g. Scout self-provisioning the `debt` canvas in a target repo, CU-3 D10) can
+#    resolve the canvas file at a stable machine-global path.
+#
+# 3. Appends each guidance snippet in claude-md/ to the global CLAUDE.md if not
 #    already present. Idempotent: a snippet's first line (its section heading) is
 #    the presence marker — if that exact line exists in CLAUDE.md, the snippet is
 #    skipped.
@@ -46,6 +51,26 @@ if [ -d "$PLUGIN_DIR/rules" ]; then
     fi
     ln -s "$rule" "$dst"
     printf '  linked  rules/%s -> %s\n' "$(basename "$rule")" "$dst"
+  done
+fi
+
+# --- canvases/ -> $CLAUDE_DIR/canvases/ (symlinked shipped canvas definitions) ---
+if [ -d "$PLUGIN_DIR/canvases" ]; then
+  mkdir -p "$CLAUDE_DIR/canvases"
+  for canvas in "$PLUGIN_DIR/canvases"/*.md; do
+    [ -e "$canvas" ] || continue
+    dst="$CLAUDE_DIR/canvases/$(basename "$canvas")"
+    if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$canvas" ]; then
+      printf '  ok      canvases/%s (already linked)\n' "$(basename "$canvas")"
+      continue
+    fi
+    if [ -e "$dst" ] || [ -L "$dst" ]; then
+      bak="$dst.bak.$(date +%s)"
+      mv "$dst" "$bak"
+      printf 'WARN: canvases/%s: existing target backed up to %s\n' "$(basename "$canvas")" "$bak" >&2
+    fi
+    ln -s "$canvas" "$dst"
+    printf '  linked  canvases/%s -> %s\n' "$(basename "$canvas")" "$dst"
   done
 fi
 
