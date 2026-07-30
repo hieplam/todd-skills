@@ -282,18 +282,18 @@ git status --short -- .c3/ && git diff --stat -- .c3/
 
   Expected: ADR created; ONLY the new ADR file appears — any stray `.c3/` change is reverted with `git checkout -- <path>` before proceeding (known `c3 add` corruption defect).
 - [x] Author patches in `.c3/changes/<adr-id>/` against c3-215 (base anchors via `c3 read c3-215 --section <name> --cite`): Contract gains the ruling surface (`gap-rule.ts` sole ruling writer, `debt-count.ts` gate, `debt-backfill.ts`, debt entities at `.c3/documents/debt/`, shipped canvas `canvases/debt.md`); Business Flow gains the closed loop (gap → Scout proposal → owner/Shaman ratification → rule/anti-rule/debt → grandfathered enforcement → burn-down to zero). Commit patches as the work order; **do not run `c3 change apply`**.
-- [ ] Run the full verification battery from spec §Verification.
+- [x] Run the full verification battery from spec §Verification.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit && cd ../../../.. && bash plugins/tribe/scripts/tests/test-install-canvases.sh && python3 scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json --eval-id 5,21,29,35,36,37,38,39,40,41,42,43 --mode with_skill --exec-model sonnet --grader-model sonnet
 ```
 
   Expected: bun suite green (Tasks 1–4 scenarios all present), types clean, install test PASS, all listed eval ids PASS. If any red: stop and fix before PR.
-- [ ] Push the branch and open the PR (title `feat(tribe): scout ruling loop — debt blacklist, grandfathering, burn-down (CU-3)`; body: problem, spec/plan links, verification evidence, install wiring outcome, and the required footer). **Do not merge — merging is owner-only.**
+- [x] Push the branch and open the PR (title `feat(tribe): scout ruling loop — debt blacklist, grandfathering, burn-down (CU-3)`; body: problem, spec/plan links, verification evidence, install wiring outcome, and the required footer). **Do not merge — merging is owner-only.**
 
 ```bash
 git push -u origin cu3-scout-ruling-loop && gh pr create --title "feat(tribe): scout ruling loop — debt blacklist, grandfathering, burn-down (CU-3)" --body-file -
 ```
 
   Expected: PR URL printed; PR open with checks green; no merge performed.
-- [ ] **Step 5: Commit** — `docs(c3): ADR + change-unit for scout ruling loop (work order, apply deferred)` (the ADR/patches commit lands before the push step above; if verification produced no file changes, no additional commit is created — evidence lives in the PR body)
+- [x] **Step 5: Commit** — `docs(c3): ADR + change-unit for scout ruling loop (work order, apply deferred)` (the ADR/patches commit lands before the push step above; if verification produced no file changes, no additional commit is created — evidence lives in the PR body)
