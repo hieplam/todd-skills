@@ -215,16 +215,16 @@ bash plugins/tribe/scripts/tests/test-install-canvases.sh
 - Modify: `plugins/tribe/agents/scout.md`
 
 **Steps:**
-- [ ] Update the frontmatter description and the Boundaries block (currently "Read-only: it never edits or commits", `scout.md:12-16,29-33`): Scout's write capability is **governance artifacts only — rules and rulings via CLIs; it never edits, stages, or commits source code, and never hand-writes any registry line or `.c3/documents/debt/` file**. Tools line stays `Read, Grep, Glob, Bash, Skill` — write paths exist only through the `c3` CLI and `gap-rule.ts`.
-- [ ] Add an `## Adjudication duty` section (after the existing Report section): triggered when the Warchief dispatches Scout with open harness gaps (`G-NNN` + category + fingerprint + evidence from the reconcile output). Per gap, produce a **proposal**: disposition (`rule` / `anti-rule` / `debt` / `dismissed` / `dismissed-duplicate`), draft rule content where applicable (anti-rule `## Not This` quotes the repo's own code), and for debt a check command + description. **Attended session: the owner rules. Unattended (campaign): return the proposal to the Warchief for Shaman ratification — never self-ratify, never contact the owner.** Only after ratification: author the rule via the `c3` CLI (self-provision the canvas first if the repo lacks it: `c3 canvas add debt --file <plugin-root>/canvases/debt.md`), then execute `gap-rule.ts` — resolved from the plugin root, never the shell cwd — with `--ratified-by owner|shaman` as ratified, passing the debt slug WITHOUT the `debt-` prefix. If the CLI refuses or errors: **stop and report the refusal verbatim — never work around it by hand-editing anything.**
-- [ ] Verify boundaries and stack-agnosticism.
+- [x] Update the frontmatter description and the Boundaries block (currently "Read-only: it never edits or commits", `scout.md:12-16,29-33`): Scout's write capability is **governance artifacts only — rules and rulings via CLIs; it never edits, stages, or commits source code, and never hand-writes any registry line or `.c3/documents/debt/` file**. Tools line stays `Read, Grep, Glob, Bash, Skill` — write paths exist only through the `c3` CLI and `gap-rule.ts`.
+- [x] Add an `## Adjudication duty` section (after the existing Report section): triggered when the Warchief dispatches Scout with open harness gaps (`G-NNN` + category + fingerprint + evidence from the reconcile output). Per gap, produce a **proposal**: disposition (`rule` / `anti-rule` / `debt` / `dismissed` / `dismissed-duplicate`), draft rule content where applicable (anti-rule `## Not This` quotes the repo's own code), and for debt a check command + description. **Attended session: the owner rules. Unattended (campaign): return the proposal to the Warchief for Shaman ratification — never self-ratify, never contact the owner.** Only after ratification: author the rule via the `c3` CLI (self-provision the canvas first if the repo lacks it: `c3 canvas add debt --file <plugin-root>/canvases/debt.md`), then execute `gap-rule.ts` — resolved from the plugin root, never the shell cwd — with `--ratified-by owner|shaman` as ratified, passing the debt slug WITHOUT the `debt-` prefix. If the CLI refuses or errors: **stop and report the refusal verbatim — never work around it by hand-editing anything.**
+- [x] Verify boundaries and stack-agnosticism.
 
 ```bash
 grep -niE 'c#|dotnet|npm |pytest|cargo ' plugins/tribe/agents/scout.md; grep -c "governance" plugins/tribe/agents/scout.md; grep -n "tools:" plugins/tribe/agents/scout.md
 ```
 
   Expected: no stack-term hits; `governance` ≥ 1; tools line unchanged (no Write/Edit).
-- [ ] **Step 4: Commit** — `feat(tribe): scout adjudicates gaps — governance writes via CLIs only`
+- [x] **Step 4: Commit** — `feat(tribe): scout adjudicates gaps — governance writes via CLIs only`
 
 ### Task 7: Warchief + Tracker prompts — gate, backfill, grandfathering, planning read
 
