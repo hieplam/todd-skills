@@ -121,16 +121,16 @@ cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 - Produces: CLI `bun debt-count.ts [--repo <path>] [--ref <tree-ish>] [--diff <base-ref>]` (ref default `HEAD`). Snapshot stdout JSON: `{ref, sha, entries: [{id, baseline, now, flags: ('harness-leak'|'closable')[]}], totals: {open_entries, instances, baseline_total}}` — `sha` from `git rev-parse <ref>`; closed entities excluded. Diff stdout JSON: `{base: {ref, sha}, head: {ref, sha}, entries: [{id, base_hits, head_hits, delta, new_hits: string[]}]}` where `entries` contains ONLY nonzero-delta entries (zero delta → absent, AG-3) and `new_hits` lists head hit lines whose `path:content` pair is absent from the base hits. **Exit 1 iff any delta > 0**, else 0.
 
 **Steps:**
-- [ ] Write failing tests for the 8 spec §10a debt-count scenarios against temp git repos with committed debt entities + fixture source (commits arranged so base/head trees differ): (1) snapshot output carries `ref` + resolved `sha` · (2) per-entry `now` vs `baseline`; an entity with `status: closed` never appears · (3) `now > baseline` → `harness-leak` flag · (4) `now == 0` → `closable` flag · (5) `--diff` with a head adding hits → that entry present, positive delta, `new_hits` names the added `file:line`, exit 1 · (6) head removing hits → negative delta entry, exit 0 · (7) zero delta → empty `entries`, exit 0 · (8) an entity whose check fails `validateFingerprint` is never executed and surfaces in a `flagged` array instead.
-- [ ] Implement `debt-tree.ts` + `debt-count.ts` (pure computation of flags/deltas separated from the git IO edge).
-- [ ] Run the check command.
+- [x] Write failing tests for the 8 spec §10a debt-count scenarios against temp git repos with committed debt entities + fixture source (commits arranged so base/head trees differ): (1) snapshot output carries `ref` + resolved `sha` · (2) per-entry `now` vs `baseline`; an entity with `status: closed` never appears · (3) `now > baseline` → `harness-leak` flag · (4) `now == 0` → `closable` flag · (5) `--diff` with a head adding hits → that entry present, positive delta, `new_hits` names the added `file:line`, exit 1 · (6) head removing hits → negative delta entry, exit 0 · (7) zero delta → empty `entries`, exit 0 · (8) an entity whose check fails `validateFingerprint` is never executed and surfaces in a `flagged` array instead.
+- [x] Implement `debt-tree.ts` + `debt-count.ts` (pure computation of flags/deltas separated from the git IO edge).
+- [x] Run the check command.
 
 ```bash
 cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 ```
 
   Expected: all 8 scenarios pass, suite green, types clean.
-- [ ] **Step 4: Commit** — `feat(tribe): debt-count CLI — tree-named burn-down, diff gate`
+- [x] **Step 4: Commit** — `feat(tribe): debt-count CLI — tree-named burn-down, diff gate`
 
 ### Task 4: Issue backfill CLI (`debt-backfill.ts`)
 
