@@ -16,15 +16,15 @@
   ],
   "cards": {
     "cu3": {
-      "status": "staged",
+      "status": "escalated",
       "spec": "docs/superpowers/specs/2026-07-29-tribe-scout-ruling-loop-design.md",
       "plan": "docs/superpowers/plans/2026-07-30-tribe-scout-ruling-loop.md",
       "branch": null,
-      "baseSha": null,
+      "baseSha": "5f210f86ee7422b8851f3930b92c1610d0229d12",
       "pr": null,
       "mergeSha": null,
-      "sessionId": null,
-      "updatedAt": null,
+      "sessionId": "eb39b651-d587-400f-9166-cdc29c021753",
+      "updatedAt": "2026-07-30T15:50:31.035Z",
       "autoAnswerRounds": 0
     }
   },
