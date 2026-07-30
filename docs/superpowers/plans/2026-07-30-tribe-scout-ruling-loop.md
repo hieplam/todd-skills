@@ -161,7 +161,7 @@ cd plugins/tribe/scripts/gaps && bun test && bunx tsc --noEmit
 - Create: `plugins/tribe/scripts/tests/test-install-canvases.sh` (mirror `test-install-rules.sh`)
 
 **Steps:**
-- [ ] Create `plugins/tribe/canvases/debt.md` with EXACTLY this content (probed valid against c3x 11.0.0 — `canvas add` accepted it and instances validate):
+- [x] Create `plugins/tribe/canvases/debt.md` with EXACTLY this content (probed valid against c3x 11.0.0 — `canvas add` accepted it and instances validate):
 
 ```markdown
 ---
@@ -199,15 +199,15 @@ reject_if:
 workorder: ""
 ```
 
-- [ ] Read how PR #61 ships `plugins/tribe/rules/` in `install.sh`/`plugins/tribe/install.sh` (`git log -1 --patch -- install.sh plugins/tribe/install.sh` shows it) and mirror the same mechanism for `plugins/tribe/canvases/` so an installed tribe can resolve `<plugin-root>/canvases/debt.md`. Add `test-install-canvases.sh` asserting the canvas lands where the install puts shipped assets (mirror the rules test's assertions 1:1).
-- [ ] Run the install test.
+- [x] Read how PR #61 ships `plugins/tribe/rules/` in `install.sh`/`plugins/tribe/install.sh` (`git log -1 --patch -- install.sh plugins/tribe/install.sh` shows it) and mirror the same mechanism for `plugins/tribe/canvases/` so an installed tribe can resolve `<plugin-root>/canvases/debt.md`. Add `test-install-canvases.sh` asserting the canvas lands where the install puts shipped assets (mirror the rules test's assertions 1:1).
+- [x] Run the install test.
 
 ```bash
 bash plugins/tribe/scripts/tests/test-install-canvases.sh
 ```
 
   Expected: PASS.
-- [ ] **Step 4: Commit** — `feat(tribe): ship debt canvas definition + install wiring`
+- [x] **Step 4: Commit** — `feat(tribe): ship debt canvas definition + install wiring`
 
 ### Task 6: Scout prompt — the write role and adjudication duty
 
