@@ -1,6 +1,6 @@
 ---
 id: c3-215
-c3-seal: 28ac638769ba6653f9d158e981f55efb94926d69b92739670406e7d60a2c5ecd
+c3-seal: 35be66eead09eccd8bd3f626ed9c6c5edc46e2071397d8d14bdbd6cdd972cb19
 title: tribe
 type: component
 category: feature
