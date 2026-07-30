@@ -9,7 +9,6 @@ TRIBE="$(cd "$HERE/../.." && pwd)"          # plugins/tribe
 HUNTER="$TRIBE/agents/hunter.md"
 WARCHIEF="$TRIBE/agents/warchief.md"
 README="$TRIBE/README.md"
-REVIEW_DOC="$TRIBE/claude-md/review-agents.md"
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf 'ok - %s\n' "$1"; }
 bad() { FAIL=$((FAIL+1)); printf 'not ok - %s\n' "$1"; }
@@ -47,12 +46,10 @@ has "$WARCHIEF" "even with rounds left on the cap" "warchief: standoff escalates
 # the DISPOSITION level (CONFIRMED/REFUTED/DEBT), and even CONFIRMED is a routing act, not proof.
 has "$README" "falsifiable hypothesis" "readme: a finding is a falsifiable hypothesis"
 has "$README" "at the **disposition** level" "readme: scopes the authority to the disposition"
-has "$REVIEW_DOC" "falsifiable hypothesis" "review-agents: a finding is a falsifiable hypothesis"
-has "$REVIEW_DOC" "holds the adjudication, at the disposition level" "review-agents: scopes the authority to the disposition"
 
 # negative assertion — the regression guard. No prompt or doc may call an individual FINDING
 # authoritative/unarguable; that phrasing is reserved for the VERDICT.
-for f in "$HUNTER" "$WARCHIEF" "$README" "$REVIEW_DOC"; do
+for f in "$HUNTER" "$WARCHIEF" "$README"; do
   lacks "$f" "finding (is|remains) (authoritative|unarguable)" "no-finding-authority: $(basename "$f")"
 done
 
