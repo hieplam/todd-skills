@@ -1,6 +1,6 @@
 ---
 id: ref-plugin-layout
-c3-seal: d2b3ae9887342ac85339bd247c44f003c7844292171eee78291563ad73b60ef4
+c3-seal: 8dd2f1b3950e5b71bb0a29f086e2dc7a9ef828961bf7941ea040c9adb0219dc9
 title: plugin-layout
 type: ref
 goal: 'Standardize the directory shape of every plugin so the installer, the marketplace manifest, and the eval harness can walk any plugin without per-plugin logic. The recurring need: 8 plugins, one install code path.'
@@ -22,17 +22,18 @@ A plugin is a directory under `plugins/<name>/` containing `.claude-plugin/plugi
 
 Golden layout, from the richest real plugin (`plugins/tribe/`):
 
-```
+```````
 plugins/tribe/
 ├── .claude-plugin/plugin.json   # REQUIRED — name matches directory basename
 ├── README.md                    # OPTIONAL
 ├── install.sh                   # OPTIONAL post-install hook (CLAUDE_DIR passed through)
 ├── agents/                      # OPTIONAL — each *.md linked to ~/.claude/agents/
 │   ├── shaman.md … skinner.md
-├── claude-md/review-agents.md   # OPTIONAL — snippet appended by install.sh hook
+├── claude-md/global-rules.md    # OPTIONAL — snippet appended by install.sh hook
 ├── scripts/                     # OPTIONAL — repo-invoked, NOT installed
 │   └── tests/                   #   shell tests for those scripts
 └── evals/evals.json             # OPTIONAL — dev fixture, NOT installed
 ```
+````
 
 Skill-flavored plugins (e.g. `plugins/verify-shipped/`) use `skills/<name>/SKILL.md` instead of `agents/`.

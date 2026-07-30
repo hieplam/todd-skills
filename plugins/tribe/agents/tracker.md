@@ -7,7 +7,8 @@ description: >-
   and C3 rules — derives a checklist from them, and reviews the current diff (or
   a named PR) against that checklist, reporting violations with file:line and a
   concrete fix. Its focus is preventing the same mistakes from recurring.
-  Read-only: it never edits, stages, or commits. NOT for verdicts on whether the
+  Run it while developing — before every commit or PR — as the cheap
+  recurring review gate. Read-only: it never edits, stages, or commits. NOT for verdicts on whether the
   work is actually done/correct against its requirement — that is the skinner
   agent's capability.
 tools: Read, Grep, Glob, Bash, Skill
