@@ -145,6 +145,14 @@ source JSON never had the key, breaking the v1 byte-identical round-trip contrac
 at authoring time is correct; callers read the conceptual default themselves
 (`card.autoAnswerRounds ?? 0`; "no `dependsOn`" simply means independent).
 
+### Visualizing campaign sessions in Kanna
+
+Every card's executor session persists to `~/.claude/projects/<encoded-repo>/<sessionId>.jsonl`.
+To watch them in Kanna: `plugins/tribe/scripts/kanna/list-session-ids.sh <state.json>` copies all recorded
+session ids to the clipboard; paste the list into Kanna's sidebar Import dialog. Active
+sessions import as a live view. Treat runner-owned sessions as view-only — sending a message
+from Kanna takes over the session and will conflict with the runner's own resume.
+
 ### Worked example (a Shaman could author this from this section alone)
 
 ```json
