@@ -52,7 +52,7 @@ threaded into the two narrower configs that don't currently carry it at all
 - Produces: `RunLoopConfig.remote: string` — always populated, default `'origin'` when `--remote`
   is omitted (Task 2+ consume this exact field name).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `cli/main.test.ts` (after the existing `describe('parseArgs — required flags', ...)`
 block, alongside the other optional-flag describe blocks — check the file for where
@@ -78,7 +78,7 @@ describe('parseArgs — --remote', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 cd plugins/tribe/scripts/runner
@@ -88,7 +88,7 @@ bun test cli/main.test.ts
 Expected: FAIL — `result.config.remote` is `undefined`, not `'origin'`/`'upstream'`
 (`RunLoopConfig` has no `remote` field yet).
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `core/types.ts`, inside `RunLoopConfig` (after the `/** --dry-run */ dryRun: boolean;` line):
 
@@ -108,7 +108,7 @@ In `cli/main.ts`'s `parseArgs`, add alongside the other optional-with-default fl
 
 and add `remote,` to the returned `config` object literal.
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test cli/main.test.ts
@@ -117,7 +117,7 @@ bun test cli/main.test.ts
 Expected: both new tests PASS; every pre-existing test in this file still PASSES unmodified
 (the new field is additive).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/types.ts plugins/tribe/scripts/runner/cli/main.ts plugins/tribe/scripts/runner/cli/main.test.ts
