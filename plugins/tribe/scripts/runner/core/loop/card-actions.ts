@@ -209,11 +209,11 @@ export async function performRevertAndRedo(ctx: CardCtx): Promise<void> {
   }
   await io.exec(['git', 'branch', '-D', branch], { cwd: resolved.repoRoot });
 
-  const remote = await io.exec(['git', 'ls-remote', '--heads', 'origin', branch], {
+  const remote = await io.exec(['git', 'ls-remote', '--heads', resolved.remote, branch], {
     cwd: resolved.repoRoot,
   });
   if (remote.stdout.trim().length > 0) {
-    await io.exec(['git', 'push', 'origin', '--delete', branch], { cwd: resolved.repoRoot });
+    await io.exec(['git', 'push', resolved.remote, '--delete', branch], { cwd: resolved.repoRoot });
   }
 }
 
@@ -271,15 +271,16 @@ export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<Se
 }
 
 /** Records the commit the card's work is being cut from, BEFORE its session spawns — the
- * schemaGuard check diffs `baseSha..origin/master`, so a card that never recorded one can
- * never be verified. Crash-safe (persisted immediately) and idempotent: a resumed card keeps
- * the base it originally started from rather than silently re-basing onto a moved master. */
+ * schemaGuard check diffs `baseSha..<remote>/<baseBranch>`, so a card that never recorded one
+ * can never be verified. Crash-safe (persisted immediately) and idempotent: a resumed card
+ * keeps the base it originally started from rather than silently re-basing onto a moved
+ * master. */
 export async function recordBaseSha(ctx: CardCtx): Promise<void> {
   const { cardId, state, resolved, io } = ctx;
   const card = state.cards[cardId];
   if (card.baseSha) return;
 
-  const result = await io.exec(['git', 'rev-parse', `origin/${resolved.baseBranch}`], {
+  const result = await io.exec(['git', 'rev-parse', `${resolved.remote}/${resolved.baseBranch}`], {
     cwd: resolved.repoRoot,
   });
   const sha = result.stdout.trim();
@@ -330,6 +331,8 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     await recordBranchFromPr(ctx);
     const verifyConfig: VerifyConfig = {
       repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
       schemaLockPaths: state.schemaLockPaths,
       docsOnlyPaths: state.docsOnlyPaths,
     };
@@ -352,6 +355,8 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     await recordBranchFromPr(ctx);
     const verifyConfig: VerifyConfig = {
       repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
       schemaLockPaths: state.schemaLockPaths,
       docsOnlyPaths: state.docsOnlyPaths,
     };

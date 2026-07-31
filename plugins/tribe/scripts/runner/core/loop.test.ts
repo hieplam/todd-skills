@@ -83,6 +83,7 @@ describe('deriveCardPhase — §D4 reality table', () => {
     repoRoot: '/sample-repo',
     escalationsDir: 'docs/campaign/escalations',
     includeEscalated: false,
+    remote: 'origin',
   };
 
   function ioWith(handlers: {
@@ -161,6 +162,31 @@ describe('deriveCardPhase — §D4 reality table', () => {
     const io = ioWith({ lsRemote: ok('abc123\trefs/heads/feat/c1-widget\n') });
     const phase = await deriveCardPhase('C1', fixtureCard({ sessionId: null }), baseConfig, io);
     expect(phase).toEqual({ kind: 'revert_and_redo' });
+  });
+
+  test('branchOrWorktreeExists ls-remotes the resolved remote, not a hardcoded "origin"', async () => {
+    const calls: string[][] = [];
+    const io: DerivePhaseIO = {
+      exec: mock(async (cmd: string[]) => {
+        calls.push(cmd);
+        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view') {
+          return fail('no pull requests found for branch');
+        }
+        if (cmd[0] === 'git' && cmd[1] === 'worktree') return ok('');
+        if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('abc123\trefs/heads/feat/c1-widget\n');
+        throw new Error(`unexpected exec: ${cmd.join(' ')}`);
+      }),
+      fileExists: mock(() => false),
+    };
+    const phase = await deriveCardPhase(
+      'C1',
+      fixtureCard({ sessionId: null }),
+      { ...baseConfig, remote: 'upstream' },
+      io,
+    );
+    expect(phase).toEqual({ kind: 'revert_and_redo' });
+    const lsRemoteCall = calls.find((c) => c[1] === 'ls-remote');
+    expect(lsRemoteCall).toEqual(['git', 'ls-remote', '--heads', 'upstream', 'feat/c1-widget']);
   });
 
   test('escalation file exists for the card -> EXIT: answer pending', async () => {
@@ -257,14 +283,21 @@ describe('isStopRequested', () => {
 // ===========================================================================================
 
 describe('resolveBaseBranch', () => {
-  test('strips the "origin/" prefix from origin/HEAD', async () => {
-    const io = { exec: mock(async () => ok('origin/master\n')) };
-    expect(await resolveBaseBranch(io, '/repo')).toBe('master');
+  test('strips the "origin/" prefix from <remote>/HEAD', async () => {
+    const calls: string[][] = [];
+    const io = {
+      exec: mock(async (cmd: string[]) => {
+        calls.push(cmd);
+        return ok('upstream/master\n');
+      }),
+    };
+    expect(await resolveBaseBranch(io, '/repo', 'upstream')).toBe('master');
+    expect(calls[0]).toEqual(['git', 'symbolic-ref', '--short', 'refs/remotes/upstream/HEAD']);
   });
 
   test('falls back to "master" when the query fails', async () => {
     const io = { exec: mock(async () => fail('no such ref')) };
-    expect(await resolveBaseBranch(io, '/repo')).toBe('master');
+    expect(await resolveBaseBranch(io, '/repo', 'origin')).toBe('master');
   });
 });
 
@@ -476,6 +509,7 @@ function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
     model: 'fixture-model',
     includeEscalated: false,
     dryRun: false,
+    remote: 'origin',
     ...overrides,
   };
 }
@@ -578,6 +612,79 @@ describe('runLoop — records branch + baseSha (handoff Fix 5)', () => {
     const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
     expect(finalState.cards.C1.baseSha).toBe('base15ha');
     expect(finalState.cards.C1.branch).toBe('feature/RecordedBranch');
+  });
+});
+
+describe('runLoop — recordBaseSha rev-parses the resolved <remote>/<baseBranch>', () => {
+  test('rev-parse targets "upstream/main", not "origin/main"', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'git' && cmd[1] === 'symbolic-ref') return ok('upstream/main\n');
+          if (cmd[0] === 'git' && cmd[1] === 'rev-parse') return ok('base15ha\n');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view') return ok(JSON.stringify({ headRefName: 'feature/RecordedBranch' }));
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'rev-list') return ok('deadbee parent1 parent2');
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'diff') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'worktree') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('');
+          if (cmd[0] === 'git') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr') return ok('https://example.invalid/o/r/pull/900\n');
+          return null;
+        },
+      ],
+      spawnQueue: [() => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1'))],
+    });
+
+    await runLoop(baseLoopConfig({ maxCards: 1, remote: 'upstream' }), io);
+
+    const revParseCall = calls.find((c) => c[0] === 'git' && c[1] === 'rev-parse');
+    expect(revParseCall).toEqual(['git', 'rev-parse', 'upstream/main']);
+  });
+});
+
+describe('runLoop — REVERT_AND_REDO ls-removes/deletes the resolved remote', () => {
+  test('both the phase-derivation ls-remote AND the delete-push target config.remote, not "origin"', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', sessionId: null }) },
+    });
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('abc123\trefs/heads/feat/c1-widget\n');
+          if (cmd[0] === 'git' && cmd[1] === 'fetch') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'checkout') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'add') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'commit') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'push') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'create') return ok('https://example.invalid/o/r/pull/911\n');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'merge') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'pull') return ok('');
+          return null;
+        },
+      ],
+      spawnQueue: [() => messages(needsDirectionMessages('sess-revert'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1, remote: 'upstream' }), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    const lsRemoteCalls = calls.filter((c) => c[1] === 'ls-remote');
+    expect(lsRemoteCalls.length).toBeGreaterThan(0);
+    for (const c of lsRemoteCalls) {
+      expect(c).toEqual(['git', 'ls-remote', '--heads', 'upstream', 'feat/c1-widget']);
+    }
+    const pushDeleteCall = calls.find((c) => c[0] === 'git' && c[1] === 'push' && c.includes('--delete'));
+    expect(pushDeleteCall).toEqual(['git', 'push', 'upstream', '--delete', 'feat/c1-widget']);
   });
 });
 

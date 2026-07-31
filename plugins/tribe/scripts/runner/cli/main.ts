@@ -119,6 +119,7 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
 
   const dryRun = raw.get('--dry-run') === true;
   const includeEscalated = raw.get('--include-escalated') === true;
+  const remote = typeof raw.get('--remote') === 'string' ? (raw.get('--remote') as string) : 'origin';
 
   return {
     config: {
@@ -136,6 +137,7 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
       cardsFilter,
       includeEscalated,
       dryRun,
+      remote,
     },
   };
 }

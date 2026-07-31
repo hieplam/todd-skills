@@ -59,6 +59,24 @@ describe('parseArgs — required flags', () => {
   }
 });
 
+describe('parseArgs — --remote', () => {
+  test('defaults to "origin" when omitted', () => {
+    const result = parseArgs(validArgv(), RUN_ID);
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.config.remote).toBe('origin');
+    }
+  });
+
+  test('--remote overrides the default', () => {
+    const result = parseArgs([...validArgv(), '--remote', 'upstream'], RUN_ID);
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.config.remote).toBe('upstream');
+    }
+  });
+});
+
 describe('parseArgs — --home / runId (Task 2, spec §4)', () => {
   test('--home is required: missing flag is a usage error', () => {
     const result = parseArgs(validArgvWithout('--home'), RUN_ID);

@@ -52,7 +52,7 @@ threaded into the two narrower configs that don't currently carry it at all
 - Produces: `RunLoopConfig.remote: string` — always populated, default `'origin'` when `--remote`
   is omitted (Task 2+ consume this exact field name).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `cli/main.test.ts` (after the existing `describe('parseArgs — required flags', ...)`
 block, alongside the other optional-flag describe blocks — check the file for where
@@ -78,7 +78,7 @@ describe('parseArgs — --remote', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 cd plugins/tribe/scripts/runner
@@ -88,7 +88,7 @@ bun test cli/main.test.ts
 Expected: FAIL — `result.config.remote` is `undefined`, not `'origin'`/`'upstream'`
 (`RunLoopConfig` has no `remote` field yet).
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `core/types.ts`, inside `RunLoopConfig` (after the `/** --dry-run */ dryRun: boolean;` line):
 
@@ -108,7 +108,7 @@ In `cli/main.ts`'s `parseArgs`, add alongside the other optional-with-default fl
 
 and add `remote,` to the returned `config` object literal.
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test cli/main.test.ts
@@ -117,7 +117,7 @@ bun test cli/main.test.ts
 Expected: both new tests PASS; every pre-existing test in this file still PASSES unmodified
 (the new field is additive).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/types.ts plugins/tribe/scripts/runner/cli/main.ts plugins/tribe/scripts/runner/cli/main.test.ts
@@ -138,7 +138,7 @@ git commit -m "feat(runner): add --remote CLI flag (default 'origin')"
 - Produces: `resolveBaseBranch(io, repoRoot, remote): Promise<string>` — Task 3+'s
   `resolveRunContext` call site is the only consumer.
 
-- [ ] **Step 1: Write the failing test** — update the two existing cases to pass a `remote`
+- [x] **Step 1: Write the failing test** — update the two existing cases to pass a `remote`
   argument and assert it is what gets queried (not hardcoded):
 
 ```ts
@@ -162,7 +162,7 @@ describe('resolveBaseBranch', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/loop.test.ts -t resolveBaseBranch
@@ -172,7 +172,7 @@ Expected: FAIL — `resolveBaseBranch` is called with 2 args in the current sign
 `remote` argument doesn't change behavior yet — the still-hardcoded `refs/remotes/origin/HEAD`
 literal means `calls[0]` asserts the wrong ref path).
 
-- [ ] **Step 3: Minimal implementation** — in `run-loop.ts`:
+- [x] **Step 3: Minimal implementation** — in `run-loop.ts`:
 
 ```ts
 export async function resolveBaseBranch(
@@ -201,7 +201,7 @@ Update `resolveRunContext`'s call site (~line 131):
   const baseBranch = await resolveBaseBranch(io, config.repoRoot, config.remote);
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/loop.test.ts
@@ -210,7 +210,7 @@ bun test core/loop.test.ts
 Expected: full `loop.test.ts` suite PASSES (the `resolveBaseBranch` cases plus everything else
 in that file, since nothing else in it calls `resolveBaseBranch` directly).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/loop/run-loop.ts plugins/tribe/scripts/runner/core/loop.test.ts
@@ -232,7 +232,7 @@ git commit -m "fix(runner): resolveBaseBranch takes the remote name as a paramet
 - Produces: `VerifyConfig.remote: string`, `VerifyConfig.baseBranch: string` — consumed by
   `checkAncestor`/`isDocsOnlyDiff`/`checkWorktreeAndBranchGone`/`checkSchemaGuard`.
 
-- [ ] **Step 1: Write the failing test** — update `fixtureConfig` and add remote-threading
+- [x] **Step 1: Write the failing test** — update `fixtureConfig` and add remote-threading
   assertions using the existing `buildIoRecordingCalls` helper:
 
 ```ts
@@ -284,7 +284,7 @@ describe('verifyShipped — remote/baseBranch are threaded, never hardcoded', ()
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/verify.test.ts
@@ -294,7 +294,7 @@ Expected: FAIL — TypeScript error (`VerifyConfig` has no `remote`/`baseBranch`
 are added as optional stubs, the 4 new assertions fail because the checks still query literal
 `origin/master`/`origin`.
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `verify.ts`'s `VerifyConfig` interface, add:
 
@@ -351,7 +351,7 @@ In `card-actions.ts`, both `VerifyConfig` literals (`actOnCard`, ~line 331 and ~
       baseBranch: resolved.baseBranch,
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/verify.test.ts core/loop.test.ts
@@ -361,7 +361,7 @@ Expected: full suite PASSES — the 4 new cases plus every pre-existing `verify.
 (unmodified behavior at the default `remote: 'origin', baseBranch: 'master'`), plus
 `loop.test.ts` (which exercises `actOnCard` and therefore both updated `VerifyConfig` literals).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/verify.ts plugins/tribe/scripts/runner/core/verify.test.ts plugins/tribe/scripts/runner/core/loop/card-actions.ts
@@ -382,7 +382,7 @@ git commit -m "fix(runner): thread remote/baseBranch through verify.ts's 4 check
 - Produces: `GithubConfig.remote: string` — the sole source of the remote name for every git
   operation `commitStateAndMerge` performs.
 
-- [ ] **Step 1: Write the failing test** — add `remote: 'origin'` to the module-level `config`
+- [x] **Step 1: Write the failing test** — add `remote: 'origin'` to the module-level `config`
   fixture (so every EXISTING test keeps passing unmodified at the default), then append:
 
 ```ts
@@ -400,7 +400,7 @@ describe('commitStateAndMerge — remote is threaded, never hardcoded', () => {
 (Check `makeIo`'s exact returned shape — the file may name the calls array differently at its
 own call site; match the existing helper's real signature rather than guessing.)
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/github.test.ts
@@ -409,7 +409,7 @@ bun test core/github.test.ts
 Expected: FAIL — TypeScript error (`GithubConfig` has no `remote`) or, once added, every `git`
 call still fires with `'origin'` regardless of the `remote` override.
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `GithubConfig`, add:
 
@@ -431,7 +431,7 @@ In `commit-guard.ts`'s `githubConfigFor`, add:
     remote: resolved.remote,
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/github.test.ts core/loop.test.ts
@@ -439,7 +439,7 @@ bun test core/github.test.ts core/loop.test.ts
 
 Expected: full suite PASSES.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/github.ts plugins/tribe/scripts/runner/core/github.test.ts plugins/tribe/scripts/runner/core/loop/commit-guard.ts
@@ -461,7 +461,7 @@ git commit -m "fix(runner): GithubConfig.remote replaces github.ts's hardcoded R
 
 **Interfaces:** no new exported names — pure internal parameterization.
 
-- [ ] **Step 1: Write the failing test** — three cases, one per function, each asserting the
+- [x] **Step 1: Write the failing test** — three cases, one per function, each asserting the
   literal command array passed to `io.exec` contains the fixture's chosen non-`'origin'`
   remote instead of `'origin'`. Follow this shape (adjust mock construction to match
   `loop.test.ts`'s existing per-function fixture helpers — read the file's existing
@@ -486,7 +486,7 @@ test('recordBaseSha rev-parses <remote>/<baseBranch>, not origin/<baseBranch>', 
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/loop.test.ts
@@ -495,7 +495,7 @@ bun test core/loop.test.ts
 Expected: FAIL — TypeScript error (`DerivePhaseConfig` has no `remote`) or the 3 new assertions
 fail against the still-hardcoded `'origin'`.
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `phase.ts`'s `DerivePhaseConfig`, add `remote: string;`. In `branchOrWorktreeExists`,
 replace the hardcoded `'origin'`:
@@ -536,7 +536,7 @@ Also fix the stale doc-comment above `recordBaseSha` that says "diffs `baseSha..
 to say "diffs `baseSha..<remote>/<baseBranch>`" (Task 3 already made that literally true; this
 comment predates it).
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/loop.test.ts
@@ -545,7 +545,7 @@ bun test core/loop.test.ts
 Expected: full suite PASSES (the 3 new cases plus every pre-existing case in this file, since
 the default `remote: 'origin'` reproduces prior behavior exactly).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/loop/phase.ts plugins/tribe/scripts/runner/core/loop/card-actions.ts plugins/tribe/scripts/runner/core/loop.test.ts
@@ -560,7 +560,7 @@ git commit -m "fix(runner): thread remote through phase.ts + card-actions.ts's r
 **Interfaces:** none new — this task adds test coverage only, proving a non-finding from the
 design doc's §3 (already-correct behavior) stays correct.
 
-- [ ] **Step 1: Write the test** (no red/green cycle needed — this documents already-correct
+- [x] **Step 1: Write the test** (no red/green cycle needed — this documents already-correct
   behavior; still verify it actually passes, since a passing assertion against the WRONG
   behavior would be worse than no test at all):
 
@@ -591,7 +591,7 @@ describe('loadState/serializeState — unknown top-level keys survive a round tr
 });
 ```
 
-- [ ] **Step 2: Run to verify it passes**
+- [x] **Step 2: Run to verify it passes**
 
 ```bash
 bun test core/state.test.ts
@@ -600,7 +600,7 @@ bun test core/state.test.ts
 Expected: PASS immediately — this documents existing, already-correct `z.looseObject` behavior
 (the design doc's §3 non-finding); no production code changes in this task.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/state.test.ts
@@ -609,7 +609,7 @@ git commit -m "test(runner): unknown top-level state fields survive load+seriali
 
 ### Task 7: full gates + PR
 
-- [ ] **Step 1: Full check**
+- [x] **Step 1: Full check**
 
 ```bash
 cd plugins/tribe/scripts/runner
@@ -652,11 +652,11 @@ EOF
 
 ## Self-review checklist
 
-- [ ] Every one of the 10 inventoried hardcodes (spec §2 table) is gone — `grep -rn "'origin'"
+- [x] Every one of the 10 inventoried hardcodes (spec §2 table) is gone — `grep -rn "'origin'"
       core/ cli/` inside `plugins/tribe/scripts/runner` returns zero matches outside test
       fixtures/comments.
-- [ ] Default behavior (`remote` omitted → `'origin'`) is byte-identical to pre-fix behavior —
+- [x] Default behavior (`remote` omitted → `'origin'`) is byte-identical to pre-fix behavior —
       every pre-existing test in `loop.test.ts`/`verify.test.ts`/`github.test.ts`/`cli/main.test.ts`
       passes unmodified except for the mechanical `remote: 'origin'` fixture additions.
-- [ ] `structure.test.ts` still passes (no new adapter/world-touching import introduced).
-- [ ] The Task 6 regression test is genuinely new coverage, not a duplicate of an existing case.
+- [x] `structure.test.ts` still passes (no new adapter/world-touching import introduced).
+- [x] The Task 6 regression test is genuinely new coverage, not a duplicate of an existing case.

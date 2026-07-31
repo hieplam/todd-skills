@@ -59,6 +59,7 @@ export function githubConfigFor(resolved: ResolvedConfig, cardId: string): Githu
     card: cardId,
     prBody: buildStatePrBody(cardId),
     baseBranch: resolved.baseBranch,
+    remote: resolved.remote,
   };
 }
 
