@@ -609,7 +609,7 @@ git commit -m "test(runner): unknown top-level state fields survive load+seriali
 
 ### Task 7: full gates + PR
 
-- [ ] **Step 1: Full check**
+- [x] **Step 1: Full check**
 
 ```bash
 cd plugins/tribe/scripts/runner
@@ -652,11 +652,11 @@ EOF
 
 ## Self-review checklist
 
-- [ ] Every one of the 10 inventoried hardcodes (spec §2 table) is gone — `grep -rn "'origin'"
+- [x] Every one of the 10 inventoried hardcodes (spec §2 table) is gone — `grep -rn "'origin'"
       core/ cli/` inside `plugins/tribe/scripts/runner` returns zero matches outside test
       fixtures/comments.
-- [ ] Default behavior (`remote` omitted → `'origin'`) is byte-identical to pre-fix behavior —
+- [x] Default behavior (`remote` omitted → `'origin'`) is byte-identical to pre-fix behavior —
       every pre-existing test in `loop.test.ts`/`verify.test.ts`/`github.test.ts`/`cli/main.test.ts`
       passes unmodified except for the mechanical `remote: 'origin'` fixture additions.
-- [ ] `structure.test.ts` still passes (no new adapter/world-touching import introduced).
-- [ ] The Task 6 regression test is genuinely new coverage, not a duplicate of an existing case.
+- [x] `structure.test.ts` still passes (no new adapter/world-touching import introduced).
+- [x] The Task 6 regression test is genuinely new coverage, not a duplicate of an existing case.

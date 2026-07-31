@@ -36,6 +36,7 @@ All paths below that are relative are relative to `--repo` unless noted otherwis
 | `--cards` | no | Comma-separated list of card ids — restricts the loop to only these ids, in the state's own `sequence` order. Default: the full sequence. |
 | `--max-cards` | no | Positive integer — stop after WORKING this many cards in this run (a card actually `shipped`/`escalated`/`stopped` this pass — see D5′ below; a card merely parked on a prior run's escalation, or skipped as `blocked`, does not consume this budget). Default: unbounded (run until `done` or the budget is spent — an escalation no longer stops the run, see D5′). |
 | `--include-escalated` | no | Bypass the escalation-file short-circuit for a card the human has already ruled on, and let `nextCard`/`deriveCardPhase` reconsider it. This is exactly the flag the Stage C round-trip re-triggers with (spec §O6). |
+| `--remote` | no | The git remote this repo's canonical upstream/PR-target actually is — resolved once and threaded everywhere the runner queries or pushes to a remote (base-branch resolution, verify-phase ancestry/diff checks, state auto-commit, branch-existence checks). Default: `'origin'`. See [`docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md`](../../../../docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md). |
 
 `--repo`, `--state`, `--model`, `--answers`, `--escalations-dir`, and `--home` have **no
 default** — this is deliberate (the stateless-capability wall): omitting any of them is a
@@ -515,11 +516,12 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
   This is separate from `github.ts`'s own D6 check-polling loop, which does sleep between
   attempts (`D6_RETRY_SPACING_MS`).
 - **`baseBranch` derivation has a silent fallback.** `resolveBaseBranch` runs
-  `git symbolic-ref --short refs/remotes/origin/HEAD` and falls back to the literal string
-  `"master"` if that command fails for any reason (not just "unset"). A target repo whose
-  default branch is `main`, hit by a transient `git` failure on this one call, would silently
-  target `master` instead and fail loudly later at `git fetch`/push — there is no
-  distinguishing "origin/HEAD really is unset" from "the query itself broke".
+  `git symbolic-ref --short refs/remotes/<remote>/HEAD` (`<remote>` is `--remote`, default
+  `origin`) and falls back to the literal string `"master"` if that command fails for any
+  reason (not just "unset"). A target repo whose default branch is `main`, hit by a transient
+  `git` failure on this one call, would silently target `master` instead and fail loudly later
+  at `git fetch`/push — there is no distinguishing "`<remote>`/HEAD really is unset" from "the
+  query itself broke".
 - **`github.ts`'s D6 sonar waiver assumes its diff is docs-only by construction, not by
   inspection.** The waiver that lets a red PR merge despite a single advisory
   SonarCloud-504 check never inspects the PR's actual file diff — it relies entirely on the
