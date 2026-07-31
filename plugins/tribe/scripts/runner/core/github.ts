@@ -24,6 +24,9 @@ export interface GithubConfig {
   prBody: string;
   /** Base branch PRs target and the branch fast-forward-synced after merge (e.g. `master`). */
   baseBranch: string;
+  /** The git remote every operation below runs against (`ResolvedConfig.remote`) — replaces
+   * the module's former hardcoded `REMOTE` constant. */
+  remote: string;
 }
 
 /** One entry from `gh pr checks --json name,bucket,description`. `bucket` is gh's own
@@ -69,8 +72,6 @@ export const D6_MAX_RETRIES = 3;
 /** D6: 10-minute spacing between retries, in milliseconds — always routed through
  * `GithubIO.sleep`, never a real wait. */
 export const D6_RETRY_SPACING_MS = 10 * 60 * 1000;
-
-const REMOTE = 'origin';
 
 function branchNameFor(card: string): string {
   return `campaign-state/${card}`;
@@ -197,7 +198,7 @@ export async function commitStateAndMerge(
     if (result.outcome === 'merged') {
       // The PR is already merged on GitHub at this point, so a local sync hiccup does not
       // change a `merged` outcome into anything else.
-      await io.exec(['git', 'pull', '--ff-only', REMOTE, config.baseBranch], { cwd });
+      await io.exec(['git', 'pull', '--ff-only', config.remote, config.baseBranch], { cwd });
     }
   } catch {
     // Swallowed deliberately: cleanup never overwrites the result computed above.
@@ -219,7 +220,7 @@ async function attemptCommitStateAndMerge(
   // `checkout -b`, which fails outright against a branch a previous (escalated/failed) run
   // left behind, and never from whatever HEAD happens to be (a stale local base would
   // silently re-commit state on top of old history).
-  const fetchResult = await io.exec(['git', 'fetch', REMOTE, config.baseBranch], { cwd });
+  const fetchResult = await io.exec(['git', 'fetch', config.remote, config.baseBranch], { cwd });
   if (fetchResult.exitCode !== 0) {
     return {
       outcome: 'commit_failed',
@@ -229,7 +230,7 @@ async function attemptCommitStateAndMerge(
   }
 
   const branchResult = await io.exec(
-    ['git', 'checkout', '-B', branch, `${REMOTE}/${config.baseBranch}`],
+    ['git', 'checkout', '-B', branch, `${config.remote}/${config.baseBranch}`],
     { cwd },
   );
   if (branchResult.exitCode !== 0) {
@@ -258,7 +259,7 @@ async function attemptCommitStateAndMerge(
   // commit (verified live: a plain push is rejected non-fast-forward in that case) — this
   // branch exists solely for this helper's own ephemeral state commits, so overwriting a
   // previous attempt's commit on it is always correct.
-  const pushResult = await io.exec(['git', 'push', '-u', REMOTE, branch, '--force'], { cwd });
+  const pushResult = await io.exec(['git', 'push', '-u', config.remote, branch, '--force'], { cwd });
   if (pushResult.exitCode !== 0) {
     return { outcome: 'commit_failed', step: 'push', reason: pushResult.stderr || 'git push failed' };
   }

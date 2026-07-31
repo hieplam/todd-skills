@@ -382,7 +382,7 @@ git commit -m "fix(runner): thread remote/baseBranch through verify.ts's 4 check
 - Produces: `GithubConfig.remote: string` — the sole source of the remote name for every git
   operation `commitStateAndMerge` performs.
 
-- [ ] **Step 1: Write the failing test** — add `remote: 'origin'` to the module-level `config`
+- [x] **Step 1: Write the failing test** — add `remote: 'origin'` to the module-level `config`
   fixture (so every EXISTING test keeps passing unmodified at the default), then append:
 
 ```ts
@@ -400,7 +400,7 @@ describe('commitStateAndMerge — remote is threaded, never hardcoded', () => {
 (Check `makeIo`'s exact returned shape — the file may name the calls array differently at its
 own call site; match the existing helper's real signature rather than guessing.)
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/github.test.ts
@@ -409,7 +409,7 @@ bun test core/github.test.ts
 Expected: FAIL — TypeScript error (`GithubConfig` has no `remote`) or, once added, every `git`
 call still fires with `'origin'` regardless of the `remote` override.
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `GithubConfig`, add:
 
@@ -431,7 +431,7 @@ In `commit-guard.ts`'s `githubConfigFor`, add:
     remote: resolved.remote,
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/github.test.ts core/loop.test.ts
@@ -439,7 +439,7 @@ bun test core/github.test.ts core/loop.test.ts
 
 Expected: full suite PASSES.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/github.ts plugins/tribe/scripts/runner/core/github.test.ts plugins/tribe/scripts/runner/core/loop/commit-guard.ts

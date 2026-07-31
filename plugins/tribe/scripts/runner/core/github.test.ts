@@ -18,6 +18,7 @@ const config: GithubConfig = {
   card: 'C2',
   prBody: 'Testing performed: sample docs-only state update.',
   baseBranch: 'master',
+  remote: 'origin',
 };
 
 const OK: ExecResult = { exitCode: 0, stdout: '', stderr: '' };
@@ -474,5 +475,15 @@ describe('commitStateAndMerge — F3: idempotent state branch + base-branch rest
       reason: 'non-advisory check(s) red after D6 retries exhausted',
       failedChecks: [FAIL_UNIT_CHECK],
     });
+  });
+});
+
+describe('commitStateAndMerge — remote is threaded, never hardcoded', () => {
+  test('fetch/checkout/push/pull all use config.remote', async () => {
+    const { io, calls } = makeIo({});
+    await commitStateAndMerge(['docs/state.json'], 'title', { ...config, remote: 'upstream' }, io);
+    const remoteCalls = calls.filter((c) => c.includes('upstream'));
+    expect(remoteCalls.length).toBeGreaterThanOrEqual(3); // fetch, checkout -B, push (pull only fires on 'merged')
+    expect(calls.some((c) => c.includes('origin'))).toBe(false);
   });
 });
