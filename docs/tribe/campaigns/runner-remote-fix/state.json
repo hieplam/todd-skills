@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "campaign": "runner-remote-fix",
+  "planning": { "mode": "shaman" },
+  "mergePolicy": "regular",
+  "sequence": ["remote-fix"],
+  "schemaLockPaths": [],
+  "docsOnlyPaths": ["docs/"],
+  "ownerOnlyEscalations": [
+    "changing behavior for the default (--remote omitted) case",
+    "widening scope beyond the 10 inventoried call sites in the spec"
+  ],
+  "cards": {
+    "remote-fix": {
+      "status": "staged",
+      "spec": "docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md",
+      "plan": "docs/superpowers/plans/2026-07-31-runner-remote-resolution.md",
+      "branch": null,
+      "baseSha": null,
+      "pr": null,
+      "mergeSha": null,
+      "sessionId": null,
+      "updatedAt": null
+    }
+  }
+}
