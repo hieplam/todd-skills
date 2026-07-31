@@ -25,6 +25,8 @@ function fixtureCard(overrides: Partial<Card> = {}): Card {
 function fixtureConfig(overrides: Partial<VerifyConfig> = {}): VerifyConfig {
   return {
     repoRoot: '/repo',
+    remote: 'origin',
+    baseBranch: 'master',
     schemaLockPaths: ['packages/app/src/domain/sample-types.ts'],
     docsOnlyPaths: ['docs/'],
     ...overrides,
@@ -323,5 +325,42 @@ describe('verifyShipped — point 3: docs-only paths are config, not hardcoded (
     const point = result.points.find((p) => p.id === 'checksGreen');
     expect(point?.passed).toBe(false);
     expect(point?.detail).toMatch(/not docs-only/i);
+  });
+});
+
+describe('verifyShipped — remote/baseBranch are threaded, never hardcoded', () => {
+  test('checkAncestor queries <remote>/<baseBranch>, not a hardcoded origin/master', async () => {
+    const { io, calls } = buildIoRecordingCalls();
+    await verifyShipped(fixtureCard(), fixtureConfig({ remote: 'upstream', baseBranch: 'main' }), io);
+    const ancestorCall = calls.find((c) => c[1] === 'merge-base');
+    expect(ancestorCall).toEqual(['git', 'merge-base', '--is-ancestor', 'mergesha1', 'upstream/main']);
+  });
+
+  test('checkWorktreeAndBranchGone queries ls-remote against the resolved remote', async () => {
+    const { io, calls } = buildIoRecordingCalls();
+    await verifyShipped(fixtureCard(), fixtureConfig({ remote: 'upstream' }), io);
+    const lsRemoteCall = calls.find((c) => c[1] === 'ls-remote');
+    expect(lsRemoteCall).toEqual(['git', 'ls-remote', '--heads', 'upstream', fixtureCard().branch as string]);
+  });
+
+  test('isDocsOnlyDiff diffs against <remote>/<baseBranch>', async () => {
+    // isDocsOnlyDiff is only invoked from checkChecksGreen's sonar-504 branch (see verify.ts);
+    // `checks` must carry that failing signature or the diff call this test asserts on never fires.
+    const { io, calls } = buildIoRecordingCalls({
+      checks: [{ name: 'SonarCloud Code Analysis', bucket: 'fail', description: 'bootstrap failed: HTTP 504' }],
+      docsOnlyDiffFiles: ['docs/note.md'],
+    });
+    await verifyShipped(fixtureCard(), fixtureConfig({ remote: 'upstream', baseBranch: 'main' }), io);
+    const diffCall = calls.find((c) => c[0] === 'git' && c[1] === 'diff' && c.includes('--name-only'));
+    expect(diffCall).toContain('base0001..upstream/main');
+  });
+
+  test('checkSchemaGuard diffs against <remote>/<baseBranch>', async () => {
+    const { io, calls } = buildIoRecordingCalls();
+    await verifyShipped(fixtureCard(), fixtureConfig({ remote: 'upstream', baseBranch: 'main' }), io);
+    const diffCall = calls.find(
+      (c) => c[0] === 'git' && c[1] === 'diff' && c[2] === 'base0001..upstream/main',
+    );
+    expect(diffCall).toBeDefined();
   });
 });

@@ -232,7 +232,7 @@ git commit -m "fix(runner): resolveBaseBranch takes the remote name as a paramet
 - Produces: `VerifyConfig.remote: string`, `VerifyConfig.baseBranch: string` — consumed by
   `checkAncestor`/`isDocsOnlyDiff`/`checkWorktreeAndBranchGone`/`checkSchemaGuard`.
 
-- [ ] **Step 1: Write the failing test** — update `fixtureConfig` and add remote-threading
+- [x] **Step 1: Write the failing test** — update `fixtureConfig` and add remote-threading
   assertions using the existing `buildIoRecordingCalls` helper:
 
 ```ts
@@ -284,7 +284,7 @@ describe('verifyShipped — remote/baseBranch are threaded, never hardcoded', ()
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/verify.test.ts
@@ -294,7 +294,7 @@ Expected: FAIL — TypeScript error (`VerifyConfig` has no `remote`/`baseBranch`
 are added as optional stubs, the 4 new assertions fail because the checks still query literal
 `origin/master`/`origin`.
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `verify.ts`'s `VerifyConfig` interface, add:
 
@@ -351,7 +351,7 @@ In `card-actions.ts`, both `VerifyConfig` literals (`actOnCard`, ~line 331 and ~
       baseBranch: resolved.baseBranch,
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/verify.test.ts core/loop.test.ts
@@ -361,7 +361,7 @@ Expected: full suite PASSES — the 4 new cases plus every pre-existing `verify.
 (unmodified behavior at the default `remote: 'origin', baseBranch: 'master'`), plus
 `loop.test.ts` (which exercises `actOnCard` and therefore both updated `VerifyConfig` literals).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/verify.ts plugins/tribe/scripts/runner/core/verify.test.ts plugins/tribe/scripts/runner/core/loop/card-actions.ts

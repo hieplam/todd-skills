@@ -18,6 +18,11 @@ export type { ExecResult, VerifyIO };
 export interface VerifyConfig {
   /** Target repo root; `cwd` for every `exec` call (an input, per spec §2). */
   repoRoot: string;
+  /** The git remote this repo's canonical upstream/PR-target actually is (resolved once,
+   * `ResolvedConfig.remote` — never re-hardcoded here). */
+  remote: string;
+  /** The branch every check below diffs/merge-bases against (`ResolvedConfig.baseBranch`). */
+  baseBranch: string;
   schemaLockPaths: string[];
   /** Path prefixes that count as "docs-only" for the D6 flake waiver — campaign config
    * carried by the caller from `CampaignState.docsOnlyPaths`, never hardcoded here
@@ -145,20 +150,15 @@ async function checkAncestor(
     };
   }
 
-  const result = await run(io, config.repoRoot, [
-    'git',
-    'merge-base',
-    '--is-ancestor',
-    mergeSha,
-    'origin/master',
-  ]);
+  const target = `${config.remote}/${config.baseBranch}`;
+  const result = await run(io, config.repoRoot, ['git', 'merge-base', '--is-ancestor', mergeSha, target]);
   const passed = result.exitCode === 0;
   return {
     id: 'mergeShaAncestorOfMaster',
     passed,
     detail: passed
-      ? `${mergeSha} is an ancestor of origin/master`
-      : `${mergeSha} is NOT an ancestor of origin/master (git merge-base --is-ancestor exit ${result.exitCode})`,
+      ? `${mergeSha} is an ancestor of ${target}`
+      : `${mergeSha} is NOT an ancestor of ${target} (git merge-base --is-ancestor exit ${result.exitCode})`,
   };
 }
 
@@ -184,7 +184,7 @@ async function isDocsOnlyDiff(baseSha: string | null, config: VerifyConfig, io: 
     'git',
     'diff',
     '--name-only',
-    `${baseSha}..origin/master`,
+    `${baseSha}..${config.remote}/${config.baseBranch}`,
   ]);
   if (result.exitCode !== 0) return false;
   const files = result.stdout
@@ -272,13 +272,7 @@ async function checkWorktreeAndBranchGone(
     .split('\n')
     .some((line) => line.trim() === `branch refs/heads/${card.branch}`);
 
-  const remoteResult = await run(io, config.repoRoot, [
-    'git',
-    'ls-remote',
-    '--heads',
-    'origin',
-    card.branch,
-  ]);
+  const remoteResult = await run(io, config.repoRoot, ['git', 'ls-remote', '--heads', config.remote, card.branch]);
   const remoteStillExists = remoteResult.stdout.trim().length > 0;
 
   if (!worktreeStillExists && !remoteStillExists) {
@@ -336,7 +330,7 @@ async function checkSchemaGuard(card: Card, config: VerifyConfig, io: VerifyIO):
   const result = await run(io, config.repoRoot, [
     'git',
     'diff',
-    `${card.baseSha}..origin/master`,
+    `${card.baseSha}..${config.remote}/${config.baseBranch}`,
     '--',
     ...config.schemaLockPaths,
   ]);

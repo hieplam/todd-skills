@@ -330,6 +330,8 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     await recordBranchFromPr(ctx);
     const verifyConfig: VerifyConfig = {
       repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
       schemaLockPaths: state.schemaLockPaths,
       docsOnlyPaths: state.docsOnlyPaths,
     };
@@ -352,6 +354,8 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     await recordBranchFromPr(ctx);
     const verifyConfig: VerifyConfig = {
       repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
       schemaLockPaths: state.schemaLockPaths,
       docsOnlyPaths: state.docsOnlyPaths,
     };
