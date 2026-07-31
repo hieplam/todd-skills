@@ -279,7 +279,7 @@ async function checkWorktreeAndBranchGone(
     return {
       id: 'worktreeAndBranchGone',
       passed: true,
-      detail: `worktree for ${card.branch} is gone and origin/${card.branch} is deleted`,
+      detail: `worktree for ${card.branch} is gone and ${config.remote}/${card.branch} is deleted`,
     };
   }
 
@@ -316,7 +316,7 @@ async function checkSchemaGuard(card: Card, config: VerifyConfig, io: VerifyIO):
     return {
       id: 'schemaGuard',
       passed: false,
-      detail: 'card.baseSha is not set; cannot diff baseSha..origin/master for the schema guard',
+      detail: `card.baseSha is not set; cannot diff baseSha..${config.remote}/${config.baseBranch} for the schema guard`,
     };
   }
 

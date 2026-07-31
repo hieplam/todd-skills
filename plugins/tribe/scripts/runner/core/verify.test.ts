@@ -363,4 +363,26 @@ describe('verifyShipped — remote/baseBranch are threaded, never hardcoded', ()
     );
     expect(diffCall).toBeDefined();
   });
+
+  test('checkWorktreeAndBranchGone passing-case detail reflects the resolved remote, not a hardcoded "origin"', async () => {
+    const io = buildIo(); // worktree gone, remote branch gone -> passing case
+    const result = await verifyShipped(fixtureCard(), fixtureConfig({ remote: 'upstream' }), io);
+    const point = result.points.find((p) => p.id === 'worktreeAndBranchGone');
+    expect(point?.passed).toBe(true);
+    expect(point?.detail).toContain(`upstream/${fixtureCard().branch}`);
+    expect(point?.detail).not.toContain('origin/');
+  });
+
+  test('checkSchemaGuard failing-case (missing baseSha) detail reflects the resolved remote/baseBranch, not hardcoded "origin/master"', async () => {
+    const io = buildIo();
+    const result = await verifyShipped(
+      fixtureCard({ baseSha: null }),
+      fixtureConfig({ remote: 'upstream', baseBranch: 'main' }),
+      io,
+    );
+    const point = result.points.find((p) => p.id === 'schemaGuard');
+    expect(point?.passed).toBe(false);
+    expect(point?.detail).toContain('baseSha..upstream/main');
+    expect(point?.detail).not.toContain('origin/master');
+  });
 });
