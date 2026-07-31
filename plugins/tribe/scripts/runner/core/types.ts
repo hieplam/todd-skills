@@ -125,6 +125,10 @@ export interface RunLoopConfig {
   includeEscalated: boolean;
   /** `--dry-run` */
   dryRun: boolean;
+  /** `--remote` — the git remote name this repo's PR-target/canonical-upstream actually is.
+   * Default `'origin'` (a protocol-level default, spec §2 shape — not a campaign value).
+   * Threaded everywhere the runner previously hardcoded the literal string `'origin'`. */
+  remote: string;
 }
 
 /** `RunLoopConfig` plus everything `core/loop/run-loop.ts`'s `resolveRunContext` loads
