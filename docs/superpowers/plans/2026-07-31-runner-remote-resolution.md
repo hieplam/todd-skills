@@ -560,7 +560,7 @@ git commit -m "fix(runner): thread remote through phase.ts + card-actions.ts's r
 **Interfaces:** none new — this task adds test coverage only, proving a non-finding from the
 design doc's §3 (already-correct behavior) stays correct.
 
-- [ ] **Step 1: Write the test** (no red/green cycle needed — this documents already-correct
+- [x] **Step 1: Write the test** (no red/green cycle needed — this documents already-correct
   behavior; still verify it actually passes, since a passing assertion against the WRONG
   behavior would be worse than no test at all):
 
@@ -591,7 +591,7 @@ describe('loadState/serializeState — unknown top-level keys survive a round tr
 });
 ```
 
-- [ ] **Step 2: Run to verify it passes**
+- [x] **Step 2: Run to verify it passes**
 
 ```bash
 bun test core/state.test.ts
@@ -600,7 +600,7 @@ bun test core/state.test.ts
 Expected: PASS immediately — this documents existing, already-correct `z.looseObject` behavior
 (the design doc's §3 non-finding); no production code changes in this task.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/state.test.ts

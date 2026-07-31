@@ -519,3 +519,28 @@ describe('nextCard — progressable rule (dependsOn / blocked, spec §O4/W6, Tas
     expect(result).toEqual({ kind: 'card', cardId: 'D', card: state.cards.D });
   });
 });
+
+describe('loadState/serializeState — unknown top-level keys survive a round trip', () => {
+  test('a caller-authored "planning" metadata field is preserved (not stripped) by loadState + serializeState', async () => {
+    const input = {
+      v: 1,
+      campaign: 'x',
+      planning: { mode: 'shaman' },
+      mergePolicy: 'regular',
+      sequence: ['a'],
+      schemaLockPaths: [],
+      docsOnlyPaths: [],
+      ownerOnlyEscalations: [],
+      cards: {
+        a: {
+          status: 'staged', spec: null, plan: null, branch: null,
+          baseSha: null, pr: null, mergeSha: null, sessionId: null, updatedAt: null,
+        },
+      },
+    };
+    const state = await loadState(() => JSON.stringify(input));
+    expect((state as unknown as { planning?: unknown }).planning).toEqual({ mode: 'shaman' });
+    const roundTripped = JSON.parse(serializeState(state));
+    expect(roundTripped.planning).toEqual({ mode: 'shaman' });
+  });
+});
