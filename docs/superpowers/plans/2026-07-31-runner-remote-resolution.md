@@ -461,7 +461,7 @@ git commit -m "fix(runner): GithubConfig.remote replaces github.ts's hardcoded R
 
 **Interfaces:** no new exported names — pure internal parameterization.
 
-- [ ] **Step 1: Write the failing test** — three cases, one per function, each asserting the
+- [x] **Step 1: Write the failing test** — three cases, one per function, each asserting the
   literal command array passed to `io.exec` contains the fixture's chosen non-`'origin'`
   remote instead of `'origin'`. Follow this shape (adjust mock construction to match
   `loop.test.ts`'s existing per-function fixture helpers — read the file's existing
@@ -486,7 +486,7 @@ test('recordBaseSha rev-parses <remote>/<baseBranch>, not origin/<baseBranch>', 
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/loop.test.ts
@@ -495,7 +495,7 @@ bun test core/loop.test.ts
 Expected: FAIL — TypeScript error (`DerivePhaseConfig` has no `remote`) or the 3 new assertions
 fail against the still-hardcoded `'origin'`.
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 In `phase.ts`'s `DerivePhaseConfig`, add `remote: string;`. In `branchOrWorktreeExists`,
 replace the hardcoded `'origin'`:
@@ -536,7 +536,7 @@ Also fix the stale doc-comment above `recordBaseSha` that says "diffs `baseSha..
 to say "diffs `baseSha..<remote>/<baseBranch>`" (Task 3 already made that literally true; this
 comment predates it).
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/loop.test.ts
@@ -545,7 +545,7 @@ bun test core/loop.test.ts
 Expected: full suite PASSES (the 3 new cases plus every pre-existing case in this file, since
 the default `remote: 'origin'` reproduces prior behavior exactly).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/loop/phase.ts plugins/tribe/scripts/runner/core/loop/card-actions.ts plugins/tribe/scripts/runner/core/loop.test.ts

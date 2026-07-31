@@ -27,6 +27,9 @@ export interface DerivePhaseConfig {
   /** `--include-escalated`: bypasses the escalation-file short-circuit — the human has
    * already ruled and is deliberately forcing a retry of a previously escalated card. */
   includeEscalated: boolean;
+  /** The git remote to query for branch existence (`RunLoopConfig.remote`) — never hardcode
+   * `'origin'` here. */
+  remote: string;
 }
 
 interface PrLookup {
@@ -69,18 +72,18 @@ async function queryPrForBranch(
  * (verify.ts's helper is not exported and this module must not rewrite verify.ts's logic). */
 async function branchOrWorktreeExists(
   branch: string,
-  repoRoot: string,
+  config: DerivePhaseConfig,
   io: DerivePhaseIO,
 ): Promise<boolean> {
   const worktreeResult = await io.exec(['git', 'worktree', 'list', '--porcelain'], {
-    cwd: repoRoot,
+    cwd: config.repoRoot,
   });
   const worktreeExists = worktreeResult.stdout
     .split('\n')
     .some((line) => line.trim() === `branch refs/heads/${branch}`);
 
-  const remoteResult = await io.exec(['git', 'ls-remote', '--heads', 'origin', branch], {
-    cwd: repoRoot,
+  const remoteResult = await io.exec(['git', 'ls-remote', '--heads', config.remote, branch], {
+    cwd: config.repoRoot,
   });
   const remoteExists = remoteResult.stdout.trim().length > 0;
 
@@ -174,7 +177,7 @@ export async function deriveCardPhase(
     return { kind: 'fresh', digest: buildStateDigest(cardId, card, reason) };
   }
 
-  const exists = await branchOrWorktreeExists(card.branch, config.repoRoot, io);
+  const exists = await branchOrWorktreeExists(card.branch, config, io);
   if (exists) {
     if (card.sessionId) {
       return { kind: 'resume', sessionId: card.sessionId, reason: 'branch_no_pr' };
@@ -192,5 +195,6 @@ export function derivePhaseConfigOf(config: RunLoopConfig): DerivePhaseConfig {
     repoRoot: config.repoRoot,
     escalationsDir: config.escalationsDir,
     includeEscalated: config.includeEscalated,
+    remote: config.remote,
   };
 }
