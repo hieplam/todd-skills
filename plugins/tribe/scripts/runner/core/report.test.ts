@@ -579,6 +579,7 @@ describe('writeReport — reflects persisted state even when the state-commit PR
       includeEscalated: false,
       dryRun: false,
       maxCards: 1,
+      remote: 'origin',
     };
 
     const loopResult = await runLoop(config, loopIo);
@@ -680,6 +681,7 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
       model: 'fixture-model',
       includeEscalated: false,
       dryRun: false,
+      remote: 'origin',
     };
 
     const loopResult = await runLoop(config, loopIo);

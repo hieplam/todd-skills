@@ -509,6 +509,7 @@ function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
     model: 'fixture-model',
     includeEscalated: false,
     dryRun: false,
+    remote: 'origin',
     ...overrides,
   };
 }
