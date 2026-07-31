@@ -45,23 +45,25 @@ function computeExitCode(processed: CardOutcome[]): number {
   return EXIT_OK;
 }
 
-/** Derives the target repo's base branch from `origin/HEAD` rather than hardcoding
+/** Derives the target repo's base branch from `<remote>/HEAD` rather than hardcoding
  * `master`/`main` (stateless-capability wall: no campaign/repo value baked in). Verified
- * against the real CLI: `git symbolic-ref --short refs/remotes/origin/HEAD` -> `origin/master`
+ * against the real CLI: `git symbolic-ref --short refs/remotes/<remote>/HEAD` -> `<remote>/master`
  * (see the task-6 report's transcript). Falls back to `master` only if the query itself
- * fails (e.g. `origin/HEAD` was never set) — a protocol-level default, not a campaign value. */
+ * fails (e.g. `<remote>/HEAD` was never set) — a protocol-level default, not a campaign value. */
 export async function resolveBaseBranch(
   io: { exec: LoopIO['exec'] },
   repoRoot: string,
+  remote: string,
 ): Promise<string> {
-  const result = await io.exec(['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], {
+  const result = await io.exec(['git', 'symbolic-ref', '--short', `refs/remotes/${remote}/HEAD`], {
     cwd: repoRoot,
   });
   if (result.exitCode !== 0) {
     return 'master';
   }
   const trimmed = result.stdout.trim();
-  return trimmed.startsWith('origin/') ? trimmed.slice('origin/'.length) : trimmed || 'master';
+  const prefix = `${remote}/`;
+  return trimmed.startsWith(prefix) ? trimmed.slice(prefix.length) : trimmed || 'master';
 }
 
 /** D5′ park-and-continue (Warchief ruling W-F2): `attempted` excludes any card id already
@@ -131,7 +133,7 @@ function startupStopResult(config: RunLoopConfig, io: LoopIO): LoopResult | null
 /** Loads everything `RunLoopConfig` doesn't carry: the base branch (from origin/HEAD), the
  * committed --answers rulings, and the committed brief template — all through the io seam. */
 async function resolveRunContext(config: RunLoopConfig, io: LoopIO): Promise<ResolvedConfig> {
-  const baseBranch = await resolveBaseBranch(io, config.repoRoot);
+  const baseBranch = await resolveBaseBranch(io, config.repoRoot, config.remote);
   const answersContent = String(await io.readFile(join(config.repoRoot, config.answersPath)));
   const briefTemplate = String(await io.readFile(BRIEF_TEMPLATE_PATH));
   return { ...config, baseBranch, answersContent, briefTemplate };

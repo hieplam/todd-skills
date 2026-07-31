@@ -257,14 +257,21 @@ describe('isStopRequested', () => {
 // ===========================================================================================
 
 describe('resolveBaseBranch', () => {
-  test('strips the "origin/" prefix from origin/HEAD', async () => {
-    const io = { exec: mock(async () => ok('origin/master\n')) };
-    expect(await resolveBaseBranch(io, '/repo')).toBe('master');
+  test('strips the "origin/" prefix from <remote>/HEAD', async () => {
+    const calls: string[][] = [];
+    const io = {
+      exec: mock(async (cmd: string[]) => {
+        calls.push(cmd);
+        return ok('upstream/master\n');
+      }),
+    };
+    expect(await resolveBaseBranch(io, '/repo', 'upstream')).toBe('master');
+    expect(calls[0]).toEqual(['git', 'symbolic-ref', '--short', 'refs/remotes/upstream/HEAD']);
   });
 
   test('falls back to "master" when the query fails', async () => {
     const io = { exec: mock(async () => fail('no such ref')) };
-    expect(await resolveBaseBranch(io, '/repo')).toBe('master');
+    expect(await resolveBaseBranch(io, '/repo', 'origin')).toBe('master');
   });
 });
 

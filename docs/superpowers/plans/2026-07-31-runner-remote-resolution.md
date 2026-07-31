@@ -138,7 +138,7 @@ git commit -m "feat(runner): add --remote CLI flag (default 'origin')"
 - Produces: `resolveBaseBranch(io, repoRoot, remote): Promise<string>` — Task 3+'s
   `resolveRunContext` call site is the only consumer.
 
-- [ ] **Step 1: Write the failing test** — update the two existing cases to pass a `remote`
+- [x] **Step 1: Write the failing test** — update the two existing cases to pass a `remote`
   argument and assert it is what gets queried (not hardcoded):
 
 ```ts
@@ -162,7 +162,7 @@ describe('resolveBaseBranch', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 bun test core/loop.test.ts -t resolveBaseBranch
@@ -172,7 +172,7 @@ Expected: FAIL — `resolveBaseBranch` is called with 2 args in the current sign
 `remote` argument doesn't change behavior yet — the still-hardcoded `refs/remotes/origin/HEAD`
 literal means `calls[0]` asserts the wrong ref path).
 
-- [ ] **Step 3: Minimal implementation** — in `run-loop.ts`:
+- [x] **Step 3: Minimal implementation** — in `run-loop.ts`:
 
 ```ts
 export async function resolveBaseBranch(
@@ -201,7 +201,7 @@ Update `resolveRunContext`'s call site (~line 131):
   const baseBranch = await resolveBaseBranch(io, config.repoRoot, config.remote);
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 bun test core/loop.test.ts
@@ -210,7 +210,7 @@ bun test core/loop.test.ts
 Expected: full `loop.test.ts` suite PASSES (the `resolveBaseBranch` cases plus everything else
 in that file, since nothing else in it calls `resolveBaseBranch` directly).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/tribe/scripts/runner/core/loop/run-loop.ts plugins/tribe/scripts/runner/core/loop.test.ts
