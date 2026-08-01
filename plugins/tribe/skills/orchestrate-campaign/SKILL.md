@@ -40,10 +40,7 @@ campaign's own docs — never invent or reuse a value from a previous campaign:
 | Placeholder | What it is |
 | --- | --- |
 | `<target-repo>` | The repo root the campaign runs against. |
-| `<state-path>` | Where the campaign state JSON lives, relative to `<target-repo>`. |
 | `<model>` | The executor model tier passed to each card's session. |
-| `<answers-path>` | Where the committed rulings file (`answers.md`) lives, relative to `<target-repo>`. |
-| `<escalations-dir>` | Where escalation files are written, relative to `<target-repo>`. |
 | `<campaign-slug>` | The campaign's own identifier, used inside the state file. |
 
 `--home` (below) is **computed**, never one of the placeholders above: it is always
@@ -71,16 +68,22 @@ value belongs in the campaign's own docs, not here.
    - Record which mode you used as `planning.mode: "shaman"` or `planning.mode: "warchief-fanout"`
      inside the state file (see schema below) — a resuming session needs to know how the docs
      were produced without re-deriving it.
-3. **Author `<state-path>` yourself.** Nothing else in the system creates this file — the runner
+3. **Author `campaign-state.json` yourself, under the campaign home** (`--home`, computed above —
+   never inside `<target-repo>`). Nothing else in the system creates this file — the runner
    requires it as an input but never authors it, and Stage A owns planning artifacts. See "The
    campaign state file" below for the exact schema to write.
-4. **Author the `<answers-path>` scaffold** — an empty (or header-only) markdown file. Only you
-   (or the owner) ever append rulings to this file, in every stage below — the runner never
-   writes to it (wall W3: judgment stays in sessions, never migrates into the runner).
-5. **Land the docs PR** (state file + answers scaffold + specs/plans) to `<target-repo>`'s master
-   via `gh pr merge --merge`. Cards are now `staged`.
+4. **Author the `answers.md` scaffold, also under the campaign home** — an empty (or header-only)
+   markdown file. Only you (or the owner) ever append rulings to this file, in every stage below —
+   the runner never writes to it (wall W3: judgment stays in sessions, never migrates into the
+   runner).
+5. **Land specs/plans ONLY** — into the host repo's **existing, discovered** convention (e.g.
+   `docs/specs/` + `docs/plans/` where present, or `.c3/adr/`) — as a normal PR to
+   `<target-repo>`'s master via `gh pr merge --merge`. Cards are now `staged`. Never invent a
+   `docs/tribe/planning/`-style namespace of your own: look for what this repo already uses for
+   specs/plans and use that. Campaign state and `answers.md` are never committed — they live only
+   under `--home`, per step 3/4 above.
 
-#### The campaign state file (`<state-path>`)
+#### The campaign state file (`campaign-state.json`, under `--home`)
 
 The runner README's own `## State file schema` section is the **authoritative** contract for
 this schema (field-by-field types, required/optional, and the load-time validation errors) —
@@ -186,10 +189,7 @@ cannot finish it.
    ```sh
    bun "$runner_dir/run.ts" \
      --repo <target-repo> \
-     --state <state-path> \
      --model <model> \
-     --answers <answers-path> \
-     --escalations-dir <escalations-dir> \
      --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
      --dry-run
    ```
@@ -201,17 +201,14 @@ cannot finish it.
    ```sh
    bun "$runner_dir/run.ts" \
      --repo <target-repo> \
-     --state <state-path> \
      --model <model> \
-     --answers <answers-path> \
-     --escalations-dir <escalations-dir> \
      --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>"
    ```
 
    The harness notifies you when a background command exits — treat that notification itself as
    the "report is ready" signal. Do not poll or guess; wait for it.
 
-3. **On the exit notification, read `campaign-report.json`** next to the state file. **The exit
+3. **On the exit notification, read `campaign-report.json`** under the campaign home. **The exit
    code is a hint, the report is the truth** — always read the report before deciding what to do
    next, even if the exit code alone looks final.
 
@@ -220,11 +217,8 @@ cannot finish it.
 | Flag | Required | Meaning |
 | --- | --- | --- |
 | `--repo` | yes | Target repo root. |
-| `--state` | yes | Campaign state JSON path, relative to `--repo`. |
 | `--model` | yes | Executor model tier. |
-| `--answers` | yes | Path to the rulings file, relative to `--repo`. |
-| `--escalations-dir` | yes | Path to the escalations directory, relative to `--repo`. |
-| `--home` | yes | The campaign's machine-local operational home — always computed as `"$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>"`, **never** typed literally (`tribe-home.sh` is the only place that knows the `~/.tribe` key derivation). |
+| `--home` | yes | The campaign's machine-local operational home — always computed as `"$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>"`, **never** typed literally (`tribe-home.sh` is the only place that knows the `~/.tribe` key derivation). Every operational artifact (`campaign-state.json`, `answers.md`, `escalations/`, `campaign-report.*`, `.runner.lock`, `STOP`) resolves to a fixed name under it — one campaign per home, so there is no separate flag for any of them. |
 | `--logs-dir` | no | Session log destination. |
 | `--session-timeout` | no | Wall-clock abort per executor session. |
 | `--dry-run` | no | Derive and print the next action with zero side effects. |
@@ -232,8 +226,9 @@ cannot finish it.
 | `--max-cards` | no | Stop after processing this many cards this run. |
 | `--include-escalated` | no | Reconsider a card whose escalation file already exists. |
 
-The six required flags have **no default** — omitting any of them is a usage error, not a value
-worth guessing.
+The three required flags have **no default** — omitting any of them is a usage error, not a value
+worth guessing. An unrecognized flag (including the deleted `--state`/`--answers`/
+`--escalations-dir`) is rejected by name.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -242,19 +237,19 @@ worth guessing.
 | `2` | The pass finished; **at least one escalation is pending.** This is NOT "aborted at the first question" — the runner parks the escalated card and keeps going, and only exits once nothing else is progressable. |
 | `3` | A spawned session ended incomplete (no further resume path); state was already recorded, so the next run resumes it automatically — this is not a human-decision escalation. |
 
-`campaign-report.json` (+ its human-readable `campaign-report.md` twin) is written next to the
-state file on **every** real exit path above — but **not** on `--dry-run` (zero side effects) and
-**not** on a refused start (exit `1` from a held lock). Its per-card `outcome` is one of `shipped
-| escalated | blocked | not_reached`; a `shipped` card carries `pr`/`mergeSha`; an `escalated`
-card carries `escalationFile`, a one-line `question` digest, and `autoAnswerRounds`; a `blocked`
-card carries `blockedOn`. Top-level `pending` lists every card still needing the owner, and
-`stats` totals each outcome. Treat this JSON (never the exit code alone, never your own memory of
-what you dispatched) as the single source of truth for "what happened."
+`campaign-report.json` (+ its human-readable `campaign-report.md` twin) is written under the
+campaign home on **every** real exit path above — but **not** on `--dry-run` (zero side effects)
+and **not** on a refused start (exit `1` from a held lock). Its per-card `outcome` is one of
+`shipped | escalated | blocked | not_reached`; a `shipped` card carries `pr`/`mergeSha`; an
+`escalated` card carries `escalationFile`, a one-line `question` digest, and `autoAnswerRounds`;
+a `blocked` card carries `blockedOn`. Top-level `pending` lists every card still needing the
+owner, and `stats` totals each outcome. Treat this JSON (never the exit code alone, never your
+own memory of what you dispatched) as the single source of truth for "what happened."
 
-`.runner.lock` (next to the state file) makes a double-trigger safe — a second instance refuses
-to start rather than double-spawning sessions. `STOP` (also next to the state file) is the
-owner's manual brake: drop it there to have the next run exit cleanly before touching a card, or
-to have an in-flight run finish its current card and stop before starting the next.
+`.runner.lock` (also under the campaign home) makes a double-trigger safe — a second instance
+refuses to start rather than double-spawning sessions. `STOP` (also under the campaign home) is
+the owner's manual brake: drop it there to have the next run exit cleanly before touching a card,
+or to have an in-flight run finish its current card and stop before starting the next.
 
 ### Stage C — Round-trip: answer, re-trigger, cap (per design §O6)
 
@@ -262,8 +257,9 @@ On every exit notification where the report shows `pending` cards:
 
 1. **For each `escalated` card**, read its `escalationFile`. Two outcomes:
    - **Within your Shaman authority** (scope clarifications, How tradeoffs, sequencing) — append
-     your ruling to `<answers-path>` yourself (this is the only writer of that file besides the
-     owner; the runner itself never writes there — wall W3). Note the card as answered.
+     your ruling to `answers.md` (under the campaign home) yourself (this is the only writer of
+     that file besides the owner; the runner itself never writes there — wall W3). Note the card
+     as answered.
    - **Owner-only** (anything on the state file's own `ownerOnlyEscalations` list — data shapes,
      product promises, new permissions, privacy) **or genuinely too hard to call** — leave it
      parked. Never rule on an owner-only trigger yourself, no matter how confident you are.
@@ -274,10 +270,7 @@ On every exit notification where the report shows `pending` cards:
    ```sh
    bun "$runner_dir/run.ts" \
      --repo <target-repo> \
-     --state <state-path> \
      --model <model> \
-     --answers <answers-path> \
-     --escalations-dir <escalations-dir> \
      --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
      --cards <answered-card-id>,<...>,<not-reached-card-id>,<...> \
      --include-escalated
@@ -322,13 +315,13 @@ irreversible escalations the register requires.
 ## A campaign can outlive this session
 
 A multi-card campaign can run for hours; the session that triggered it may not still be open
-when it finishes. That is fine by design — **every piece of state lives on disk**: the state
-JSON, the report, the escalation files, `answers.md`, and the session logs. If you are a *new*
-session picking this up cold, do not try to reconstruct anything from a prior conversation:
-re-enter through this same skill, read the latest `campaign-report.json` next to `<state-path>`,
-and continue from Stage C (or Stage B, if nothing has been triggered yet). You are always a
-*viewer and answerer* of state that lives on disk — the running process and its memory never
-live inside you.
+when it finishes. That is fine by design — **every piece of state lives on disk, under the
+campaign home**: the state JSON, the report, the escalation files, `answers.md`, and the session
+logs. If you are a *new* session picking this up cold, do not try to reconstruct anything from a
+prior conversation: re-enter through this same skill, read the latest `campaign-report.json`
+under the campaign home, and continue from Stage C (or Stage B, if nothing has been triggered
+yet). You are always a *viewer and answerer* of state that lives on disk — the running process
+and its memory never live inside you.
 
 ## Walls this skill exists to hold
 

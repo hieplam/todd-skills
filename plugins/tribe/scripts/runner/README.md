@@ -12,11 +12,18 @@ schema additions, and the report contract). This file documents what the code in
 **actually does** — verified against the code, not asserted from memory.
 
 "Stateless capability" means: this script hardcodes no repo, path, model, or campaign value.
-Every environment-specific value — the target repo, where its state file lives, which model
-tier to use, where answers/escalations live — arrives as a CLI input. The campaign
-**instance** data (the state JSON, specs, plans, `answers.md`, escalation files) lives in the
-**target repo**, never in this plugin. That's the split: the loop belongs to the tribe, the
-memory belongs to the project.
+Every environment-specific value — the target repo, the campaign's machine-local home, which
+model tier to use — arrives as a CLI input. Campaign artifacts split into two classes, and they
+live in two different places:
+
+- **Contracts** — specs and plans — are reviewable, durable, and useful to a human reader with
+  no `~/.tribe`, so they stay committed in the **target repo**, in that repo's own discovered
+  convention (e.g. `docs/specs/` + `docs/plans/`, or `.c3/adr/`) — never in a namespace this
+  plugin invents.
+- **Operational state** — `campaign-state.json`, `answers.md`, escalation files,
+  `campaign-report.*`, `.runner.lock`, `STOP`, per-card worker reports, run records — is
+  machine bookkeeping, never committed, and lives entirely under `--home` (see "Run record"
+  below). The runner makes no git commits of its own.
 
 ## Inputs
 
@@ -25,22 +32,22 @@ All paths below that are relative are relative to `--repo` unless noted otherwis
 | Flag | Required | Meaning |
 | --- | --- | --- |
 | `--repo` | yes | Target repo root — `cwd` for every `gh`/`git` call and the executor session. |
-| `--state` | yes | Campaign state JSON path, relative to `--repo`. **Schema documented below.** |
 | `--model` | yes | Executor model tier passed to each spawned session. |
-| `--answers` | yes | Path (relative to `--repo`) to the committed rulings file embedded in every executor brief. |
-| `--escalations-dir` | yes | Path (relative to `--repo`) where escalation files are written. |
-| `--home` | yes | The campaign's machine-local operational home (absolute, or resolved against `cwd`) — where this invocation's `run.json` record and (by default) its session logs are written. Matches the `~/.tribe/<repo-key>/campaigns/<campaign-slug>` convention (see "Run record" below), but this script never derives that key itself — the caller (normally `orchestrate-campaign`, via `tribe-home.sh`) computes it and passes it in (stateless-capability wall: this is an environment-specific value, not a value worth guessing). |
+| `--home` | yes | The campaign's machine-local operational home (absolute, or resolved against `cwd`). One campaign per home, so every operational artifact resolves to a fixed name under it (`core/paths.ts`) — no separate flag for any of them. Full layout: `campaign-state.json`, `answers.md`, `escalations/<cardId>.md`, `campaign-report.json`, `campaign-report.md`, `.runner.lock`, `STOP`, `reports/<cardId>.md`, `runs/<run-id>/run.json` + `runs/<run-id>/logs/`. Matches the `~/.tribe/<repo-key>/campaigns/<campaign-slug>` convention, but this script never derives that key itself — the caller (normally `orchestrate-campaign`, via `tribe-home.sh`) computes it and passes it in (stateless-capability wall: this is an environment-specific value, not a value worth guessing). |
 | `--logs-dir` | no | Session log destination. Default: `<home>/runs/<run-id>/logs/` (i.e. this invocation's own run directory under `--home`). Explicit `--logs-dir` overrides. |
 | `--session-timeout` | no | Wall-clock abort per executor session. Accepts `<n>ms`, `<n>s`, `<n>m`, `<n>h`, or a plain millisecond integer (e.g. `3h`, `30m`, `90s`, `5000ms`, `5000`). Default: `3h`. |
 | `--dry-run` | no | Derive and print the next action with **zero side effects** — no lock, no writes, no session, no report file (see the report contract below). |
 | `--cards` | no | Comma-separated list of card ids — restricts the loop to only these ids, in the state's own `sequence` order. Default: the full sequence. |
 | `--max-cards` | no | Positive integer — stop after WORKING this many cards in this run (a card actually `shipped`/`escalated`/`stopped` this pass — see D5′ below; a card merely parked on a prior run's escalation, or skipped as `blocked`, does not consume this budget). Default: unbounded (run until `done` or the budget is spent — an escalation no longer stops the run, see D5′). |
 | `--include-escalated` | no | Bypass the escalation-file short-circuit for a card the human has already ruled on, and let `nextCard`/`deriveCardPhase` reconsider it. This is exactly the flag the Stage C round-trip re-triggers with (spec §O6). |
-| `--remote` | no | The git remote this repo's canonical upstream/PR-target actually is — resolved once and threaded everywhere the runner queries or pushes to a remote (base-branch resolution, verify-phase ancestry/diff checks, state auto-commit, branch-existence checks). Default: `'origin'`. See [`docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md`](../../../../docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md). |
+| `--remote` | no | The git remote this repo's canonical upstream/PR-target actually is — resolved once and threaded everywhere the runner queries or pushes to a remote (base-branch resolution, verify-phase ancestry/diff checks, branch-existence checks). Default: `'origin'`. See [`docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md`](../../../../docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md). |
 
-`--repo`, `--state`, `--model`, `--answers`, `--escalations-dir`, and `--home` have **no
-default** — this is deliberate (the stateless-capability wall): omitting any of them is a
-usage error, not a value worth guessing.
+`--repo`, `--model`, and `--home` — the three required flags — have **no default** — this is
+deliberate (the stateless-capability wall): omitting any of them is a usage error, not a value
+worth guessing. `--state`, `--answers`, and `--escalations-dir` were deleted as flags: with one
+campaign per `--home`, every operational artifact now resolves to a fixed name under it, so
+those three values are no longer environment-specific. Any flag `parseArgs` doesn't recognize
+(including these three) is rejected by name, not silently ignored.
 
 ## Run record
 
@@ -91,14 +98,14 @@ writes nothing (it returns before the lock is ever acquired).
 ```
 
 `statePath`/`answersPath`/`escalationsDir` are recorded **absolute** (resolved against
-`--repo`) — a reader of `run.json` never has to re-derive them relative to anything. `argv` is
-the raw `process.argv.slice(2)` this invocation was started with.
+`--home`, via `core/paths.ts`) — a reader of `run.json` never has to re-derive them relative to
+anything. `argv` is the raw `process.argv.slice(2)` this invocation was started with.
 
 ## State file schema
 
-The `--state` file is the one artifact the runner requires but never creates — it must be
-authored before the runner is ever invoked (normally by a Shaman-authority session doing Stage A
-planning; see `plugins/tribe/agents/shaman.md`'s Mode 2). This section documents the schema
+`<home>/campaign-state.json` is the one artifact the runner requires but never creates — it must
+be authored before the runner is ever invoked (normally by a Shaman-authority session doing Stage
+A planning; see `plugins/tribe/agents/shaman.md`'s Mode 2). This section documents the schema
 completely enough to author a valid file from this README alone, derived from the authoritative
 source: the zod schema in `state.ts`'s `CampaignStateSchema`/`CardSchema` and the TypeScript
 types in `types.ts`. Schema version stays `"v": 1` — every field this effort added is optional,
@@ -149,8 +156,9 @@ at authoring time is correct; callers read the conceptual default themselves
 ### Visualizing campaign sessions in Kanna
 
 Every card's executor session persists to `~/.claude/projects/<encoded-repo>/<sessionId>.jsonl`.
-To watch them in Kanna: `plugins/tribe/scripts/kanna/list-session-ids.sh <state.json>` copies all recorded
-session ids to the clipboard; paste the list into Kanna's sidebar Import dialog. Active
+To watch them in Kanna: `plugins/tribe/scripts/kanna/list-session-ids.sh <home>/campaign-state.json`
+copies all recorded session ids to the clipboard; paste the list into Kanna's sidebar Import
+dialog. Active
 sessions import as a live view. Treat runner-owned sessions as view-only — sending a message
 from Kanna takes over the session and will conflict with the runner's own resume.
 
@@ -236,10 +244,7 @@ while diagnosing one card:
 ```sh
 bun plugins/tribe/scripts/runner/run.ts \
   --repo <target-repo> \
-  --state <path-to-campaign-state.json> \
   --model <model> \
-  --answers <path-to-answers.md> \
-  --escalations-dir <path-to-escalations-dir> \
   --home <path-to-campaign-home> \
   --dry-run
 ```
@@ -251,10 +256,7 @@ contract below), or spawning a session. Then, to run for real, optionally scoped
 ```sh
 bun plugins/tribe/scripts/runner/run.ts \
   --repo <target-repo> \
-  --state <path-to-campaign-state.json> \
   --model <model> \
-  --answers <path-to-answers.md> \
-  --escalations-dir <path-to-escalations-dir> \
   --home <path-to-campaign-home> \
   --cards <card-id> --max-cards 1
 ```
@@ -329,14 +331,11 @@ The runner escalates instead of deciding whenever: the executor reports
 progressable card's spec/plan files are missing on disk (`PLANNING_NEEDED`). On escalation, the
 runner:
 
-1. Writes `<escalations-dir>/<card-id>.md` (question, context, options) — written **first,
+1. Writes `<home>/escalations/<card-id>.md` (question, context, options) — written **first,
    unconditionally**, before anything else.
-2. Marks the card `escalated` in the local state.
-3. Best-effort commits the state + escalation file via its own docs PR (the same commit path
-   used for a shipped card) — but the escalation stands even if that commit fails, since a
-   broken CI check is a common escalation *cause*. A failed commit is retried automatically
-   at the start of the next run.
-4. **D5′ (this effort's amendment — replaces the original D5 "exit"):** the loop does **not**
+2. Marks the card `escalated` in the local state (`<home>/campaign-state.json`; the runner makes
+   no git commits of its own).
+3. **D5′ (this effort's amendment — replaces the original D5 "exit"):** the loop does **not**
    exit here. It moves on to the next progressable card in the same pass (`loop.ts`'s `runLoop`,
    the `while` loop that turned a `break` into a `continue`). The run exits only once **no
    progressable card remains** — every remaining card is `shipped`, `escalated`, or `blocked` —
@@ -351,8 +350,8 @@ makes `--include-escalated` (the exact flag Stage C's round-trip re-triggers wit
 instead of re-escalating the same card forever.
 
 To resolve an escalation: a human (or, per spec §O6, a Shaman-authority orchestrator session)
-appends a ruling to the committed `--answers` file (every executor brief embeds its full
-content), then re-runs the script. A card whose escalation file is still present is skipped
+appends a ruling to `<home>/answers.md` (every executor brief embeds its full content), then
+re-runs the script. A card whose escalation file is still present is skipped
 (`escalation_pending`, parked — see the resume matrix above) unless the re-run passes
 `--include-escalated`.
 
@@ -361,9 +360,9 @@ content), then re-runs the script. A card whose escalation file is still present
 On **every** exit path except `--dry-run` (zero side effects, by construction — nothing is
 written) and `EXIT_LOCKED` (a refused process must never clobber the live process's in-progress
 report), the runner writes `campaign-report.json` and its human-readable twin
-`campaign-report.md` into the state file's own directory. This is the **one artifact** a caller
-needs to read after an invocation — per spec §O3, **the exit code is a hint; the report is the
-truth.**
+`campaign-report.md` into `--home` (`core/paths.ts`'s `reportDirOf`). This is the **one
+artifact** a caller needs to read after an invocation — per spec §O3, **the exit code is a hint;
+the report is the truth.**
 
 ```json
 {
@@ -416,7 +415,7 @@ truth.**
 
 ## STOP file and the lock file (spec §D2)
 
-Both live next to the state file (i.e. in the state file's own directory):
+Both live directly under `--home`, alongside `campaign-state.json`:
 
 - **`STOP`** — the owner's soft-stop. If present when a run starts, the runner exits cleanly
   (code `0`) before touching any card. If it appears mid-run, the loop finishes the
@@ -459,25 +458,28 @@ names, no filename convention required — enforced executably by `structure.tes
   `orchestrate-campaign`'s `resolve-runner.sh` and `test-fresh-machine.sh` both assert
   `scripts/runner/run.ts` exists — so it has to keep resolving even though the real logic
   lives in `cli/main.ts`.
-- **`ports/ports.ts`** — the single home of every injected IO seam (`VerifyIO`, `GithubIO`,
-  `ReportIO`, `StateIO`, `SessionIO`, `DerivePhaseIO`, `LockIO`, `LoopIO`, ...) plus the
-  unified `ExecResult` (previously defined twice, identically, in two core modules). The
-  bigger seams (`LoopIO`, `GithubIO`, `LockIO`) are composed from small capability ports
-  (`ExecPort`, `TimerPort`, `ClockPort`, `FsPort`, `LogPort`, `ProcessPort`, `LockStorePort`,
-  `PendingCommitPort`, `SessionSpawnPort`) — structural typing means every existing mock
-  still satisfies the composed interface. `ports/` contains type declarations only: no
-  runtime values, and its only import is a type-only one from `core/types.ts`.
+- **`ports/ports.ts`** — the single home of every injected IO seam (`VerifyIO`, `ReportIO`,
+  `StateIO`, `SessionIO`, `DerivePhaseIO`, `LockIO`, `LoopIO`, ...) plus the unified
+  `ExecResult` (previously defined twice, identically, in two core modules, one of them
+  `core/github.ts` — deleted with the state auto-commit path). The bigger seams (`LoopIO`,
+  `LockIO`) are composed from small capability ports (`ExecPort`, `TimerPort`, `ClockPort`,
+  `FsPort`, `LogPort`, `ProcessPort`, `LockStorePort`, `SessionSpawnPort`, `RunHomePort`) —
+  structural typing means every existing mock still satisfies the composed interface.
+  `ports/` contains type declarations only: no runtime values, and its only import is a
+  type-only one from `core/types.ts`.
 - **`core/types.ts`** — the shared kernel: imports nothing local, and is home to ALL shared
-  vocabulary, including the `EXIT_*` constants, `RunLoopConfig`/`ResolvedConfig`, and
-  `StateCommitFiles`. Every other file may import from it.
+  vocabulary, including the `EXIT_*` constants and `RunLoopConfig`/`ResolvedConfig`. Every
+  other file may import from it.
 - **`core/loop.ts` + `core/loop/`** — the orchestrator. `core/loop.ts` is a pure re-export
   barrel (every symbol it ever exported is still available from that same path); the actual
   logic is split into `core/loop/phase.ts` (the §D4 resume matrix), `core/loop/lock.ts` (the
-  §D2 single-instance lock + STOP file), `core/loop/commit-guard.ts` (the D6/D5 commit wall),
-  `core/loop/card-actions.ts` (per-card escalate/ship/session work), and
-  `core/loop/run-loop.ts` (the pass + `runLoop` entry point).
-- **everything else in `core/`** — pure logic: `state.ts`, `verify.ts`, `github.ts`,
-  `report.ts`, `brief.ts`, `session.ts`. Every world-touching effect is reached through a
+  §D2 single-instance lock + STOP file), `core/loop/commit-guard.ts` (now holds only
+  `persistLocalState` — the runner's own state auto-commit path was deleted entirely, see
+  "Known limitations" below), `core/loop/card-actions.ts` (per-card escalate/ship/session
+  work), and `core/loop/run-loop.ts` (the pass + `runLoop` entry point).
+- **everything else in `core/`** — pure logic: `state.ts`, `verify.ts`, `report.ts`,
+  `brief.ts`, `session.ts`, `paths.ts` (pure campaign-home path helpers, spec §4), and
+  `run-record.ts` (the `run.json` schema). Every world-touching effect is reached through a
   `ports/ports.ts` seam, never a direct import; each of these modules re-exports the seam
   type(s) its own tests/importers pull from it (e.g. `verify.ts` re-exports `VerifyIO`).
 - **`adapters/*.adapter.ts`** — the only files allowed to import a world-touching module
@@ -513,8 +515,6 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
   twice back-to-back with no sleep between attempts (`loop.ts`). This catches a transient
   `gh`/network blip on the *second* call, but it will **not** catch a check that is still
   settling (e.g. CI still running) — the two attempts happen too close together for that.
-  This is separate from `github.ts`'s own D6 check-polling loop, which does sleep between
-  attempts (`D6_RETRY_SPACING_MS`).
 - **`baseBranch` derivation has a silent fallback.** `resolveBaseBranch` runs
   `git symbolic-ref --short refs/remotes/<remote>/HEAD` (`<remote>` is `--remote`, default
   `origin`) and falls back to the literal string `"master"` if that command fails for any
@@ -522,12 +522,6 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
   `git` failure on this one call, would silently target `master` instead and fail loudly later
   at `git fetch`/push — there is no distinguishing "`<remote>`/HEAD really is unset" from "the
   query itself broke".
-- **`github.ts`'s D6 sonar waiver assumes its diff is docs-only by construction, not by
-  inspection.** The waiver that lets a red PR merge despite a single advisory
-  SonarCloud-504 check never inspects the PR's actual file diff — it relies entirely on the
-  fact that this module's only call site (`loop.ts`'s `commitState`) is restricted at the
-  type/runtime level to `.json`/`.md` paths. If that restriction were ever bypassed, the
-  waiver would apply to a non-docs diff too.
 - **Mocked tests validate logic, not invocations.** All 172 tests (baseline 116 before this
   effort, +56 across `dependsOn`/`blocked`, D5′, and the report contract) mock every seam
   (`exec`, `spawnSession`, the filesystem, the clock, the lock). They prove the loop's *logic*
@@ -553,10 +547,14 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
   declares `dependsOn: ["A"]`) producing `### B — blocked` / `- Blocked on: A` in
   `campaign-report.md`, with `pending: ["A"]` and `Stats: 0 shipped, 1 escalated, 1 blocked, 0
   not reached`, exit code `2`.
-- **What is still UNVERIFIED against reality:** `github.ts`'s mutating path — `gh pr create`,
-  `gh pr merge`, `git push` — and therefore a full end-to-end card ship (session → verify →
-  state PR → next card), plus `.runner.lock` contention and the STOP file **under a real,
-  in-flight session** (the STOP verification above proves the startup-check exit path and its
-  report write; it does not exercise a live executor session running when `STOP` appears).
-  Exercising these needs a disposable GitHub repo. **Do a scoped `--cards <id> --max-cards 1`
-  run under supervision before trusting this against a live campaign.**
+- **What is still UNVERIFIED against reality:** this runner's own mutating git calls —
+  `revert_and_redo`'s worktree/branch deletion and `git push --delete` (`card-actions.ts`) —
+  and therefore a full end-to-end card ship (session → verify → next card). `gh pr create`/
+  `gh pr merge` for a card's own PR are the executor session's responsibility, not this
+  runner's own code (Global Constraints wall — card-PR handling is out of this capability's
+  scope), so verifying them is that session's concern, not this runner's. Also unverified:
+  `.runner.lock` contention and the STOP file **under a real, in-flight session** (the STOP
+  verification above proves the startup-check exit path and its report write; it does not
+  exercise a live executor session running when `STOP` appears). Exercising these needs a
+  disposable GitHub repo. **Do a scoped `--cards <id> --max-cards 1` run under supervision
+  before trusting this against a live campaign.**

@@ -687,7 +687,7 @@ rule is explicit: *"When change content, always update docs to keep that updated
 
 **Interfaces:** consumes the final CLI contract from Task 3 and the trailer from Task 4.
 
-- [ ] **Step 1: Update the runner README**
+- [x] **Step 1: Update the runner README**
 
 Every one of these currently asserts deleted behaviour — fix each:
 - Line 17: *"The campaign instance data (the state JSON, specs, plans, `answers.md`, escalation
@@ -704,7 +704,7 @@ Every one of these currently asserts deleted behaviour — fix each:
 - Architecture/layer list (~460-485): `core/github.ts` and `commit-guard.ts`'s commit machinery are
   gone; `commit-guard.ts` now holds only `persistLocalState`. Add `core/paths.ts` to the core list.
 
-- [ ] **Step 2: Update `orchestrate-campaign/SKILL.md`**
+- [x] **Step 2: Update `orchestrate-campaign/SKILL.md`**
 
 - The Inputs placeholder table: delete `<state-path>`, `<answers-path>`, `<escalations-dir>`; they
   are no longer caller-supplied.
@@ -719,7 +719,7 @@ Every one of these currently asserts deleted behaviour — fix each:
   re-trigger): drop the three deleted flags.
 - Stage D: `campaign-report.json` is read from the campaign home.
 
-- [ ] **Step 3: Update the agents and plugin README**
+- [x] **Step 3: Update the agents and plugin README**
 
 ```bash
 cd /Users/home/repos/todd-skills
@@ -728,7 +728,7 @@ grep -rn "docs/tribe\|--state\|--answers\|--escalations-dir" plugins/tribe/agent
 
 Fix every hit. `warchief.md` and `shaman.md` both reference `docs/tribe` paths.
 
-- [ ] **Step 4: Check `install.sh`**
+- [x] **Step 4: Check `install.sh`**
 
 The project rule says new skills/agents/scripts must be added to the installer. This plan adds no
 new installed artifact (`core/paths.ts` is internal to the runner; the migrator already exists),
@@ -741,7 +741,7 @@ grep -rn "migrate-campaign-home\|runner" install.sh 2>/dev/null
 
 If `install.sh` is not at the repo root, find it and report where it lives.
 
-- [ ] **Step 5: Verify no stale reference survives**
+- [x] **Step 5: Verify no stale reference survives**
 
 ```bash
 cd /Users/home/repos/todd-skills
@@ -752,7 +752,7 @@ grep -rn -- "--state\|--answers\|--escalations-dir\|commitStateAndMerge\|StateCo
 Expected: zero hits describing current behaviour. Hits inside historical `docs/superpowers/specs/`
 files are fine — those are dated records, do not rewrite history.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
