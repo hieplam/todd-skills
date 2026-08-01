@@ -5,7 +5,7 @@
 import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import type { ExecResult, LockInfo, LoopIO, PendingCommit, RunLoopConfig } from '../core/loop.ts';
+import type { ExecResult, LockInfo, LoopIO, RunLoopConfig } from '../core/loop.ts';
 import type { SessionMessage, SpawnSessionParams } from '../core/session.ts';
 import { sdkSpawnSession } from './session.adapter.ts';
 
@@ -33,7 +33,6 @@ function isProcessAlive(pid: number): boolean {
 export function buildRealIo(config: RunLoopConfig): LoopIO {
   const stateDir = dirname(join(config.repoRoot, config.statePath));
   const lockPath = join(stateDir, '.runner.lock');
-  const pendingCommitPath = join(stateDir, '.pending-commit.json');
 
   return {
     exec: realExec,
@@ -60,18 +59,6 @@ export function buildRealIo(config: RunLoopConfig): LoopIO {
     isProcessAlive,
     currentPid: () => process.pid,
     now: () => new Date().toISOString(),
-
-    readPendingCommit: () => {
-      if (!existsSync(pendingCommitPath)) return null;
-      return JSON.parse(readFileSync(pendingCommitPath, 'utf8')) as PendingCommit;
-    },
-    writePendingCommit: (pc) => {
-      mkdirSync(dirname(pendingCommitPath), { recursive: true });
-      writeFileSync(pendingCommitPath, JSON.stringify(pc));
-    },
-    clearPendingCommit: () => {
-      if (existsSync(pendingCommitPath)) rmSync(pendingCommitPath);
-    },
 
     spawnSession: (params: SpawnSessionParams): AsyncIterable<SessionMessage> => sdkSpawnSession(params),
     appendLog: (logPath, line) => {

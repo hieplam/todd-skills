@@ -7,7 +7,6 @@
 // `LockIO`) so every existing mock/test in core/*.test.ts stays compatible for free —
 // TypeScript's structural typing means an object satisfying the composed interface already
 // satisfies each capability port, with no test rewritten.
-import type { StateCommitFiles } from '../core/types.ts';
 
 // ---------------------------------------------------------------------------------------
 // Capability ports — the smallest independent IO seams.
@@ -42,11 +41,6 @@ export interface LockStorePort {
   readLock(): LockInfo | null;
   writeLock(info: LockInfo): void;
   removeLock(): void;
-}
-export interface PendingCommitPort {
-  readPendingCommit(): PendingCommit | null;
-  writePendingCommit(pc: PendingCommit): void;
-  clearPendingCommit(): void;
 }
 export interface SessionSpawnPort {
   spawnSession(params: SpawnSessionParams): AsyncIterable<SessionMessage>;
@@ -198,18 +192,6 @@ export interface LockInfo {
 /** §D2 single-instance lock seam. Composed from the capability algebra above. */
 export interface LockIO extends LockStorePort, ProcessPort, ClockPort {}
 
-/** §D6/§D5 — the ONLY path this capability may use to commit files via
- * `commitStateAndMerge`. `github.ts`'s D6 sonar waiver assumes its diff is docs-only BY
- * CONSTRUCTION (it only ever commits campaign state files) — so this module must never be
- * able to hand it a code file. `StateCommitFiles` (kernel: `core/types.ts`, since 2+ modules
- * use it) has exactly two named, single-purpose fields (never a bare `string[]` the rest of
- * the orchestrator could smuggle an arbitrary path into). */
-export interface PendingCommit {
-  card: string;
-  files: StateCommitFiles;
-  title: string;
-}
-
 /** The full seam the orchestrator (`core/loop.ts`) needs. Every field is injected;
  * production wiring (`adapters/run-io.adapter.ts`) supplies the real gh/git/fs/SDK/clock/lock
  * implementations. Composed from the capability algebra above — the member set is exactly
@@ -222,6 +204,5 @@ export interface LoopIO
     LogPort,
     ProcessPort,
     LockStorePort,
-    PendingCommitPort,
     SessionSpawnPort,
     RunHomePort {}

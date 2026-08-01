@@ -1,6 +1,5 @@
 // Tests for loop.ts (Task 6): the §D4 resume matrix, the single-instance lock, the STOP
-// file, escalation (incl. commit-failure), the state/escalation-files-only structural
-// constraint on `commitStateAndMerge`, and `--dry-run`'s zero-side-effects guarantee.
+// file, escalation, and `--dry-run`'s zero-side-effects guarantee.
 //
 // NEVER hits a real binary or the SDK: every test drives a fully mocked `LoopIO`. Fixture
 // values are deliberately neutral (no repo names, no absolute paths, no campaign values) —
@@ -14,7 +13,6 @@ import {
   releaseLock,
   resolveBaseBranch,
   runLoop,
-  toCommitFileList,
   type CardPhase,
   type DerivePhaseConfig,
   type DerivePhaseIO,
@@ -22,7 +20,6 @@ import {
   type LockIO,
   type LockInfo,
   type LoopIO,
-  type PendingCommit,
   type RunLoopConfig,
 } from './loop.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
@@ -302,31 +299,6 @@ describe('resolveBaseBranch', () => {
 });
 
 // ===========================================================================================
-// toCommitFileList — the structural state/escalation-files-only guard
-// ===========================================================================================
-
-describe('toCommitFileList — structural guard on commitStateAndMerge inputs', () => {
-  test('accepts a state-only file list', () => {
-    expect(toCommitFileList({ statePath: 'docs/campaign/state.json' })).toEqual([
-      'docs/campaign/state.json',
-    ]);
-  });
-
-  test('accepts state + escalation', () => {
-    expect(
-      toCommitFileList({ statePath: 'docs/campaign/state.json', escalationPath: 'docs/campaign/escalations/C1.md' }),
-    ).toEqual(['docs/campaign/state.json', 'docs/campaign/escalations/C1.md']);
-  });
-
-  test('a code file (.ts) is refused at runtime — the mechanical enforcement behind the ' +
-    "structural guard, not just the type's two named fields", () => {
-    expect(() =>
-      toCommitFileList({ statePath: 'packages/app/src/domain/types.ts' }),
-    ).toThrow(/only campaign state .* escalation .* files/i);
-  });
-});
-
-// ===========================================================================================
 // extractMergeSha
 // ===========================================================================================
 
@@ -382,7 +354,6 @@ interface MockLoopIoOptions {
   processAlive?: boolean;
   stopFile?: boolean;
   escalationFiles?: Set<string>;
-  pendingCommit?: PendingCommit | null;
   /** When true, every card's spec/plan path is treated as MISSING on disk (drives the
    * PLANNING_NEEDED trigger) — off by default so unrelated tests aren't spuriously escalated. */
   missingSpecPlan?: boolean;
@@ -394,7 +365,6 @@ interface MockLoopIoResult {
   writtenFiles: Map<string, string>;
   spawnBriefs: string[];
   lockCalls: string[];
-  pendingCommitCalls: string[];
   ensuredDirs: string[];
   atomicWrites: Array<{ path: string; content: string }>;
 }
@@ -406,11 +376,9 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
   if (opts.answers !== undefined) writtenFiles.set('/repo/answers.md', opts.answers);
   const spawnBriefs: string[] = [];
   const lockCalls: string[] = [];
-  const pendingCommitCalls: string[] = [];
   const ensuredDirs: string[] = [];
   const atomicWrites: Array<{ path: string; content: string }> = [];
   let lock = opts.lock ?? null;
-  let pendingCommit = opts.pendingCommit ?? null;
   const spawnQueue = [...(opts.spawnQueue ?? [])];
   const escalationFiles = new Set(opts.escalationFiles ?? []);
 
@@ -469,15 +437,6 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     isProcessAlive: mock(() => opts.processAlive ?? false),
     currentPid: mock(() => 4242),
     now: mock(() => '2026-07-16T12:00:00Z'),
-    readPendingCommit: mock(() => pendingCommit),
-    writePendingCommit: mock((pc: PendingCommit) => {
-      pendingCommitCalls.push('write');
-      pendingCommit = pc;
-    }),
-    clearPendingCommit: mock(() => {
-      pendingCommitCalls.push('clear');
-      pendingCommit = null;
-    }),
     spawnSession: mock((params: SpawnSessionParams) => {
       spawnBriefs.push(params.prompt);
       const next = spawnQueue.shift();
@@ -493,7 +452,7 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     }),
   };
 
-  return { io, calls, writtenFiles, spawnBriefs, lockCalls, pendingCommitCalls, ensuredDirs, atomicWrites };
+  return { io, calls, writtenFiles, spawnBriefs, lockCalls, ensuredDirs, atomicWrites };
 }
 
 function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
@@ -723,7 +682,7 @@ describe('runLoop — crash-resume: verify_only phase (PR merged, not yet shippe
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.processed).toEqual([
-      { kind: 'shipped', cardId: 'C1', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+      { kind: 'shipped', cardId: 'C1' },
     ]);
     expect(io.spawnSession).not.toHaveBeenCalled();
     const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
@@ -775,7 +734,7 @@ describe('runLoop — resume-probe failure -> fresh-with-digest', () => {
     // carrying the crash-recovery digest (never the raw continuation prompt).
     expect(spawnBriefs[1]).toContain('Crash-recovery digest for C1');
     expect(result.processed).toEqual([
-      { kind: 'shipped', cardId: 'C1', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+      { kind: 'shipped', cardId: 'C1' },
     ]);
   });
 });
@@ -822,7 +781,7 @@ describe('runLoop — F8: open PR with no sessionId spawns fresh WITH a digest, 
     // and continues PR #9 instead of rebuilding the card and opening a second one (F8).
     expect(spawnBriefs[0]).toContain('9');
     expect(result.processed).toEqual([
-      { kind: 'shipped', cardId: 'C1', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+      { kind: 'shipped', cardId: 'C1' },
     ]);
   });
 });
@@ -992,34 +951,6 @@ describe('runLoop — escalation flow', () => {
     expect(finalState.cards.C1.status).toBe('escalated');
   });
 
-  test('commit-failure path: exit code and escalation file stand even when the commit fails', async () => {
-    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null } ) } });
-    const { io, writtenFiles, pendingCommitCalls } = buildMockLoopIo({
-      stateJson: JSON.stringify(state),
-      answers: '',
-      execHandlers: [
-        (cmd) => {
-          if (cmd[0] === 'git' && cmd[1] === 'fetch') return fail('remote: could not resolve host');
-          if (cmd[0] === 'git' && cmd[1] === 'checkout') return ok('');
-          return null;
-        },
-      ],
-      spawnQueue: [() => messages(needsDirectionMessages('sess-nd2'))],
-    });
-
-    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
-
-    expect(result.exitCode).toBe(EXIT_ESCALATED);
-    expect(result.processed[0]).toMatchObject({
-      kind: 'escalated',
-      cardId: 'C1',
-      commitResult: expect.objectContaining({ outcome: 'commit_failed' }),
-    });
-    // The local escalation file stands, independent of the failed commit.
-    expect(writtenFiles.get('/repo/escalations/C1.md')).toBeDefined();
-    // The failed commit is queued for retry on the next run.
-    expect(pendingCommitCalls).toEqual(['write']);
-  });
 });
 
 describe('runLoop — double verify-fail -> escalation', () => {
@@ -1074,8 +1005,6 @@ describe('runLoop — --dry-run: zero side effects', () => {
       writeFile: forbid('writeFile') as LoopIO['writeFile'],
       writeLock: forbid('writeLock') as LoopIO['writeLock'],
       removeLock: forbid('removeLock') as LoopIO['removeLock'],
-      writePendingCommit: forbid('writePendingCommit') as LoopIO['writePendingCommit'],
-      clearPendingCommit: forbid('clearPendingCommit') as LoopIO['clearPendingCommit'],
       spawnSession: forbid('spawnSession') as LoopIO['spawnSession'],
       appendLog: forbid('appendLog') as LoopIO['appendLog'],
       exec: mock(async (cmd: string[]) => {
@@ -1149,10 +1078,10 @@ describe('runLoop — session error/timeout without a resume attempt: stops for 
 // Task 2 — D5′ park-and-continue (spec §O4, plan Task 2, Warchief ruling W-F2)
 // ===========================================================================================
 
-/** Shared boilerplate for a card whose state-commit (escalation OR ship) goes through
- * `commitStateAndMerge` cleanly: fetch/checkout -B/add/commit/push/create/checks/merge/pull all
+/** Shared boilerplate for a card whose PR (create OR merge) goes through the executor session's
+ * gh/git call sequence cleanly: fetch/checkout -B/add/commit/push/create/checks/merge/pull all
  * succeed. Reused verbatim across the park-and-continue tests below — none of them are testing
- * `commitStateAndMerge`/`verify.ts` themselves (already covered elsewhere in this file). */
+ * that sequence or `verify.ts` themselves (already covered elsewhere in this file). */
 function cleanCommitAndVerifyHandlers(mergeSha: string): Array<(cmd: string[]) => ExecResult | null> {
   return [
     (cmd) => {
@@ -1339,7 +1268,7 @@ describe('runLoop — D5′: escalation_pending phase (prior-run escalation file
     expect(result.exitCode).toBe(EXIT_ESCALATED);
     expect(result.processed).toEqual([
       { kind: 'escalation_pending', cardId: 'C1', escalationPath: expect.stringContaining('C1.md') },
-      { kind: 'shipped', cardId: 'C2', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+      { kind: 'shipped', cardId: 'C2' },
     ]);
     // No session was ever spawned for the parked card C1 — only C2's.
     expect(io.spawnSession).toHaveBeenCalledTimes(1);
@@ -1444,7 +1373,7 @@ describe('runLoop — D5′ Warchief audit fix: --max-cards budgets only cards a
 
     expect(result.processed).toEqual([
       { kind: 'escalation_pending', cardId: 'A', escalationPath: expect.stringContaining('A.md') },
-      { kind: 'shipped', cardId: 'B', commitResult: expect.objectContaining({ outcome: 'merged' }) },
+      { kind: 'shipped', cardId: 'B' },
     ]);
     // B's session was in fact spawned this pass — the budget did not stop it.
     expect(io.spawnSession).toHaveBeenCalledTimes(1);

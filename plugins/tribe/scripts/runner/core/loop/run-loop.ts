@@ -1,5 +1,5 @@
 // The pass + entry: derive-and-act until `done`, honoring STOP and the `--max-cards` budget,
-// tied together with the §D2 lock and crash-recovery (pending-commit retry).
+// tied together with the §D2 lock.
 import { join } from 'node:path';
 import type { CampaignState, NextCardResult, ResolvedConfig, RunLoopConfig } from '../types.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from '../types.ts';
@@ -9,7 +9,7 @@ import { buildRunRecord, reportsDirOf, runDirOf, runRecordPathOf, serializeRunRe
 import type { LoopIO, StateIO } from '../../ports/ports.ts';
 import { acquireLock, isStopRequested, releaseLock, stopFilePathOf } from './lock.ts';
 import { deriveCardPhase, derivePhaseConfigOf, type CardPhase } from './phase.ts';
-import { commitState, githubConfigFor, persistLocalState } from './commit-guard.ts';
+import { persistLocalState } from './commit-guard.ts';
 import { actOnCard, escalateCard, type CardCtx, type CardOutcome } from './card-actions.ts';
 
 export interface DryRunPlan {
@@ -139,16 +139,6 @@ async function resolveRunContext(config: RunLoopConfig, io: LoopIO): Promise<Res
   return { ...config, baseBranch, answersContent, briefTemplate };
 }
 
-/** Crash recovery: retries a prior run's pending state commit before any new work. */
-async function retryPendingCommit(resolved: ResolvedConfig, io: LoopIO): Promise<void> {
-  const pending = io.readPendingCommit();
-  if (!pending) return;
-  const retryResult = await commitState(pending.files, pending.title, githubConfigFor(resolved, pending.card), io);
-  if (retryResult.outcome === 'merged') {
-    io.clearPendingCommit();
-  }
-}
-
 /** One D5′ park-and-continue pass over the campaign: derive-and-act until `done`, STOP, or
  * the --max-cards budget is spent. */
 async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopIO): Promise<LoopResult> {
@@ -216,7 +206,7 @@ async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopI
 }
 
 /** The main loop, spec §D2/§D4/§D5′ tied together: acquire the single-instance lock → STOP-file
- * check → retry any pending state commit → repeatedly derive-and-act on the next card, PARKING
+ * check → repeatedly derive-and-act on the next card, PARKING
  * (never exiting) on an escalation or a `stopped` session — D5′'s amendment of the original
  * exit-on-escalation D5. The pass stops only when no progressable card remains (`done`) or the
  * `--max-cards` budget is spent — counted by cards actually WORKED this pass (`shipped` /
@@ -257,7 +247,6 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
     if (stopped) return stopped;
 
     const resolved = await resolveRunContext(config, io);
-    await retryPendingCommit(resolved, io);
 
     const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
     const result = await runPass(state, resolved, io);

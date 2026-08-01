@@ -76,21 +76,6 @@ export interface CardResult {
 
 export type NextCardResult = NoCardResult | PlanningNeededResult | CardResult;
 
-/** §D6/§D5 — the shape of the files a state commit is allowed to touch. Homed in the
- * kernel (not `ports/ports.ts`) because it is used by 2+ modules (`core/loop/commit-guard.ts`'s
- * `toCommitFileList`/`commitState`, and `ports.ts`'s own `PendingCommit`) — lesson L5:
- * anything used by 2+ modules lives in the kernel. Exactly two named, single-purpose fields
- * (never a bare `string[]` a caller could smuggle an arbitrary path into);
- * `core/loop/commit-guard.ts`'s `assertStateOrEscalationPath` additionally asserts every path
- * ends in `.json`/`.md` at runtime. */
-export interface StateCommitFiles {
-  /** The campaign state JSON path (relative to repoRoot) — always included. */
-  statePath: string;
-  /** An escalation markdown path (relative to repoRoot) — only present when this commit
-   * records an escalation. */
-  escalationPath?: string;
-}
-
 /** The orchestrator's (`core/loop/`) full config, assembled by `cli/main.ts`'s `parseArgs`
  * from CLI flags. Homed in the kernel (not `core/loop/run-loop.ts`) because every
  * `core/loop/*` module needs it — `phase.ts`, `lock.ts`, and `commit-guard.ts` would

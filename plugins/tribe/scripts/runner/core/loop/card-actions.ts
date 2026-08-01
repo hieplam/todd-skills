@@ -3,27 +3,25 @@
 // injected `LoopIO`/`SessionIO` seams — this module never imports a world-touching module
 // itself.
 import { join } from 'node:path';
-import type { Card, CampaignState, ResolvedConfig, StateCommitFiles } from '../types.ts';
+import type { Card, CampaignState, ResolvedConfig } from '../types.ts';
 import type { LoopIO } from '../../ports/ports.ts';
 import { verifyShipped } from '../verify.ts';
 import type { VerifyConfig, VerifyIO, VerifyResult } from '../verify.ts';
-import type { CommitStateAndMergeResult } from '../github.ts';
 import { runSession } from '../session.ts';
 import type { RunSessionConfig, SessionIO, SessionResult } from '../session.ts';
 import { executorBrief, reportPathFor } from '../brief.ts';
 import type { BriefCard, BriefState } from '../brief.ts';
 import type { CardPhase } from './phase.ts';
 import { buildStateDigest, findWorktreePathForBranch } from './phase.ts';
-import { commitState, githubConfigFor, persistLocalState } from './commit-guard.ts';
+import { persistLocalState } from './commit-guard.ts';
 
 export type CardOutcome =
-  | { kind: 'shipped'; cardId: string; commitResult: CommitStateAndMergeResult }
+  | { kind: 'shipped'; cardId: string }
   | {
       kind: 'escalated';
       cardId: string;
       escalationPath: string;
       reason: string;
-      commitResult: CommitStateAndMergeResult;
     }
   | {
       /** D5′ park-and-continue (spec §O4): the card already carries an UNANSWERED escalation
@@ -104,8 +102,7 @@ export async function escalateCard(ctx: CardCtx, reason: string, detail: string)
   const { cardId, state, resolved, io } = ctx;
   const escalationRelPath = `${resolved.escalationsDir}/${cardId}.md`;
   const markdown = buildEscalationMarkdown(cardId, reason, detail, resolved);
-  // D5: the local escalation file + exit code stand alone even if the commit below fails —
-  // write it FIRST, unconditionally.
+  // D5: the local escalation file + exit code stand alone — write it FIRST, unconditionally.
   io.writeFile(join(resolved.repoRoot, escalationRelPath), markdown);
 
   const card = state.cards[cardId];
@@ -115,16 +112,7 @@ export async function escalateCard(ctx: CardCtx, reason: string, detail: string)
   }
   persistLocalState(state, resolved, io);
 
-  const files: StateCommitFiles = { statePath: resolved.statePath, escalationPath: escalationRelPath };
-  const title = `chore: escalate ${cardId} (${reason})`;
-  const commitResult = await commitState(files, title, githubConfigFor(resolved, cardId), io);
-  if (commitResult.outcome === 'merged') {
-    io.clearPendingCommit();
-  } else {
-    io.writePendingCommit({ card: cardId, files, title });
-  }
-
-  return { kind: 'escalated', cardId, escalationPath: escalationRelPath, reason, commitResult };
+  return { kind: 'escalated', cardId, escalationPath: escalationRelPath, reason };
 }
 
 export async function shipCard(ctx: CardCtx, verifyResult: VerifyResult): Promise<CardOutcome> {
@@ -135,16 +123,7 @@ export async function shipCard(ctx: CardCtx, verifyResult: VerifyResult): Promis
   card.updatedAt = io.now();
   persistLocalState(state, resolved, io);
 
-  const files: StateCommitFiles = { statePath: resolved.statePath };
-  const title = `chore: mark ${cardId} shipped`;
-  const commitResult = await commitState(files, title, githubConfigFor(resolved, cardId), io);
-  if (commitResult.outcome === 'merged') {
-    io.clearPendingCommit();
-  } else {
-    io.writePendingCommit({ card: cardId, files, title });
-  }
-
-  return { kind: 'shipped', cardId, commitResult };
+  return { kind: 'shipped', cardId };
 }
 
 export function toBriefCard(cardId: string, card: Card): BriefCard {

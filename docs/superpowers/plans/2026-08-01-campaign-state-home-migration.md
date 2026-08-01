@@ -66,7 +66,7 @@ remaining purpose. Deleting it first shrinks every later task.
   signature — Task 3 repoints its path resolution. `CardOutcome` loses its `commitResult` field on
   both the `shipped` and `escalated` variants.
 
-- [ ] **Step 1: Prove `core/github.ts` is state-commit-only before deleting it**
+- [x] **Step 1: Prove `core/github.ts` is state-commit-only before deleting it**
 
 The Global Constraints wall says card-PR handling must survive. Confirm this file is not it:
 
@@ -78,7 +78,7 @@ grep -rn "from './github.ts'\|from '../github.ts'\|from '../../core/github.ts'" 
 Expected: the ONLY importer is `core/loop/commit-guard.ts`. If anything else imports it, **STOP
 and report back** — the deletion premise is wrong.
 
-- [ ] **Step 2: Run the existing suite to capture the green baseline**
+- [x] **Step 2: Run the existing suite to capture the green baseline**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun run check 2>&1 | tail -20
@@ -86,7 +86,7 @@ cd plugins/tribe/scripts/runner && bun run check 2>&1 | tail -20
 
 Record the pass/fail counts. Every later step compares against this baseline.
 
-- [ ] **Step 3: Delete the two github files and the commit machinery in `commit-guard.ts`**
+- [x] **Step 3: Delete the two github files and the commit machinery in `commit-guard.ts`**
 
 ```bash
 cd plugins/tribe/scripts/runner
@@ -112,14 +112,14 @@ export function persistLocalState(resolved: ResolvedConfig, state: CampaignState
 (Keep the `repoRoot` join for now — Task 3 repoints it. Changing both at once makes a failure
 ambiguous.)
 
-- [ ] **Step 4: Strip the commit blocks from `card-actions.ts`**
+- [x] **Step 4: Strip the commit blocks from `card-actions.ts`**
 
 In `escalateCard`, delete lines 118-125 (the `StateCommitFiles` literal, `title`, `commitState`
 call, and the `writePendingCommit`/`clearPendingCommit` branch). In `shipCard`, delete the
 equivalent block at 138-145. Delete `commitResult` from both `CardOutcome` variants (lines 20-27)
 and from both return statements (127, 147). Delete the `StateCommitFiles` import at line 6.
 
-- [ ] **Step 5: Delete `retryPendingCommit` and the `PendingCommitPort` seam**
+- [x] **Step 5: Delete `retryPendingCommit` and the `PendingCommitPort` seam**
 
 In `core/loop/run-loop.ts` delete `retryPendingCommit` (143-150) and its call at line 260.
 In `ports/ports.ts` delete the `PendingCommitPort` interface (46-50), the `PendingCommit`
@@ -130,7 +130,7 @@ In `core/types.ts` delete `StateCommitFiles` (86-92).
 In `core/loop.ts` delete the `StateCommitFiles` re-export (line 10), the `PendingCommit` re-export
 (line 11), and the `commitState`/`toCommitFileList` re-export (line 25).
 
-- [ ] **Step 6: Delete the now-premise-less tests**
+- [x] **Step 6: Delete the now-premise-less tests**
 
 In `core/loop.test.ts`: delete the whole `describe('toCommitFileList — structural guard on
 commitStateAndMerge inputs', …)` block (308-332) and its `toCommitFileList` import (line 17);
@@ -150,7 +150,7 @@ In `core/report.test.ts`: delete `describe('writeReport — reflects persisted s
 state-commit PR failed', …)` (503-605) entirely. Its premise — a state commit that can fail — no
 longer exists.
 
-- [ ] **Step 7: Run the suite; expect green with a smaller count**
+- [x] **Step 7: Run the suite; expect green with a smaller count**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun run check 2>&1 | tail -20
@@ -160,7 +160,7 @@ Expected: PASS, with fewer tests than the Step 2 baseline (the deleted describes
 If `structure.test.ts` fails, a `*IO`/`*Port` declaration was left stranded outside `ports/` —
 fix that, do not weaken the rule.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
