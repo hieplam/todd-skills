@@ -227,6 +227,7 @@ export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<Se
       `${digest}\n\n---\n\n${resolved.answersContent}`,
       resolved.briefTemplate,
       reportPathFor(resolved.homeDir, cardId),
+      ctx.state.campaign,
     );
     const freshIO = buildSessionIOForCard(ctx);
     return runSession({ brief }, sessionConfig, freshIO);
@@ -244,6 +245,7 @@ export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<Se
     answersContent,
     resolved.briefTemplate,
     reportPathFor(resolved.homeDir, cardId),
+    ctx.state.campaign,
   );
   const freshIO = buildSessionIOForCard(ctx);
   return runSession({ brief }, sessionConfig, freshIO);

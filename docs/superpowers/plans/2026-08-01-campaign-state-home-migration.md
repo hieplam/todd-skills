@@ -511,7 +511,7 @@ backfilled with PR numbers.
   `ctx.state.campaign` (the `campaign` field of `CampaignState`), already available at both call
   sites via `CardCtx`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `core/brief.test.ts`:
 
@@ -536,7 +536,7 @@ describe('executorBrief — campaign trailer', () => {
 Read the existing tests in this file first and match their fixture-construction style — do not
 invent a new one.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun test core/brief.test.ts
@@ -544,7 +544,7 @@ cd plugins/tribe/scripts/runner && bun test core/brief.test.ts
 
 Expected: FAIL — `campaignSlug` is not a parameter.
 
-- [ ] **Step 3: Add the placeholder to the brief template**
+- [x] **Step 3: Add the placeholder to the brief template**
 
 Open the template named by `BRIEF_TEMPLATE_PATH` in `core/brief.ts` and add this section, matching
 the template's existing heading style:
@@ -562,18 +562,18 @@ campaign's own state lives outside the repo. Recovery is
 `git log --grep="Campaign: CAMPAIGN_SLUG"`. Do NOT add an agent co-author line.
 ```
 
-- [ ] **Step 4: Substitute it in `executorBrief`**
+- [x] **Step 4: Substitute it in `executorBrief`**
 
 In `core/brief.ts`, add `campaignSlug: string` to the params interface and substitute it exactly
 as the existing `ANSWERS_CONTENT` placeholder is substituted — follow that code, do not invent a
 second substitution mechanism.
 
-- [ ] **Step 5: Pass the slug at both call sites**
+- [x] **Step 5: Pass the slug at both call sites**
 
 `core/loop/card-actions.ts:245-253` (resume-failure fallback) and `258-268` (`runCardSession`'s
 fresh path) both have `ctx` in scope. Pass `campaignSlug: ctx.state.campaign` at each.
 
-- [ ] **Step 6: Run the suite**
+- [x] **Step 6: Run the suite**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun run check 2>&1 | tail -20
@@ -581,7 +581,7 @@ cd plugins/tribe/scripts/runner && bun run check 2>&1 | tail -20
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -832,3 +832,14 @@ step rather than a new task, since it touches the same `loadState` call site:
 `persistLocalState` keeps its Task-1 signature into Task 3. `campaignSlug` is the param name in
 Task 4 Steps 1, 4, and 5. `CardOutcome.commitResult` is deleted in Task 1 and referenced nowhere
 after.
+
+**Task 4 plan-vs-reality note (Hunter, Task 4):** `executorBrief` is a positional-args function
+(`card, state, answersContent, template, reportPath`), not an options object — the plan's Step 1
+snippet (`executorBrief({ campaignSlug: … })`) is illustrative only, per the task brief's own
+warning. `campaignSlug` was added as the 6th positional argument. The template placeholder is
+`{{CAMPAIGN_SLUG}}` (double-brace, matching `renderTemplate`'s existing `/\{\{(\w+)\}\}/g`
+mechanism used by `ANSWERS_CONTENT` etc.) rather than the bare `CAMPAIGN_SLUG` token shown in the
+plan's Step 3 markdown — a bare token would never be substituted and the "no raw placeholder"
+test would fail. Both call sites' real line numbers, after Tasks 1-3 renumbered the file, were
+`core/loop/card-actions.ts:224-230` (resume-failure fallback) and `241-247` (`runCardSession`'s
+fresh path), not `245-253`/`258-268` as the plan's Files list states.

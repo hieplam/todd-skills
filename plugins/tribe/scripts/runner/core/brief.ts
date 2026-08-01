@@ -58,6 +58,7 @@ export function executorBrief(
   answersContent: string,
   template: string,
   reportPath: string,
+  campaignSlug: string,
 ): string {
   const ownerOnly =
     state.ownerOnlyEscalations.length > 0
@@ -74,5 +75,6 @@ export function executorBrief(
     OWNER_ONLY_ESCALATIONS: ownerOnly,
     REPORT_PATH: reportPath,
     ANSWERS_CONTENT: answersContent,
+    CAMPAIGN_SLUG: campaignSlug,
   });
 }

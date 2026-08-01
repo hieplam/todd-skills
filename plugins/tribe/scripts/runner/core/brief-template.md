@@ -56,6 +56,17 @@ that proves them — paste gate output verbatim into worker reports.
 
 Land the PR with `gh pr merge --merge`.
 
+## Commit trailer (required on every commit)
+
+Every commit you make for this card MUST end with this trailer line, after a blank
+line, alongside any other trailers:
+
+    Campaign: {{CAMPAIGN_SLUG}}
+
+This is the only in-repo record of which commits belong to this campaign — the
+campaign's own state lives outside the repo. Recovery is
+`git log --grep="Campaign: {{CAMPAIGN_SLUG}}"`. Do NOT add an agent co-author line.
+
 ## Worker reports
 
 Every dispatched worker (Hunter, Skinner) writes its report to:

@@ -28,6 +28,10 @@ function fixtureState(overrides: Partial<BriefState> = {}): BriefState {
 
 const FIXTURE_ANSWERS = '## 2026-01-01 -- sample ruling\n\nUse the neutral fixture path for all future sessions.\n';
 
+/** Matches `fixtureState().campaign` — the trailer instruction's slug is the same value the
+ * heading already renders via {{CAMPAIGN}}, just carried through its own explicit param. */
+const FIXTURE_CAMPAIGN_SLUG = 'sample-campaign';
+
 /** Spec §5.3: the report path is injected by the caller (composed from `resolved.homeDir` via
  * `reportPathFor`, Task 2/3) — never derived here from the campaign name, and never
  * `.claude/state/...`. */
@@ -91,6 +95,17 @@ that proves them — paste gate output verbatim into worker reports.
 
 Land the PR with \`gh pr merge --merge\`.
 
+## Commit trailer (required on every commit)
+
+Every commit you make for this card MUST end with this trailer line, after a blank
+line, alongside any other trailers:
+
+    Campaign: sample-campaign
+
+This is the only in-repo record of which commits belong to this campaign — the
+campaign's own state lives outside the repo. Recovery is
+\`git log --grep="Campaign: sample-campaign"\`. Do NOT add an agent co-author line.
+
 ## Worker reports
 
 Every dispatched worker (Hunter, Skinner) writes its report to:
@@ -116,23 +131,51 @@ No other terminal line is a valid signal.
 
 describe('executorBrief', () => {
   test('renders the committed template with card/state substitutions and the embedded answers content (snapshot)', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
+    const rendered = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
     expect(rendered).toBe(EXPECTED_BRIEF);
   });
 
   test('embeds the answers file content verbatim so a past ruling reaches every future session', () => {
     const distinctiveRuling = '## ruling\n\nAlways use the neutral fixture, never a real repo name.\n';
-    const rendered = executorBrief(fixtureCard(), fixtureState(), distinctiveRuling, TEMPLATE, FIXTURE_REPORT_PATH);
+    const rendered = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      distinctiveRuling,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
     expect(rendered).toContain(distinctiveRuling);
   });
 
   test('states the merge command the executor lands with', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
+    const rendered = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
     expect(rendered).toContain('gh pr merge --merge');
   });
 
   test('states the anti-livelock wall — the 2026-07-17 incident killed 6 workers without it', () => {
-    const rendered = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
+    const rendered = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
     expect(rendered).toContain('Your session ends the instant you stop calling tools');
     expect(rendered).toContain('timeout: 600000');
     expect(rendered).toContain('run_in_background: false');
@@ -146,6 +189,7 @@ describe('executorBrief', () => {
       FIXTURE_ANSWERS,
       TEMPLATE,
       otherReportPath,
+      'other-campaign',
     );
     expect(rendered).toContain('card X9 (other-campaign)');
     expect(rendered).toContain(otherReportPath);
@@ -157,8 +201,42 @@ describe('executorBrief', () => {
   });
 
   test('executorBrief substitutes the injected report path into {{REPORT_PATH}}', () => {
-    const brief = executorBrief(fixtureCard(), fixtureState(), FIXTURE_ANSWERS, TEMPLATE, FIXTURE_REPORT_PATH);
+    const brief = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
     expect(brief).toContain(FIXTURE_REPORT_PATH);
     expect(brief).not.toContain('.claude/state');
+  });
+});
+
+describe('executorBrief — campaign trailer', () => {
+  test('instructs the executor to add a Campaign trailer with the real slug', () => {
+    const brief = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      'kanna-session-import',
+    );
+    expect(brief).toContain('Campaign: kanna-session-import');
+  });
+
+  test('the slug is substituted, never left as a placeholder', () => {
+    const brief = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      'widget-export',
+    );
+    expect(brief).not.toContain('CAMPAIGN_SLUG');
+    expect(brief).toContain('Campaign: widget-export');
   });
 });
