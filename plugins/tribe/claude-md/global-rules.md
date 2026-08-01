@@ -18,6 +18,7 @@ something, record the new baseline in project memory.
   Start from the current state, then the question, then the why.
 - Grounded: pair every abstract claim with a code snippet, worked example, or
   verifiable fact; mark unverifiable claims as opinion or delete them.
+- Never use shorthand word, if you must give the full name after parentheses.
 
 The eval-backed long form of these two rules lives in the `explaining` skill, which
 triggers automatically on explanatory prose.
