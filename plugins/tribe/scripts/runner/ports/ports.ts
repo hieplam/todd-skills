@@ -3,8 +3,8 @@
 // the lock, the Agent SDK spawn) is reached through one of the interfaces below, never a
 // direct import of the world-touching module itself (that stays confined to `adapters/`).
 //
-// Small capability ports compose into the bigger per-module seams (`LoopIO`, `GithubIO`,
-// `LockIO`) so every existing mock/test in core/*.test.ts stays compatible for free —
+// Small capability ports compose into the bigger per-module seams (`LoopIO`, `LockIO`) so
+// every existing mock/test in core/*.test.ts stays compatible for free —
 // TypeScript's structural typing means an object satisfying the composed interface already
 // satisfies each capability port, with no test rewritten.
 
@@ -78,14 +78,6 @@ export interface VerifyIO {
    * never see a bare relative path. */
   readFile(resolvedPath: string): Promise<string> | string;
 }
-
-// ---------------------------------------------------------------------------------------
-// github.ts's seam. Composed from the capability algebra above — a bare `exec` + `sleep`.
-// ---------------------------------------------------------------------------------------
-
-/** World-touching seam. No direct `child_process`/`fs`/network import anywhere in
- * `github.ts` — every git/gh call and every wait goes through this. */
-export interface GithubIO extends ExecPort, TimerPort {}
 
 // ---------------------------------------------------------------------------------------
 // report.ts's seam.

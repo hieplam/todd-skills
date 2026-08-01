@@ -26,7 +26,6 @@ import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from '.
 import { BRIEF_TEMPLATE_PATH } from './brief.ts';
 import { parseState } from './state.ts';
 import type { Card, CampaignState } from './types.ts';
-import type { SessionMessage, SpawnSessionParams } from './session.ts';
 
 // ---------------------------------------------------------------------------------------
 // Shared fixtures (deliberately neutral — no repo names, no absolute paths beyond the
@@ -484,21 +483,6 @@ describe('writeReport — writes BOTH twins into `dir`, both derived from ONE bu
     }
   });
 });
-
-// ===========================================================================================
-// Integration: report reflects persisted state even when the state-commit PR failed
-// ===========================================================================================
-
-async function* messages(list: SessionMessage[]): AsyncGenerator<SessionMessage> {
-  for (const m of list) yield m;
-}
-
-function shippedMessages(pr: number, sha: string, sessionId: string): SessionMessage[] {
-  return [
-    { type: 'system', subtype: 'init', session_id: sessionId },
-    { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId },
-  ];
-}
 
 // ===========================================================================================
 // W-F5: the owner-visible half of the bug — a card blocked by the LAST tick's reconciliation

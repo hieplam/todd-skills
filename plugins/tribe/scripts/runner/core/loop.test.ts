@@ -13,7 +13,6 @@ import {
   releaseLock,
   resolveBaseBranch,
   runLoop,
-  type CardPhase,
   type DerivePhaseConfig,
   type DerivePhaseIO,
   type ExecResult,

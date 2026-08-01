@@ -204,7 +204,7 @@ export async function performRevertAndRedo(ctx: CardCtx): Promise<void> {
  * fresh with the plain brief; a `fresh` phase carrying a digest (F8: open PR, no sessionId)
  * spawns fresh too, but with that digest prepended — never blind. */
 export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<SessionResult> {
-  const { cardId, state, resolved, io } = ctx;
+  const { cardId, state, resolved } = ctx;
   const card = state.cards[cardId];
   const sessionConfig = sessionConfigFor(cardId, resolved);
 
