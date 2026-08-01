@@ -1,0 +1,6 @@
+---
+target: c3-215
+scope: block
+base: c3-215#n1396@v1:sha256:5cab0d63685ee38f3deb8a93272258dee9c326322b000050ced77ead11f6aa7f
+---
+Unattended path | One owner directive ("orchestration: do these N ideas") and then no owner intervention until one report. orchestrate-campaign assumes Shaman authority → Stage A authors the specs and plans and lands them alone as a docs PR into the host repo's own discovered convention — campaign state and answers.md are authored under the campaign's --home and never committed → the runner loops at zero token cost, verifying each card mechanically, and on an escalation it PARKS that card and continues to the next progressable one (a dependent of a parked card is blocked, never started) → the orchestrator answers within-authority escalations into answers.md and re-triggers, capped at 2 rounds per card → ONE consolidated report: every card either shipped (PR and merge sha, independently re-verified rather than agent-claimed) or blocked (the question, and why it needs the owner). The sole designed interruption is an irreversible decision — data shapes, product promises, new permissions, privacy — which parks for the owner by campaign config | N.A - see plugins/tribe/skills/orchestrate-campaign/SKILL.md, plugins/tribe/scripts/runner/README.md

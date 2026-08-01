@@ -14,10 +14,7 @@ const RUN_ID = '2026-07-24T00-00-00-000Z-beef';
 function validArgv(): string[] {
   return [
     '--repo', '/repo',
-    '--state', 'state.json',
     '--model', 'sonnet',
-    '--answers', 'answers.md',
-    '--escalations-dir', 'escalations',
     '--home', '/th/campaigns/camp',
   ];
 }
@@ -40,21 +37,31 @@ describe('parseArgs — required flags', () => {
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
       expect(result.config.repoRoot).toBe('/repo');
-      expect(result.config.statePath).toBe('state.json');
       expect(result.config.model).toBe('sonnet');
-      expect(result.config.answersPath).toBe('answers.md');
-      expect(result.config.escalationsDir).toBe('escalations');
       expect(result.config.homeDir).toBe('/th/campaigns/camp');
     }
   });
 
-  for (const missing of ['--repo', '--state', '--model', '--answers', '--escalations-dir', '--home']) {
+  for (const missing of ['--repo', '--model', '--home']) {
     test(`missing ${missing} -> error naming it`, () => {
       const result = parseArgs(validArgvWithout(missing), RUN_ID);
       expect('error' in result).toBe(true);
       if ('error' in result) {
         expect(result.error).toContain(missing);
       }
+    });
+  }
+});
+
+// Task 3 (spec §3 decision 2): --state/--answers/--escalations-dir are DELETED flags — every
+// campaign artifact now resolves to a fixed name under --home (core/paths.ts), so passing any
+// of the three former path flags is a usage error naming the offending flag, not a silent
+// no-op. Required flags drop 6 -> 3.
+describe('parseArgs — the three deleted path flags (--state/--answers/--escalations-dir)', () => {
+  for (const deleted of ['--state', '--answers', '--escalations-dir']) {
+    test(`${deleted} is rejected as an unknown flag`, () => {
+      const result = parseArgs([...validArgv(), deleted, 'whatever'], RUN_ID);
+      expect(result).toEqual({ error: `unknown flag: ${deleted}` });
     });
   }
 });

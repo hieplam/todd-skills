@@ -2,6 +2,7 @@
 // Pure module — no fs/clock imports; the caller injects pid/now and performs the writes
 // through the RunHomePort seam (ports/ports.ts).
 import { join } from 'node:path';
+import { answersPathOf, campaignStatePathOf, escalationsDirOf } from './paths.ts';
 
 export interface RunRecord {
   v: 1;
@@ -9,7 +10,9 @@ export interface RunRecord {
   pid: number;
   startedAt: string;
   repo: string;
-  /** Absolute — resolved against repo so the viewer never guesses a path (spec §4). */
+  /** Absolute — resolved against the campaign home (`--home`) so the viewer never guesses a
+   * path (spec §4). Field names/absoluteness are unchanged from before the campaign-home
+   * migration; only the directory they resolve under moved from the target repo to `--home`. */
   statePath: string;
   answersPath: string;
   escalationsDir: string;
@@ -42,8 +45,7 @@ export function reportsDirOf(homeDir: string): string {
 
 export function buildRunRecord(
   config: {
-    homeDir: string; runId: string; argv: string[]; repoRoot: string;
-    statePath: string; answersPath: string; escalationsDir: string; logsDir: string;
+    homeDir: string; runId: string; argv: string[]; repoRoot: string; logsDir: string;
   },
   io: { currentPid(): number; now(): string },
 ): RunRecord {
@@ -53,9 +55,9 @@ export function buildRunRecord(
     pid: io.currentPid(),
     startedAt: io.now(),
     repo: config.repoRoot,
-    statePath: join(config.repoRoot, config.statePath),
-    answersPath: join(config.repoRoot, config.answersPath),
-    escalationsDir: join(config.repoRoot, config.escalationsDir),
+    statePath: campaignStatePathOf(config.homeDir),
+    answersPath: answersPathOf(config.homeDir),
+    escalationsDir: escalationsDirOf(config.homeDir),
     logsDir: config.logsDir,
     argv: config.argv,
     endedAt: null,

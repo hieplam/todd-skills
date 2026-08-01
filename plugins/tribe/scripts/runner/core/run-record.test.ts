@@ -10,9 +10,6 @@ const config = {
   runId: '2026-07-24T01-02-03-000Z-ab12',
   argv: ['--cards', 'C1'],
   repoRoot: '/work/target',
-  statePath: 'docs/tribe/campaigns/camp/state.json',
-  answersPath: 'docs/tribe/campaigns/camp/answers.md',
-  escalationsDir: 'docs/tribe/campaigns/camp/escalations',
   logsDir: '/home/u/.tribe/-repo/campaigns/camp/runs/2026-07-24T01-02-03-000Z-ab12/logs',
 };
 
@@ -32,7 +29,7 @@ describe('path helpers', () => {
 });
 
 describe('buildRunRecord', () => {
-  test('records absolute repo-relative paths, pid, startedAt; end fields null (spec §4 run.json v1)', () => {
+  test('records absolute home-relative paths, pid, startedAt; end fields null (spec §4 run.json v1)', () => {
     const rec = buildRunRecord(config, io);
     expect(rec).toEqual({
       v: 1,
@@ -40,9 +37,9 @@ describe('buildRunRecord', () => {
       pid: 4242,
       startedAt: '2026-07-24T01:02:03.000Z',
       repo: '/work/target',
-      statePath: '/work/target/docs/tribe/campaigns/camp/state.json',
-      answersPath: '/work/target/docs/tribe/campaigns/camp/answers.md',
-      escalationsDir: '/work/target/docs/tribe/campaigns/camp/escalations',
+      statePath: '/home/u/.tribe/-repo/campaigns/camp/campaign-state.json',
+      answersPath: '/home/u/.tribe/-repo/campaigns/camp/answers.md',
+      escalationsDir: '/home/u/.tribe/-repo/campaigns/camp/escalations',
       logsDir: config.logsDir,
       argv: ['--cards', 'C1'],
       endedAt: null,

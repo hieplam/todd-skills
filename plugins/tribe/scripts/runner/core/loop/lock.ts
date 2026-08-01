@@ -2,9 +2,10 @@
 // holder is a stale crash artifact and must not wedge the runner forever), the STOP file
 // (owner's soft-stop: finish the in-flight step, exit cleanly), and the state-dir paths both
 // derive from.
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type { RunLoopConfig } from '../types.ts';
 import type { LockIO, LockInfo } from '../../ports/ports.ts';
+import { reportDirOf } from '../paths.ts';
 
 export type LockResult =
   | { ok: true }
@@ -35,8 +36,10 @@ export function isStopRequested(stopFilePath: string, io: { fileExists(p: string
   return io.fileExists(stopFilePath);
 }
 
+/** The directory campaign-state.json (and .runner.lock/STOP alongside it) lives in — the
+ * campaign's home itself (Task 3, spec §4: everything under `--home` moved to fixed names). */
 export function stateDirOf(config: RunLoopConfig): string {
-  return dirname(join(config.repoRoot, config.statePath));
+  return reportDirOf(config.homeDir);
 }
 
 export function lockFilePath(config: RunLoopConfig): string {

@@ -26,7 +26,6 @@ import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from '.
 import { BRIEF_TEMPLATE_PATH } from './brief.ts';
 import { parseState } from './state.ts';
 import type { Card, CampaignState } from './types.ts';
-import type { SessionMessage, SpawnSessionParams } from './session.ts';
 
 // ---------------------------------------------------------------------------------------
 // Shared fixtures (deliberately neutral — no repo names, no absolute paths beyond the
@@ -74,8 +73,7 @@ function fixtureRun(overrides: Partial<ReportRunInfo> = {}): ReportRunInfo {
 
 function fixtureConfig(overrides: Partial<ReportConfig> = {}): ReportConfig {
   return {
-    repoRoot: '/repo',
-    escalationsDir: 'escalations',
+    homeDir: '/home/c',
     ...overrides,
   };
 }
@@ -220,8 +218,8 @@ describe('buildCampaignReport — escalated', () => {
     });
     const markdown = ['**Reason:** needs_direction', '', '## Context', 'Which repo owns this?', ''].join('\n');
     const io = ioWith({
-      fileExists: (p) => p === '/repo/escalations/B4.md',
-      readFile: (p) => (p === '/repo/escalations/B4.md' ? markdown : Promise.reject(new Error('no fixture'))),
+      fileExists: (p) => p === '/home/c/escalations/B4.md',
+      readFile: (p) => (p === '/home/c/escalations/B4.md' ? markdown : Promise.reject(new Error('no fixture'))),
     });
     const report = await buildCampaignReport(state, fixtureRun(), fixtureConfig(), io);
     expect(report.cards.B4).toEqual({
@@ -486,125 +484,6 @@ describe('writeReport — writes BOTH twins into `dir`, both derived from ONE bu
 });
 
 // ===========================================================================================
-// Integration: report reflects persisted state even when the state-commit PR failed
-// ===========================================================================================
-
-async function* messages(list: SessionMessage[]): AsyncGenerator<SessionMessage> {
-  for (const m of list) yield m;
-}
-
-function shippedMessages(pr: number, sha: string, sessionId: string): SessionMessage[] {
-  return [
-    { type: 'system', subtype: 'init', session_id: sessionId },
-    { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId },
-  ];
-}
-
-describe('writeReport — reflects persisted state even when the state-commit PR failed', () => {
-  test('a card that ships locally is reported "shipped" even though its state-commit push failed', async () => {
-    // loop.ts's `shipCard` calls `persistLocalState` BEFORE attempting `commitState` — so the
-    // state file on disk already carries `status: 'shipped'` regardless of whether the commit
-    // to GitHub succeeds. This test runs the REAL `runLoop` (loop.ts, already unit-tested on
-    // its own terms) with a mocked `git push` failure, then feeds the resulting on-disk state
-    // into `buildCampaignReport` to prove report.ts shows 'shipped' regardless.
-    const state = fixtureState({
-      sequence: ['C1'],
-      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
-    });
-    const written = new Map<string, string>();
-    written.set('/repo/state.json', JSON.stringify(state));
-    written.set('/repo/answers.md', '');
-
-    const loopIo: LoopIO = {
-      exec: mock(async (cmd: string[]): Promise<ExecResult> => {
-        if (cmd[0] === 'git' && cmd[1] === 'symbolic-ref') return { stdout: 'origin/master\n', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view') return { stdout: '', stderr: 'no PRs', exitCode: 1 };
-        if (cmd[0] === 'git' && cmd[1] === 'worktree') return { stdout: '', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return { stdout: '', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'gh' && cmd[1] === 'api')
-          return { stdout: JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }), stderr: '', exitCode: 0 };
-        if (cmd[0] === 'git' && cmd[1] === 'rev-list') return { stdout: 'deadbee p1 p2', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'git' && cmd[1] === 'merge-base') return { stdout: '', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks')
-          return { stdout: JSON.stringify([{ name: 'ci', bucket: 'pass' }]), stderr: '', exitCode: 0 };
-        if (cmd[0] === 'git' && cmd[1] === 'diff') return { stdout: '', stderr: '', exitCode: 0 };
-        // baseSha/branch recording (handoff Fix 5) — incidental to what this test asserts.
-        if (cmd[0] === 'git' && cmd[1] === 'rev-parse') return { stdout: 'basesha0\n', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view')
-          return { stdout: '', stderr: 'no pull requests found', exitCode: 1 };
-        if (cmd[0] === 'git' && cmd[1] === 'fetch') return { stdout: '', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'git' && cmd[1] === 'checkout') return { stdout: '', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'git' && cmd[1] === 'add') return { stdout: '', stderr: '', exitCode: 0 };
-        if (cmd[0] === 'git' && cmd[1] === 'commit') return { stdout: '', stderr: '', exitCode: 0 };
-        // The failure this test is about: the push that would open the state-commit PR fails.
-        if (cmd[0] === 'git' && cmd[1] === 'push') return { stdout: '', stderr: 'remote: rejected', exitCode: 1 };
-        throw new Error(`unscripted exec: ${cmd.join(' ')}`);
-      }),
-      sleep: async () => {},
-      fileExists: (p) => !p.endsWith('STOP') && !p.includes('/escalations/'),
-      readFile: (p) => {
-        if (p === BRIEF_TEMPLATE_PATH) return '# Executor brief for {{CARD_ID}}\n{{ANSWERS_CONTENT}}';
-        const c = written.get(p);
-        if (c === undefined) throw new Error(`no fixture for ${p}`);
-        return c;
-      },
-      writeFile: (p, content) => {
-        written.set(p, content);
-      },
-      readLock: () => null,
-      writeLock: () => {},
-      removeLock: () => {},
-      isProcessAlive: () => false,
-      currentPid: () => 1234,
-      now: () => '2026-07-17T00:00:00Z',
-      readPendingCommit: () => null,
-      writePendingCommit: () => {},
-      clearPendingCommit: () => {},
-      spawnSession: (_params: SpawnSessionParams) => messages(shippedMessages(41, 'deadbee', 'sess-c1')),
-      appendLog: () => {},
-      ensureDir: () => {},
-      writeFileAtomic: () => {},
-    };
-
-    const config: RunLoopConfig = {
-      repoRoot: '/repo',
-      statePath: 'state.json',
-      escalationsDir: 'escalations',
-      answersPath: 'answers.md',
-      logsDir: '/logs',
-      homeDir: '/th',
-      runId: 'fixture-run',
-      argv: [],
-      model: 'fixture-model',
-      includeEscalated: false,
-      dryRun: false,
-      maxCards: 1,
-      remote: 'origin',
-    };
-
-    const loopResult = await runLoop(config, loopIo);
-    expect(loopResult.processed[0]).toMatchObject({
-      kind: 'shipped',
-      commitResult: expect.objectContaining({ outcome: 'commit_failed' }),
-    });
-
-    const finalState = parseState(JSON.parse(written.get('/repo/state.json') as string));
-    expect(finalState.cards.C1.status).toBe('shipped');
-
-    const report = await buildCampaignReport(
-      finalState,
-      fixtureRun({
-        exitCode: loopResult.exitCode,
-        reason: deriveExitReason({ threw: false, exitCode: loopResult.exitCode, hasMessage: false }),
-      }),
-      fixtureConfig(),
-      ioWith(),
-    );
-    expect(report.cards.C1).toEqual({ outcome: 'shipped', pr: 41, mergeSha: 'deadbee' });
-  });
-});
-
-// ===========================================================================================
 // W-F5: the owner-visible half of the bug — a card blocked by the LAST tick's reconciliation
 // must reach the report as "blocked", never "not_reached".
 // ===========================================================================================
@@ -622,8 +501,8 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
       },
     });
     const written = new Map<string, string>();
-    written.set('/repo/state.json', JSON.stringify(state));
-    written.set('/repo/answers.md', '');
+    written.set('/th/campaign-state.json', JSON.stringify(state));
+    written.set('/th/answers.md', '');
 
     const loopIo: LoopIO = {
       exec: mock(async (cmd: string[]): Promise<ExecResult> => {
@@ -658,9 +537,6 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
       isProcessAlive: () => false,
       currentPid: () => 4321,
       now: () => '2026-07-17T00:00:00Z',
-      readPendingCommit: () => null,
-      writePendingCommit: () => {},
-      clearPendingCommit: () => {},
       spawnSession: () => {
         throw new Error('no session should ever be spawned in this test — B is only reconciled, never attempted');
       },
@@ -671,9 +547,6 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
 
     const config: RunLoopConfig = {
       repoRoot: '/repo',
-      statePath: 'state.json',
-      escalationsDir: 'escalations',
-      answersPath: 'answers.md',
       logsDir: '/logs',
       homeDir: '/th',
       runId: 'fixture-run',
@@ -692,7 +565,7 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
     // The bug this guards: without loop.ts persisting the final-tick reconciliation, B would
     // still read "staged" here, and the report below would show B as not_reached instead of
     // blocked.
-    const finalState = parseState(JSON.parse(written.get('/repo/state.json') as string));
+    const finalState = parseState(JSON.parse(written.get('/th/campaign-state.json') as string));
     expect(finalState.cards.A.status).toBe('escalated');
     expect(finalState.cards.B.status).toBe('blocked');
 

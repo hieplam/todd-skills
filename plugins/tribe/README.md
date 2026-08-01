@@ -167,14 +167,16 @@ environment-specific value is a CLI input) and costs zero LLM tokens itself — 
 sessions it spawns do.
 
 ```sh
-bun plugins/tribe/scripts/runner/run.ts --repo <target-repo> --state <path> --model <model> \
-  --answers <path> --escalations-dir <path> --dry-run
+bun plugins/tribe/scripts/runner/run.ts --repo <target-repo> --model <model> \
+  --home <campaign-home> --dry-run
 ```
 
 See [`scripts/runner/README.md`](scripts/runner/README.md) for the full inputs table, resume
-semantics, escalation workflow, and known limitations. Every real (non-`--dry-run`) invocation
-now also requires `--home <campaign-home>` and records a `run.json` under it (see that README's
-"Run record" section) — this is what the status viewer below reads.
+semantics, escalation workflow, and known limitations. `--repo`, `--model`, and `--home` are the
+only required flags — every campaign operational artifact (state, answers, escalations, reports,
+lock, STOP) resolves to a fixed name under `--home` and is never committed to the target repo.
+Every real (non-`--dry-run`) invocation records a `run.json` under `--home` too (see that
+README's "Run record" section) — this is what the status viewer below reads.
 
 ---
 
