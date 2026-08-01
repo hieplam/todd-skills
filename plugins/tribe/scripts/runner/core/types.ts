@@ -83,12 +83,6 @@ export type NextCardResult = NoCardResult | PlanningNeededResult | CardResult;
 export interface RunLoopConfig {
   /** `--repo` */
   repoRoot: string;
-  /** `--state`, relative to repoRoot */
-  statePath: string;
-  /** `--escalations-dir`, relative to repoRoot */
-  escalationsDir: string;
-  /** `--answers`, relative to repoRoot */
-  answersPath: string;
   /** `--logs-dir` */
   logsDir: string;
   /** `--home` — the campaign's machine-local operational home (spec §4). REQUIRED input;

@@ -316,7 +316,7 @@ shape. Pure string math, no IO."
 - Produces: `RunLoopConfig` loses `statePath`, `answersPath`, `escalationsDir` as *inputs*; all
   three are derived from `homeDir`. `--repo`, `--model`, `--home` are the only required flags.
 
-- [ ] **Step 1: Write the failing test for the new CLI contract**
+- [x] **Step 1: Write the failing test for the new CLI contract**
 
 Append to `cli/main.test.ts`:
 
@@ -345,7 +345,7 @@ describe('parseArgs — path flags are derived from --home, not passed', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun test cli/main.test.ts
@@ -353,7 +353,7 @@ cd plugins/tribe/scripts/runner && bun test cli/main.test.ts
 
 Expected: FAIL — `--state` is currently accepted, and omitting it currently throws.
 
-- [ ] **Step 3: Update `RunLoopConfig` and `parseArgs`**
+- [x] **Step 3: Update `RunLoopConfig` and `parseArgs`**
 
 In `core/types.ts`, delete `statePath`, `answersPath`, `escalationsDir` from `RunLoopConfig`
 (lines 99-111) along with their `/** … relative to repoRoot */` doc comments. `homeDir` stays.
@@ -367,7 +367,7 @@ because `--home` now carries the only environment-specific part.
 An unknown flag must throw naming the flag — confirm `parseArgs` already rejects unknown flags; if
 it silently ignores them, the Step 1 tests will tell you, and adding the rejection is in scope.
 
-- [ ] **Step 4: Repoint every consumer site**
+- [x] **Step 4: Repoint every consumer site**
 
 Replace each `join(config.repoRoot, config.<field>)` with the Task 2 helper:
 
@@ -392,7 +392,7 @@ In `core/run-record.ts`, `buildRunRecord`'s param type (43-52) drops `statePath`
 the campaign home. **The field names and their absoluteness do not change** — that is what keeps
 the viewer working (spec §4).
 
-- [ ] **Step 5: Repoint `report.ts`**
+- [x] **Step 5: Repoint `report.ts`**
 
 `ReportConfig` (46-54) drops `repoRoot` + `escalationsDir` and gains `homeDir: string`.
 `escalationFileRelPath` (123-125) and `buildEscalatedEntry` (127-154) use
@@ -413,14 +413,14 @@ const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeD
 await writeReport(state, run, reportDirOf(config.homeDir), { homeDir: config.homeDir }, io);
 ```
 
-- [ ] **Step 6: Update `buildEscalationMarkdown`'s embedded wording**
+- [x] **Step 6: Update `buildEscalationMarkdown`'s embedded wording**
 
 `card-actions.ts:82-101` writes an "Options" line naming the answers file. It currently renders
 the repo-relative path (verified live in kanna: *"Append a ruling to
 `docs/tribe/planning/kanna-session-import/answers.md`"*). It must now render
 `answersPathOf(resolved.homeDir)` so a human reading the escalation is pointed at the real file.
 
-- [ ] **Step 7: Fix the path-sensitive tests**
+- [x] **Step 7: Fix the path-sensitive tests**
 
 - `core/report.test.ts`: `fixtureConfig` (75-81) → `{ homeDir: '/home/c' }`. The escalated
   describe (215-284) asserts `/repo/escalations/B4.md` → `/home/c/escalations/B4.md`. The
@@ -431,7 +431,7 @@ the repo-relative path (verified live in kanna: *"Append a ruling to
 - `core/run-record.test.ts`: the test at line 35 is literally named *"records absolute
   repo-relative paths…"* — rename to reflect home-relative and update its assertions.
 
-- [ ] **Step 8: Run the full suite**
+- [x] **Step 8: Run the full suite**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun run check 2>&1 | tail -20
@@ -439,7 +439,7 @@ cd plugins/tribe/scripts/runner && bun run check 2>&1 | tail -20
 
 Expected: PASS, zero failures.
 
-- [ ] **Step 9: Prove the viewer still works untouched (AG-3 regression gate)**
+- [x] **Step 9: Prove the viewer still works untouched (AG-3 regression gate)**
 
 The viewer must need **no source change** (spec §4). Prove it:
 
@@ -452,7 +452,7 @@ Expected: viewer tests PASS and `git status` shows **zero modified viewer source
 viewer source change appears necessary, **STOP and report back** — that means the move broke the
 `run.json` indirection and is a design problem, not something to patch around.
 
-- [ ] **Step 10: Live `--dry-run` smoke against a real repo (AG-3)**
+- [x] **Step 10: Live `--dry-run` smoke against a real repo (AG-3)**
 
 Mocked tests validate logic, not invocations — the runner README's own "Known limitations" records
 that `gh api pulls/<pr>` 404'd in reality while 25 tests passed. Run a real dry-run:
@@ -475,7 +475,7 @@ Expected: exit 0, a derived next action printed, and **zero files written** into
 `/Users/home/repos/todd-skills` (`git status --porcelain` unchanged). Record the output in the
 task report.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add -A
@@ -817,10 +817,15 @@ missing state → **gap**, see below. AG-5 → every task's `bun run check` step
 no state for a campaign it is asked to resume") had no task. It is folded into Task 3 as an extra
 step rather than a new task, since it touches the same `loadState` call site:
 
-> **Task 3, Step 8b:** confirm that a missing `<home>/campaign-state.json` produces a named,
+> - [x] **Task 3, Step 8b:** confirm that a missing `<home>/campaign-state.json` produces a named,
 > non-zero failure rather than a silent fresh start. Run the Step 10 smoke with the state file
 > deleted; expected: non-zero exit naming the expected absolute path. If it silently succeeds or
 > throws an unnamed error, add the diagnostic and a test for it in `core/loop/run-loop.test.ts`.
+>
+> Verified live (Hunter, Task 3): already fails loudly with no code change needed — `main()`'s
+> unhandled-error path surfaces Node's own `ENOENT: no such file or directory, open
+> '<home>/campaign-state.json'` and exits 4 (`EXIT_ERROR`). The absolute path is named exactly
+> by the underlying fs error; no new diagnostic/test was added, since one already existed.
 
 **Type consistency:** `campaignStatePathOf`/`answersPathOf`/`escalationsDirOf`/`escalationPathOf`/
 `reportDirOf` are defined in Task 2 and used under exactly those names in Task 3's table.

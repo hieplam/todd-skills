@@ -1,10 +1,10 @@
 // The pass + entry: derive-and-act until `done`, honoring STOP and the `--max-cards` budget,
 // tied together with the §D2 lock.
-import { join } from 'node:path';
 import type { CampaignState, NextCardResult, ResolvedConfig, RunLoopConfig } from '../types.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from '../types.ts';
 import { loadState, nextCard } from '../state.ts';
 import { BRIEF_TEMPLATE_PATH } from '../brief.ts';
+import { campaignStatePathOf, answersPathOf } from '../paths.ts';
 import { buildRunRecord, reportsDirOf, runDirOf, runRecordPathOf, serializeRunRecord } from '../run-record.ts';
 import type { LoopIO, StateIO } from '../../ports/ports.ts';
 import { acquireLock, isStopRequested, releaseLock, stopFilePathOf } from './lock.ts';
@@ -97,7 +97,7 @@ function filteredNextCard(
 }
 
 async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult> {
-  const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
+  const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
   const nc = filteredNextCard(state, config, io);
 
   if (nc.kind === 'done') {
@@ -134,7 +134,7 @@ function startupStopResult(config: RunLoopConfig, io: LoopIO): LoopResult | null
  * committed --answers rulings, and the committed brief template — all through the io seam. */
 async function resolveRunContext(config: RunLoopConfig, io: LoopIO): Promise<ResolvedConfig> {
   const baseBranch = await resolveBaseBranch(io, config.repoRoot, config.remote);
-  const answersContent = String(await io.readFile(join(config.repoRoot, config.answersPath)));
+  const answersContent = String(await io.readFile(answersPathOf(config.homeDir)));
   const briefTemplate = String(await io.readFile(BRIEF_TEMPLATE_PATH));
   return { ...config, baseBranch, answersContent, briefTemplate };
 }
@@ -248,7 +248,7 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
 
     const resolved = await resolveRunContext(config, io);
 
-    const state = await loadState(() => io.readFile(join(config.repoRoot, config.statePath)));
+    const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
     const result = await runPass(state, resolved, io);
     // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
     // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable

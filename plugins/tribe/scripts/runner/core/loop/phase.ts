@@ -1,7 +1,7 @@
 // §D4 — the resume matrix, derived from reality, never from the state file.
-import { join } from 'node:path';
 import type { Card, RunLoopConfig } from '../types.ts';
 import type { DerivePhaseIO } from '../../ports/ports.ts';
+import { escalationPathOf } from '../paths.ts';
 
 /** The five §D4 outcomes, plus the escalation-file short-circuit. `deriveCardPhase` never
  * itself attempts a resume or spawns anything — it only classifies reality; the loop's own
@@ -22,8 +22,9 @@ export type CardPhase =
 export interface DerivePhaseConfig {
   /** Target repo root; cwd for every gh/git call (an input, per spec §2). */
   repoRoot: string;
-  /** `--escalations-dir` input, relative to repoRoot. */
-  escalationsDir: string;
+  /** `--home` — the escalation file for a card lives at `escalationPathOf(homeDir, cardId)`
+   * (Task 3, spec §4). */
+  homeDir: string;
   /** `--include-escalated`: bypasses the escalation-file short-circuit — the human has
    * already ruled and is deliberately forcing a retry of a previously escalated card. */
   includeEscalated: boolean;
@@ -140,7 +141,7 @@ export async function deriveCardPhase(
   io: DerivePhaseIO,
 ): Promise<CardPhase> {
   if (!config.includeEscalated) {
-    const escalationPath = join(config.repoRoot, config.escalationsDir, `${cardId}.md`);
+    const escalationPath = escalationPathOf(config.homeDir, cardId);
     if (io.fileExists(escalationPath)) {
       return { kind: 'escalation_pending', escalationPath };
     }
@@ -193,7 +194,7 @@ export async function deriveCardPhase(
 export function derivePhaseConfigOf(config: RunLoopConfig): DerivePhaseConfig {
   return {
     repoRoot: config.repoRoot,
-    escalationsDir: config.escalationsDir,
+    homeDir: config.homeDir,
     includeEscalated: config.includeEscalated,
     remote: config.remote,
   };

@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { ReportIO } from '../ports/ports.ts';
+import { ESCALATIONS_DIRNAME, escalationPathOf } from './paths.ts';
 
 export type { ReportIO };
 
@@ -44,13 +45,12 @@ export interface ReportRunInfo {
 }
 
 /** Everything this module needs from campaign config, as inputs (W1: nothing environment
- * specific is ever hardcoded here). `escalationsDir` mirrors `RunLoopConfig.escalationsDir`
- * verbatim — the same value the runner used to write the escalation file in the first place. */
+ * specific is ever hardcoded here). `homeDir` is `--home` (Task 3, spec §4) — escalation file
+ * paths resolve against it via `core/paths.ts`'s `escalationPathOf`, the same absolute path the
+ * runner used to write the escalation file in the first place. */
 export interface ReportConfig {
-  /** Target repo root — escalation file paths are resolved against this. */
-  repoRoot: string;
-  /** `--escalations-dir`, relative to repoRoot. */
-  escalationsDir: string;
+  /** `--home` — the campaign's machine-local operational home. */
+  homeDir: string;
 }
 
 export type CardReportEntry =
@@ -120,8 +120,10 @@ export function extractQuestionDigest(markdown: string): string {
   return digest.replace(/\s+/g, ' ').trim().slice(0, 200);
 }
 
-function escalationFileRelPath(cardId: string, config: ReportConfig): string {
-  return `${config.escalationsDir}/${cardId}.md`;
+/** Display-only relative path (`escalations/<id>.md`) for the emitted JSON/md — never used to
+ * resolve a read (see `buildEscalatedEntry`'s `resolvedPath`, below). */
+function escalationFileRelPath(cardId: string): string {
+  return `${ESCALATIONS_DIRNAME}/${cardId}.md`;
 }
 
 async function buildEscalatedEntry(
@@ -130,8 +132,8 @@ async function buildEscalatedEntry(
   config: ReportConfig,
   io: Pick<ReportIO, 'fileExists' | 'readFile'>,
 ): Promise<CardReportEntry> {
-  const relPath = escalationFileRelPath(cardId, config);
-  const resolvedPath = join(config.repoRoot, relPath);
+  const relPath = escalationFileRelPath(cardId);
+  const resolvedPath = escalationPathOf(config.homeDir, cardId);
 
   let question: string;
   if (!io.fileExists(resolvedPath)) {
@@ -269,9 +271,9 @@ export function renderReportMarkdown(report: CampaignReport): string {
 }
 
 /** The Task 3 entry point (spec §O5): builds the ONE shared report structure, then writes both
- * the JSON and md twins into `dir` (the state file's own directory, per the design doc — the
- * caller, run.ts, derives it via `loop.ts`'s `stateDirOf`). Fully unit-tested here with an
- * injected `ReportIO`; run.ts's own wiring stays a thin caller (per the brief's design note 3). */
+ * the JSON and md twins into `dir` (the campaign home, per the design doc §4 — the caller,
+ * cli/main.ts, derives it via `core/paths.ts`'s `reportDirOf`). Fully unit-tested here with an
+ * injected `ReportIO`; cli/main.ts's own wiring stays a thin caller (per the brief's design note 3). */
 export async function writeReport(
   state: CampaignState,
   run: ReportRunInfo,

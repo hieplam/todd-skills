@@ -73,8 +73,7 @@ function fixtureRun(overrides: Partial<ReportRunInfo> = {}): ReportRunInfo {
 
 function fixtureConfig(overrides: Partial<ReportConfig> = {}): ReportConfig {
   return {
-    repoRoot: '/repo',
-    escalationsDir: 'escalations',
+    homeDir: '/home/c',
     ...overrides,
   };
 }
@@ -219,8 +218,8 @@ describe('buildCampaignReport — escalated', () => {
     });
     const markdown = ['**Reason:** needs_direction', '', '## Context', 'Which repo owns this?', ''].join('\n');
     const io = ioWith({
-      fileExists: (p) => p === '/repo/escalations/B4.md',
-      readFile: (p) => (p === '/repo/escalations/B4.md' ? markdown : Promise.reject(new Error('no fixture'))),
+      fileExists: (p) => p === '/home/c/escalations/B4.md',
+      readFile: (p) => (p === '/home/c/escalations/B4.md' ? markdown : Promise.reject(new Error('no fixture'))),
     });
     const report = await buildCampaignReport(state, fixtureRun(), fixtureConfig(), io);
     expect(report.cards.B4).toEqual({
@@ -502,8 +501,8 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
       },
     });
     const written = new Map<string, string>();
-    written.set('/repo/state.json', JSON.stringify(state));
-    written.set('/repo/answers.md', '');
+    written.set('/th/campaign-state.json', JSON.stringify(state));
+    written.set('/th/answers.md', '');
 
     const loopIo: LoopIO = {
       exec: mock(async (cmd: string[]): Promise<ExecResult> => {
@@ -548,9 +547,6 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
 
     const config: RunLoopConfig = {
       repoRoot: '/repo',
-      statePath: 'state.json',
-      escalationsDir: 'escalations',
-      answersPath: 'answers.md',
       logsDir: '/logs',
       homeDir: '/th',
       runId: 'fixture-run',
@@ -569,7 +565,7 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
     // The bug this guards: without loop.ts persisting the final-tick reconciliation, B would
     // still read "staged" here, and the report below would show B as not_reached instead of
     // blocked.
-    const finalState = parseState(JSON.parse(written.get('/repo/state.json') as string));
+    const finalState = parseState(JSON.parse(written.get('/th/campaign-state.json') as string));
     expect(finalState.cards.A.status).toBe('escalated');
     expect(finalState.cards.B.status).toBe('blocked');
 

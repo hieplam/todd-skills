@@ -23,6 +23,7 @@ import {
 } from './loop.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { BRIEF_TEMPLATE_PATH } from './brief.ts';
+import { answersPathOf, campaignStatePathOf } from './paths.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
 import type { VerifyResult } from './verify.ts';
@@ -77,7 +78,7 @@ function fixtureState(overrides: Partial<CampaignState> = {}): CampaignState {
 describe('deriveCardPhase — §D4 reality table', () => {
   const baseConfig: DerivePhaseConfig = {
     repoRoot: '/sample-repo',
-    escalationsDir: 'docs/campaign/escalations',
+    homeDir: '/th',
     includeEscalated: false,
     remote: 'origin',
   };
@@ -347,6 +348,10 @@ function needsDirectionMessages(sessionId: string): SessionMessage[] {
 interface MockLoopIoOptions {
   stateJson: string;
   answers?: string;
+  /** The campaign home the state/answers fixtures are keyed under — must match whatever
+   * `homeDir` the config passed to `runLoop` carries (default: `baseLoopConfig`'s own default,
+   * `/th`). Only tests that override `homeDir` on the config need to pass this too. */
+  homeDir?: string;
   execHandlers?: Array<(cmd: string[]) => ExecResult | null>;
   spawnQueue?: Array<(params: SpawnSessionParams) => AsyncIterable<SessionMessage>>;
   lock?: LockInfo | null;
@@ -370,9 +375,10 @@ interface MockLoopIoResult {
 
 function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
   const calls: string[][] = [];
+  const homeDir = opts.homeDir ?? '/th';
   const writtenFiles = new Map<string, string>();
-  writtenFiles.set('/repo/state.json', opts.stateJson);
-  if (opts.answers !== undefined) writtenFiles.set('/repo/answers.md', opts.answers);
+  writtenFiles.set(campaignStatePathOf(homeDir), opts.stateJson);
+  if (opts.answers !== undefined) writtenFiles.set(answersPathOf(homeDir), opts.answers);
   const spawnBriefs: string[] = [];
   const lockCalls: string[] = [];
   const ensuredDirs: string[] = [];
@@ -457,9 +463,6 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
 function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
   return {
     repoRoot: '/repo',
-    statePath: 'state.json',
-    escalationsDir: 'escalations',
-    answersPath: 'answers.md',
     logsDir: '/logs',
     homeDir: '/th',
     runId: 'fixture-run',
@@ -523,7 +526,7 @@ describe('runLoop — full happy path over two cards', () => {
     expect(result.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C2' });
     expect(spawnBriefs).toHaveLength(2);
 
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.C1.status).toBe('shipped');
     expect(finalState.cards.C2.status).toBe('shipped');
     expect(finalState.cards.C1.mergeSha).toBe('deadbee');
@@ -567,7 +570,7 @@ describe('runLoop — records branch + baseSha (handoff Fix 5)', () => {
 
     await runLoop(baseLoopConfig({ maxCards: 1 }), io);
 
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.C1.baseSha).toBe('base15ha');
     expect(finalState.cards.C1.branch).toBe('feature/RecordedBranch');
   });
@@ -684,7 +687,7 @@ describe('runLoop — crash-resume: verify_only phase (PR merged, not yet shippe
       { kind: 'shipped', cardId: 'C1' },
     ]);
     expect(io.spawnSession).not.toHaveBeenCalled();
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.C1.status).toBe('shipped');
   });
 });
@@ -838,6 +841,7 @@ describe('runLoop — run record write (Task 2, spec §4/§5.2)', () => {
     const { io, ensuredDirs, atomicWrites } = buildMockLoopIo({
       stateJson: stateJsonWithTwoFreshCards(),
       answers: '',
+      homeDir: '/th/campaigns/camp',
     });
 
     await runLoop(baseLoopConfig({ dryRun: true, homeDir: '/th/campaigns/camp', runId: 'r-1' }), io);
@@ -908,10 +912,15 @@ describe('runLoop — escalation flow', () => {
 
     expect(result.exitCode).toBe(EXIT_ESCALATED);
     expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1' });
-    const escalationContent = writtenFiles.get('/repo/escalations/C1.md');
+    const escalationContent = writtenFiles.get('/th/escalations/C1.md');
     expect(escalationContent).toBeDefined();
     expect(escalationContent).toContain('NEEDS_DIRECTION');
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    // Task 3 Step 6: the "Options" line must point the human at the REAL answers.md location
+    // under --home, not the deleted repo-relative --answers path (live evidence, kanna
+    // campaign: it used to print "docs/tribe/planning/kanna-session-import/answers.md", a path
+    // that no longer exists once state moves out of the repo).
+    expect(escalationContent).toContain('Append a ruling to `/th/answers.md`');
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.C1.status).toBe('escalated');
   });
 
@@ -943,10 +952,10 @@ describe('runLoop — escalation flow', () => {
     expect(result.exitCode).toBe(EXIT_ESCALATED);
     expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1', reason: 'planning_needed' });
     expect(io.spawnSession).not.toHaveBeenCalled();
-    const escalationContent = writtenFiles.get('/repo/escalations/C1.md');
+    const escalationContent = writtenFiles.get('/th/escalations/C1.md');
     expect(escalationContent).toContain('spec');
     expect(escalationContent).toContain('plan');
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.C1.status).toBe('escalated');
   });
 
@@ -1133,7 +1142,7 @@ describe('runLoop — D5′: escalate-then-continue ordering', () => {
     expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1' });
     expect(result.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C2' });
 
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.C1.status).toBe('escalated');
     expect(finalState.cards.C2.status).toBe('shipped');
   });
@@ -1201,11 +1210,11 @@ describe('runLoop — D5′: blocked cascade (W6)', () => {
     expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'A' });
     expect(result.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C' });
 
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.A.status).toBe('escalated');
     expect(finalState.cards.B.status).toBe('blocked');
     expect(finalState.cards.C.status).toBe('shipped');
-    expect(writtenFiles.has('/repo/escalations/B.md')).toBe(false);
+    expect(writtenFiles.has('/th/escalations/B.md')).toBe(false);
   });
 });
 
@@ -1237,7 +1246,7 @@ describe('runLoop — W-F5: a last-tick blocked reconciliation must be PERSISTED
     // No session was ever spawned for B — it was never attempted, only reconciled to blocked.
     expect(io.spawnSession).not.toHaveBeenCalled();
 
-    const finalState = JSON.parse(writtenFiles.get('/repo/state.json') as string);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
     expect(finalState.cards.A.status).toBe('escalated');
     expect(finalState.cards.B.status).toBe('blocked');
   });

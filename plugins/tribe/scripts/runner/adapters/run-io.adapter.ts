@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { spawn } from 'node:child_process';
 import type { ExecResult, LockInfo, LoopIO, RunLoopConfig } from '../core/loop.ts';
 import type { SessionMessage, SpawnSessionParams } from '../core/session.ts';
+import { reportDirOf } from '../core/paths.ts';
 import { sdkSpawnSession } from './session.adapter.ts';
 
 function realExec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult> {
@@ -31,8 +32,7 @@ function isProcessAlive(pid: number): boolean {
 }
 
 export function buildRealIo(config: RunLoopConfig): LoopIO {
-  const stateDir = dirname(join(config.repoRoot, config.statePath));
-  const lockPath = join(stateDir, '.runner.lock');
+  const lockPath = join(reportDirOf(config.homeDir), '.runner.lock');
 
   return {
     exec: realExec,

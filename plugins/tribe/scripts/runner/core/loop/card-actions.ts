@@ -2,7 +2,6 @@
 // fallback matrix), and REVERT_AND_REDO. Every world-touching effect goes through the
 // injected `LoopIO`/`SessionIO` seams — this module never imports a world-touching module
 // itself.
-import { join } from 'node:path';
 import type { Card, CampaignState, ResolvedConfig } from '../types.ts';
 import type { LoopIO } from '../../ports/ports.ts';
 import { verifyShipped } from '../verify.ts';
@@ -14,6 +13,7 @@ import type { BriefCard, BriefState } from '../brief.ts';
 import type { CardPhase } from './phase.ts';
 import { buildStateDigest, findWorktreePathForBranch } from './phase.ts';
 import { persistLocalState } from './commit-guard.ts';
+import { answersPathOf, escalationPathOf } from '../paths.ts';
 
 export type CardOutcome =
   | { kind: 'shipped'; cardId: string }
@@ -92,7 +92,7 @@ export function buildEscalationMarkdown(
     detail,
     '',
     '## Options',
-    `- Append a ruling to \`${resolved.answersPath}\` and re-run with \`--include-escalated\`.`,
+    `- Append a ruling to \`${answersPathOf(resolved.homeDir)}\` and re-run with \`--include-escalated\`.`,
     '- Fix the underlying issue (plan, code, CI) directly and re-run.',
     '',
   ].join('\n');
@@ -100,10 +100,10 @@ export function buildEscalationMarkdown(
 
 export async function escalateCard(ctx: CardCtx, reason: string, detail: string): Promise<CardOutcome> {
   const { cardId, state, resolved, io } = ctx;
-  const escalationRelPath = `${resolved.escalationsDir}/${cardId}.md`;
+  const escalationPath = escalationPathOf(resolved.homeDir, cardId);
   const markdown = buildEscalationMarkdown(cardId, reason, detail, resolved);
   // D5: the local escalation file + exit code stand alone — write it FIRST, unconditionally.
-  io.writeFile(join(resolved.repoRoot, escalationRelPath), markdown);
+  io.writeFile(escalationPath, markdown);
 
   const card = state.cards[cardId];
   if (card) {
@@ -112,7 +112,7 @@ export async function escalateCard(ctx: CardCtx, reason: string, detail: string)
   }
   persistLocalState(state, resolved, io);
 
-  return { kind: 'escalated', cardId, escalationPath: escalationRelPath, reason };
+  return { kind: 'escalated', cardId, escalationPath, reason };
 }
 
 export async function shipCard(ctx: CardCtx, verifyResult: VerifyResult): Promise<CardOutcome> {
