@@ -612,7 +612,7 @@ into `<home>/reports/`, is idempotent, supports `--campaign <slug>` and `--dry-r
 is held by a live pid. Every one of those guarantees must extend to the new file set — that is the
 reason to reuse it.
 
-- [ ] **Step 1: Read the script and its test, then write the failing test**
+- [x] **Step 1: Read the script and its test, then write the failing test**
 
 ```bash
 cd /Users/home/repos/todd-skills
@@ -626,7 +626,7 @@ runs the migrator, and asserts all four land under `<home>/` at the fixed names 
 gone. Add a second case asserting a pre-existing destination file produces `CONFLICT` + non-zero
 exit and leaves both copies untouched. Add a third asserting `--dry-run` moves nothing.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-migrate-campaign-home.sh
@@ -634,7 +634,7 @@ bash plugins/tribe/scripts/tests/test-migrate-campaign-home.sh
 
 Expected: FAIL on the new cases.
 
-- [ ] **Step 3: Extend the script**
+- [x] **Step 3: Extend the script**
 
 Add the operational-file move alongside the existing reports move, reusing the script's existing
 conflict check and live-lock refusal helpers rather than duplicating them. Map:
@@ -651,7 +651,7 @@ conflict check and live-lock refusal helpers rather than duplicating them. Map:
 host repo's convention is a human judgement call about which convention applies (spec §3
 decision 4). Print a reminder naming each spec/plan file left behind.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 bash plugins/tribe/scripts/tests/test-migrate-campaign-home.sh
@@ -659,7 +659,7 @@ bash plugins/tribe/scripts/tests/test-migrate-campaign-home.sh
 
 Expected: PASS, all cases.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A

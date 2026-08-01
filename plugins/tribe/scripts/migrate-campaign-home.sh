@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# migrate-campaign-home.sh — one-shot: move committed .claude/state/<slug>/reports/*.md
-# worker reports into the per-repo campaign home (~/.tribe/<key>/campaigns/<slug>/reports).
+# migrate-campaign-home.sh — one-shot: move committed campaign operational files into the
+# per-repo campaign home (~/.tribe/<key>/campaigns/<slug>/). Two file sets, moved separately:
+#   - .claude/state/<slug>/reports/*.md              (worker reports)      -> <home>/reports/
+#   - docs/tribe/planning/<slug>/{campaign-state.json,answers.md,          -> <home>/
+#     campaign-report.json,campaign-report.md,escalations/*.md}
+# SPEC.md and plan-*.md under docs/tribe/planning/<slug>/ are contracts, not operational
+# state, and are deliberately left in place — relocating them to this repo's own
+# docs/specs, docs/plans or .c3/adr convention is a human call the migrator must not guess.
 # Idempotent; refuses to touch a campaign whose .runner.lock holds a live pid.
 # Never re-derives the ~/.tribe key itself — always via tribe-home.sh (W1).
 #
@@ -36,6 +42,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 HOME_DIR="$("$DIR/tribe-home.sh" "$REPO")"
 
 STATE_ROOT="$REPO/.claude/state"
+OPS_ROOT="$REPO/docs/tribe/planning"
 
 failed=0
 touched_campaigns=()
@@ -61,7 +68,10 @@ slug_is_live_locked() {
   return 1
 }
 
-[[ -d "$STATE_ROOT" ]] || { echo "migrate-campaign-home: nothing to migrate, no $STATE_ROOT"; exit 0; }
+if [[ ! -d "$STATE_ROOT" && ! -d "$OPS_ROOT" ]]; then
+  echo "migrate-campaign-home: nothing to migrate, no $STATE_ROOT or $OPS_ROOT"
+  exit 0
+fi
 
 for slugdir in "$STATE_ROOT"/*/; do
   [[ -d "$slugdir" ]] || continue
@@ -117,6 +127,91 @@ for slugdir in "$STATE_ROOT"/*/; do
     fi
     rmdir "$reports_src" 2>/dev/null || true
     rmdir "$STATE_ROOT/$slug" 2>/dev/null || true
+  fi
+done
+
+# Operational state (campaign-state.json, answers.md, campaign-report.*, escalations/*.md) —
+# moves into the campaign home at its fixed name. SPEC.md/plan-*.md are contracts and are
+# never touched here; only named in a reminder so a human relocates them by hand.
+for slugdir in "$OPS_ROOT"/*/; do
+  [[ -d "$slugdir" ]] || continue
+  slug="$(basename "$slugdir")"
+
+  if [[ -n "$CAMPAIGN" && "$slug" != "$CAMPAIGN" ]]; then
+    continue
+  fi
+
+  if slug_is_live_locked "$slug"; then
+    echo "migrate-campaign-home: refusing $slug — .runner.lock is held by a live pid"
+    failed=1
+    continue
+  fi
+
+  ops_dest="$HOME_DIR/campaigns/$slug"
+  ops_had_conflict=0
+  ops_moved_any=0
+
+  for fname in campaign-state.json answers.md campaign-report.json campaign-report.md; do
+    src="$slugdir$fname"
+    [[ -e "$src" ]] || continue
+    dest="$ops_dest/$fname"
+
+    if [[ -e "$dest" ]]; then
+      echo "CONFLICT: $slug/$fname already exists at $dest — not migrated"
+      failed=1
+      ops_had_conflict=1
+      continue
+    fi
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      echo "would move: $src -> $dest"
+    else
+      mkdir -p "$ops_dest"
+      mv "$src" "$dest"
+      echo "moved: $src -> $dest"
+    fi
+    ops_moved_any=1
+  done
+
+  esc_src="${slugdir}escalations"
+  if [[ -d "$esc_src" ]]; then
+    esc_dest="$ops_dest/escalations"
+    for f in "$esc_src"/*.md; do
+      [[ -e "$f" ]] || continue
+      fname="$(basename "$f")"
+      dest="$esc_dest/$fname"
+
+      if [[ -e "$dest" ]]; then
+        echo "CONFLICT: $slug/escalations/$fname already exists at $dest — not migrated"
+        failed=1
+        ops_had_conflict=1
+        continue
+      fi
+
+      if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "would move: $f -> $dest"
+      else
+        mkdir -p "$esc_dest"
+        mv "$f" "$dest"
+        echo "moved: $f -> $dest"
+      fi
+      ops_moved_any=1
+    done
+  fi
+
+  if [[ "$ops_moved_any" -eq 1 ]]; then
+    touched_campaigns+=("$slug")
+  fi
+
+  # Contracts: leave in place, but the human needs to know they are there to relocate.
+  for f in "$slugdir"SPEC.md "$slugdir"plan-*.md; do
+    [[ -e "$f" ]] || continue
+    echo "migrate-campaign-home: reminder — $f is a contract, left in place; relocate to this repo's own docs/specs, docs/plans, or .c3/adr convention by hand"
+  done
+
+  if [[ "$DRY_RUN" -ne 1 && "$ops_had_conflict" -eq 0 ]]; then
+    rmdir "$esc_src" 2>/dev/null || true
+    rmdir "$slugdir" 2>/dev/null || true
   fi
 done
 

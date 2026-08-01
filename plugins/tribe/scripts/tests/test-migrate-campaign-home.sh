@@ -115,4 +115,71 @@ set +e; bash "$SCRIPT" "$repo" --campaign camp2 >/dev/null 2>&1; set -e
 tracked .claude/state/camp2/reports/C2.md && ok "(h) conflicted slug stays tracked" \
   || bad "(h) conflicted slug stays tracked"
 
+# --- operational-file migration: docs/tribe/planning/<slug>/* -> campaign home ---------
+# campaign-state.json, answers.md, campaign-report.{json,md} and escalations/*.md are
+# machine bookkeeping and move. SPEC.md/plan-*.md are contracts and must stay in the repo.
+ops_home_dir(){ printf '%s/campaigns/%s' "$home" "$1"; }
+
+seed_ops(){
+  local slug="$1"
+  mkdir -p "$repo/docs/tribe/planning/$slug/escalations"
+  printf '{"v":1,"campaign":"%s"}\n' "$slug" > "$repo/docs/tribe/planning/$slug/campaign-state.json"
+  printf '# Answers\n' > "$repo/docs/tribe/planning/$slug/answers.md"
+  printf '{"campaign":"%s"}\n' "$slug" > "$repo/docs/tribe/planning/$slug/campaign-report.json"
+  printf '# Report\n' > "$repo/docs/tribe/planning/$slug/campaign-report.md"
+  printf '# C1 escalation\n' > "$repo/docs/tribe/planning/$slug/escalations/C1.md"
+}
+
+# (i) operational files move to the campaign home at fixed names; repo copies gone
+seed_ops demo
+out_i="$(bash "$SCRIPT" "$repo" --campaign demo 2>&1)"; rc_i="$?"
+demo_home="$(ops_home_dir demo)"
+check "(i) ops migration exit 0" "$rc_i" "0"
+for fname in campaign-state.json answers.md campaign-report.json campaign-report.md; do
+  [[ -f "$demo_home/$fname" ]] && ok "(i) $fname landed at campaign home" || bad "(i) $fname landed at campaign home"
+  [[ -f "$repo/docs/tribe/planning/demo/$fname" ]] && bad "(i) $fname removed from repo" || ok "(i) $fname removed from repo"
+done
+[[ -f "$demo_home/escalations/C1.md" ]] && ok "(i) escalation landed at campaign home" || bad "(i) escalation landed at campaign home"
+[[ -f "$repo/docs/tribe/planning/demo/escalations/C1.md" ]] && bad "(i) escalation removed from repo" \
+  || ok "(i) escalation removed from repo"
+
+# (j) SPEC.md and plan-*.md are contracts: left in place, with a named reminder
+seed_ops contracts
+printf '# Spec\n' > "$repo/docs/tribe/planning/contracts/SPEC.md"
+printf '# Plan 01\n' > "$repo/docs/tribe/planning/contracts/plan-01.md"
+out_j="$(bash "$SCRIPT" "$repo" --campaign contracts 2>&1)"; rc_j="$?"
+check "(j) contracts migration exit 0" "$rc_j" "0"
+[[ -f "$repo/docs/tribe/planning/contracts/SPEC.md" ]] && ok "(j) SPEC.md left in place" || bad "(j) SPEC.md left in place"
+[[ -f "$repo/docs/tribe/planning/contracts/plan-01.md" ]] && ok "(j) plan-01.md left in place" \
+  || bad "(j) plan-01.md left in place"
+echo "$out_j" | grep -q 'SPEC.md' && ok "(j) reminder names SPEC.md" || bad "(j) reminder names SPEC.md (got: $out_j)"
+echo "$out_j" | grep -q 'plan-01.md' && ok "(j) reminder names plan-01.md" \
+  || bad "(j) reminder names plan-01.md (got: $out_j)"
+
+# (k) pre-existing destination -> CONFLICT, non-zero exit, both copies untouched
+seed_ops clash
+clash_home="$(ops_home_dir clash)"
+mkdir -p "$clash_home"
+printf 'already here\n' > "$clash_home/campaign-state.json"
+set +e
+out_k="$(bash "$SCRIPT" "$repo" --campaign clash 2>&1)"; rc_k="$?"
+set -e
+check "(k) conflict exit 1" "$rc_k" "1"
+echo "$out_k" | grep -q 'CONFLICT' && ok "(k) prints CONFLICT" || bad "(k) prints CONFLICT (got: $out_k)"
+[[ -f "$repo/docs/tribe/planning/clash/campaign-state.json" ]] && ok "(k) repo copy left untouched on conflict" \
+  || bad "(k) repo copy left untouched on conflict"
+clash_dest_content="$(cat "$clash_home/campaign-state.json")"
+check "(k) destination left untouched on conflict" "$clash_dest_content" "already here"
+
+# (l) --dry-run moves nothing
+seed_ops dry
+dry_home="$(ops_home_dir dry)"
+out_l="$(bash "$SCRIPT" "$repo" --campaign dry --dry-run 2>&1)"; rc_l="$?"
+check "(l) dry-run ops exit 0" "$rc_l" "0"
+[[ -e "$dry_home" ]] && bad "(l) dry-run created no campaign home" || ok "(l) dry-run created no campaign home"
+[[ -f "$repo/docs/tribe/planning/dry/campaign-state.json" ]] && ok "(l) dry-run repo copy untouched" \
+  || bad "(l) dry-run repo copy untouched"
+echo "$out_l" | grep -qi 'would move' && ok "(l) dry-run prints would-move line" \
+  || bad "(l) dry-run prints would-move line (got: $out_l)"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"; [[ "$FAIL" -eq 0 ]]
