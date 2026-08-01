@@ -833,6 +833,23 @@ step rather than a new task, since it touches the same `loadState` call site:
 Task 4 Steps 1, 4, and 5. `CardOutcome.commitResult` is deleted in Task 1 and referenced nowhere
 after.
 
+**Task 5 follow-up, git-index gap (Hunter, no Task 5b in this plan):** Task 5's own report flagged
+that the operational-file move it added never extended the git-index untracking the script's own
+header comment promises ("Sibling migrate-state.sh already closes that loop … this does the
+same"). Verified live in `/Users/home/repos/kanna`: `git ls-files docs/tribe/planning/
+kanna-session-import/` returns 16 tracked files, 11 of which are operational state the Task 5 code
+moves — migrating that repo left 11 tracked-but-deleted paths with no `git rm --cached` and no
+commit hint. Fixed in `migrate-campaign-home.sh`: after a successful, conflict-free operational
+move, the four fixed filenames are untracked individually (`git ls-files --error-unmatch` guard +
+`git rm --cached`, matching the existing reports idiom exactly) and `escalations/` is untracked as
+a whole directory via `git rm -r --cached` — deliberately including a tracked
+`escalations/.gitkeep` if one exists, since the directory it holds open is itself moving.
+`SPEC.md`/`plan-*.md` are never touched by any `rm --cached` call — a blanket
+`git rm -r --cached "$slugdir"` was rejected specifically because it would have caught them too
+(AG-2). Covered by new cases (m)/(n)/(o) in `test-migrate-campaign-home.sh`, proving SPEC.md and
+plan-01.md stay tracked after a real migration, `--dry-run` leaves the index byte-identical, and
+the follow-up commit hint names "operational files" (distinct from the pre-existing reports hint).
+
 **Task 4 plan-vs-reality note (Hunter, Task 4):** `executorBrief` is a positional-args function
 (`card, state, answersContent, template, reportPath`), not an options object — the plan's Step 1
 snippet (`executorBrief({ campaignSlug: … })`) is illustrative only, per the task brief's own

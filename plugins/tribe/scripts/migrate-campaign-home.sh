@@ -10,10 +10,11 @@
 # Idempotent; refuses to touch a campaign whose .runner.lock holds a live pid.
 # Never re-derives the ~/.tribe key itself — always via tribe-home.sh (W1).
 #
-# The reports this moves were COMMITTED, so moving the files alone leaves the index
+# Both file sets this moves can be COMMITTED, so moving the files alone leaves the index
 # claiming they still exist — a working tree full of unexplained deletions that the
 # next `git status` reader has to reverse-engineer. Sibling migrate-state.sh already
-# closes that loop (`git rm -r --cached` + the commit to run); this does the same.
+# closes that loop (`git rm -r --cached` + the commit to run); this does the same, but only
+# for the exact operational paths it moved — SPEC.md/plan-*.md are never untracked.
 # Does not commit — a migration decides where files live, never what lands in history.
 set -euo pipefail
 
@@ -47,6 +48,7 @@ OPS_ROOT="$REPO/docs/tribe/planning"
 failed=0
 touched_campaigns=()
 detracked_campaigns=()
+detracked_ops_campaigns=()
 
 is_pid_alive() {
   local pid="$1"
@@ -210,6 +212,29 @@ for slugdir in "$OPS_ROOT"/*/; do
   done
 
   if [[ "$DRY_RUN" -ne 1 && "$ops_had_conflict" -eq 0 ]]; then
+    # Index still lists the moved operational files; drop them so it matches the disk.
+    # Only the fixed filenames actually moved are untracked here — SPEC.md/plan-*.md are
+    # contracts and never touched, so a blanket `git rm -r --cached "$slugdir"` is
+    # deliberately NOT used: it would silently untrack the contracts too (AG-2).
+    ops_detracked=0
+    for fname in campaign-state.json answers.md campaign-report.json campaign-report.md; do
+      ops_rel="docs/tribe/planning/$slug/$fname"
+      if git -C "$REPO" ls-files --error-unmatch "$ops_rel" >/dev/null 2>&1; then
+        git -C "$REPO" rm --cached -q "$ops_rel"
+        ops_detracked=1
+      fi
+    done
+    # The escalations/ directory itself is moving in full, so untrack it whole — this also
+    # drops a tracked escalations/.gitkeep placeholder (kept only to hold the dir in git),
+    # which has no reason to survive once the directory it holds open is gone.
+    esc_rel="docs/tribe/planning/$slug/escalations"
+    if git -C "$REPO" ls-files --error-unmatch "$esc_rel" >/dev/null 2>&1; then
+      git -C "$REPO" rm -r --cached -q "$esc_rel"
+      ops_detracked=1
+    fi
+    if [[ "$ops_detracked" -eq 1 ]]; then
+      detracked_ops_campaigns+=("$slug")
+    fi
     rmdir "$esc_src" 2>/dev/null || true
     rmdir "$slugdir" 2>/dev/null || true
   fi
@@ -221,6 +246,11 @@ echo "migrate-campaign-home: reminder — old session logs were caller-chosen (-
 if [[ "${#detracked_campaigns[@]}" -gt 0 ]]; then
   echo "migrate-campaign-home: un-tracked from git: ${detracked_campaigns[*]}"
   echo "next: git -C '$REPO' commit -m 'chore(tribe): stop tracking campaign reports (moved to ~/.tribe)'"
+fi
+
+if [[ "${#detracked_ops_campaigns[@]}" -gt 0 ]]; then
+  echo "migrate-campaign-home: un-tracked from git: ${detracked_ops_campaigns[*]} (operational files — SPEC.md/plan-*.md remain tracked)"
+  echo "next: git -C '$REPO' commit -m 'chore(tribe): stop tracking campaign operational files (moved to ~/.tribe)'"
 fi
 
 exit "$failed"

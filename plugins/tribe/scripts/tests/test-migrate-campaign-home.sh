@@ -182,4 +182,47 @@ check "(l) dry-run ops exit 0" "$rc_l" "0"
 echo "$out_l" | grep -qi 'would move' && ok "(l) dry-run prints would-move line" \
   || bad "(l) dry-run prints would-move line (got: $out_l)"
 
+# --- tracked operational files: the index must follow ONLY the files that moved -------
+# campaign-state.json, answers.md, campaign-report.{json,md} and escalations/*.md were
+# committed in the fixture below alongside SPEC.md and plan-01.md (contracts, which stay in
+# the repo AND stay tracked — untracking them would be an AG-2 design-rationale loss).
+seed_ops_tracked(){
+  local slug="$1"
+  seed_ops "$slug"
+  printf '# Spec\n' > "$repo/docs/tribe/planning/$slug/SPEC.md"
+  printf '# Plan 01\n' > "$repo/docs/tribe/planning/$slug/plan-01.md"
+  git_c "$repo" add "docs/tribe/planning/$slug"
+  git_c "$repo" commit -qm "add $slug operational + contract files"
+}
+
+# (m) real run un-tracks only the 5 moved operational paths; SPEC.md/plan-01.md stay tracked
+seed_ops_tracked gitdemo
+out_m="$(bash "$SCRIPT" "$repo" --campaign gitdemo 2>&1)"; rc_m="$?"
+check "(m) tracked-ops run exit 0" "$rc_m" "0"
+for f in campaign-state.json answers.md campaign-report.json campaign-report.md escalations/C1.md; do
+  tracked "docs/tribe/planning/gitdemo/$f" && bad "(m) $f no longer tracked" \
+    || ok "(m) $f no longer tracked"
+done
+tracked docs/tribe/planning/gitdemo/SPEC.md && ok "(m) SPEC.md stays tracked" \
+  || bad "(m) SPEC.md stays tracked"
+tracked docs/tribe/planning/gitdemo/plan-01.md && ok "(m) plan-01.md stays tracked" \
+  || bad "(m) plan-01.md stays tracked"
+
+# (n) --dry-run leaves the index completely unchanged
+seed_ops_tracked gitdry
+before_n="$(git -C "$repo" ls-files docs/tribe/planning/gitdry | sort)"
+bash "$SCRIPT" "$repo" --campaign gitdry --dry-run >/dev/null 2>&1
+after_n="$(git -C "$repo" ls-files docs/tribe/planning/gitdry | sort)"
+check "(n) dry-run leaves ops index untouched" "$after_n" "$before_n"
+
+# (o) the follow-up commit hint is printed and names the operational files, not the reports
+seed_ops_tracked gitdemo2
+out_o="$(bash "$SCRIPT" "$repo" --campaign gitdemo2 2>&1)"
+echo "$out_o" | grep -q 'un-tracked from git' && ok "(o) reports what it un-tracked" \
+  || bad "(o) reports what it un-tracked (got: $out_o)"
+echo "$out_o" | grep -qi 'next:.*git.*commit' && ok "(o) prints the follow-up commit" \
+  || bad "(o) prints the follow-up commit (got: $out_o)"
+echo "$out_o" | grep -qi 'operational' && ok "(o) hint names operational files" \
+  || bad "(o) hint names operational files (got: $out_o)"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"; [[ "$FAIL" -eq 0 ]]
