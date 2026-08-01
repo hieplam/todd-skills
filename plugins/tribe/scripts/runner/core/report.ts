@@ -11,11 +11,13 @@
 // Design choice (Warchief ruling 1): `card.status` is read as authoritative for `shipped` /
 // `escalated` / `blocked` — this module NEVER recomputes the `dependsOn` fixpoint that
 // state.ts's `nextCard`/`reconcileBlockedStatuses` already own. The per-card outcome is
-// derived ENTIRELY from the final `CampaignState` (never from `loop.ts`'s `CardOutcome[]`),
-// which is also what makes "report written even when the state commit failed" true for free:
-// `loop.ts`'s `shipCard`/`escalateCard` both call `persistLocalState` BEFORE attempting the
-// GitHub commit, so the state this module reads already reflects the outcome regardless of
-// whether that commit later succeeds.
+// derived ENTIRELY from the final `CampaignState` (never from `loop.ts`'s `CardOutcome[]`) —
+// `cli/main.ts`'s `tryWriteReport` reloads that state fresh from disk before calling into this
+// module, rather than reusing `runLoop`'s own in-memory result, so this module's report stays
+// correct even when the run ends via an unhandled exception mid-pass: `loop.ts`'s
+// `shipCard`/`escalateCard` both call `persistLocalState` the moment a card concludes, so every
+// card that finished before the crash is already durable on disk regardless of what happens to
+// the rest of the pass afterward.
 import { join } from 'node:path';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import type { Card, CampaignState } from './types.ts';

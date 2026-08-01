@@ -25,6 +25,24 @@ live in two different places:
   machine bookkeeping, never committed, and lives entirely under `--home` (see "Run record"
   below). The runner makes no git commits of its own.
 
+## Campaign commit trailer
+
+Because operational state now lives entirely under `--home` and nothing is committed to the
+target repo (see above), git history itself is the only durable, in-repo trace of which commits
+belong to a campaign. Every executor brief (`core/brief.ts`, spec §6) instructs the spawned
+session to end every commit it makes with:
+
+    Campaign: <campaign-slug>
+
+Recovery is `git log --grep="Campaign: <campaign-slug>"` — no `~/.tribe`, no GitHub API, just git.
+
+**This is instructional, not enforced.** The runner tells the executor session to add the
+trailer; nothing mechanically checks that it did. `core/verify.ts`'s D3 five-point SHIPPED
+replay does not check for it, and neither does the `verify-shipped` skill — a card can ship
+(and this runner will happily record it as `shipped`) without the trailer present on any of its
+commits. Enforcing it would mean adding a sixth point to the D3 verify replay — the runner's
+highest-risk module — which is deliberate future work, not an oversight.
+
 ## Inputs
 
 All paths below that are relative are relative to `--repo` unless noted otherwise.
@@ -385,9 +403,12 @@ the report is the truth.**
   exception thrown after `runLoop` was entered (`run.ts`'s own `EXIT_ERROR = 4` — see Exit codes
   below; not one of `loop.ts`'s `EXIT_*` constants).
 - **Per-card `outcome`** is one of `shipped | escalated | blocked | not_reached`, read entirely
-  from the final `CampaignState` on disk (never from `loop.ts`'s own `CardOutcome[]`) — which is
-  what makes "report written even when the state commit failed" true for free: the local state
-  is persisted before the GitHub commit is even attempted.
+  from the final `CampaignState` on disk (never from `loop.ts`'s own `CardOutcome[]`) —
+  `main()` reloads state fresh from disk to build the report rather than reusing `runLoop`'s
+  in-memory result, so even if the run ends via an unhandled exception mid-pass, the report
+  still reflects every card that concluded before the crash: each card's outcome is written to
+  disk (`persistLocalState`) the moment that card ships or escalates, independent of whatever
+  happens to the rest of the pass afterward.
   - `shipped` carries `pr`/`mergeSha`.
   - `escalated` carries `escalationFile`, a best-effort one-line `question` digest parsed from
     that file, and `autoAnswerRounds` (defaults to `0` if absent).

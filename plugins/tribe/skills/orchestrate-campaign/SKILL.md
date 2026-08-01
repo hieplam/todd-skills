@@ -301,7 +301,15 @@ build the single message the owner reads:
    worktree path. This is the design's no-cascade read: the runner's own claim that a card
    shipped is not evidence on its own. Treat a `verify-shipped` failure as `blocked`, not
    `shipped`, in your final report.
-2. **Compose ONE report** to the owner, covering every card in the campaign:
+2. **You can also recover which commits belong to this campaign directly from git.** Every
+   commit a card's executor session made should carry a `Campaign: <campaign-slug>` git trailer
+   — the runner's executor brief instructs it (see the runner README's "Campaign commit
+   trailer" section). `git log --grep="Campaign: <campaign-slug>"` in `<target-repo>` lists
+   them. **This is instructional, not verified**: neither the D3 checks the runner replays nor
+   `verify-shipped` confirm the trailer is present, so a missing trailer is a documentation gap
+   worth noting, never proof a card didn't ship — `verify-shipped` (item 1) stays the actual
+   acceptance gate.
+3. **Compose ONE report** to the owner, covering every card in the campaign:
    - **Shipped** — PR number, merge sha, and the `verify-shipped` verdict.
    - **Escalated / blocked** — the question (or `blockedOn` dependency), why it needs the owner,
      and how many auto-answer rounds it already used.
