@@ -774,12 +774,12 @@ be factually wrong once Tasks 1-6 land.
 - Create: `.c3/adr/adr-20260801-campaign-state-home-migration.md` + change units (via the C3 CLI)
 - Modify: `.c3/c3-2-plugins/c3-215-tribe.md` (via `c3 change apply`, NOT by hand)
 
-- [ ] **Step 1: Open the ADR and change units through the C3 skill**
+- [x] **Step 1: Open the ADR and change units through the C3 skill**
 
 Use `/c3` (operation: change). Per the project's C3 rule, **never hand-write a registry line or a
 `.c3/documents/debt/` file.** The drifted rows are listed in spec §8 — carry them verbatim.
 
-- [ ] **Step 2: Apply and verify**
+- [x] **Step 2: Apply and verify**
 
 ```bash
 c3 change apply adr-20260801-campaign-state-home-migration
@@ -794,7 +794,7 @@ change-unit patch files repo-wide**. If `apply` blocks, hand-apply the patch tex
 and verify with `c3 check --only c3-215`. **Do not run `c3 repair`.** If you do hit it, check
 `git status` for mass deletions and revert with `git checkout --`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .c3/
