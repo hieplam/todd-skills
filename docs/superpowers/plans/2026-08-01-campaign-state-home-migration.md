@@ -194,7 +194,7 @@ the PendingCommitPort seam, and retryPendingCommit."
 Precedent: `core/brief.ts`'s `reportPathFor` already returns `<home>/reports/<cardId>.md`, and
 `core/brief.test.ts:155` asserts it. This module follows that shape.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // core/paths.test.ts
@@ -225,7 +225,7 @@ describe('campaign-home path helpers', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun test core/paths.test.ts
@@ -233,7 +233,7 @@ cd plugins/tribe/scripts/runner && bun test core/paths.test.ts
 
 Expected: FAIL — `Cannot find module './paths.ts'`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```ts
 // core/paths.ts
@@ -274,7 +274,7 @@ export function reportDirOf(homeDir: string): string {
 }
 ```
 
-- [ ] **Step 4: Run the tests and the layering guard**
+- [x] **Step 4: Run the tests and the layering guard**
 
 ```bash
 cd plugins/tribe/scripts/runner && bun test core/paths.test.ts && bun run check 2>&1 | tail -10
@@ -283,7 +283,7 @@ cd plugins/tribe/scripts/runner && bun test core/paths.test.ts && bun run check 
 Expected: PASS. `structure.test.ts` must stay green — `node:path` is not a world-touching module
 (it is already imported across `core/`), but confirm the sweep still passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add core/paths.ts core/paths.test.ts
