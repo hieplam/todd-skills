@@ -50,7 +50,7 @@ only thing that legitimately crosses every boundary in this tribe is a **file**.
 **The infrastructure cost.** Because every brief is bespoke prose, every stateless agent spawns
 with a **different prefix** — no shared prompt-cache prefix. Bun's run shows the size of what is
 being left on the table: 72B cached reads vs 5.9B uncached, ≈12:1 (handoff §2.1, and idea file
-`bun-rust-migrate-ideas.md:140-141`), attributable to every agent sharing one identical
+`docs/tribe/ideas/bun-rust-migrate-ideas.md:140-141`), attributable to every agent sharing one identical
 `PORTING.md` + `LIFETIMES.tsv` prefix.
 
 **Problem, in one line:** the tribe has no per-campaign artifact that turns a repeated **judgment
@@ -237,7 +237,7 @@ Skinner/Tracker dispatch, the content is ordered:
 Put a single per-task line *above* the codex and the shared prefix is destroyed for every agent in
 the campaign. The ordering is therefore stated as a **rule in the Warchief's brief contract**, not
 left to taste. This is the mechanism behind Bun's ≈12:1 cached:uncached ratio
-(`bun-rust-migrate-ideas.md:140-141`).
+(`docs/tribe/ideas/bun-rust-migrate-ideas.md:140-141`).
 
 ---
 
@@ -323,7 +323,7 @@ recurring failure pattern into an enforceable rule ("a >3-line comment justifyin
 Blocker"; "a new stub / `todo!` in the diff = Blocker"; "a weakened or skipped test = Blocker" —
 the last already a Hunter anti-goal at `hunter.md:103-104` but **not yet a rule the Tracker can
 check**), and it names *this* codex as one of the two possible sinks
-(`bun-rust-migrate-ideas.md:242-246`).
+(`docs/tribe/ideas/bun-rust-migrate-ideas.md:242-246`).
 
 This spec makes idea 10 a **drop-in, with no schema change required**, and that is a hard
 requirement of the design, not a coincidence:

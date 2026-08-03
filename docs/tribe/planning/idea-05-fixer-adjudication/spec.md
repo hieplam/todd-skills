@@ -3,7 +3,7 @@
 **Card:** `idea-05-fixer-adjudication`
 **Status:** planning-only. This spec + its plan are the deliverable; a *future* implementation
 campaign applies the prompt edits described here.
-**Source:** `bun-rust-migrate-ideas.md` §"Idea 5" (lines 110-129); handoff analysis
+**Source:** `docs/tribe/ideas/bun-rust-migrate-ideas.md` §"Idea 5" (lines 110-129); handoff analysis
 `bun-rust-migration-analysis-handoff.md` §4.3 (the reviewer's output is a *hypothesis* that walks a
 chain of arbiters) and §4.4 principle 3 ("don't make the reviewer right — make its wrongness cheap").
 
@@ -322,7 +322,7 @@ as *producer and consumer* of one field, and neither depends on the other:
   disjoint, so under the Warchief's own wave rules (`warchief.md:332-333, 376-380`) they must be
   sequenced, not parallelised. **Recommended order: 05 before 04** — 05 defines the fixer's contract that 04's
   routing table points at ("only one flags → the fixer is allowed to adjudicate (see Idea 5)",
-  `bun-rust-migrate-ideas.md:102-103`), so 04 lands against a fixer role that already exists rather
+  `docs/tribe/ideas/bun-rust-migrate-ideas.md:102-103`), so 04 lands against a fixer role that already exists rather
   than a forward reference to a role that does not.
 
 **Idea 01 (2 independent Skinners) — compatible, and it makes this card *more* valuable.** Idea 01
@@ -346,7 +346,7 @@ this card still behaves as if it had.
 
 **Idea 03 (input asymmetry — a "cold lens" Skinner B with no contract) — synergistic, and it needs
 this card.** Idea 03 itself says reviewer B's findings "are **hypotheses** feeding the Warchief's
-adjudication, not a verdict" (`bun-rust-migrate-ideas.md:82`) — but idea 03 defines no adjudication
+adjudication, not a verdict" (`docs/tribe/ideas/bun-rust-migrate-ideas.md:82`) — but idea 03 defines no adjudication
 machinery, because *this* card is it. A contract-blind reviewer will naturally produce more false
 positives (it cannot tell an intentional design decision from a defect), so the reproduce-first
 discipline is the thing that makes a cold lens affordable at all. Ship 05 first.
