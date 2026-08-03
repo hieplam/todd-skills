@@ -35,7 +35,7 @@ failure modes:
 3. **No mechanical done-check.** "Is the sweep finished?" is answered by an LLM re-reading its own
    checklist, rather than by re-running the proof command and observing zero failures.
 
-This is the one place Bun's rewrite is a direct, boring lesson (`bun-rust-migrate-ideas.md:158-176`;
+This is the one place Bun's rewrite is a direct, boring lesson (`docs/tribe/ideas/bun-rust-migrate-ideas.md:158-176`;
 handoff `§1.4` layer 3): the queue of ~16,000 `cargo check` errors and the per-failure stacktrace
 files were **machine output**. The agents only *consumed* the queue. Determinism where no judgment
 is needed; judgment reserved for where it is.
@@ -313,7 +313,7 @@ proof command cannot rebuild).
 **Idea 01 — the 4-role cell (1 Hunter + 2 Skinners + 1 Fixer). This is the natural consumer of the
 queue, and the schema is built for it:**
 - **One queue row = one work item = one cell.** That is precisely Bun's shape (each failing test's
-  stacktrace saved to a file → one cell per failure, `bun-rust-migrate-ideas.md:160-163`). Idea 01
+  stacktrace saved to a file → one cell per failure, `docs/tribe/ideas/bun-rust-migrate-ideas.md:160-163`). Idea 01
   supplies the cell; idea 07 supplies the item stream the cells consume. Neither depends on the
   other to ship — they compose, and either can land first.
 - The row's stable `id` gives the cell a **durable identity** (usable in a commit trailer, a brief

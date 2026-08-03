@@ -1,6 +1,6 @@
 # Planning campaign: Bun-rewrite ideas → tribe specs + plans
 
-10 idea cards from `bun-rust-migrate-ideas.md` (root), each turned into a spec + a
+10 idea cards from `docs/tribe/ideas/bun-rust-migrate-ideas.md`, each turned into a spec + a
 validate-plan.sh-passing plan by a dedicated Warchief in its own worktree (planning-only:
 nothing under `plugins/` changed). Every spec carries an "Interactions with other ideas"
 section; the constraints below are the union of those sections, verified pairwise-consistent.

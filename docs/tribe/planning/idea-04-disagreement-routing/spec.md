@@ -3,7 +3,7 @@
 **Card:** `idea-04-disagreement-routing`
 **Status:** planning-only. This spec + its plan are the deliverable; a *future* implementation
 campaign applies the prompt edits described here.
-**Source:** `bun-rust-migrate-ideas.md` §"Idea 4" (lines 86-106); handoff analysis
+**Source:** `docs/tribe/ideas/bun-rust-migrate-ideas.md` §"Idea 4" (lines 86-106); handoff analysis
 `bun-rust-migration-analysis-handoff.md` §4.3 ("Khi 2 reviewer mâu thuẫn" — disagreement as a routing
 signal; "agreement between independent samples = a cheap confidence measure").
 
@@ -78,7 +78,7 @@ in idea 05 computes classes. This card supplies the missing function.
 
 The Warchief is a language model handed two reports and no law. It will merge them *some* way every
 time — and a different way each time, since nothing constrains it. That is the ideas file's own
-diagnosis (`bun-rust-migrate-ideas.md:95-98`): *"If Ideas 1+3 land without a law for merging
+diagnosis (`docs/tribe/ideas/bun-rust-migrate-ideas.md:95-98`): *"If Ideas 1+3 land without a law for merging
 findings, the Warchief will improvise a different merge every time."* Non-determinism at the tribe's
 most authoritative gate is exactly the class of defect the tribe pushes into scripts and tables
 everywhere else.
@@ -374,7 +374,7 @@ this is a prompt-and-shell repo with no UI.
    Warchief fixture **d** (the head-on conflict) **twice, in two fresh contexts**. Capture both
    transcripts. The expected result — and the whole reason this card exists — is **two different
    merges from identical input**: no table exists, so the Warchief improvises, exactly as
-   `bun-rust-migrate-ideas.md:95-98` predicts. Two divergent transcripts side by side is stronger
+   `docs/tribe/ideas/bun-rust-migrate-ideas.md:95-98` predicts. Two divergent transcripts side by side is stronger
    evidence than any argument in this spec.
 2. **AFTER.** The same fixture on the branch, twice: **identical routing both times**, with the
    ledger rows to prove it.
@@ -504,7 +504,7 @@ routing table survives **unchanged**, and here is why, class by class:
 
 **One open seam this card explicitly does NOT resolve:** idea 03 proposes that only reviewer A (the
 contract lens) holds the authoritative PASS/FAIL, with B's findings as pure hypotheses
-(`bun-rust-migrate-ideas.md:82`), whereas idea 01's Law 4 requires **both** Skinners to PASS. That is
+(`docs/tribe/ideas/bun-rust-migrate-ideas.md:82`), whereas idea 01's Law 4 requires **both** Skinners to PASS. That is
 a genuine 01-versus-03 question about **verdict** policy. **This card is verdict-agnostic** — it
 routes *findings*, and every rung of the ladder operates on findings alone — so it composes with
 whichever policy wins. Flagged here for the Shaman because it is a real seam between two sister

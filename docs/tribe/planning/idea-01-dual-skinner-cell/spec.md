@@ -217,7 +217,7 @@ the next dispatch with no cleanup.
 ## Interactions with other ideas
 
 This card is the **baseline of the adversarial-review cluster** (ideas 01–05 in
-`bun-rust-migrate-ideas.md`). Four of the other nine ideas layer directly on it; the rest are
+`docs/tribe/ideas/bun-rust-migrate-ideas.md`). Four of the other nine ideas layer directly on it; the rest are
 independent but touch adjacent text.
 
 | Idea | Relationship | Conflict / overlap and how it is handled |
@@ -261,5 +261,5 @@ rules forbid two sub-plans with overlapping `owns_files` in one concurrent wave
 
 This order is the settled cross-campaign decision, reconciled against the sibling specs for ideas
 03, 04 and 05, which state it identically. Where it conflicts with the brainstormed "suggested build
-order" in `bun-rust-migrate-ideas.md:275-277` (`2 → 1 → 5 → 4`), **this order governs** — that line
+order" in `docs/tribe/ideas/bun-rust-migrate-ideas.md:275-277` (`2 → 1 → 5 → 4`), **this order governs** — that line
 is a first-pass suggestion, not a ruling.

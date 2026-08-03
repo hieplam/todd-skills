@@ -3,7 +3,7 @@
 **Card:** `idea-02-context-isolation`
 **Branch:** `planning/idea-02-context-isolation`
 **Status:** spec for a FUTURE implementation campaign (this campaign produces spec + plan only)
-**Source:** `bun-rust-migrate-ideas.md:39-58` ("Idea 2"), handoff `§2.2`, `§4.1`
+**Source:** `docs/tribe/ideas/bun-rust-migrate-ideas.md:39-58` ("Idea 2"), handoff `§2.2`, `§4.1`
 
 ---
 
@@ -32,7 +32,7 @@ hole (nothing stops the receiver).** A rule that patches only one side leaves th
 
 ### 1.2 Why this matters — the rationale, from the source
 
-From `bun-rust-migrate-ideas.md:41-46`, quoted verbatim:
+From `docs/tribe/ideas/bun-rust-migrate-ideas.md:41-46`, quoted verbatim:
 
 > **What Bun did:** the reviewer sees only the diff — **never the implementer's reasoning** — because
 > *"the Claude that wrote the code wants the code to get accepted"*: reading the implementer's
@@ -59,7 +59,7 @@ This is the exact bias channel that is the entire reason adversarial review exis
 tribe pays for a second model, a second context window, and a fix-loop — and today a single pasted
 paragraph can silently refund all of it. **Sealing this channel is the precondition for every other
 audit-quality idea in the backlog** (which is why the ideas file's build order opens with it:
-`bun-rust-migrate-ideas.md:277-279`, "**2 → 1 → 5 → 4**").
+`docs/tribe/ideas/bun-rust-migrate-ideas.md:277-279`, "**2 → 1 → 5 → 4**").
 
 ### 1.3 The failure is silent
 
@@ -294,7 +294,7 @@ additive and disappears with the revert. Blast radius is one commit.
 ## 7. Interactions with other ideas
 
 This card is the **foundation of the adversarial-review cluster** — the ideas file's own build order
-opens with it (`bun-rust-migrate-ideas.md:277-279`: "**2 → 1 → 5 → 4**"), because the other cluster
+opens with it (`docs/tribe/ideas/bun-rust-migrate-ideas.md:277-279`: "**2 → 1 → 5 → 4**"), because the other cluster
 cards *assume* a clean reviewer context and would silently inherit the leak if it shipped without them.
 
 | Idea | Interaction | Conflict? |

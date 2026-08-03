@@ -342,7 +342,7 @@ existing.
 - **Idea 06 (campaign codex, `docs/tribe/CODEX.md`) — the alternate rule destination.** Idea 10
   needs a *rule sink that Tracker reads fresh*. Two exist: the repo's `.claude/rules/` (live today,
   `tracker.md:34`) and idea 06's codex (proposed, and idea 06 explicitly plans to add its path to
-  Tracker's rule-source list — `bun-rust-migrate-ideas.md` idea 6: *"The Tracker gains one more rule
+  Tracker's rule-source list — `docs/tribe/ideas/bun-rust-migrate-ideas.md` idea 6: *"The Tracker gains one more rule
   source to read fresh… just add the path"*). **Idea 10 targets `.claude/rules/tripwires/` and does
   not depend on idea 06 shipping.** The relationship is defined, not left to chance:
   - **If idea 06 ships first or later**, the codex becomes the natural home for *cross-cutting,
@@ -355,7 +355,7 @@ existing.
     active tripwire ids (a one-line "active tripwires: see `.claude/rules/tripwires/`") so a Hunter
     reading the codex as its lookup table finds them. That is a one-line addition to idea 06's
     template and requires nothing from idea 10.
-  - **Build-order note:** they are independent. `bun-rust-migrate-ideas.md:275-277` suggests
+  - **Build-order note:** they are independent. `docs/tribe/ideas/bun-rust-migrate-ideas.md:275-277` suggests
     "10 → 6" (the rule/artifact cluster); either order works, since neither's files overlap
     (`.claude/rules/tripwires/` vs `docs/tribe/CODEX.md`).
 - **Idea 1 (2 parallel Skinners) and Idea 4 (disagreement routing).** These *multiply* idea 10's
