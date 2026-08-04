@@ -1,1 +1,4 @@
 node_modules/
+
+# Local debugging sandbox (--home fixture + whatever a non-dry-run scribbles into it).
+.debug/
