@@ -1,0 +1,104 @@
+{
+  // Debug configs for the tribe campaign runner (plugins/tribe/scripts/runner).
+  // Requires the Bun debug adapter: code --install-extension oven.bun-vscode
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // SAFEST starting point: --dry-run derives the next card and prints the plan with
+      // ZERO side effects (no lock, no writes, no Claude session, no report file).
+      // See core/loop/run-loop.ts:runDryRun.
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: --dry-run (sandbox home)",
+      "program": "${workspaceFolder}/plugins/tribe/scripts/runner/run.ts",
+      "cwd": "${workspaceFolder}/plugins/tribe/scripts/runner",
+      "args": [
+        "--repo", "${workspaceFolder}",
+        "--model", "sonnet",
+        "--home", "${workspaceFolder}/plugins/tribe/scripts/runner/.debug/home",
+        "--dry-run"
+      ],
+      "stopOnEntry": false,
+      "internalConsoleOptions": "openOnSessionStart"
+    },
+    {
+      // Same, but breaks on the first line of run.ts so you can step the whole
+      // parseArgs -> buildRealIo -> runLoop composition root by hand.
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: --dry-run (stop on entry)",
+      "program": "${workspaceFolder}/plugins/tribe/scripts/runner/run.ts",
+      "cwd": "${workspaceFolder}/plugins/tribe/scripts/runner",
+      "args": [
+        "--repo", "${workspaceFolder}",
+        "--model", "sonnet",
+        "--home", "${workspaceFolder}/plugins/tribe/scripts/runner/.debug/home",
+        "--dry-run"
+      ],
+      "stopOnEntry": true
+    },
+    {
+      // Prompts for the flags each launch — use once you want a real --repo/--home.
+      // WARNING: without --dry-run this takes the lock, writes run.json/state, and
+      // SPAWNS a real Claude Agent SDK session that makes commits and PRs.
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: custom args (prompts)",
+      "program": "${workspaceFolder}/plugins/tribe/scripts/runner/run.ts",
+      "cwd": "${workspaceFolder}/plugins/tribe/scripts/runner",
+      "args": [
+        "--repo", "${input:repoRoot}",
+        "--model", "${input:model}",
+        "--home", "${input:homeDir}",
+        "--dry-run"
+      ]
+    },
+    {
+      // Debug the test file currently open in the editor (bun test <file>).
+      // Breakpoints work in both the test and the module under test.
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: debug current test file",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/plugins/tribe/scripts/runner",
+      "runtimeArgs": ["test"]
+    },
+    {
+      // Debug the whole runner suite.
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: debug all tests",
+      "program": "${workspaceFolder}/plugins/tribe/scripts/runner",
+      "cwd": "${workspaceFolder}/plugins/tribe/scripts/runner",
+      "runtimeArgs": ["test"]
+    },
+    {
+      // For a process you started yourself with:
+      //   bun --inspect-wait=ws://localhost:6499/debug run.ts ...
+      "type": "bun",
+      "request": "attach",
+      "name": "Runner: attach to running bun",
+      "url": "ws://localhost:6499/debug"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "repoRoot",
+      "type": "promptString",
+      "description": "--repo: target repo root",
+      "default": "${workspaceFolder}"
+    },
+    {
+      "id": "model",
+      "type": "promptString",
+      "description": "--model: executor model tier",
+      "default": "sonnet"
+    },
+    {
+      "id": "homeDir",
+      "type": "promptString",
+      "description": "--home: campaign operational home (must contain campaign-state.json)",
+      "default": "${workspaceFolder}/plugins/tribe/scripts/runner/.debug/home"
+    }
+  ]
+}

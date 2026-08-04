@@ -523,6 +523,63 @@ root `run.ts` shim recursively), run via `bun run check` (`tsc --noEmit` + `bun 
 ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amendment A3,
 [typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
 
+## Debugging
+
+The runtime is Bun, so a Node debugger cannot attach (Bun speaks the WebKit inspector
+protocol, not the Chrome DevTools protocol). Two supported paths, both committed:
+
+**VS Code.** Install the debug adapter once — `code --install-extension oven.bun-vscode` —
+then **reload the window**: a newly installed extension's `bun` debug type is not registered
+in an already-running extension host, and an unregistered debug type fails as a toast that
+auto-dismisses, which reads as "nothing happened". Launch configs live in two places because
+VS Code only reads `launch.json` from the workspace root, and this directory is routinely
+opened as a root of its own:
+
+| File | Applies when the workspace root is |
+| --- | --- |
+| `<repo>/.vscode/launch.json` | the repo root |
+| `plugins/tribe/scripts/runner/.vscode/launch.json` | this directory |
+
+Both define the same configurations: `--dry-run` against the committed sandbox (with and
+without `stopOnEntry`), `bun test` on the current file, `bun test` on the whole suite, and an
+attach config for `ws://127.0.0.1:6499/debug`.
+
+**No VS Code** — Bun's own inspector:
+
+```bash
+bun --inspect-brk run.ts --repo "$(git rev-parse --show-toplevel)" \
+    --model sonnet --home "$PWD/.debug/home" --dry-run
+```
+
+It prints a `https://debug.bun.sh/#127.0.0.1:6499/debug` URL — a full DevTools-style debugger
+in the browser.
+
+### The `.debug/` sandbox
+
+`.debug/home/` is a committed, throwaway `--home` so both paths above run offline with zero
+side effects. Its `campaign-state.json` stages two cards deliberately: **C1** has a spec and
+plan that exist and `branch: null`, so `deriveCardPhase` (`core/loop/phase.ts`) returns
+`fresh` at its `if (!card.branch)` short-circuit **without issuing a single `gh`/`git` call**;
+**C2** has `spec`/`plan` null and `dependsOn: ["C1"]`, which is the `planning_needed` /
+`blocked` path. `answers.md` is present only because `resolveRunContext`
+(`core/loop/run-loop.ts`) reads it unconditionally. Everything the runner writes into that
+home during a non-dry-run is gitignored (see `.gitignore`).
+
+Expected output of the sandbox dry-run:
+
+```json
+{ "cardId": "C1", "phase": { "kind": "fresh" } }
+```
+
+**Dropping `--dry-run` against a real `--repo` is a real run**: it acquires the
+single-instance lock, writes `run.json`/state/reports under `--home`, and spawns a real Agent
+SDK session that commits and opens PRs (`adapters/session.adapter.ts`).
+
+Useful first breakpoints: `cli/main.ts`'s `parseArgs` call (the parsed config), its `runLoop`
+call (composition root → core), `core/loop/run-loop.ts`'s `filteredNextCard` (which card got
+selected), `core/loop/phase.ts`'s `deriveCardPhase` (the D4 resume matrix), and
+`core/loop/run-loop.ts`'s `actOnCard` (where a session is actually spawned).
+
 ## Known limitations
 
 - **Run-record (`run.json`) write/finalize failures are silent by design.** Both the initial
