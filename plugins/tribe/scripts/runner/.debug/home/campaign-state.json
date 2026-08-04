@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "campaign": "debug-sandbox",
+  "mergePolicy": "normal merge, never squash",
+  "sequence": ["C1", "C2"],
+  "schemaLockPaths": [],
+  "docsOnlyPaths": ["docs/", "README.md"],
+  "ownerOnlyEscalations": ["data_shape", "product_promise", "new_permission", "privacy"],
+  "cards": {
+    "C1": {
+      "status": "staged",
+      "spec": "plugins/tribe/README.md",
+      "plan": "plugins/tribe/scripts/runner/README.md",
+      "branch": null,
+      "baseSha": null,
+      "pr": null,
+      "mergeSha": null,
+      "sessionId": null,
+      "updatedAt": null
+    },
+    "C2": {
+      "status": "staged",
+      "spec": null,
+      "plan": null,
+      "branch": null,
+      "baseSha": null,
+      "pr": null,
+      "mergeSha": null,
+      "sessionId": null,
+      "updatedAt": null,
+      "dependsOn": ["C1"]
+    }
+  }
+}

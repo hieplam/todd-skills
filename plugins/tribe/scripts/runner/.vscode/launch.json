@@ -1,0 +1,63 @@
+{
+  // Same configs as the repo-root .vscode/launch.json, but written for the case where
+  // VS Code's workspace folder is THIS directory (plugins/tribe/scripts/runner) rather
+  // than the repo root. VS Code only reads .vscode/launch.json from the workspace root,
+  // so whichever folder you opened, one of the two files applies.
+  // Requires: code --install-extension oven.bun-vscode
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: --dry-run (sandbox home)",
+      "program": "${workspaceFolder}/run.ts",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--repo", "${workspaceFolder}/../../../..",
+        "--model", "sonnet",
+        "--home", "${workspaceFolder}/.debug/home",
+        "--dry-run"
+      ],
+      "stopOnEntry": false,
+      "internalConsoleOptions": "openOnSessionStart"
+    },
+    {
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: --dry-run (stop on entry)",
+      "program": "${workspaceFolder}/run.ts",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--repo", "${workspaceFolder}/../../../..",
+        "--model", "sonnet",
+        "--home", "${workspaceFolder}/.debug/home",
+        "--dry-run"
+      ],
+      "stopOnEntry": true
+    },
+    {
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: debug current test file",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": ["test"]
+    },
+    {
+      "type": "bun",
+      "request": "launch",
+      "name": "Runner: debug all tests",
+      "program": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": ["test"]
+    },
+    {
+      // For a process you started yourself with:
+      //   bun --inspect-wait=ws://127.0.0.1:6499/debug run.ts ...
+      "type": "bun",
+      "request": "attach",
+      "name": "Runner: attach to running bun",
+      "url": "ws://127.0.0.1:6499/debug"
+    }
+  ]
+}

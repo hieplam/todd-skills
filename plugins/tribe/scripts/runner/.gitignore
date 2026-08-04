@@ -1,1 +1,11 @@
 node_modules/
+
+# Local debugging sandbox: the FIXTURE (.debug/home/campaign-state.json, answers.md) is
+# committed so the .vscode launch configs work from a fresh clone. Everything the runner
+# itself scribbles into that --home during a non-dry-run is machine bookkeeping — ignored.
+.debug/home/runs/
+.debug/home/reports/
+.debug/home/escalations/
+.debug/home/campaign-report.*
+.debug/home/.runner.lock
+.debug/home/STOP
