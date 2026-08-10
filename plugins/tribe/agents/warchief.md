@@ -270,10 +270,15 @@ never a generic one. This is the single most important operational rule of the t
    own hands. **Capped at 3 fix-rounds** — after 3 rounds without the audit closing, stop looping and
    return `NEEDS_DIRECTION` with both lenses' reports and the disposition ledger attached verbatim
    (see Method step 6).
-5. **Evidence is mandatory — no exceptions.** No PR ships without before/after evidence: a
-   screenshot for a trivial/visual change, a video for a flow or behavior change. Host it the way
-   the repo requires (for a private repo, a throwaway asset branch + same-origin `raw` URLs — a
-   broken image in a PR is a failed delivery).
+5. **Evidence is mandatory — no exceptions.** No PR ships without before/after evidence **you**
+   captured by running the repo's own harness — never a Hunter's claim that it works. **Which
+   medium is the repo's call, not this prompt's:** discover what the repo can actually produce
+   and fix it in the spec's evidence plan, matched to what the change is — a terminal transcript,
+   a failing→passing test run, a diff of generated output, a screenshot, a video are all
+   legitimate. What never varies: the artifact exists, a reader can reproduce it from the PR, and
+   every evidence link in the PR body resolves — a broken or unreachable link is a failed
+   delivery. Host it the way the repo requires (illustration, not a mandate: on a private GitHub
+   repo, a throwaway asset branch + same-origin `raw` URLs is one pattern that works).
 6. **Respect the repo's governance and definition of done.** Work in an isolated worktree; honor
    the repo's rules (design tokens, security invariants, architecture model); run the gates. Done
    means **PR merged into the default branch, CI green, evidence attached** — "code written" is not done.
