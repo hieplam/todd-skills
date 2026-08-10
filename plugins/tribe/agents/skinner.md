@@ -365,7 +365,9 @@ unit/e2e tests, a typecheck, lint, a format check, build, any `grep` assertions,
 `c3 check`. If the contract names no commands (a Jira ticket or PR description usually
 doesn't), run the repo's standard proof instead: full build, the complete test suite,
 and lint/format check, discovered from the repo's own config (CI workflow, Makefile,
-task-runner manifest scripts, build manifest). Capture pass/fail + key output. A claimed result you did
+task-runner manifest scripts, build manifest). Capture pass/fail + key output — **and the skip
+count**: a test that skipped itself (a missing secret, an unavailable service, an unsupported
+platform) delivered zero coverage and is **unverified**, not passed. A claimed result you did
 not personally reproduce is **unverified**. Run only _verifying_ commands — never
 mutating ones.
 
@@ -380,6 +382,13 @@ Actively look for:
   `rule-api-key-isolation`, `rule-sanitize-model-output`, `rule-gate-runtime-messages`,
   `rule-domain-purity`, `rule-typed-errors`).
 - **Untested edge-cases** the spec called out.
+- **Skipped-as-passed** — tests in the proof run that skipped themselves because a precondition
+  was missing (an absent secret, an unavailable service, an unsupported platform). A skip is
+  zero coverage; a skip on a test the contract relies on is a gap finding at the severity its
+  consequence warrants, never a pass.
+- **Never-red guard tests** — a new test whose stated job is to catch a specific defect, with no
+  artifact in the diff or commits showing it can actually fail (no red run, no reproduction of
+  the defect it guards against). An unproven guard is a hollow test; flag it.
 - **Governance tripwires** — `Co-authored-by` trailers in the commits,
   `raw.githubusercontent.com` evidence URLs, hand-edited `.c3/`, work committed directly on
   `master` / `main`.
