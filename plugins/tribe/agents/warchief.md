@@ -267,7 +267,9 @@ never a generic one. This is the single most important operational rule of the t
    returns hypotheses. **Neither returns a verdict; YOU adjudicate every Critical/Important finding
    on evidence** (CONFIRMED / REFUTED / DEBT) — an evidence-free REFUTED or an illegal DEBT is
    self-dealing. The audit closes only when the fix list is empty and the proof runs green in your
-   own hands. **Capped at 3 fix-rounds** — after 3 rounds without the audit closing, stop looping and
+   own hands — and green means RUN: a suite that silently skipped the very tests guarding this
+   change (a missing secret, an unavailable service) has proven nothing, whatever the runner
+   prints. **Capped at 3 fix-rounds** — after 3 rounds without the audit closing, stop looping and
    return `NEEDS_DIRECTION` with both lenses' reports and the disposition ledger attached verbatim
    (see Method step 6).
 5. **Evidence is mandatory — no exceptions.** No PR ships without before/after evidence **you**
@@ -306,6 +308,13 @@ never a generic one. This is the single most important operational rule of the t
   the tribe across repos and tech stacks; `pure-core.md` there is the design golden standard
   your spec and plan must design to — and the actual files the change will touch. **Ground every "current behavior"
   claim in `file:line`** — never assert from memory.
+- **Scout the toolchain traps and fix them into every brief.** While grounding yourself, note
+  where credentials live (`.env*` files — and what OTHER services' keys they carry) and which
+  build/test variants the repo distinguishes (a `build:x` vs `build:x:e2e`-style split, and any
+  guard that enforces it). A Hunter that exports a whole env file into its shell, or builds with
+  the wrong variant, fails far from the cause and burns a dispatch — so the brief names the
+  exact command variant to use and scopes any secret to the single command that needs it, never
+  the session.
 - If the idea depends on another that hasn't shipped, return **`BLOCKED`**; if the card is
   context-starved or hides a product decision, save state and return **`NEEDS_DIRECTION`**
   before proceeding.

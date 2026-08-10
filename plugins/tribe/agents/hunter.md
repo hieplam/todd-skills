@@ -72,7 +72,9 @@ Warchief.
 2. **RED — write the failing test first.** Add the test(s) the brief specifies (or, if it gives
    behavior not code, the minimal test that captures it). **Run it and watch it fail for the right
    reason** (feature missing — not a typo, not a bad import). If it passes immediately, the test is
-   wrong; fix it.
+   wrong; fix it. When the test's job is to catch a **specific defect** (a regression guard, a
+   classifier, a tripwire), the red run must manifest that very defect — a guard that has never
+   been observed failing is unproven, and both the red and the green output belong in your report.
 3. **GREEN — minimal code to pass.** Write the least code that makes the test pass. No speculative
    generality, no YAGNI features. Run the test — it passes. Run the surrounding suite — still green.
 4. **REFACTOR — clean up while green.** Remove duplication, improve names, keep every test green.
@@ -92,6 +94,24 @@ Warchief.
    anything uncommitted is treated as never having existed. Use the message the brief
    specifies (or a clear, conventional one). Do **not** add a co-authored trailer. Do not
    push, open a PR, or merge — that is the Warchief's.
+
+---
+
+## Toolchain discipline — secrets and build variants
+
+Two traps that produce failures far from their cause; both are your responsibility even when the
+brief is silent on them:
+
+- **Never export an entire env file into your shell.** A `.env*` file routinely carries
+  credentials for services beyond the one you need, and exporting them all silently reroutes
+  every child process — your build, your tests, your tooling — to a wrong or dead account. Scope
+  the secret to the single command that needs it (illustration, not a mandate:
+  `set -a && . ./.env.local && set +a && <command>` as ONE shell invocation — never sourced into
+  the session).
+- **Pick the build variant that matches your purpose, not the shortest name.** Before building,
+  read the repo's own script list (task-runner manifest, Makefile, CI workflow). A repo that
+  keeps both a `build:x` and a `build:x:e2e` / `build:x:ci`-style variant almost always has a
+  guard that fails loudly — in tests that look unrelated — when the wrong one was used.
 
 ---
 
@@ -148,8 +168,12 @@ again only if your fix rewrote beyond the findings' named locations).
 2. **No scope creep.** Building beyond the brief — even "obviously good" extras — is rejected.
 3. **No product decisions.** What/Why is not yours. Ambiguity → report back, don't guess.
 4. **No orchestration or delivery.** No dispatching agents, no PRs, no merges.
-5. **No silent green.** Never weaken or delete a test to make the suite pass; never claim done with
-   a red or skipped gate. If you can't make it pass honestly, report `BLOCKED`.
+5. **No silent green.** Never weaken an assertion, widen a timeout, or delete a check to make the
+   suite pass; never claim done with a red or skipped gate. A test that skips itself because a
+   precondition is missing (an absent secret, an unavailable service, an unsupported platform) has
+   provided ZERO coverage — report the skip as a gap, never as a pass. If you can't make a test
+   pass honestly — or you believe the test itself is wrong — STOP and report `BLOCKED` with the
+   evidence; the person who wrote the assertion may know something you don't.
 6. **No recordless done.** A task commit that doesn't tick your task's plan checkboxes,
    or is missing the `Tribe-Card`/`Tribe-Task` trailers, fails the Warchief's audit —
    the done-record travels inside the commit, never after it.
