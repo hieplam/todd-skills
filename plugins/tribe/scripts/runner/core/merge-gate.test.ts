@@ -117,6 +117,34 @@ describe('parseMergeCommand', () => {
     expect(parsed.isMerge).toBe(true);
     expect(parsed.prRef).toBe('188');
   });
+
+  // P2 audit fix round 2 (findings 1 & 2): the subcommand-anchored redesign scoped detection
+  // to only the FIRST matching subcommand and required a subcommand's OWN first three tokens
+  // to be exactly gh/pr/merge — both regressions vs. the pre-round flat scan. These reproduce
+  // the auditor's live-repro evidence exactly.
+  test('a SECOND "gh pr merge" invocation chained after a clean first one is still gated for a forbidden flag', () => {
+    const parsed = parseMergeCommand('gh pr merge 1 --merge && gh pr merge 2 --admin');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.forbiddenFlag).toBe('--admin');
+  });
+
+  test('a real-world prefix in front of the invocation (env assignment) still matches and is gated', () => {
+    const parsed = parseMergeCommand('GH_TOKEN=x gh pr merge --admin');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.forbiddenFlag).toBe('--admin');
+  });
+
+  test('a real-world prefix in front of the invocation (sudo) still matches and is gated', () => {
+    const parsed = parseMergeCommand('sudo gh pr merge --admin');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.forbiddenFlag).toBe('--admin');
+  });
+
+  test('a real-world prefix in front of the invocation (exec) still matches and is gated', () => {
+    const parsed = parseMergeCommand('exec gh pr merge --admin');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.forbiddenFlag).toBe('--admin');
+  });
 });
 
 describe('judgeChecks', () => {

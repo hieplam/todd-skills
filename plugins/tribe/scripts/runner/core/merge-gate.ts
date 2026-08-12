@@ -125,25 +125,21 @@ function tokenizeShellCommand(command: string): string[][] {
   return subcommands;
 }
 
-/** PURE: is this Bash command a `gh pr merge` attempt, and if so what ref/forbidden flag
- * does it carry? Anchored at a real command boundary: a subcommand (split on `&&`/`||`/`;`/
- * `|`/newline, quote-aware) whose first three tokens are exactly `gh`, `pr`, `merge` — so a
- * prefix like `cd repo && gh pr merge ...` still matches (its own subcommand starts with
- * those three tokens), but a command that only MENTIONS the phrase inside a quoted argument
- * (`git commit -m "...gh pr merge..."`) does not, because the quoted span is one token. */
-export function parseMergeCommand(command: string): ParsedMergeCommand {
-  const subcommands = tokenizeShellCommand(command);
-  const mergeTokens = subcommands.find((tokens) => tokens[0] === 'gh' && tokens[1] === 'pr' && tokens[2] === 'merge');
-
-  if (!mergeTokens) {
-    return { isMerge: false, prRef: undefined, forbiddenFlag: undefined };
-  }
+/** Scans one subcommand's own token list for a contiguous `gh`, `pr`, `merge` sequence
+ * ANYWHERE within it (not just at index 0) — so a prefix ahead of the invocation (a
+ * directory change, an env-var assignment, `sudo`, `exec`, `time`, ...) still matches, same
+ * as the spec's literal "Bash command CONTAINING `gh pr merge`" wording. Returns `null` when
+ * this subcommand's tokens contain no such sequence (e.g. the phrase only appears inside a
+ * single quoted token, which can never equal three separate consecutive tokens). */
+function extractMergeInvocation(tokens: string[]): { prRef?: string; forbiddenFlag?: string } | null {
+  const mergeIndex = tokens.findIndex((token, i) => token === 'gh' && tokens[i + 1] === 'pr' && tokens[i + 2] === 'merge');
+  if (mergeIndex === -1) return null;
 
   let forbiddenFlag: string | undefined;
   let prRef: string | undefined;
 
-  for (let i = 3; i < mergeTokens.length; i++) {
-    const token = mergeTokens[i];
+  for (let i = mergeIndex + 3; i < tokens.length; i++) {
+    const token = tokens[i];
     const forbidden = matchForbiddenFlag(token);
     if (forbidden) {
       forbiddenFlag = forbidden;
@@ -152,6 +148,35 @@ export function parseMergeCommand(command: string): ParsedMergeCommand {
     if (!token.startsWith('-') && prRef === undefined) {
       prRef = token;
     }
+  }
+
+  return { prRef, forbiddenFlag };
+}
+
+/** PURE: is this Bash command a `gh pr merge` attempt, and if so what ref/forbidden flag
+ * does it carry? Anchored at real command boundaries: the command is split into subcommands
+ * (on unquoted `&&`/`||`/`;`/`|`/newline, quote-aware, so a quoted span is one token and can
+ * never itself split a command), and EVERY subcommand is inspected for a `gh pr merge`
+ * invocation — not just the first — so a forbidden flag on a second, later `gh pr merge` in
+ * a chained command (`gh pr merge 1 --merge && gh pr merge 2 --admin`) is still caught, and
+ * a prefix ahead of the invocation in its own subcommand (`cd repo && gh pr merge ...`,
+ * `sudo gh pr merge --admin`, `GH_TOKEN=x gh pr merge --admin`) still matches. A command that
+ * only MENTIONS the phrase inside a quoted argument (`git commit -m "...gh pr merge..."`)
+ * does not match, because the quoted span is one token, never three consecutive ones. */
+export function parseMergeCommand(command: string): ParsedMergeCommand {
+  const invocations = tokenizeShellCommand(command)
+    .map(extractMergeInvocation)
+    .filter((invocation): invocation is { prRef?: string; forbiddenFlag?: string } => invocation !== null);
+
+  if (invocations.length === 0) {
+    return { isMerge: false, prRef: undefined, forbiddenFlag: undefined };
+  }
+
+  let forbiddenFlag: string | undefined;
+  let prRef: string | undefined;
+  for (const invocation of invocations) {
+    if (forbiddenFlag === undefined) forbiddenFlag = invocation.forbiddenFlag;
+    if (prRef === undefined) prRef = invocation.prRef;
   }
 
   return { isMerge: true, prRef, forbiddenFlag };
