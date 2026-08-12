@@ -10,12 +10,17 @@ import { escalationPathOf } from '../paths.ts';
  * API — never list"). */
 export type CardPhase =
   | { kind: 'verify_only'; pr: number }
-  | { kind: 'resume'; sessionId: string; reason: 'pr_open' | 'branch_no_pr'; pr?: number }
+  // P1 audit fix-round (blocker, skinnerB): `'session_only'` covers a `card.branch === null`
+  // card that DOES carry a recorded `sessionId` — the exact incident shape (a session opened
+  // a PR/branch, then ended its turn with no terminal line before `card.pr`/`card.branch`
+  // were ever written back). Never carries `pr`: we have no PR number to attach, only a
+  // session to resume.
+  | { kind: 'resume'; sessionId: string; reason: 'pr_open' | 'branch_no_pr' | 'session_only'; pr?: number }
   | { kind: 'revert_and_redo' }
   // F8: `digest` is present exactly when there IS a trace worth telling the executor about
   // (an open PR with no recorded sessionId) but nothing is resumable — the genuine
-  // "no trace at all" case (see `card.branch === null` below) leaves it undefined, so a
-  // fresh session there stays a plain blind fresh, unchanged.
+  // "no trace at all, no sessionId either" case (see `card.branch === null` below) leaves it
+  // undefined, so a fresh session there stays a plain blind fresh, unchanged.
   | { kind: 'fresh'; digest?: string }
   | { kind: 'escalation_pending'; escalationPath: string };
 
@@ -148,6 +153,20 @@ export async function deriveCardPhase(
   }
 
   if (!card.branch) {
+    // P1 audit fix-round (blocker, skinnerB): a session that opened a PR/branch and then
+    // errored before its outcome ever reached `'shipped'` (session.ts's `parseResultMessage`
+    // never populates `pr` on an `'error'` outcome, so `card-actions.ts`'s
+    // `recordBranchFromPr` — gated on `card.pr` — never ran) leaves `card.branch`/`card.pr`
+    // null even though `onSessionStart` DID record `card.sessionId` the instant the SDK
+    // assigned it. That is the P1 incident's own shape ("opens its PR ... then ends its
+    // turn"). A blind `{ kind: 'fresh' }` here would spawn a second, ignorant session on top
+    // of that possibly-still-open PR — exactly the duplicate-PR hazard F8 (below) exists to
+    // prevent for the branch-known case. We cannot query gh for a branch we were never told,
+    // but we CAN resume the one thing that does know what happened: the prior SDK session
+    // itself, by its recorded id.
+    if (card.sessionId) {
+      return { kind: 'resume', sessionId: card.sessionId, reason: 'session_only' };
+    }
     return { kind: 'fresh' };
   }
 

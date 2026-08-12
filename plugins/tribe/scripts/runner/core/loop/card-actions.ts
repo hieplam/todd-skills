@@ -309,6 +309,16 @@ export const CONTINUE_PR_OPEN_PROMPT =
 export const CONTINUE_BRANCH_PROMPT =
   'Resume this card from your existing branch/worktree: continue implementing the plan, then ' +
   'report the terminal SHIPPED/NEEDS_DIRECTION line.';
+// P1 audit fix-round (blocker, skinnerB): the `session_only` resume reason — no branch or PR
+// was ever recorded locally, so (unlike CONTINUE_PR_OPEN_PROMPT/CONTINUE_BRANCH_PROMPT) this
+// prompt cannot assume either exists; it tells the resumed session to check for itself before
+// assuming a clean slate.
+export const CONTINUE_UNKNOWN_STATE_PROMPT =
+  'Resume this card: no branch or PR was ever recorded for it locally (the previous attempt ' +
+  'ended its turn before reporting one), so first check what you already did — `git status`, ' +
+  '`git branch`, `gh pr list --head <branch>` — before continuing; do not assume a clean ' +
+  'slate. Then continue implementing the plan and report the terminal SHIPPED/NEEDS_DIRECTION ' +
+  'line.';
 
 export function buildSessionIOForCard(ctx: CardCtx): SessionIO {
   const { cardId, state, resolved, io } = ctx;
@@ -365,19 +375,26 @@ export async function performRevertAndRedo(ctx: CardCtx): Promise<void> {
 }
 
 /** Runs the executor session for one card's phase, implementing the D4 resume-with-fallback:
- * a `resume` phase attempts `runSession({resume: sessionId})`; if (and only if) that surfaces
- * a typed `error` outcome (a failed resume attempt: no transcript, SDK error — never on
- * `timeout`, which means the prior session may still be running), it falls back to a fresh
- * session carrying a state digest. `revert_and_redo` and a blind `fresh` (no digest) just spawn
- * fresh with the plain brief; a `fresh` phase carrying a digest (F8: open PR, no sessionId)
- * spawns fresh too, but with that digest prepended — never blind. */
+ * a `resume` phase attempts `runSession({resume: sessionId})` — with the prompt selected by
+ * `phase.reason` (`pr_open` / `branch_no_pr` / the P1-fix-round `session_only`, for a card with
+ * no recorded branch/PR but a recorded sessionId) — and if (and only if) that surfaces a typed
+ * `error` outcome (a failed resume attempt: no transcript, SDK error — never on `timeout`,
+ * which means the prior session may still be running), it falls back to a fresh session
+ * carrying a state digest. `revert_and_redo` and a blind `fresh` (no digest) just spawn fresh
+ * with the plain brief; a `fresh` phase carrying a digest (F8: open PR, no sessionId) spawns
+ * fresh too, but with that digest prepended — never blind. */
 export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<SessionResult> {
   const { cardId, state, resolved } = ctx;
   const card = state.cards[cardId];
   const sessionConfig = sessionConfigFor(cardId, resolved);
 
   if (phase.kind === 'resume') {
-    const prompt = phase.reason === 'pr_open' ? CONTINUE_PR_OPEN_PROMPT : CONTINUE_BRANCH_PROMPT;
+    const prompt =
+      phase.reason === 'pr_open'
+        ? CONTINUE_PR_OPEN_PROMPT
+        : phase.reason === 'session_only'
+          ? CONTINUE_UNKNOWN_STATE_PROMPT
+          : CONTINUE_BRANCH_PROMPT;
     const resumeIO = buildSessionIOForCard(ctx);
     const resumeResult = await runSession(
       { brief: prompt, resume: phase.sessionId },

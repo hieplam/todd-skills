@@ -14,6 +14,7 @@ import {
   WAIT_TOOL_DENIED_REASON,
   decideBackgroundingHook,
   decideMergeGateHook,
+  decideWaitToolHook,
   runSession,
   type HookDecision,
   type PinnedSessionOptions,
@@ -116,6 +117,30 @@ describe('runSession — §D1 option set (regression guard against SDK drift)', 
     expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
   });
 
+  test('wires the wait-tool deny-hook into every spawned session', async () => {
+    let capturedOptions: PinnedSessionOptions | undefined;
+    const io = recordingIo();
+    io.spawnSession = (params) => {
+      capturedOptions = params.options;
+      return messages([
+        INIT_MESSAGE,
+        { type: 'result', subtype: 'success', result: 'SHIPPED 42 abc1234', session_id: 'sess-123' },
+      ]);
+    };
+
+    await runSession({ brief: 'do the thing' }, fixtureConfig(), io);
+
+    // P1 audit fix-round (should-fix, scout): its own PreToolUse entry, index 1 — never
+    // grafted into `decideBackgroundingHook`'s (index 0).
+    const wired = (capturedOptions as PinnedSessionOptions).hooks.PreToolUse[1]?.hooks[0];
+    expect(wired).toBeDefined();
+    const decision = await (wired as (i: unknown) => Promise<{ hookSpecificOutput?: { permissionDecision?: string } }>)({
+      tool_name: 'Monitor',
+      tool_input: { description: 'watch CI' },
+    });
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+  });
+
   test('wires the pre-merge check gate PreToolUse deny-hook into every spawned session', async () => {
     let capturedOptions: PinnedSessionOptions | undefined;
     const io = recordingIo();
@@ -130,8 +155,9 @@ describe('runSession — §D1 option set (regression guard against SDK drift)', 
     await runSession({ brief: 'do the thing' }, fixtureConfig(), io);
 
     // Not merely "a hook is present" — invoke the wired hook and prove it actually denies (no
-    // execInRepo stub needed: a forbidden-flag merge denies without ever calling out).
-    const wired = (capturedOptions as PinnedSessionOptions).hooks.PreToolUse[1]?.hooks[0];
+    // execInRepo stub needed: a forbidden-flag merge denies without ever calling out). Index 2:
+    // 0 is decideBackgroundingHook, 1 is decideWaitToolHook (P1 audit fix-round split).
+    const wired = (capturedOptions as PinnedSessionOptions).hooks.PreToolUse[2]?.hooks[0];
     expect(wired).toBeDefined();
     const decision = await (wired as (i: unknown) => Promise<HookDecision>)({
       tool_name: 'Bash',
@@ -208,6 +234,33 @@ describe('decideBackgroundingHook — the anti-livelock wall, enforced', () => {
     expect(decideBackgroundingHook({ tool_name: 42, tool_input: 'nonsense' })).toEqual({});
   });
 
+  test('a backgrounded Bash still denies with BACKGROUNDING_DENIED_REASON (unchanged)', () => {
+    const decision = deny('Bash', { command: 'bun run e2e:chrome', run_in_background: true });
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(decision.hookSpecificOutput?.permissionDecisionReason).toBe(BACKGROUNDING_DENIED_REASON);
+  });
+
+  // P1 audit fix-round (should-fix, scout): Monitor/ScheduleWakeup are a DIFFERENT concern
+  // (waiting synchronously ends the turn; it is not a backgrounding attempt) and now have
+  // their own hook, `decideWaitToolHook` (below) — registered as its own separate PreToolUse
+  // entry, the same one-function-per-concern shape `decideMergeGateHook` already established.
+  // `decideBackgroundingHook` must stay exactly what its name/docstring says it is.
+  test('leaves Monitor/ScheduleWakeup alone — that concern lives in decideWaitToolHook, not here', () => {
+    expect(deny('Monitor', { description: 'watch CI' })).toEqual({});
+    expect(deny('ScheduleWakeup', { delaySeconds: 300 })).toEqual({});
+  });
+});
+
+// P1 audit fix-round (should-fix, scout): split out of `decideBackgroundingHook` into its own
+// named hook — mirrors the sibling `decideMergeGateHook` pattern (one PreToolUse concern per
+// function), so a reader grepping "wait tool" or "backgrounding" finds exactly the function
+// that owns that concern, and the next denied tool has an established place to go rather than
+// being grafted onto an unrelated function's body.
+describe('decideWaitToolHook — wait-tools end a session before a notification can ever reach it', () => {
+  function deny(toolName: string, toolInput: Record<string, unknown> = {}) {
+    return decideWaitToolHook({ tool_name: toolName, tool_input: toolInput });
+  }
+
   // P1 fix-list: wait-tools end a session's turn without a terminal SHIPPED/NEEDS_DIRECTION
   // line — an armed Monitor/ScheduleWakeup notification can never reach a session that has
   // already died. Deny both, with a steering message that teaches the foreground alternative.
@@ -231,10 +284,11 @@ describe('decideBackgroundingHook — the anti-livelock wall, enforced', () => {
     expect(deny('Bash', { command: 'bun test', timeout: 600000 })).toEqual({});
   });
 
-  test('a backgrounded Bash still denies with BACKGROUNDING_DENIED_REASON (unchanged)', () => {
-    const decision = deny('Bash', { command: 'bun run e2e:chrome', run_in_background: true });
-    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
-    expect(decision.hookSpecificOutput?.permissionDecisionReason).toBe(BACKGROUNDING_DENIED_REASON);
+  test('does not throw on malformed or absent hook input', () => {
+    expect(decideWaitToolHook(undefined)).toEqual({});
+    expect(decideWaitToolHook(null)).toEqual({});
+    expect(decideWaitToolHook({})).toEqual({});
+    expect(decideWaitToolHook({ tool_name: 42, tool_input: 'nonsense' })).toEqual({});
   });
 });
 
