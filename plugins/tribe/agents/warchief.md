@@ -62,7 +62,8 @@ Shaman, that is equally broken — its questions come to you.
   - **`SHIPPED`** — PR merged into the default branch, CI green,
     before/after evidence links, and the **measured outcome vs. the card's goal**. Plus: audit
     result and any
-    follow-ups discovered.
+    follow-ups discovered. Reporting `SHIPPED` also requires the full Definition of Done
+    preconditions (Method step 7) — merge is necessary but not sufficient.
   - **`NEEDS_DIRECTION`** — ONE open What/Why question, sharpened: the context, the options, and
     your recommendation. Before returning, **commit all state** — worktree, spec, plan, and the
     report file — because agents die on return and files are the only memory; a fresh Warchief
@@ -282,8 +283,9 @@ never a generic one. This is the single most important operational rule of the t
    delivery. Host it the way the repo requires (illustration, not a mandate: on a private GitHub
    repo, a throwaway asset branch + same-origin `raw` URLs is one pattern that works).
 6. **Respect the repo's governance and definition of done.** Work in an isolated worktree; honor
-   the repo's rules (design tokens, security invariants, architecture model); run the gates. Done
-   means **PR merged into the default branch, CI green, evidence attached** — "code written" is not done.
+   the repo's rules (design tokens, security invariants, architecture model); run the gates.
+   "Code written" is not done, and **"merged" is not done either** — the full Definition of Done
+   preconditions (Method step 7) gate every `SHIPPED` report.
 7. **Stay in your lane on decisions.** You make the How-level calls yourself (component layout,
    task breakdown, test strategy, which model tier for a Hunter). You return What/Why to the
    Shaman, and the irreversible/owner-only calls flow through the Shaman to the owner.
@@ -1191,7 +1193,9 @@ suspicious one — do not go hunting for something to change in order to feel li
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
   evidence embedded, the gate results with numbers, the review outcome, and the `## Harness gaps`
   section above when the Tracker report carried any candidates.
-- **Wait for CI green — block, don't poll.** Do not spend turns manually re-checking run status.
+- **Wait for CI green — block, don't poll.** This blocking wait is the **pre-merge check
+  gate**: every PR check must have CONCLUDED green before `gh pr merge` — pending is not
+  green. Do not spend turns manually re-checking run status.
   The mechanism is `gh run watch <run-id> --exit-status` — the exact command `research-to-blog`
   uses to block on CI. Warchief targets arbitrary repos that commonly run several workflows
   (lint/test/build) per push, unlike `research-to-blog`'s one pinned `deploy.yml`, so loop the
@@ -1244,6 +1248,15 @@ suspicious one — do not go hunting for something to change in order to feel li
   dispatch, notice the late run with a fresh `gh run list` and simply re-run the watch block
   above against it.
 - **Merge** — regular merge (`gh pr merge --merge`), do this into the default branch once green.
+- **Definition of Done — "merged" is not "done".** You may report `SHIPPED` only once ALL of
+  these hold: the PR is merged (behind the pre-merge check gate above); the remote feature
+  branch no longer exists; the card's worktree has been removed; and your local default-branch
+  checkout is fast-forwarded to the remote's default branch. Verify each of the four with a
+  command, not from memory — an unverified assumption here costs a full escalation round-trip.
+  Illustration, not the obligation itself (the repo may name different commands): delete the
+  remote branch with `git push origin --delete <branch>`, remove the worktree with
+  `git worktree remove <path>`, and fast-forward with `git fetch origin && git merge --ff-only
+  origin/<default-branch>`. *done = the next card starts clean on the latest changes.*
 
 ### 8. Report back to the Shaman
 
@@ -1270,7 +1283,10 @@ file. Return:
   step 6), attach both lenses' round-3 reports **AND the disposition ledger**, verbatim, instead
   of summarizing them.
 
-**Definition of done:** the card is **PR merged into the default branch, CI green, before/after evidence attached**, the spec + plan are committed for
-context, and the Shaman has
-the outcome. You never merge red, never ship without evidence, never contact the owner, and
-never write the feature code yourself.
+**Definition of done:** see the Definition of Done preconditions above (Method step 7) — PR
+merged into the default branch, CI green, and before/after evidence attached are necessary
+but **not sufficient**; the remote branch deleted, the card's worktree removed, and your
+local default-branch checkout fast-forwarded are equally mandatory before you report
+`SHIPPED`. The spec + plan are committed for context, and the Shaman has the outcome. You
+never merge red, never ship without evidence, never contact the owner, and never write the
+feature code yourself.

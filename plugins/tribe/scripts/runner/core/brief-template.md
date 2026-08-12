@@ -32,6 +32,9 @@ scope beyond this card.
   not green. A merge attempt with checks not green is blocked at the permission layer; if
   a check is red for reasons outside this card's diff, escalate NEEDS_DIRECTION instead of
   merging.
+- After creating a worktree, run the repo's dependency bootstrap (e.g. `bun install`)
+  before the first commit — repo hooks typically run repo-wide and fail spuriously in a
+  worktree without dependencies.
 
 ## Session liveness (hard wall — this is what kills runs)
 
@@ -82,6 +85,20 @@ Before raising any question, check whether it is already answered here. If it is
 the ruling; do not ask again.
 
 {{ANSWERS_CONTENT}}
+
+## Definition of Done (preconditions for SHIPPED)
+
+"Merged" is not "done". You may print the `SHIPPED` line only after ALL of:
+
+1. The PR is merged (behind the pre-merge check gate).
+2. The remote feature branch is deleted (`git push origin --delete <branch>`).
+3. The card's worktree is removed (`git worktree remove <path>`).
+4. Local master is fast-forwarded to origin/master.
+
+Verify each step with a command, not from memory — the runner independently re-verifies
+all four and a missing one costs a full escalation round-trip.
+
+*done = the next card starts clean on the latest changes.*
 
 ## Terminal contract
 

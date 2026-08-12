@@ -1,6 +1,6 @@
 # P2 — pre-merge check gate (mechanical, in the executor session)
 
-- **Status:** RATIFIED 2026-08-12 (owner delegated ratification authority this session).
+- **Status:** SHIPPED — PR #79, merge `f11c83d` (2026-08-12).
 - **Incident:** log lines 213–232. The A2 executor merged PR #188 while `format-check` was
   red on the PR head → master red for ~42 minutes — the campaign's only breach of a
   WRITTEN rule. The runner's `checksGreen` verify runs post-merge (`core/verify.ts`), so

@@ -41,7 +41,7 @@ that loop; they do not replace it.
 | #   | Problem (short)                                        | Observed cost (08-08)                | Status                                       |
 | --- | ------------------------------------------------------ | ------------------------------------ | -------------------------------------------- |
 | P1  | Executor waits look dead to the runner                 | ×4 incidents, ~5 min round-trip each | **RATIFIED** → [spec](P1-wait-aware-liveness.md) |
-| P2  | Merge gate verified only AFTER merge                   | 1 written-rule breach, 42 min red master | **RATIFIED** → [spec](P2-pre-merge-check-gate.md) |
+| P2  | Merge gate verified only AFTER merge                   | 1 written-rule breach, 42 min red master | **SHIPPED** — PR #79, `f11c83d` → [spec](P2-pre-merge-check-gate.md) |
 | P3  | Definition of Done (post-merge cleanup) not in brief   | First escalation of the campaign (B6) | **RATIFIED** → [spec](P3-definition-of-done-brief.md) |
 | P4  | Runner escalates instead of self-healing safe residue  | Same B6 escalation                   | **RATIFIED** → [spec](P4-self-heal-safe-residue.md) |
 | P5  | Escalations don't say answerable vs world-fixable      | 1 wasted round-trip (A1)             | **RATIFIED** → [spec](P5-escalation-reason-kinds.md) |
@@ -252,9 +252,9 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
 - Current position (2026-08-12, implementation phase): playbook =
   [IMPLEMENTATION.md](IMPLEMENTATION.md) (serial dynamic loop, Tribe-style cell per item:
   hunter → two-lens skinners + scout → bounded fix rounds → merged PR). **P10 SHIPPED**
-  (PR #78, merge `177ca3a`, 1 fix round, 10 audit findings). Now implementing: **P2**
-  (branch `fixlist/p2-pre-merge-check-gate`). Remaining order: P2 → P3 → P4 → P1 → P6 →
-  P5 → P11 → P9 → P12 → P8 → P7.
+  (PR #78, merge `177ca3a`). **P2 SHIPPED** (PR #79, merge `f11c83d`, 2 fix rounds,
+  6 audit findings). Now implementing: **P3** (branch `fixlist/p3-definition-of-done`).
+  Remaining order: P3 → P4 → P1 → P6 → P5 → P11 → P9 → P12 → P8 → P7.
 - Owner's rewind protocol is active (see memory `tribe-fixlist-rewind-protocol`): each
   round = read this README → brainstorm one P → ratify → persist spec + flip table →
   owner rewinds the conversation.
