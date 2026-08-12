@@ -1,6 +1,6 @@
 # P10 — `ANTHROPIC_API_KEY` guard in the campaign runner
 
-- **Status:** RATIFIED by owner, 2026-08-12. Not yet implemented.
+- **Status:** SHIPPED — PR #78, merge `177ca3a` (2026-08-12).
 - **Parent:** [fix-list README](README.md) · Source incident: `ai-dict` campaign diary
   `docs/superpowers/campaign/2026-aug-08-log.md`, lines 82–92.
 

@@ -67,6 +67,10 @@ Ship C7 end-to-end: implement the plan at docs/superpowers/plans/2026-01-01-c7-p
 - Owner-only items for this campaign (escalate, never decide): schema-lock-change, breaking-change
 - Stay inside this card's plan. No scope creep, no adjacent refactors, no speculative
   generality.
+- Merge gate: every PR check must have CONCLUDED green BEFORE \`gh pr merge\` — pending is
+  not green. A merge attempt with checks not green is blocked at the permission layer; if
+  a check is red for reasons outside this card's diff, escalate NEEDS_DIRECTION instead of
+  merging.
 
 ## Session liveness (hard wall — this is what kills runs)
 

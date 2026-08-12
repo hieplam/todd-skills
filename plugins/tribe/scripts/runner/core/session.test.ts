@@ -7,11 +7,14 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { MERGE_GATE_DENIED_CHECKS_ERROR_REASON } from './merge-gate.ts';
 import {
   BACKGROUNDING_DENIED_REASON,
   TRIBE_PLUGIN_DIR,
   decideBackgroundingHook,
+  decideMergeGateHook,
   runSession,
+  type HookDecision,
   type PinnedSessionOptions,
   type RunSessionConfig,
   type SessionIO,
@@ -28,12 +31,15 @@ function fixtureConfig(overrides: Partial<RunSessionConfig> = {}): RunSessionCon
   };
 }
 
-function recordingIo(): SessionIO & { calls: string[]; logLines: string[] } {
+function recordingIo(
+  execInRepo?: SessionIO['execInRepo'],
+): SessionIO & { calls: string[]; logLines: string[] } {
   const calls: string[] = [];
   const logLines: string[] = [];
   return {
     calls,
     logLines,
+    execInRepo,
     spawnSession: () => {
       throw new Error('spawnSession not stubbed for this test');
     },
@@ -105,6 +111,30 @@ describe('runSession — §D1 option set (regression guard against SDK drift)', 
     const decision = await (wired as (i: unknown) => Promise<{ hookSpecificOutput?: { permissionDecision?: string } }>)({
       tool_name: 'Bash',
       tool_input: { command: 'bun run e2e:chrome', run_in_background: true },
+    });
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+  });
+
+  test('wires the pre-merge check gate PreToolUse deny-hook into every spawned session', async () => {
+    let capturedOptions: PinnedSessionOptions | undefined;
+    const io = recordingIo();
+    io.spawnSession = (params) => {
+      capturedOptions = params.options;
+      return messages([
+        INIT_MESSAGE,
+        { type: 'result', subtype: 'success', result: 'SHIPPED 42 abc1234', session_id: 'sess-123' },
+      ]);
+    };
+
+    await runSession({ brief: 'do the thing' }, fixtureConfig(), io);
+
+    // Not merely "a hook is present" — invoke the wired hook and prove it actually denies (no
+    // execInRepo stub needed: a forbidden-flag merge denies without ever calling out).
+    const wired = (capturedOptions as PinnedSessionOptions).hooks.PreToolUse[1]?.hooks[0];
+    expect(wired).toBeDefined();
+    const decision = await (wired as (i: unknown) => Promise<HookDecision>)({
+      tool_name: 'Bash',
+      tool_input: { command: 'gh pr merge --admin' },
     });
     expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
   });
@@ -312,5 +342,106 @@ describe('runSession — resume-attempt failure (§D4 fallback trigger)', () => 
     const result = await runSession({ brief: 'continue', resume: 'sess-previous' }, fixtureConfig(), io);
     expect(result.outcome).toBe('error');
     expect(result.finalText).toContain('resume stream rejected');
+  });
+});
+
+describe('decideMergeGateHook — the pre-merge check gate, enforced (P2 fix-list card)', () => {
+  // Calls the exported hook function DIRECTLY (mirrors decideBackgroundingHook's own describe
+  // block above) — decoupled from spawnSession/message-parsing machinery and from the wired
+  // hook's array position, so reordering the PreToolUse array can never silently make these
+  // tests exercise the wrong function. A single wiring smoke test (in the §D1 option set
+  // describe above) is the only place that still goes through the real wiring.
+  function hookWith(execInRepo: SessionIO['execInRepo']): (input: unknown) => Promise<HookDecision> {
+    return decideMergeGateHook({ execInRepo });
+  }
+
+  test('denies a merge attempt when gh pr checks reports a red check (A2 replay: format-check red)', async () => {
+    const hook = hookWith(async () => ({
+      stdout: JSON.stringify([{ name: 'format-check', state: 'FAILURE' }]),
+      exitCode: 0,
+    }));
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'gh pr merge --merge' } });
+
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(decision.hookSpecificOutput?.permissionDecisionReason).toContain('format-check: FAILURE');
+  });
+
+  test('allows a merge attempt when gh pr checks reports every check SUCCESS', async () => {
+    const hook = hookWith(async () => ({
+      stdout: JSON.stringify([{ name: 'format-check', state: 'SUCCESS' }]),
+      exitCode: 0,
+    }));
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'gh pr merge --merge' } });
+
+    expect(decision).toEqual({});
+  });
+
+  test('denies outright on --auto, without ever calling execInRepo', async () => {
+    let execCalled = false;
+    const hook = hookWith(async () => {
+      execCalled = true;
+      return { stdout: '[]', exitCode: 0 };
+    });
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'gh pr merge --auto' } });
+
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(execCalled).toBe(false);
+  });
+
+  test('denies outright on --admin, without ever calling execInRepo', async () => {
+    let execCalled = false;
+    const hook = hookWith(async () => {
+      execCalled = true;
+      return { stdout: '[]', exitCode: 0 };
+    });
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'gh pr merge --admin' } });
+
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(execCalled).toBe(false);
+  });
+
+  test('returns an empty decision for a non-merge Bash command, without ever calling execInRepo', async () => {
+    let execCalled = false;
+    const hook = hookWith(async () => {
+      execCalled = true;
+      return { stdout: '[]', exitCode: 0 };
+    });
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'bun test' } });
+
+    expect(decision).toEqual({});
+    expect(execCalled).toBe(false);
+  });
+
+  test('returns an empty decision for a non-Bash tool call', async () => {
+    let execCalled = false;
+    const hook = hookWith(async () => {
+      execCalled = true;
+      return { stdout: '[]', exitCode: 0 };
+    });
+
+    const decision = await hook({ tool_name: 'Read', tool_input: { file_path: '/x' } });
+
+    expect(decision).toEqual({});
+    expect(execCalled).toBe(false);
+  });
+
+  // P2 audit fix (skinnerB): a REJECTING execInRepo (real-world: the `gh` binary missing,
+  // ENOENT) must still resolve to the module's own fail-closed deny decision, never a rejected
+  // promise — the hook is documented "fail-closed, never crash" and must honor that even when
+  // its one injected I/O call misbehaves.
+  test('fails closed (denies) when execInRepo REJECTS instead of resolving — never crashes the hook', async () => {
+    const hook = hookWith(async () => {
+      throw new Error('gh: command not found (ENOENT)');
+    });
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'gh pr merge --merge' } });
+
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(decision.hookSpecificOutput?.permissionDecisionReason).toBe(MERGE_GATE_DENIED_CHECKS_ERROR_REASON);
   });
 });

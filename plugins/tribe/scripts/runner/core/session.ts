@@ -5,6 +5,7 @@
 // a session through the `SessionIO` seam below, never the SDK package directly.
 import { join } from 'node:path';
 import type { HookDecision, PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams } from '../ports/ports.ts';
+import { buildMergeGateDecision, parseMergeCommand } from './merge-gate.ts';
 
 export type { HookDecision, PinnedSessionOptions, SessionIO, SessionMessage, SpawnSessionParams };
 
@@ -87,11 +88,58 @@ export function decideBackgroundingHook(input: unknown): HookDecision {
   };
 }
 
+/** PURE-except-for-the-one-injected-call: decides whether one PreToolUse event is a
+ * `gh pr merge` attempt and, if so, whether it may proceed. Every decision (forbidden flag,
+ * fail-closed on a `gh pr checks` error, red/pending check) is made by the pure
+ * `buildMergeGateDecision` in `merge-gate.ts`; this wrapper's only job is running the exec
+ * call that function needs, via the injected `io.execInRepo` seam (spec §Incident: PR #188
+ * merged with `format-check` red, master red ~42min — the runner's own post-merge
+ * `checksGreen` verify could only detect that breach, not prevent it).
+ *
+ * Bash-only, and only when `parseMergeCommand` says the command is a merge attempt — every
+ * other tool call, and every non-merge Bash command, gets an empty decision (no opinion). */
+export function decideMergeGateHook(io: Pick<SessionIO, 'execInRepo'>) {
+  return async (hookInput: unknown): Promise<HookDecision> => {
+    const event = (hookInput ?? {}) as { tool_name?: unknown; tool_input?: unknown };
+    const toolName = typeof event.tool_name === 'string' ? event.tool_name : '';
+    if (toolName !== 'Bash') return {};
+
+    const toolInput = (event.tool_input ?? {}) as { command?: unknown };
+    const command = typeof toolInput.command === 'string' ? toolInput.command : '';
+    const parsed = parseMergeCommand(command);
+    if (!parsed.isMerge) return {};
+
+    // A forbidden flag denies outright — never worth spending an exec call to check.
+    if (parsed.forbiddenFlag) {
+      return buildMergeGateDecision({ parsed });
+    }
+
+    if (!io.execInRepo) {
+      // No exec seam wired -> cannot verify checks -> fail-closed, same as a `gh pr checks`
+      // error (buildMergeGateDecision treats a missing checksExec identically).
+      return buildMergeGateDecision({ parsed });
+    }
+
+    const argv = ['gh', 'pr', 'checks', ...(parsed.prRef ? [parsed.prRef] : []), '--json', 'name,state'];
+    try {
+      const checksExec = await io.execInRepo(argv);
+      return buildMergeGateDecision({ parsed, checksExec });
+    } catch {
+      // A rejecting execInRepo (e.g. `gh` missing, ENOENT) must still resolve to the
+      // module's own fail-closed deny decision, never propagate as a rejected promise —
+      // this hook is documented "fail-closed, never crash". Same treatment as a missing
+      // checksExec (buildMergeGateDecision denies identically either way).
+      return buildMergeGateDecision({ parsed });
+    }
+  };
+}
+
 /** Builds the §D1 option block verbatim. */
 export function buildSessionOptions(
   input: RunSessionInput,
   config: RunSessionConfig,
   abortController: AbortController,
+  io: Pick<SessionIO, 'execInRepo'>,
 ): PinnedSessionOptions {
   const options: PinnedSessionOptions = {
     cwd: config.repoRoot, // --repo input
@@ -103,8 +151,14 @@ export function buildSessionOptions(
     allowDangerouslySkipPermissions: true, // required by the SDK for the above
     abortController,
     executable: 'bun',
-    // Anti-livelock wall, enforced (not merely stated in the brief) — see decideBackgroundingHook.
-    hooks: { PreToolUse: [{ hooks: [(hookInput: unknown) => Promise.resolve(decideBackgroundingHook(hookInput))] }] },
+    hooks: {
+      PreToolUse: [
+        // Anti-livelock wall, enforced (not merely stated in the brief) — decideBackgroundingHook.
+        { hooks: [(hookInput: unknown) => Promise.resolve(decideBackgroundingHook(hookInput))] },
+        // Pre-merge check gate (P2 fix-list card) — decideMergeGateHook.
+        { hooks: [decideMergeGateHook(io)] },
+      ],
+    },
   };
   if (input.resume) {
     options.resume = input.resume;
@@ -197,7 +251,7 @@ export async function runSession(
   io: SessionIO,
 ): Promise<SessionResult> {
   const abortController = new AbortController();
-  const options = buildSessionOptions(input, config, abortController);
+  const options = buildSessionOptions(input, config, abortController, io);
   const sessionPromise = consumeSession(input, config, io, options);
 
   if (config.sessionTimeoutMs === undefined) {

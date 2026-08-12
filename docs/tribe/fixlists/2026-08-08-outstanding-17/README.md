@@ -49,7 +49,7 @@ that loop; they do not replace it.
 | P7  | Rulings can't reach a running session                  | A12 carried 5+ soon-invalid commits  | **RATIFIED (accept + document)** → [spec](P7-mid-flight-rulings.md) |
 | P8  | Batch-authored specs drop inherited obligations        | 2 escalation rounds (B13→B14)        | **RATIFIED** → [spec](P8-inherited-obligations-check.md) |
 | P9  | schemaGuard front-matter patched post-hoc, not at authoring | 1 escalation + world-fix PR #185 | **RATIFIED** → [spec](P9-schema-lock-at-authoring.md) |
-| P10 | `ANTHROPIC_API_KEY` env trap kills all sessions        | 13 sessions dead in 36s              | **RATIFIED** → [spec](P10-anthropic-api-key-guard.md) |
+| P10 | `ANTHROPIC_API_KEY` env trap kills all sessions        | 13 sessions dead in 36s              | **SHIPPED** — PR #78, `177ca3a` → [spec](P10-anthropic-api-key-guard.md) |
 | P11 | Stale `baseSha` on hand-edited state resets            | 1 false-positive escalation (B13)    | **RATIFIED** → [spec](P11-basesha-invariants.md) |
 | P12 | Skill doc claims sequential default; runner is parallel | Hand-authoring a 17-link dependsOn chain | **RATIFIED (docs+skill only)** → [spec](P12-concurrency-truth.md) |
 | P13 | Harness externally kills background runner tasks       | ×2, ~2 min recovery each             | WON'T-FIX (ratified — mitigation works)      |
@@ -249,13 +249,12 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
   workflow actually OBEY its rules, i.e. convert prose rules to mechanical enforcement.
 - Owner's process directive: go through the P's one at a time; after each ratification,
   persist context + solution here before moving on.
-- Current position (2026-08-12, end of ratification phase): **ALL 15 P's ratified and
-  specced** — 12 with implementation-ready specs, P13/P14 won't-fix, P15 folded into P3.
-  Next phase: **implementation — the entry point is [IMPLEMENTATION.md](IMPLEMENTATION.md)**
-  (owner-ratified playbook: serial dynamic loop, Tribe-style, one item → one merged PR →
-  next item; the first PR also commits this whole directory).
-  (Definition-of-Done in the brief + runner self-heals safe residue — one B6 incident,
-  two complementary fixes, worth brainstorming as a pair).
+- Current position (2026-08-12, implementation phase): playbook =
+  [IMPLEMENTATION.md](IMPLEMENTATION.md) (serial dynamic loop, Tribe-style cell per item:
+  hunter → two-lens skinners + scout → bounded fix rounds → merged PR). **P10 SHIPPED**
+  (PR #78, merge `177ca3a`, 1 fix round, 10 audit findings). Now implementing: **P2**
+  (branch `fixlist/p2-pre-merge-check-gate`). Remaining order: P2 → P3 → P4 → P1 → P6 →
+  P5 → P11 → P9 → P12 → P8 → P7.
 - Owner's rewind protocol is active (see memory `tribe-fixlist-rewind-protocol`): each
   round = read this README → brainstorm one P → ratify → persist spec + flip table →
   owner rewinds the conversation.
