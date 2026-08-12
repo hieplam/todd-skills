@@ -38,6 +38,26 @@ describe('parseMergeCommand', () => {
     expect(parsed.forbiddenFlag).toBe('--admin');
   });
 
+  // P2 audit fix (skinnerB): `gh` is a cobra CLI and accepts `--flag=value` just as much as
+  // the bare `--flag` form — `gh pr merge --admin=true` is a real, GH-CLI-accepted invocation
+  // that must be caught exactly like `--admin`.
+  test('"--auto=true" sets forbiddenFlag (gh cobra --flag=value syntax)', () => {
+    const parsed = parseMergeCommand('gh pr merge --auto=true');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.forbiddenFlag).toBe('--auto');
+  });
+
+  test('"--admin=true" sets forbiddenFlag (gh cobra --flag=value syntax)', () => {
+    const parsed = parseMergeCommand('gh pr merge --admin=true');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.forbiddenFlag).toBe('--admin');
+  });
+
+  test('"--auto=false"/"--admin=false" do NOT set forbiddenFlag (explicitly disabled)', () => {
+    expect(parseMergeCommand('gh pr merge --auto=false').forbiddenFlag).toBeUndefined();
+    expect(parseMergeCommand('gh pr merge --admin=false').forbiddenFlag).toBeUndefined();
+  });
+
   test('a PR ref given as a bare number is extracted', () => {
     const parsed = parseMergeCommand('gh pr merge 188 --merge');
     expect(parsed.isMerge).toBe(true);
@@ -66,6 +86,36 @@ describe('parseMergeCommand', () => {
       forbiddenFlag: undefined,
     });
     expect(parseMergeCommand('bun test')).toEqual({ isMerge: false, prRef: undefined, forbiddenFlag: undefined });
+  });
+
+  // P2 audit fix (scout): the old raw-substring regex + non-quote-aware whitespace tokenizer
+  // could disagree and neither was shell-aware. These reproduce the scout's live-repro
+  // evidence exactly.
+  test('a commit message that merely MENTIONS "gh pr merge" is not a merge attempt (false positive)', () => {
+    expect(parseMergeCommand('git commit -m "docs: explain how to run gh pr merge safely"')).toEqual({
+      isMerge: false,
+      prRef: undefined,
+      forbiddenFlag: undefined,
+    });
+  });
+
+  test('a merge command glued to a preceding command via ";" is still found at its own command boundary', () => {
+    const parsed = parseMergeCommand('git fetch;gh pr merge --merge');
+    expect(parsed.isMerge).toBe(true);
+    // Must NOT pick up an unrelated leading token ("git") as the PR ref.
+    expect(parsed.prRef).toBeUndefined();
+  });
+
+  test('a quoted flag value containing spaces is kept together, not split mid-string into prRef', () => {
+    const parsed = parseMergeCommand('gh pr merge --merge --subject "release notes go here"');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.prRef).toBe('release notes go here');
+  });
+
+  test('"cd repo && gh pr merge ..." (documented supported prefix) still matches, anchored at its own subcommand', () => {
+    const parsed = parseMergeCommand('cd repo && gh pr merge 188 --merge');
+    expect(parsed.isMerge).toBe(true);
+    expect(parsed.prRef).toBe('188');
   });
 });
 

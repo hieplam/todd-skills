@@ -36,29 +36,117 @@ export interface MergeGateDecisionInput {
   checksExec?: { stdout: string; exitCode: number };
 }
 
-const MERGE_COMMAND_RE = /\bgh\s+pr\s+merge\b/;
-const FORBIDDEN_FLAGS = new Set(['--auto', '--admin']);
+const FORBIDDEN_FLAG_NAMES = ['--auto', '--admin'] as const;
+
+/** Matches a token against `--auto`/`--admin`, in both the bare (`--auto`) and cobra
+ * `--flag=value` (`--auto=true`) forms — `gh` is a cobra CLI and accepts both; live `gh pr
+ * merge --admin=true` reaches the GraphQL call rather than erroring on an unrecognized flag,
+ * so a substring/exact-token check alone lets it slip past. `--auto=false`/`--admin=false`
+ * explicitly DISABLE the flag, so they are correctly not forbidden. Returns the base flag
+ * name (`--auto`/`--admin`), never the full `--flag=value` token, so the deny reason and
+ * callers stay flag-name-only regardless of which form was used. */
+function matchForbiddenFlag(token: string): string | undefined {
+  for (const flag of FORBIDDEN_FLAG_NAMES) {
+    if (token === flag) return flag;
+    const prefix = `${flag}=`;
+    if (token.startsWith(prefix) && token.slice(prefix.length) !== 'false') {
+      return flag;
+    }
+  }
+  return undefined;
+}
+
+/** Quote-aware, subcommand-anchored tokenizer: splits `command` into one token array per
+ * shell subcommand, where subcommands are separated by unquoted `&&`, `||`, `;`, `|`, or a
+ * newline, and a single/double-quoted span inside a subcommand becomes ONE token (quotes
+ * stripped) instead of being split on internal whitespace. This is NOT a full shell parser
+ * (no `$VAR` expansion, no backslash escapes, no backticks) — it exists only to anchor "is
+ * this actually invoking `gh pr merge`" at a real command boundary, never a substring match
+ * over free text (a commit message that merely MENTIONS "gh pr merge" must not match). */
+function tokenizeShellCommand(command: string): string[][] {
+  const subcommands: string[][] = [];
+  let currentTokens: string[] = [];
+  let currentToken = '';
+  let hasToken = false;
+  let quote: '"' | "'" | null = null;
+
+  const flushToken = () => {
+    if (hasToken) {
+      currentTokens.push(currentToken);
+      currentToken = '';
+      hasToken = false;
+    }
+  };
+  const flushSubcommand = () => {
+    flushToken();
+    if (currentTokens.length > 0) subcommands.push(currentTokens);
+    currentTokens = [];
+  };
+
+  let i = 0;
+  while (i < command.length) {
+    const ch = command[i];
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        currentToken += ch;
+        hasToken = true;
+      }
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      hasToken = true; // an empty quoted string ("") still counts as a (empty) token
+      i++;
+      continue;
+    }
+    if ((ch === '&' && command[i + 1] === '&') || (ch === '|' && command[i + 1] === '|')) {
+      flushSubcommand();
+      i += 2;
+      continue;
+    }
+    if (ch === ';' || ch === '|' || ch === '\n') {
+      flushSubcommand();
+      i++;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      flushToken();
+      i++;
+      continue;
+    }
+    currentToken += ch;
+    hasToken = true;
+    i++;
+  }
+  flushSubcommand();
+  return subcommands;
+}
 
 /** PURE: is this Bash command a `gh pr merge` attempt, and if so what ref/forbidden flag
- * does it carry? Any prefix (`cd repo && gh pr merge ...`) still matches — the regex looks
- * for the three words as whitespace-separated tokens anywhere in the command. */
+ * does it carry? Anchored at a real command boundary: a subcommand (split on `&&`/`||`/`;`/
+ * `|`/newline, quote-aware) whose first three tokens are exactly `gh`, `pr`, `merge` — so a
+ * prefix like `cd repo && gh pr merge ...` still matches (its own subcommand starts with
+ * those three tokens), but a command that only MENTIONS the phrase inside a quoted argument
+ * (`git commit -m "...gh pr merge..."`) does not, because the quoted span is one token. */
 export function parseMergeCommand(command: string): ParsedMergeCommand {
-  if (!MERGE_COMMAND_RE.test(command)) {
+  const subcommands = tokenizeShellCommand(command);
+  const mergeTokens = subcommands.find((tokens) => tokens[0] === 'gh' && tokens[1] === 'pr' && tokens[2] === 'merge');
+
+  if (!mergeTokens) {
     return { isMerge: false, prRef: undefined, forbiddenFlag: undefined };
   }
-
-  const tokens = command.trim().split(/\s+/);
-  const mergeTokenIndex = tokens.findIndex(
-    (token, i) => token === 'merge' && tokens[i - 1] === 'pr' && tokens[i - 2] === 'gh',
-  );
 
   let forbiddenFlag: string | undefined;
   let prRef: string | undefined;
 
-  for (let i = mergeTokenIndex + 1; i < tokens.length; i++) {
-    const token = tokens[i];
-    if (FORBIDDEN_FLAGS.has(token)) {
-      forbiddenFlag = token;
+  for (let i = 3; i < mergeTokens.length; i++) {
+    const token = mergeTokens[i];
+    const forbidden = matchForbiddenFlag(token);
+    if (forbidden) {
+      forbiddenFlag = forbidden;
       continue;
     }
     if (!token.startsWith('-') && prRef === undefined) {

@@ -121,8 +121,16 @@ export function decideMergeGateHook(io: Pick<SessionIO, 'execInRepo'>) {
     }
 
     const argv = ['gh', 'pr', 'checks', ...(parsed.prRef ? [parsed.prRef] : []), '--json', 'name,state'];
-    const checksExec = await io.execInRepo(argv);
-    return buildMergeGateDecision({ parsed, checksExec });
+    try {
+      const checksExec = await io.execInRepo(argv);
+      return buildMergeGateDecision({ parsed, checksExec });
+    } catch {
+      // A rejecting execInRepo (e.g. `gh` missing, ENOENT) must still resolve to the
+      // module's own fail-closed deny decision, never propagate as a rejected promise —
+      // this hook is documented "fail-closed, never crash". Same treatment as a missing
+      // checksExec (buildMergeGateDecision denies identically either way).
+      return buildMergeGateDecision({ parsed });
+    }
   };
 }
 
