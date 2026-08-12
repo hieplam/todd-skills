@@ -6,6 +6,7 @@
 // performs zero I/O. The edge (`healSafeResidue` in `core/loop/card-actions.ts`) gathers
 // those facts via `git`/`gh` through the injected `io.exec` seam and executes the actions
 // this module decides are safe.
+import { REMOTE_BRANCH_STILL_PRESENT_DETAIL, WORKTREE_STILL_PRESENT_DETAIL } from './verify.ts';
 
 /** The two residue-cleanup recipes proven safe by `performRevertAndRedo` — reused here,
  * never duplicated: `git push <remote> --delete <branch>` for a leftover remote branch on
@@ -46,12 +47,12 @@ export function decideResidueHeal(input: DecideResidueHealInput): HealAction[] {
 
   const actions: HealAction[] = [];
 
-  if (input.detail.includes('remote branch still present')) {
+  if (input.detail.includes(REMOTE_BRANCH_STILL_PRESENT_DETAIL)) {
     actions.push({ kind: 'delete_remote_branch', branch: input.branch });
   }
 
   if (
-    input.detail.includes('worktree still present') &&
+    input.detail.includes(WORKTREE_STILL_PRESENT_DETAIL) &&
     input.worktreePath &&
     input.worktreeStatusClean &&
     input.tipIsAncestorOfBase

@@ -29,6 +29,14 @@ export interface Card {
    * ?? 0`, never relying on a schema-injected default (same byte-identical reasoning as
    * `dependsOn`). */
   autoAnswerRounds?: number;
+  /** P4 fix-list item (spec: "Every heal performed is recorded ... so the report shows ...
+   * instead of silently passing"): the `HealAction.kind`s `healSafeResidue` actually applied
+   * (never merely attempted — see `card-actions.ts`'s `executeHealActions`) the run this card
+   * last shipped. OPTIONAL and absent by default (same byte-identical round-trip reasoning as
+   * `dependsOn`/`autoAnswerRounds`) — only ever set by `shipCard` when a heal actually
+   * happened; report.ts reads it to surface the heal on the ONE artifact a human/orchestrating
+   * session reads after a run. */
+  healedResidue?: string[];
 }
 
 /** D2 campaign state root. `schemaLockPaths` (D3 point 6) and `ownerOnlyEscalations` (D5)
