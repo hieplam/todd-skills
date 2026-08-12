@@ -58,6 +58,16 @@ export const BACKGROUNDING_DENIED_REASON =
   'foreground with timeout: 600000 (Bash) or run_in_background: false (Agent/Task). If the ' +
   'work cannot fit in 600s, split it by exact file name and run each part in the foreground.';
 
+/** The reason text a denied wait-tool attempt (Monitor / ScheduleWakeup) reports back to the
+ * executor. Phrased as an instruction, not just a refusal (spec P1: ×4 incident — a session
+ * that arms a wait-tool then ends its turn dies before the notification can ever reach it). */
+export const WAIT_TOOL_DENIED_REASON =
+  'Wait-tools are disabled for campaign executor sessions: this session ends the moment ' +
+  'it stops calling tools, so an armed Monitor/ScheduleWakeup notification can never ' +
+  'reach you — ending your turn to wait kills the session. To wait on CI, run ' +
+  '`gh pr checks <pr> --watch` in the FOREGROUND (Bash, timeout: 600000) and proceed ' +
+  'when it concludes.';
+
 /** PURE: decides whether one PreToolUse event is an attempt to background work.
  *
  * This is the enforcement half of the anti-livelock wall. The 2026-07-17 campaign incident
@@ -74,6 +84,16 @@ export function decideBackgroundingHook(input: unknown): HookDecision {
   const toolName = typeof event.tool_name === 'string' ? event.tool_name : '';
   const toolInput = (event.tool_input ?? {}) as { run_in_background?: unknown };
   const requested = toolInput.run_in_background;
+
+  if (toolName === 'Monitor' || toolName === 'ScheduleWakeup') {
+    return {
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: WAIT_TOOL_DENIED_REASON,
+      },
+    };
+  }
 
   const backgrounds =
     toolName === 'Bash' ? requested === true : (toolName === 'Agent' || toolName === 'Task') && requested !== false;

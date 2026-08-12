@@ -356,6 +356,21 @@ function needsDirectionMessages(sessionId: string): SessionMessage[] {
   ];
 }
 
+/** A `result` message carrying neither a `SHIPPED` nor a `NEEDS_DIRECTION` terminal line —
+ * `parseResultMessage` (session.ts) classifies this outcome `'error'`, exactly the "ended the
+ * turn without reporting" shape the P1 fix-list's bounded auto-retry targets. */
+function errorMessages(sessionId: string): SessionMessage[] {
+  return [
+    { type: 'system', subtype: 'init', session_id: sessionId },
+    {
+      type: 'result',
+      subtype: 'success',
+      result: 'armed a Monitor and ended the turn without a terminal line',
+      session_id: sessionId,
+    },
+  ];
+}
+
 interface MockLoopIoOptions {
   stateJson: string;
   answers?: string;
@@ -1439,14 +1454,24 @@ describe('runLoop — --dry-run: zero side effects', () => {
 });
 
 describe('runLoop — session error/timeout without a resume attempt: stops for external retry', () => {
-  test('a fresh session that errors stops this run without escalating', async () => {
+  test('a fresh session that errors exhausts its 2 bounded auto-retries, then stops this run', async () => {
+    // P1 fix-list: a lone `error` outcome is now `retryable`, so this scenario needs the SDK
+    // to keep failing across every attempt (1 original + 2 retries = 3) to still reach
+    // `stopped` — see the "bounded auto-retry" describe block below for the retry-succeeds
+    // and timeout-never-retries counterparts.
     const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
-    const { io } = buildMockLoopIo({
+    const { io, spawnBriefs } = buildMockLoopIo({
       stateJson: JSON.stringify(state),
       answers: '',
       spawnQueue: [
         () => {
           throw new Error('sdk crashed');
+        },
+        () => {
+          throw new Error('sdk crashed again');
+        },
+        () => {
+          throw new Error('sdk crashed a third time');
         },
       ],
     });
@@ -1454,7 +1479,78 @@ describe('runLoop — session error/timeout without a resume attempt: stops for 
     const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
 
     expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
-    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1' });
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: true });
+    expect(spawnBriefs).toHaveLength(3);
+  });
+});
+
+describe('runLoop — bounded auto-retry (P1 fix-list, spec "wait-aware liveness")', () => {
+  test('(a) session ends "error" once then ships on retry: outcome shipped, exactly 2 sessions spawned', async () => {
+    // A pre-assigned branch, no PR/worktree trace yet — same "still derives to fresh" fixture
+    // shape `stateJsonWithTwoFreshCards` documents above; needed so the post-ship
+    // worktreeAndBranchGone verify point (which requires `card.branch` to be non-null) can pass.
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard() } });
+    const { io, spawnBriefs, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: cleanCommitAndVerifyHandlers('aaaaaaa'),
+      spawnQueue: [
+        () => messages(errorMessages('sess-c1-try1')),
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1-try2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(spawnBriefs).toHaveLength(2);
+
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
+    expect(finalState.cards.C1.status).toBe('shipped');
+  });
+
+  test('(b) session ends "error" 3 times: outcome stopped after exactly 3 attempts (1 + 2 retries), exit EXIT_SESSION_INCOMPLETE', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      spawnQueue: [
+        () => messages(errorMessages('sess-c1-try1')),
+        () => messages(errorMessages('sess-c1-try2')),
+        () => messages(errorMessages('sess-c1-try3')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: true });
+    expect(spawnBriefs).toHaveLength(3);
+  });
+
+  test('(c) session outcome "timeout": no retry, exactly 1 attempt', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      spawnQueue: [
+        () =>
+          (async function* () {
+            yield { type: 'system', subtype: 'init', session_id: 'sess-c1-try1' } as SessionMessage;
+            await new Promise(() => {}); // hang forever — only the wall-clock timeout resolves.
+          })(),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1, sessionTimeoutMs: 20 }), io);
+
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: false });
+    expect(spawnBriefs).toHaveLength(1);
   });
 });
 

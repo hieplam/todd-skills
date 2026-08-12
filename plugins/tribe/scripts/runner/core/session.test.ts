@@ -11,6 +11,7 @@ import { MERGE_GATE_DENIED_CHECKS_ERROR_REASON } from './merge-gate.ts';
 import {
   BACKGROUNDING_DENIED_REASON,
   TRIBE_PLUGIN_DIR,
+  WAIT_TOOL_DENIED_REASON,
   decideBackgroundingHook,
   decideMergeGateHook,
   runSession,
@@ -205,6 +206,35 @@ describe('decideBackgroundingHook — the anti-livelock wall, enforced', () => {
     expect(decideBackgroundingHook(null)).toEqual({});
     expect(decideBackgroundingHook({})).toEqual({});
     expect(decideBackgroundingHook({ tool_name: 42, tool_input: 'nonsense' })).toEqual({});
+  });
+
+  // P1 fix-list: wait-tools end a session's turn without a terminal SHIPPED/NEEDS_DIRECTION
+  // line — an armed Monitor/ScheduleWakeup notification can never reach a session that has
+  // already died. Deny both, with a steering message that teaches the foreground alternative.
+  test('denies Monitor with WAIT_TOOL_DENIED_REASON', () => {
+    const decision = deny('Monitor', { description: 'watch CI' });
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(decision.hookSpecificOutput?.hookEventName).toBe('PreToolUse');
+    expect(decision.hookSpecificOutput?.permissionDecisionReason).toBe(WAIT_TOOL_DENIED_REASON);
+  });
+
+  test('denies ScheduleWakeup with WAIT_TOOL_DENIED_REASON', () => {
+    const decision = deny('ScheduleWakeup', { delaySeconds: 300 });
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(decision.hookSpecificOutput?.hookEventName).toBe('PreToolUse');
+    expect(decision.hookSpecificOutput?.permissionDecisionReason).toBe(WAIT_TOOL_DENIED_REASON);
+  });
+
+  test('leaves Read/Grep/plain Bash alone (no wait-tool false positive)', () => {
+    expect(deny('Read', { file_path: '/x' })).toEqual({});
+    expect(deny('Grep', { pattern: 'foo' })).toEqual({});
+    expect(deny('Bash', { command: 'bun test', timeout: 600000 })).toEqual({});
+  });
+
+  test('a backgrounded Bash still denies with BACKGROUNDING_DENIED_REASON (unchanged)', () => {
+    const decision = deny('Bash', { command: 'bun run e2e:chrome', run_in_background: true });
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(decision.hookSpecificOutput?.permissionDecisionReason).toBe(BACKGROUNDING_DENIED_REASON);
   });
 });
 

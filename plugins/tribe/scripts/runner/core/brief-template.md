@@ -48,6 +48,9 @@ notification can reach you. A backgrounded job dies with you. Therefore:
   which will kill you.
 - If a command genuinely cannot fit in 600s, split it by exact spec/test file name and run
   each part in the foreground.
+- To wait for CI: `gh pr checks <pr> --watch` in the foreground (timeout: 600000), re-run it
+  if 10 minutes is not enough. Monitor/ScheduleWakeup are blocked — a notification can never
+  wake you.
 
 A tool call that tries to background is blocked at the permission layer and returns an
 error — that block is this wall enforcing itself, not a bug to work around.

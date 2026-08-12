@@ -193,7 +193,19 @@ async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopI
       continue;
     }
 
-    const outcome = await actOnCard(ctx, phase);
+    // P1 fix-list "wait-aware liveness" (containment layer): a `stopped` outcome whose
+    // session ended with `error` (never `timeout`) is exactly what a human re-trigger fixed
+    // on 08-08 — the card's sessionId/PR are already recorded locally, so re-deriving the
+    // phase naturally takes the D4 resume path. Bounded to 2 retries per card per pass so a
+    // persistently-erroring card still surfaces as `stopped` rather than looping forever.
+    let outcome = await actOnCard(ctx, phase);
+    let retries = 0;
+    while (outcome.kind === 'stopped' && outcome.retryable && retries < 2) {
+      retries += 1;
+      const retryPhase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(resolved), io);
+      if (retryPhase.kind === 'escalation_pending') break;
+      outcome = await actOnCard(ctx, retryPhase);
+    }
     attempted.add(nc.cardId);
     processed.push(outcome);
     worked += 1;

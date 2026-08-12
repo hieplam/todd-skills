@@ -36,7 +36,17 @@ export type CardOutcome =
       cardId: string;
       escalationPath: string;
     }
-  | { kind: 'stopped'; cardId: string; reason: string };
+  | {
+      /** P1 fix-list: `retryable` is `true` only when the session ended with outcome
+       * `'error'` ("ended without a terminal SHIPPED/NEEDS_DIRECTION line" — exactly the
+       * wait-trap the ×4 incident hit) and `false` for `'timeout'` (a timed-out session was
+       * aborted deliberately; retrying it risks racing a still-running process). Read by
+       * `run-loop.ts`'s bounded auto-retry loop. */
+      kind: 'stopped';
+      cardId: string;
+      reason: string;
+      retryable: boolean;
+    };
 
 /** The per-card working set threaded through every card-scoped function. `card` is
  * deliberately NOT a member: it is always derived as `ctx.state.cards[ctx.cardId]` at point
@@ -518,5 +528,6 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     kind: 'stopped',
     cardId,
     reason: `session ended with outcome "${sessionResult.outcome}": ${sessionResult.finalText}`,
+    retryable: sessionResult.outcome === 'error',
   };
 }
