@@ -58,6 +58,16 @@ export const BACKGROUNDING_DENIED_REASON =
   'foreground with timeout: 600000 (Bash) or run_in_background: false (Agent/Task). If the ' +
   'work cannot fit in 600s, split it by exact file name and run each part in the foreground.';
 
+/** The reason text a denied wait-tool attempt (Monitor / ScheduleWakeup) reports back to the
+ * executor. Phrased as an instruction, not just a refusal (spec P1: ×4 incident — a session
+ * that arms a wait-tool then ends its turn dies before the notification can ever reach it). */
+export const WAIT_TOOL_DENIED_REASON =
+  'Wait-tools are disabled for campaign executor sessions: this session ends the moment ' +
+  'it stops calling tools, so an armed Monitor/ScheduleWakeup notification can never ' +
+  'reach you — ending your turn to wait kills the session. To wait on CI, run ' +
+  '`gh pr checks <pr> --watch` in the FOREGROUND (Bash, timeout: 600000) and proceed ' +
+  'when it concludes.';
+
 /** PURE: decides whether one PreToolUse event is an attempt to background work.
  *
  * This is the enforcement half of the anti-livelock wall. The 2026-07-17 campaign incident
@@ -84,6 +94,29 @@ export function decideBackgroundingHook(input: unknown): HookDecision {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
       permissionDecisionReason: BACKGROUNDING_DENIED_REASON,
+    },
+  };
+}
+
+/** PURE: decides whether one PreToolUse event is an attempt to arm a wait-tool (`Monitor` /
+ * `ScheduleWakeup`). Split out of `decideBackgroundingHook` (P1 audit fix-round, should-fix,
+ * scout) into its own named hook: waiting synchronously and ending the turn is a DIFFERENT
+ * failure mode than backgrounding a job (the P1 spec's own distinction — "ending a turn is not
+ * a tool call"), and this repo already has an established one-function-per-PreToolUse-concern
+ * shape (`decideMergeGateHook`, below) rather than grafting a second concern onto
+ * `decideBackgroundingHook`'s body. Registered as its own separate `PreToolUse` entry in
+ * `buildSessionOptions`. */
+export function decideWaitToolHook(input: unknown): HookDecision {
+  const event = (input ?? {}) as { tool_name?: unknown };
+  const toolName = typeof event.tool_name === 'string' ? event.tool_name : '';
+
+  if (toolName !== 'Monitor' && toolName !== 'ScheduleWakeup') return {};
+
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: WAIT_TOOL_DENIED_REASON,
     },
   };
 }
@@ -155,6 +188,8 @@ export function buildSessionOptions(
       PreToolUse: [
         // Anti-livelock wall, enforced (not merely stated in the brief) — decideBackgroundingHook.
         { hooks: [(hookInput: unknown) => Promise.resolve(decideBackgroundingHook(hookInput))] },
+        // Wait-tool wall (P1 fix-list; split into its own hook, P1 audit fix-round) — decideWaitToolHook.
+        { hooks: [(hookInput: unknown) => Promise.resolve(decideWaitToolHook(hookInput))] },
         // Pre-merge check gate (P2 fix-list card) — decideMergeGateHook.
         { hooks: [decideMergeGateHook(io)] },
       ],

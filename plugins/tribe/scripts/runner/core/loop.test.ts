@@ -32,7 +32,7 @@ import type { VerifyConfig, VerifyResult } from './verify.ts';
 // use to self-heal safe residue between a first failed verify and the retry — exercised
 // directly here (same `CardCtx` shape `runPass` builds) so the healed retry detail is
 // observable, which `CardOutcome`'s `shipped` variant deliberately does not carry.
-import { healSafeResidue } from './loop/card-actions.ts';
+import { healSafeResidue, CONTINUE_UNKNOWN_STATE_PROMPT } from './loop/card-actions.ts';
 import type { CardCtx } from './loop/card-actions.ts';
 // P4 audit fix-round: proving the "report notes the heal" acceptance criterion at the ONLY
 // artifact an orchestrating session actually reads (report.ts), not just at healSafeResidue's
@@ -149,13 +149,33 @@ describe('deriveCardPhase — §D4 reality table', () => {
     }
   });
 
-  test('genuine no-trace (card.branch null) still yields a plain blind fresh — no bogus digest', async () => {
+  test('genuine no-trace (card.branch null, no sessionId either) still yields a plain blind fresh — no bogus digest', async () => {
     const io = ioWith({});
     const phase = await deriveCardPhase('C1', fixtureCard({ branch: null }), baseConfig, io);
     expect(phase).toEqual({ kind: 'fresh' });
     if (phase.kind === 'fresh') {
       expect(phase.digest).toBeUndefined();
     }
+  });
+
+  // P1 audit fix-round (blocker, skinnerB): the exact incident shape — an executor "opens its
+  // PR ... then ends its turn" with no terminal line — leaves `card.branch`/`card.pr` null
+  // (session.ts's `parseResultMessage` never populates `pr` on an `'error'` outcome, and
+  // `card-actions.ts`'s `recordBranchFromPr` is gated on `card.pr`), even though
+  // `onSessionStart` DID record `card.sessionId` the instant the SDK assigned it. Before this
+  // fix, `!card.branch` short-circuited straight to a blind `{ kind: 'fresh' }` here, silently
+  // discarding that sessionId and risking a duplicate PR/worktree on the very retry the P1
+  // spec exists to make safe. It must instead resume the one thing that DOES know what
+  // happened: the prior SDK session itself.
+  test('no branch/PR recorded, but sessionId IS recorded (P1 incident shape: session opened a PR then errored before reporting) -> resume with reason session_only', async () => {
+    const io = ioWith({});
+    const phase = await deriveCardPhase(
+      'C1',
+      fixtureCard({ branch: null, sessionId: 'sess-c1-try1' }),
+      baseConfig,
+      io,
+    );
+    expect(phase).toEqual({ kind: 'resume', sessionId: 'sess-c1-try1', reason: 'session_only' });
   });
 
   test('branch/worktree exist (worktree present), sessionId recorded -> resume with reason branch_no_pr', async () => {
@@ -351,6 +371,21 @@ function needsDirectionMessages(sessionId: string): SessionMessage[] {
       type: 'result',
       subtype: 'success',
       result: 'NEEDS_DIRECTION: which schema-lock path applies?',
+      session_id: sessionId,
+    },
+  ];
+}
+
+/** A `result` message carrying neither a `SHIPPED` nor a `NEEDS_DIRECTION` terminal line —
+ * `parseResultMessage` (session.ts) classifies this outcome `'error'`, exactly the "ended the
+ * turn without reporting" shape the P1 fix-list's bounded auto-retry targets. */
+function errorMessages(sessionId: string): SessionMessage[] {
+  return [
+    { type: 'system', subtype: 'init', session_id: sessionId },
+    {
+      type: 'result',
+      subtype: 'success',
+      result: 'armed a Monitor and ended the turn without a terminal line',
       session_id: sessionId,
     },
   ];
@@ -1439,14 +1474,24 @@ describe('runLoop — --dry-run: zero side effects', () => {
 });
 
 describe('runLoop — session error/timeout without a resume attempt: stops for external retry', () => {
-  test('a fresh session that errors stops this run without escalating', async () => {
+  test('a fresh session that errors exhausts its 2 bounded auto-retries, then stops this run', async () => {
+    // P1 fix-list: a lone `error` outcome is now `retryable`, so this scenario needs the SDK
+    // to keep failing across every attempt (1 original + 2 retries = 3) to still reach
+    // `stopped` — see the "bounded auto-retry" describe block below for the retry-succeeds
+    // and timeout-never-retries counterparts.
     const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
-    const { io } = buildMockLoopIo({
+    const { io, spawnBriefs } = buildMockLoopIo({
       stateJson: JSON.stringify(state),
       answers: '',
       spawnQueue: [
         () => {
           throw new Error('sdk crashed');
+        },
+        () => {
+          throw new Error('sdk crashed again');
+        },
+        () => {
+          throw new Error('sdk crashed a third time');
         },
       ],
     });
@@ -1454,7 +1499,115 @@ describe('runLoop — session error/timeout without a resume attempt: stops for 
     const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
 
     expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
-    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1' });
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: true });
+    expect(spawnBriefs).toHaveLength(3);
+  });
+});
+
+describe('runLoop — bounded auto-retry (P1 fix-list, spec "wait-aware liveness")', () => {
+  test('(a) session ends "error" once then ships on retry: retry takes the D4 RESUME path (not a second blind fresh), outcome shipped, exactly 2 sessions spawned', async () => {
+    // A genuinely fresh card (branch: null) — the P1 incident's own shape: the executor opens
+    // its PR then ends its turn before ever reporting SHIPPED, so `card.pr`/`card.branch` are
+    // never recorded (session.ts's `parseResultMessage` never sets `pr` on an `'error'`
+    // outcome) even though `onSessionStart` DID record `card.sessionId` the instant attempt 1
+    // started. P1 audit fix-round (blocker/should-fix, skinnerB + scout): this is the exact
+    // scenario the earlier version of this test failed to exercise — it pre-set `card.branch`
+    // to satisfy the post-ship verify point, which incidentally made the retry ALSO derive to
+    // a blind `fresh` (the mocked `gh pr view` has no handler here either), so the "retry
+    // succeeds" assertion below passed for the wrong reason. `gh pr view <pr> --json
+    // headRefName` is now mocked so `recordBranchFromPr` can discover the branch AFTER shipping
+    // — the same way it would for real.
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        ...cleanCommitAndVerifyHandlers('aaaaaaa'),
+        (cmd) =>
+          cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view'
+            ? ok(JSON.stringify({ headRefName: 'feat/c1-widget' }))
+            : null,
+      ],
+      spawnQueue: [
+        () => messages(errorMessages('sess-c1-try1')),
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1-try2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(spawnBriefs).toHaveLength(2);
+    // The proof this test exists for (P1 audit fix-round, finding 2): the retry did NOT spawn
+    // a second blind fresh session carrying the plain executor-brief template — it sent the
+    // literal `session_only` resume prompt, with `resume: 'sess-c1-try1'` set on the SDK call
+    // (verified indirectly: only the resume path ever sends this exact literal string; a fresh
+    // spawn always renders through `executorBrief`'s template).
+    expect(spawnBriefs[1]).toBe(CONTINUE_UNKNOWN_STATE_PROMPT);
+    expect(spawnBriefs[1]).not.toContain('{{CARD_ID}}');
+
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
+    expect(finalState.cards.C1.status).toBe('shipped');
+    expect(finalState.cards.C1.branch).toBe('feat/c1-widget');
+  });
+
+  test('(b) session ends "error" every time it is tried: still bounded to exactly 2 retries, exit EXIT_SESSION_INCOMPLETE', async () => {
+    // P1 audit fix-round (blocker/should-fix, skinnerB + scout): now that a genuinely fresh
+    // card (branch: null) whose session recorded a sessionId before erroring takes the D4
+    // RESUME path on retry (`phase.ts`'s `session_only` reason), each of the 2 bounded retries
+    // costs UP TO TWO underlying SDK spawns — the resume attempt itself, and (only when THAT
+    // also surfaces `'error'`) `runCardSession`'s own pre-existing resume-failure fallback to
+    // one fresh-with-digest spawn (card-actions.ts, unchanged by this fix-round). Worst case,
+    // every one of those 5 spawns (1 initial fresh + 2 retries x [resume attempt + fresh
+    // fallback]) errors — this is exactly that worst case, proving the run-loop's own retry
+    // counter (`retries < 2`) still bounds it, independent of how many spawns each retry costs.
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      spawnQueue: [
+        () => messages(errorMessages('sess-c1-try1')), // initial blind fresh
+        () => messages(errorMessages('sess-c1-try2')), // retry 1: resume attempt
+        () => messages(errorMessages('sess-c1-try3')), // retry 1: resume-failure fresh fallback
+        () => messages(errorMessages('sess-c1-try4')), // retry 2: resume attempt
+        () => messages(errorMessages('sess-c1-try5')), // retry 2: resume-failure fresh fallback
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: true });
+    expect(spawnBriefs).toHaveLength(5);
+    // Retries 1 and 2 both actually took the resume path (the literal prompt, not a rendered
+    // executor-brief template) before falling back — the same proof point as test (a) above.
+    expect(spawnBriefs[1]).toBe(CONTINUE_UNKNOWN_STATE_PROMPT);
+    expect(spawnBriefs[3]).toBe(CONTINUE_UNKNOWN_STATE_PROMPT);
+  });
+
+  test('(c) session outcome "timeout": no retry, exactly 1 attempt', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      spawnQueue: [
+        () =>
+          (async function* () {
+            yield { type: 'system', subtype: 'init', session_id: 'sess-c1-try1' } as SessionMessage;
+            await new Promise(() => {}); // hang forever — only the wall-clock timeout resolves.
+          })(),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1, sessionTimeoutMs: 20 }), io);
+
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: false });
+    expect(spawnBriefs).toHaveLength(1);
   });
 });
 

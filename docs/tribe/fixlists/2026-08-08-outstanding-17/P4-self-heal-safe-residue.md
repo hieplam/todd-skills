@@ -1,6 +1,6 @@
 # P4 — verify self-heals safe residue instead of escalating
 
-- **Status:** RATIFIED 2026-08-12 (delegated).
+- **Status:** SHIPPED — PR #81, merge `1865704` (2026-08-12).
 - **Incident:** same B6 event as P3 (log lines 113–126). The only residue was the remote
   branch of an **already-merged** PR — unconditionally safe to delete — yet the runner
   escalated (`verify_failed_twice — worktreeAndBranchGone`) and a human ran the deletion.
