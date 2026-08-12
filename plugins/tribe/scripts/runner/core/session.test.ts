@@ -12,6 +12,7 @@ import {
   TRIBE_PLUGIN_DIR,
   decideBackgroundingHook,
   runSession,
+  type HookDecision,
   type PinnedSessionOptions,
   type RunSessionConfig,
   type SessionIO,
@@ -28,12 +29,15 @@ function fixtureConfig(overrides: Partial<RunSessionConfig> = {}): RunSessionCon
   };
 }
 
-function recordingIo(): SessionIO & { calls: string[]; logLines: string[] } {
+function recordingIo(
+  execInRepo?: SessionIO['execInRepo'],
+): SessionIO & { calls: string[]; logLines: string[] } {
   const calls: string[] = [];
   const logLines: string[] = [];
   return {
     calls,
     logLines,
+    execInRepo,
     spawnSession: () => {
       throw new Error('spawnSession not stubbed for this test');
     },
@@ -312,5 +316,80 @@ describe('runSession — resume-attempt failure (§D4 fallback trigger)', () => 
     const result = await runSession({ brief: 'continue', resume: 'sess-previous' }, fixtureConfig(), io);
     expect(result.outcome).toBe('error');
     expect(result.finalText).toContain('resume stream rejected');
+  });
+});
+
+describe('runSession — pre-merge check gate hook wiring (P2 fix-list card)', () => {
+  /** Spawns a session with the given io (its `spawnSession` is overwritten to capture
+   * options and terminate immediately) and returns the SECOND wired PreToolUse hook —
+   * the merge gate, alongside the anti-livelock hook at index 0. */
+  async function wiredMergeGateHook(
+    io: SessionIO,
+  ): Promise<(input: unknown) => Promise<HookDecision>> {
+    let capturedOptions: PinnedSessionOptions | undefined;
+    io.spawnSession = (params) => {
+      capturedOptions = params.options;
+      return messages([
+        INIT_MESSAGE,
+        { type: 'result', subtype: 'success', result: 'SHIPPED 1 aaaaaaa', session_id: 'sess-123' },
+      ]);
+    };
+    await runSession({ brief: 'x' }, fixtureConfig(), io);
+    const wired = (capturedOptions as PinnedSessionOptions).hooks.PreToolUse[1]?.hooks[0];
+    expect(wired).toBeDefined();
+    return wired as (input: unknown) => Promise<HookDecision>;
+  }
+
+  test('denies a merge attempt when gh pr checks reports a red check (A2 replay: format-check red)', async () => {
+    const io = recordingIo(async () => ({
+      stdout: JSON.stringify([{ name: 'format-check', state: 'FAILURE' }]),
+      exitCode: 0,
+    }));
+    const hook = await wiredMergeGateHook(io);
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'gh pr merge --merge' } });
+
+    expect(decision.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(decision.hookSpecificOutput?.permissionDecisionReason).toContain('format-check: FAILURE');
+  });
+
+  test('allows a merge attempt when gh pr checks reports every check SUCCESS', async () => {
+    const io = recordingIo(async () => ({
+      stdout: JSON.stringify([{ name: 'format-check', state: 'SUCCESS' }]),
+      exitCode: 0,
+    }));
+    const hook = await wiredMergeGateHook(io);
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'gh pr merge --merge' } });
+
+    expect(decision).toEqual({});
+  });
+
+  test('returns an empty decision for a non-merge Bash command, without ever calling execInRepo', async () => {
+    let execCalled = false;
+    const io = recordingIo(async () => {
+      execCalled = true;
+      return { stdout: '[]', exitCode: 0 };
+    });
+    const hook = await wiredMergeGateHook(io);
+
+    const decision = await hook({ tool_name: 'Bash', tool_input: { command: 'bun test' } });
+
+    expect(decision).toEqual({});
+    expect(execCalled).toBe(false);
+  });
+
+  test('returns an empty decision for a non-Bash tool call', async () => {
+    let execCalled = false;
+    const io = recordingIo(async () => {
+      execCalled = true;
+      return { stdout: '[]', exitCode: 0 };
+    });
+    const hook = await wiredMergeGateHook(io);
+
+    const decision = await hook({ tool_name: 'Read', tool_input: { file_path: '/x' } });
+
+    expect(decision).toEqual({});
+    expect(execCalled).toBe(false);
   });
 });

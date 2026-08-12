@@ -158,6 +158,9 @@ export function buildSessionIOForCard(ctx: CardCtx): SessionIO {
       card.updatedAt = io.now();
       persistLocalState(state, resolved, io);
     },
+    // P2 fix-list card: the pre-merge check gate's exec seam — reuses LoopIO's own `exec`,
+    // scoped to this card's repo root.
+    execInRepo: (argv) => io.exec(argv, { cwd: resolved.repoRoot }),
   };
 }
 

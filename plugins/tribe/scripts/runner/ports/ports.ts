@@ -135,6 +135,11 @@ export interface SessionIO {
    * session id is SDK-assigned and cannot be known before spawn (spec §D1/§D4). */
   onSessionStart(sessionId: string): void;
   appendLog(logPath: string, line: string): void;
+  /** P2 fix-list card: the pre-merge check gate's one I/O call — runs `gh pr checks` (or
+   * any other argv) in the target repo. Optional because it is exercised only by the merge
+   * gate hook, not by every caller of `SessionIO`; a caller that never wires it is treated
+   * as "cannot verify checks" (fail-closed) by the hook, not as a crash. */
+  execInRepo?(argv: string[]): Promise<{ stdout: string; exitCode: number }>;
 }
 
 /** The exact §D1 pinned option set, pinned in this one module. Every field is load-bearing
