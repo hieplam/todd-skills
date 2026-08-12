@@ -181,6 +181,37 @@ async function tryWriteReport(config: RunLoopConfig, io: LoopIO, run: ReportRunI
   }
 }
 
+/** P10 (fix-list): scrub a stray ANTHROPIC_API_KEY line out of the target repo's
+ * `.env.local` — the incident vector (Bun auto-loads `.env.local` from cwd). Real run:
+ * delete without asking (owner ruling). Dry run: warn only — stays zero side effects by
+ * construction. Best-effort, same contract as tryWriteReport/tryFinalizeRunRecord below: a
+ * transient fs error here (EACCES, a mid-flight delete between the exists-check and the
+ * read, a read-only mount) must never crash the run before `runLoop` is even entered — this
+ * is a hygiene step, not part of the campaign's actual progress, so it degrades to a warning
+ * rather than an uncaught exception. Exported for `cli/main.test.ts` (takes only the FsPort
+ * slice of `LoopIO` it actually needs, so a test can inject a throwing mock without building
+ * a full `LoopIO`). */
+export async function scrubTargetEnvLocal(
+  repoRoot: string,
+  dryRun: boolean,
+  io: Pick<LoopIO, 'fileExists' | 'readFile' | 'writeFile'>,
+): Promise<void> {
+  const envLocalPath = join(repoRoot, '.env.local');
+  try {
+    if (!io.fileExists(envLocalPath)) return;
+    const { cleaned, removed } = scrubEnvContent(String(await io.readFile(envLocalPath)));
+    if (removed === 0) return;
+    if (dryRun) {
+      console.error(`campaign runner: ${envLocalPath} has ${removed} ANTHROPIC_API_KEY line(s) — would remove (--dry-run, not written)`);
+      return;
+    }
+    io.writeFile(envLocalPath, cleaned);
+    console.error(`campaign runner: removed ${removed} ANTHROPIC_API_KEY line(s) from ${envLocalPath}`);
+  } catch (err) {
+    console.error(`campaign runner: could not scrub ${envLocalPath} for ANTHROPIC_API_KEY (continuing): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 /** Best-effort, same contract as tryWriteReport: a missing/corrupt run.json (e.g. the
  * startup write itself failed) is swallowed — observability exhaust never crashes the run;
  * an unfinalized record with a dead pid is exactly how the viewer detects a crash. */
@@ -220,23 +251,11 @@ export async function main(): Promise<void> {
   const io = buildRealIo(parsed.config);
   const startedAt = new Date().toISOString();
 
-  // P10: scrub a stray ANTHROPIC_API_KEY line out of the target repo's .env.local — the
-  // incident vector (Bun auto-loads .env.local from cwd). Real run: delete without
-  // asking (owner ruling). Dry run: warn only — stays zero side effects by construction.
-  // Routed through `io` (the composition root's own adapter handle), never a direct fs
-  // import here — cli/main.ts only wires adapters, per structure.test.ts.
-  const envLocalPath = join(parsed.config.repoRoot, '.env.local');
-  if (io.fileExists(envLocalPath)) {
-    const { cleaned, removed } = scrubEnvContent(String(await io.readFile(envLocalPath)));
-    if (removed > 0) {
-      if (parsed.config.dryRun) {
-        console.error(`campaign runner: ${envLocalPath} has ${removed} ANTHROPIC_API_KEY line(s) — would remove (--dry-run, not written)`);
-      } else {
-        io.writeFile(envLocalPath, cleaned);
-        console.error(`campaign runner: removed ${removed} ANTHROPIC_API_KEY line(s) from ${envLocalPath}`);
-      }
-    }
-  }
+  // P10: scrub a stray ANTHROPIC_API_KEY line out of the target repo's .env.local. Routed
+  // through `io` (the composition root's own adapter handle), never a direct fs import here
+  // — cli/main.ts only wires adapters, per structure.test.ts. See scrubTargetEnvLocal's doc
+  // comment above for the best-effort contract (never throws).
+  await scrubTargetEnvLocal(parsed.config.repoRoot, parsed.config.dryRun, io);
 
   let result: LoopResult | undefined;
   let thrown: unknown;

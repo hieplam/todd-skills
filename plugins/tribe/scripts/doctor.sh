@@ -45,24 +45,28 @@ else
 fi
 
 # --- Agent SDK credentials: the runner spawns Claude sessions ----------------
-# Either an explicit API key, or an existing Claude Code login the SDK can reuse.
-if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  ok "Agent SDK credentials (ANTHROPIC_API_KEY is set)"
-elif [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" ] || [ -f "$HOME/.claude.json" ]; then
+# P10 (fix-list): the tribe never authenticates via ANTHROPIC_API_KEY — the runner unsets it
+# from its own process environment before spawning any session (unconditionally, every run),
+# so ANTHROPIC_API_KEY ALONE is never sufficient credentials at spawn time, even though it is
+# present right now in THIS shell. Only a real Claude Code login satisfies this check; a
+# machine whose only credential source is ANTHROPIC_API_KEY is reported MISSING here (not
+# "ok"), because by the time a session actually spawns, that variable is already gone.
+if [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" ] || [ -f "$HOME/.claude.json" ]; then
   ok "Agent SDK credentials (Claude Code login found)"
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    warn "ANTHROPIC_API_KEY is also set in the environment — ignored (the tribe authenticates via Claude Code login, never this variable; the runner removes it automatically before spawning any session)"
+  fi
+elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  gap "Agent SDK credentials — ANTHROPIC_API_KEY is set, but the runner removes it automatically before spawning any session (the tribe authenticates via Claude Code login only, never this variable) and no Claude Code login was found"
+  fix "log in with Claude Code (run: claude) — ANTHROPIC_API_KEY will not be used as a fallback"
 else
   gap "Agent SDK credentials — the runner spawns Claude sessions and cannot authenticate"
-  fix "either log in with Claude Code, or export ANTHROPIC_API_KEY=<key>"
+  fix "log in with Claude Code (run: claude)"
 fi
 
-# --- ANTHROPIC_API_KEY trap (fix-list P10): the tribe never authenticates via this
-# variable — executor sessions authenticate via Claude Code login only. Report-only: the
-# runner itself enforces the rule (unsets the env var, scrubs the target repo's
-# .env.local) at the top of every run, so this is a heads-up, not a gate — it never
-# increments MISSING or affects the exit code.
-if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  warn "ANTHROPIC_API_KEY is set in the environment — the tribe authenticates via Claude Code login, never this variable (the runner removes it automatically before spawning any session)"
-fi
+# --- ANTHROPIC_API_KEY in the target repo's .env.local (fix-list P10) --------------------
+# Report-only: the runner itself enforces the rule (scrubs the line) at the top of every real
+# run, so this is a heads-up, not a gate — it never increments MISSING or affects the exit code.
 if [ -f ".env.local" ] && grep -qE '^\s*(export\s+)?ANTHROPIC_API_KEY\s*=' ".env.local"; then
   warn "$(pwd)/.env.local sets ANTHROPIC_API_KEY — the runner removes that line automatically on its next run against this repo"
 fi
