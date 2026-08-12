@@ -24,9 +24,16 @@ import {
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { BRIEF_TEMPLATE_PATH } from './brief.ts';
 import { answersPathOf, campaignStatePathOf } from './paths.ts';
-import type { Card, CampaignState } from './types.ts';
+import type { Card, CampaignState, ResolvedConfig } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
-import type { VerifyResult } from './verify.ts';
+import { verifyShipped } from './verify.ts';
+import type { VerifyConfig, VerifyResult } from './verify.ts';
+// P4 fix-list item: `healSafeResidue` is the ONE helper `actOnCard`'s two verify call sites
+// use to self-heal safe residue between a first failed verify and the retry — exercised
+// directly here (same `CardCtx` shape `runPass` builds) so the healed retry detail is
+// observable, which `CardOutcome`'s `shipped` variant deliberately does not carry.
+import { healSafeResidue } from './loop/card-actions.ts';
+import type { CardCtx } from './loop/card-actions.ts';
 
 // ---------------------------------------------------------------------------------------
 // Shared fixtures
@@ -1000,6 +1007,151 @@ describe('runLoop — double verify-fail -> escalation', () => {
     // verifyShipped's `merged` check (gh api) was attempted exactly twice — the D5 "fails
     // twice" trigger, never escalating on a single (possibly transient) failure.
     expect(apiCalls).toBe(2);
+  });
+});
+
+// ===========================================================================================
+// P4 fix-list item: verify self-heals safe residue instead of escalating
+// (docs/tribe/fixlists/2026-08-08-outstanding-17/P4-self-heal-safe-residue.md)
+// ===========================================================================================
+
+describe('runLoop — self-heals safe residue between the first failed verify and the retry (P4)', () => {
+  test('merged PR + only remote-branch residue -> deletes the branch, ships, no escalation', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', pr: null }) },
+    });
+    let branchDeleted = false;
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view' && cmd[3] === 'feat/c1-widget') {
+            return ok(JSON.stringify({ number: 12, state: 'MERGED' }));
+          }
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') {
+            return branchDeleted ? ok('') : ok('abc123\trefs/heads/feat/c1-widget\n');
+          }
+          if (cmd[0] === 'git' && cmd[1] === 'push' && cmd[2] === 'origin' && cmd[3] === '--delete') {
+            branchDeleted = true;
+            return ok('');
+          }
+          return null;
+        },
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    // The heal exec fired.
+    expect(calls).toContainEqual(['git', 'push', 'origin', '--delete', 'feat/c1-widget']);
+    // The card shipped, not escalated.
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed[0]).toEqual({ kind: 'shipped', cardId: 'C1' });
+  });
+
+  test('dirty worktree residue -> no heal exec, escalates as today', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', pr: null }) },
+    });
+    const worktreePorcelain = [
+      'worktree /repo/.worktrees/c1',
+      'HEAD abcdef0123456789abcdef0123456789abcdef01',
+      'branch refs/heads/feat/c1-widget',
+    ].join('\n');
+    const { io, calls, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view' && cmd[3] === 'feat/c1-widget') {
+            return ok(JSON.stringify({ number: 12, state: 'MERGED' }));
+          }
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok(worktreePorcelain);
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('');
+          // The worktree is DIRTY — `git status --porcelain` reports a pending change.
+          if (cmd[0] === 'git' && cmd[1] === 'status') return ok(' M some-file.txt\n');
+          return null;
+        },
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    // No heal exec fired — neither recipe was invoked.
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'push' && c[2] === 'origin' && c[3] === '--delete')).toBe(
+      false,
+    );
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'worktree' && c[2] === 'remove')).toBe(false);
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'branch' && c[2] === '-D')).toBe(false);
+    // Escalates exactly as before P4.
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1', reason: 'verify_failed_twice' });
+    const escalationOutcome = result.processed[0] as { escalationPath: string };
+    const escalationMarkdown = writtenFiles.get(escalationOutcome.escalationPath) ?? '';
+    expect(escalationMarkdown).not.toContain('healed:');
+    expect(escalationMarkdown).toContain('worktree still present');
+  });
+
+  test('healSafeResidue: merged + remote-branch residue -> retry result detail records "healed: delete_remote_branch"', async () => {
+    const card = fixtureCard({ branch: 'feat/c1-widget', pr: 12 });
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: card } });
+    let branchDeleted = false;
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') {
+            return branchDeleted ? ok('') : ok('abc123\trefs/heads/feat/c1-widget\n');
+          }
+          if (cmd[0] === 'git' && cmd[1] === 'push' && cmd[2] === 'origin' && cmd[3] === '--delete') {
+            branchDeleted = true;
+            return ok('');
+          }
+          return null;
+        },
+      ],
+    });
+
+    const resolved: ResolvedConfig = {
+      ...baseLoopConfig(),
+      baseBranch: 'master',
+      answersContent: '',
+      briefTemplate: '',
+    };
+    const verifyConfig: VerifyConfig = {
+      repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
+      schemaLockPaths: [],
+      docsOnlyPaths: ['docs/'],
+    };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    const first = await verifyShipped(card, verifyConfig, io);
+    expect(first.shipped).toBe(false);
+
+    const healed = await healSafeResidue(ctx, first, verifyConfig);
+
+    expect(healed.shipped).toBe(true);
+    expect(calls).toContainEqual(['git', 'push', 'origin', '--delete', 'feat/c1-widget']);
+    const worktreePoint = healed.points.find((p) => p.id === 'worktreeAndBranchGone');
+    expect(worktreePoint?.detail).toContain('healed:');
+    expect(worktreePoint?.detail).toContain('delete_remote_branch');
   });
 });
 
