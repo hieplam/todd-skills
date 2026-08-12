@@ -1244,6 +1244,15 @@ suspicious one — do not go hunting for something to change in order to feel li
   dispatch, notice the late run with a fresh `gh run list` and simply re-run the watch block
   above against it.
 - **Merge** — regular merge (`gh pr merge --merge`), do this into the default branch once green.
+- **Definition of Done — "merged" is not "done".** You may report `SHIPPED` only once ALL of
+  these hold: the PR is merged (behind the pre-merge check gate above); the remote feature
+  branch no longer exists; the card's worktree has been removed; and your local default-branch
+  checkout is fast-forwarded to the remote's default branch. Verify each of the four with a
+  command, not from memory — an unverified assumption here costs a full escalation round-trip.
+  Illustration, not the obligation itself (the repo may name different commands): delete the
+  remote branch with `git push origin --delete <branch>`, remove the worktree with
+  `git worktree remove <path>`, and fast-forward with `git fetch origin && git merge --ff-only
+  origin/<default-branch>`. *done = the next card starts clean on the latest changes.*
 
 ### 8. Report back to the Shaman
 

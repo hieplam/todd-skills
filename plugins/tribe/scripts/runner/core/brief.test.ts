@@ -71,6 +71,9 @@ Ship C7 end-to-end: implement the plan at docs/superpowers/plans/2026-01-01-c7-p
   not green. A merge attempt with checks not green is blocked at the permission layer; if
   a check is red for reasons outside this card's diff, escalate NEEDS_DIRECTION instead of
   merging.
+- After creating a worktree, run the repo's dependency bootstrap (e.g. \`bun install\`)
+  before the first commit — repo hooks typically run repo-wide and fail spuriously in a
+  worktree without dependencies.
 
 ## Session liveness (hard wall — this is what kills runs)
 
@@ -121,6 +124,20 @@ Before raising any question, check whether it is already answered here. If it is
 the ruling; do not ask again.
 
 ${FIXTURE_ANSWERS}
+
+## Definition of Done (preconditions for SHIPPED)
+
+"Merged" is not "done". You may print the \`SHIPPED\` line only after ALL of:
+
+1. The PR is merged (behind the pre-merge check gate).
+2. The remote feature branch is deleted (\`git push origin --delete <branch>\`).
+3. The card's worktree is removed (\`git worktree remove <path>\`).
+4. Local master is fast-forwarded to origin/master.
+
+Verify each step with a command, not from memory — the runner independently re-verifies
+all four and a missing one costs a full escalation round-trip.
+
+*done = the next card starts clean on the latest changes.*
 
 ## Terminal contract
 
@@ -183,6 +200,38 @@ describe('executorBrief', () => {
     expect(rendered).toContain('Your session ends the instant you stop calling tools');
     expect(rendered).toContain('timeout: 600000');
     expect(rendered).toContain('run_in_background: false');
+  });
+
+  test('states the Definition of Done preconditions for SHIPPED (P3: merged is not done)', () => {
+    const rendered = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
+    expect(rendered).toContain('## Definition of Done (preconditions for SHIPPED)');
+    expect(rendered).toContain('"Merged" is not "done"');
+    expect(rendered).toContain('The PR is merged (behind the pre-merge check gate).');
+    expect(rendered).toContain('The remote feature branch is deleted (`git push origin --delete <branch>`).');
+    expect(rendered).toContain("The card's worktree is removed (`git worktree remove <path>`).");
+    expect(rendered).toContain('Local master is fast-forwarded to origin/master.');
+    expect(rendered).toContain('done = the next card starts clean on the latest changes.');
+    // The DoD section must land before the terminal contract, not after it.
+    expect(rendered.indexOf('## Definition of Done')).toBeLessThan(rendered.indexOf('## Terminal contract'));
+  });
+
+  test('states the worktree dependency bootstrap wall (P15 remainder)', () => {
+    const rendered = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
+    expect(rendered).toContain('After creating a worktree, run the repo\'s dependency bootstrap');
   });
 
   test('renders a distinct brief per card id and per campaign (no hardcoded values)', () => {
