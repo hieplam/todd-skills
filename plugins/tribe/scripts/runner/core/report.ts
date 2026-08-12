@@ -56,7 +56,16 @@ export interface ReportConfig {
 }
 
 export type CardReportEntry =
-  | { outcome: 'shipped'; pr: number | null; mergeSha: string | null }
+  | {
+      outcome: 'shipped';
+      pr: number | null;
+      mergeSha: string | null;
+      /** P4 fix-list item: the `HealAction.kind`s `healSafeResidue` actually applied while
+       * shipping this card (`card.healedResidue`, set only by `shipCard` — see
+       * `core/loop/card-actions.ts`). OPTIONAL and present ONLY when non-empty, so every
+       * existing shipped-card fixture/assertion that never healed anything is untouched. */
+      healedResidue?: string[];
+    }
   | { outcome: 'escalated'; escalationFile: string; question: string; autoAnswerRounds: number }
   | { outcome: 'blocked'; blockedOn: string }
   | { outcome: 'not_reached' };
@@ -191,7 +200,13 @@ export async function buildCampaignReport(
     if (!card) continue; // referential integrity already enforced at load (state.ts); defensive only.
 
     if (card.status === 'shipped') {
-      cards[cardId] = { outcome: 'shipped', pr: card.pr, mergeSha: card.mergeSha };
+      const healedResidue = card.healedResidue ?? [];
+      cards[cardId] = {
+        outcome: 'shipped',
+        pr: card.pr,
+        mergeSha: card.mergeSha,
+        ...(healedResidue.length > 0 ? { healedResidue } : {}),
+      };
       stats.shipped += 1;
       continue;
     }
@@ -248,6 +263,9 @@ export function renderReportMarkdown(report: CampaignReport): string {
     if (entry.outcome === 'shipped') {
       lines.push(`- PR: ${entry.pr ?? '(none)'}`);
       lines.push(`- Merge sha: ${entry.mergeSha ?? '(none)'}`);
+      if (entry.healedResidue && entry.healedResidue.length > 0) {
+        lines.push(`- Healed residue: ${entry.healedResidue.join(', ')}`);
+      }
     } else if (entry.outcome === 'escalated') {
       lines.push(`- Escalation file: ${entry.escalationFile}`);
       lines.push(`- Question: ${entry.question}`);

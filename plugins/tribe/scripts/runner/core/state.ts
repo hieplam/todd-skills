@@ -102,6 +102,9 @@ const CardSchema = z.looseObject({
   // (`autoAnswerRounds ?? 0`, "no dependsOn" == independent) themselves.
   dependsOn: z.array(z.string()).optional(),
   autoAnswerRounds: z.number().optional(),
+  // P4 fix-list item: same optional-with-no-default reasoning as `dependsOn`/`autoAnswerRounds`
+  // above — only ever present when `shipCard` actually recorded a heal.
+  healedResidue: z.array(z.string()).optional(),
 });
 
 export const CampaignStateSchema = z.looseObject({

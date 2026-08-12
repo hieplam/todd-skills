@@ -5,7 +5,7 @@
 import type { Card, CampaignState, ResolvedConfig } from '../types.ts';
 import type { LoopIO } from '../../ports/ports.ts';
 import { verifyShipped } from '../verify.ts';
-import type { VerifyConfig, VerifyIO, VerifyResult } from '../verify.ts';
+import type { VerifyConfig, VerifyResult } from '../verify.ts';
 import { runSession } from '../session.ts';
 import type { RunSessionConfig, SessionIO, SessionResult } from '../session.ts';
 import { executorBrief, reportPathFor } from '../brief.ts';
@@ -14,6 +14,8 @@ import type { CardPhase } from './phase.ts';
 import { buildStateDigest, findWorktreePathForBranch } from './phase.ts';
 import { persistLocalState } from './commit-guard.ts';
 import { answersPathOf, escalationPathOf } from '../paths.ts';
+import { decideResidueHeal, type HealAction } from '../residue.ts';
+import { WORKTREE_STILL_PRESENT_DETAIL } from '../verify.ts';
 
 export type CardOutcome =
   | { kind: 'shipped'; cardId: string }
@@ -47,17 +49,144 @@ export interface CardCtx {
   io: LoopIO;
 }
 
-/** D5/D3: verifyShipped fails once, then is given exactly one more attempt before the caller
- * escalates ("D3 verification fails twice for a card") — the second attempt is what tells a
- * transient exec/network blip apart from a real, stable finding on an already-merged PR. */
-export async function verifyWithRetry(
-  card: Card,
+/** Gathers the facts `decideResidueHeal` needs about worktree residue — ONLY when the
+ * failing point's detail actually names a worktree problem (`"worktree still present"`);
+ * an absent worktree needs no `git status`/`git merge-base` probe at all. Reuses
+ * `findWorktreePathForBranch` (the same `git worktree list --porcelain` parser
+ * `performRevertAndRedo` uses) rather than re-deriving worktree discovery. */
+async function gatherWorktreeResidueFacts(
+  ctx: CardCtx,
+  branch: string,
+  worktreeDetail: string,
+): Promise<{ worktreePath: string | null; worktreeStatusClean: boolean; tipIsAncestorOfBase: boolean }> {
+  if (!worktreeDetail.includes(WORKTREE_STILL_PRESENT_DETAIL)) {
+    return { worktreePath: null, worktreeStatusClean: false, tipIsAncestorOfBase: false };
+  }
+
+  const { resolved, io } = ctx;
+  const worktreeList = await io.exec(['git', 'worktree', 'list', '--porcelain'], { cwd: resolved.repoRoot });
+  const worktreePath = findWorktreePathForBranch(worktreeList.stdout, branch);
+  if (!worktreePath) {
+    return { worktreePath: null, worktreeStatusClean: false, tipIsAncestorOfBase: false };
+  }
+
+  const status = await io.exec(['git', 'status', '--porcelain'], { cwd: worktreePath });
+  // P4 audit fix-round (blocker, scout): a failed `git status --porcelain` (locked index,
+  // transient error) presents as empty stdout — `exitCode === 0` is required too, exactly like
+  // every other exec consumer in this module (the ancestor check below, `recordBaseSha`,
+  // `recordBranchFromPr`), so a failed probe is never wrongly treated as "clean".
+  const worktreeStatusClean = status.exitCode === 0 && status.stdout.trim().length === 0;
+
+  const ancestor = await io.exec(
+    ['git', 'merge-base', '--is-ancestor', branch, `${resolved.remote}/${resolved.baseBranch}`],
+    { cwd: resolved.repoRoot },
+  );
+  const tipIsAncestorOfBase = ancestor.exitCode === 0;
+
+  return { worktreePath, worktreeStatusClean, tipIsAncestorOfBase };
+}
+
+/** Executes the `HealAction`s `decideResidueHeal` proved safe, and returns ONLY the actions
+ * that actually SUCCEEDED (checked by `exitCode`, never assumed) — `appendHealedDetail` must
+ * never label an attempted-but-failed action as healed (P4 audit fix-round, should-fix:
+ * a network blip/race that leaves the residue in place must not make the report claim
+ * otherwise). Both recipes are the ones `performRevertAndRedo` already established for
+ * REVERT_AND_REDO — reused, not duplicated — EXCEPT `remove_worktree` deliberately omits
+ * `--force`: unlike REVERT_AND_REDO's "start over unconditionally", this residue was already
+ * proven to carry no uncommitted work (spec §"worktree residue: safe only when ... `git status
+ * --porcelain` is EMPTY"), so a plain `git worktree remove` is both sufficient and the more
+ * conservative choice — the moment that changes underneath us (a stray write between the probe
+ * and the remove), the plain form fails loudly instead of silently discarding it. P4 audit
+ * fix-round (blocker): that "fails loudly" guarantee was previously undermined by running
+ * `git branch -D` UNCONDITIONALLY even when the `worktree remove` was refused — a refused
+ * (dirty) removal now short-circuits the branch delete entirely, so a dirty worktree is never
+ * left orphaned with no branch pointing at it. */
+async function executeHealActions(ctx: CardCtx, actions: HealAction[]): Promise<HealAction[]> {
+  const { resolved, io } = ctx;
+  const succeeded: HealAction[] = [];
+  for (const action of actions) {
+    if (action.kind === 'delete_remote_branch') {
+      const result = await io.exec(
+        ['git', 'push', resolved.remote, '--delete', action.branch],
+        { cwd: resolved.repoRoot },
+      );
+      if (result.exitCode === 0) succeeded.push(action);
+    } else {
+      const removeResult = await io.exec(['git', 'worktree', 'remove', action.path], {
+        cwd: resolved.repoRoot,
+      });
+      if (removeResult.exitCode !== 0) continue; // refused — do NOT touch the branch ref.
+      const branchResult = await io.exec(['git', 'branch', '-D', action.branch], {
+        cwd: resolved.repoRoot,
+      });
+      if (branchResult.exitCode === 0) succeeded.push(action);
+    }
+  }
+  return succeeded;
+}
+
+/** Appends `(healed: <kind>, <kind>, ...)` to the `worktreeAndBranchGone` point's detail —
+ * the ONLY place residue healing is recorded, so a report built from this result (whether it
+ * ships or still needs to escalate on a DIFFERENT point) shows the heal instead of silently
+ * passing over it. A no-op (returns `result` unchanged) when nothing was healed. */
+function appendHealedDetail(result: VerifyResult, actions: HealAction[]): VerifyResult {
+  if (actions.length === 0) return result;
+  const suffix = ` (healed: ${actions.map((a) => a.kind).join(', ')})`;
+  return {
+    ...result,
+    points: result.points.map((p) =>
+      p.id === 'worktreeAndBranchGone' ? { ...p, detail: `${p.detail}${suffix}` } : p,
+    ),
+  };
+}
+
+/** The P4 fix-list wiring: between a first FAILED verify and the retry, heal whatever
+ * residue `decideResidueHeal` proves safe (spec: only when the `merged` point PASSED and
+ * `worktreeAndBranchGone` is the failing point), then re-verify. This is the ONE helper used
+ * at both of `actOnCard`'s verify call sites — never duplicated. Heal is skipped entirely
+ * (falling through to a plain retry, exactly today's D3/D5 "one more attempt" behavior)
+ * whenever the safety conditions don't hold: an unmerged PR, a dirty worktree, or a
+ * non-ancestor branch tip all leave `decideResidueHeal` returning `[]`, and the existing
+ * escalation flow runs unchanged. */
+export async function healSafeResidue(
+  ctx: CardCtx,
+  firstResult: VerifyResult,
   verifyConfig: VerifyConfig,
-  io: VerifyIO,
 ): Promise<VerifyResult> {
-  const first = await verifyShipped(card, verifyConfig, io);
+  const { state, cardId, io } = ctx;
+  const card = state.cards[cardId];
+
+  const mergedPoint = firstResult.points.find((p) => p.id === 'merged');
+  const worktreePoint = firstResult.points.find((p) => p.id === 'worktreeAndBranchGone');
+
+  let healedActions: HealAction[] = [];
+  if (mergedPoint?.passed && worktreePoint && !worktreePoint.passed && card.branch) {
+    const facts = await gatherWorktreeResidueFacts(ctx, card.branch, worktreePoint.detail);
+    const actions = decideResidueHeal({
+      mergedPassed: mergedPoint.passed,
+      detail: worktreePoint.detail,
+      branch: card.branch,
+      ...facts,
+    });
+    healedActions = await executeHealActions(ctx, actions);
+  }
+
+  const retry = await verifyShipped(card, verifyConfig, io);
+  return appendHealedDetail(retry, healedActions);
+}
+
+/** `actOnCard`'s two verify call sites both need exactly this: verify once, and only on
+ * failure fall through to `healSafeResidue`'s heal-then-retry (which itself degrades to a
+ * plain retry when nothing is provably safe to heal — see that function's doc comment).
+ * Kept as its own tiny wrapper so neither call site repeats the `first.shipped` branch. Takes
+ * only `ctx` — no separately threaded `card` — per `CardCtx`'s own doc comment: `card` is
+ * always derived as `ctx.state.cards[ctx.cardId]` at point of use (P4 audit fix-round,
+ * should-fix: this was the one function in the file that violated that invariant). */
+async function verifyThenHealIfNeeded(ctx: CardCtx, verifyConfig: VerifyConfig): Promise<VerifyResult> {
+  const card = ctx.state.cards[ctx.cardId];
+  const first = await verifyShipped(card, verifyConfig, ctx.io);
   if (first.shipped) return first;
-  return verifyShipped(card, verifyConfig, io);
+  return healSafeResidue(ctx, first, verifyConfig);
 }
 
 /** Extracts the merge sha `checkMerged`'s point recorded in its `detail` string —
@@ -68,6 +197,24 @@ export function extractMergeSha(result: VerifyResult): string | null {
   if (!mergedPoint) return null;
   const match = /merge_commit_sha=([0-9a-f]+)/.exec(mergedPoint.detail);
   return match ? (match[1] as string) : null;
+}
+
+/** P4 audit fix-round (blocker, skinnerA): reads back the `(healed: <kind>, <kind>, ...)`
+ * suffix `appendHealedDetail` wrote onto the `worktreeAndBranchGone` point's detail — same
+ * regex-extraction idiom as `extractMergeSha` above, for the same reason (`VerifyResult`
+ * carries no dedicated field, and verify.ts must not be rewritten to add one). This is what
+ * lets `shipCard` persist the heal onto `card.healedResidue`, which is the ONLY way a heal
+ * that happened during THIS card's ship reaches `campaign-report.json`/`.md` — the actual
+ * spec acceptance criterion ("report notes the heal"). Returns `[]` when nothing was healed. */
+export function extractHealedKinds(result: VerifyResult): string[] {
+  const worktreePoint = result.points.find((p) => p.id === 'worktreeAndBranchGone');
+  if (!worktreePoint) return [];
+  const match = /\(healed: ([^)]+)\)/.exec(worktreePoint.detail);
+  if (!match) return [];
+  return (match[1] as string)
+    .split(',')
+    .map((kind) => kind.trim())
+    .filter((kind) => kind.length > 0);
 }
 
 export function formatVerifyFailure(result: VerifyResult): string {
@@ -120,6 +267,14 @@ export async function shipCard(ctx: CardCtx, verifyResult: VerifyResult): Promis
   const card = state.cards[cardId];
   card.status = 'shipped';
   card.mergeSha = extractMergeSha(verifyResult) ?? card.mergeSha;
+  // P4 audit fix-round (blocker, skinnerA): persist the heal onto the CARD, since `CardOutcome`
+  // (`shipped`) never carries anything beyond `{ kind, cardId }` and report.ts builds its
+  // report ENTIRELY from `CampaignState` (Warchief ruling 1) — never from `CardOutcome[]`. This
+  // is the only path by which "healed: <kind>" reaches campaign-report.json/.md.
+  const healedKinds = extractHealedKinds(verifyResult);
+  if (healedKinds.length > 0) {
+    card.healedResidue = healedKinds;
+  }
   card.updatedAt = io.now();
   persistLocalState(state, resolved, io);
 
@@ -320,7 +475,7 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
       schemaLockPaths: state.schemaLockPaths,
       docsOnlyPaths: state.docsOnlyPaths,
     };
-    const result = await verifyWithRetry(card, verifyConfig, io);
+    const result = await verifyThenHealIfNeeded(ctx, verifyConfig);
     if (result.shipped) {
       return shipCard(ctx, result);
     }
@@ -344,7 +499,7 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
       schemaLockPaths: state.schemaLockPaths,
       docsOnlyPaths: state.docsOnlyPaths,
     };
-    const result = await verifyWithRetry(card, verifyConfig, io);
+    const result = await verifyThenHealIfNeeded(ctx, verifyConfig);
     if (result.shipped) {
       return shipCard(ctx, result);
     }

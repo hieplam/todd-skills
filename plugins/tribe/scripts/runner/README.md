@@ -561,10 +561,13 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
   exhaust must never fail a campaign run (spec §9). A caller relying on `run.json` for liveness
   should treat its absence, or a permanently-unfinalized record with a dead pid, as informative
   rather than assume every invocation always produces one.
-- **`verifyWithRetry` retries with zero delay.** The D3 verify-shipped check is attempted
-  twice back-to-back with no sleep between attempts (`loop.ts`). This catches a transient
-  `gh`/network blip on the *second* call, but it will **not** catch a check that is still
-  settling (e.g. CI still running) — the two attempts happen too close together for that.
+- **The verify retry (`verifyThenHealIfNeeded`/`healSafeResidue`, `core/loop/card-actions.ts`)
+  has zero delay.** The D3 verify-shipped check is attempted twice back-to-back with no sleep
+  between attempts (the second attempt heals whatever residue P4's `decideResidueHeal` proves
+  safe first, per spec `docs/tribe/fixlists/2026-08-08-outstanding-17/P4-self-heal-safe-residue.md`).
+  This catches a transient `gh`/network blip on the *second* call, but it will **not** catch a
+  check that is still settling (e.g. CI still running) — the two attempts happen too close
+  together for that.
 - **`baseBranch` derivation has a silent fallback.** `resolveBaseBranch` runs
   `git symbolic-ref --short refs/remotes/<remote>/HEAD` (`<remote>` is `--remote`, default
   `origin`) and falls back to the literal string `"master"` if that command fails for any

@@ -1,7 +1,7 @@
 # P3 — Definition of Done in the executor brief (+ P15's bootstrap clause)
 
-- **Status:** RATIFIED 2026-08-12 (delegated). P15's tribe-side remainder is folded in
-  here because both are edits to the same brief template.
+- **Status:** SHIPPED — PR #80, merge `e226209` (2026-08-12). P15's tribe-side remainder
+  is folded in here because both are edits to the same brief template.
 - **Incident:** log lines 113–126. The B6 executor merged and removed its worktree but
   left the remote branch → ship-verify failed twice → the campaign's first escalation.
   Ruling R1/UC-2 defined "merged ≠ done", but the ruling lives only in that campaign's
