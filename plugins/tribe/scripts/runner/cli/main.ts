@@ -16,10 +16,11 @@ import {
 } from '../core/loop.ts';
 import { loadState } from '../core/state.ts';
 import { campaignStatePathOf, reportDirOf } from '../core/paths.ts';
-import { buildRealIo } from '../adapters/run-io.adapter.ts';
+import { buildRealIo, unsetAnthropicApiKeyEnv } from '../adapters/run-io.adapter.ts';
 import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from '../core/report.ts';
 import { EXIT_ERROR } from '../core/types.ts';
 import { finalizeRunRecord, generateRunId, runRecordPathOf, serializeRunRecord } from '../core/run-record.ts';
+import { scrubEnvContent } from '../core/env-guard.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 
@@ -198,6 +199,16 @@ function tryFinalizeRunRecord(
 }
 
 export async function main(): Promise<void> {
+  // P10 (fix-list): the tribe never authenticates via ANTHROPIC_API_KEY — executor
+  // sessions authenticate via Claude Code login. Unset it before anything else runs
+  // (before any session spawn), so an inherited key from the launching shell's env
+  // never reaches a spawned session. The env mutation itself lives in the adapter
+  // (`unsetAnthropicApiKeyEnv`) — cli/main.ts never reads `process.env` directly
+  // (structure.test.ts: "no ambient process.env read outside adapters/").
+  if (unsetAnthropicApiKeyEnv()) {
+    console.error('campaign runner: ANTHROPIC_API_KEY was set in the environment — removed (the tribe authenticates via Claude Code login, never this variable)');
+  }
+
   const runId = generateRunId(new Date().toISOString(), randomBytes(2).toString('hex'));
   const parsed = parseArgs(process.argv.slice(2), runId);
   if ('error' in parsed) {
@@ -208,6 +219,24 @@ export async function main(): Promise<void> {
 
   const io = buildRealIo(parsed.config);
   const startedAt = new Date().toISOString();
+
+  // P10: scrub a stray ANTHROPIC_API_KEY line out of the target repo's .env.local — the
+  // incident vector (Bun auto-loads .env.local from cwd). Real run: delete without
+  // asking (owner ruling). Dry run: warn only — stays zero side effects by construction.
+  // Routed through `io` (the composition root's own adapter handle), never a direct fs
+  // import here — cli/main.ts only wires adapters, per structure.test.ts.
+  const envLocalPath = join(parsed.config.repoRoot, '.env.local');
+  if (io.fileExists(envLocalPath)) {
+    const { cleaned, removed } = scrubEnvContent(String(await io.readFile(envLocalPath)));
+    if (removed > 0) {
+      if (parsed.config.dryRun) {
+        console.error(`campaign runner: ${envLocalPath} has ${removed} ANTHROPIC_API_KEY line(s) — would remove (--dry-run, not written)`);
+      } else {
+        io.writeFile(envLocalPath, cleaned);
+        console.error(`campaign runner: removed ${removed} ANTHROPIC_API_KEY line(s) from ${envLocalPath}`);
+      }
+    }
+  }
 
   let result: LoopResult | undefined;
   let thrown: unknown;

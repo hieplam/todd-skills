@@ -19,6 +19,7 @@ MISSING=0
 ok()   { printf '  ok    %s\n' "$*"; }
 gap()  { printf '  MISSING %s\n' "$*"; MISSING=$((MISSING + 1)); }
 fix()  { printf '        -> %s\n' "$*"; }
+warn() { printf '  WARN  %s\n' "$*"; }
 
 printf 'campaign runner preflight\n'
 
@@ -52,6 +53,18 @@ elif [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" ] || [ -f "$HO
 else
   gap "Agent SDK credentials — the runner spawns Claude sessions and cannot authenticate"
   fix "either log in with Claude Code, or export ANTHROPIC_API_KEY=<key>"
+fi
+
+# --- ANTHROPIC_API_KEY trap (fix-list P10): the tribe never authenticates via this
+# variable — executor sessions authenticate via Claude Code login only. Report-only: the
+# runner itself enforces the rule (unsets the env var, scrubs the target repo's
+# .env.local) at the top of every run, so this is a heads-up, not a gate — it never
+# increments MISSING or affects the exit code.
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  warn "ANTHROPIC_API_KEY is set in the environment — the tribe authenticates via Claude Code login, never this variable (the runner removes it automatically before spawning any session)"
+fi
+if [ -f ".env.local" ] && grep -qE '^\s*(export\s+)?ANTHROPIC_API_KEY\s*=' ".env.local"; then
+  warn "$(pwd)/.env.local sets ANTHROPIC_API_KEY — the runner removes that line automatically on its next run against this repo"
 fi
 
 # --- runner dependencies: node_modules/ is gitignored ------------------------

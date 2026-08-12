@@ -22,6 +22,19 @@ function realExec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult> {
   });
 }
 
+/** P10 (fix-list): the tribe never authenticates via ANTHROPIC_API_KEY — executor sessions
+ * authenticate via Claude Code login. Deletes the variable from `process.env` if present,
+ * returning whether it was removed (so the composition root can decide whether to warn).
+ * Lives here, not `core/`, because it is a `process.env` side effect — `structure.test.ts`
+ * bans an ambient `process.env` read anywhere outside `adapters/`. Called directly by
+ * `cli/main.ts` at the very top of `main()`, before `buildRealIo` (and everything else)
+ * runs, so an inherited key never reaches a spawned session. */
+export function unsetAnthropicApiKeyEnv(): boolean {
+  if (process.env.ANTHROPIC_API_KEY === undefined) return false;
+  delete process.env.ANTHROPIC_API_KEY;
+  return true;
+}
+
 function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
