@@ -182,6 +182,24 @@ if [[ -x "$DOCTOR" ]]; then
   dout="$(cd "$FOREIGN" && bash "$DOCTOR" 2>&1)"; drc=$?
   set -e
   check "doctor passes on a fully-provisioned machine" "$drc" "0"
+
+  # --- Probe 7b: P10 fix round — ANTHROPIC_API_KEY-only is never reported "ok" ------------
+  # A machine whose ONLY credential source is ANTHROPIC_API_KEY (no Claude Code login) must
+  # NOT be told its credentials are "ok": the runner unsets that variable before spawning any
+  # session (unconditionally, every run), so it is never actually usable at spawn time. Isolate
+  # HOME so no real login file is found, keep the full PATH so bun/deps still pass.
+  HOME_KEYONLY="$TMP/home-keyonly"; mkdir -p "$HOME_KEYONLY"
+  set +e
+  dout_key="$(cd "$FOREIGN" && env -u CLAUDE_CONFIG_DIR HOME="$HOME_KEYONLY" ANTHROPIC_API_KEY="sk-ant-test-only" bash "$DOCTOR" 2>&1)"
+  set -e
+  case "$dout_key" in
+    *'ok    Agent SDK credentials (ANTHROPIC_API_KEY is set)'*)
+      bad "doctor never claims ANTHROPIC_API_KEY alone is 'ok' credentials (the runner strips it before every spawn)" ;;
+    *)
+      ok "doctor never claims ANTHROPIC_API_KEY alone is 'ok' credentials (the runner strips it before every spawn)" ;;
+  esac
+  contains "doctor flags ANTHROPIC_API_KEY-only as a credentials gap, not a pass" \
+    "$dout_key" "MISSING Agent SDK credentials"
 else
   bad "doctor.sh exists and is executable (missing: $DOCTOR)"
 fi

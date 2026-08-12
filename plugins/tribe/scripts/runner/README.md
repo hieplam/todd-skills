@@ -450,6 +450,33 @@ Both live directly under `--home`, alongside `campaign-state.json`:
 `--dry-run` touches neither file, and writes no report either: it never acquires the lock and
 never checks `STOP` — zero side effects by construction, not merely by intent.
 
+## ANTHROPIC_API_KEY guard (fix-list P10)
+
+The tribe **never** authenticates via `ANTHROPIC_API_KEY` — executor sessions authenticate via
+Claude Code login only. Two mechanical steps run at the very top of `main()`, before any session
+spawn, on **every** invocation (fresh launch and re-trigger), and both are idempotent:
+
+1. **Unset the runner's own process env.** If `process.env.ANTHROPIC_API_KEY` is set,
+   `adapters/run-io.adapter.ts`'s `unsetAnthropicApiKeyEnv()` deletes it and `main()` prints one
+   warning line to stderr. This is process-local — it happens the same way under `--dry-run`.
+2. **Scrub the target repo's `.env.local`.** If `<repoRoot>/.env.local` exists and contains an
+   `ANTHROPIC_API_KEY=...` line (with or without a leading `export `), the runner removes that
+   line **without asking** (owner ruling) on a real run, and warns-only under `--dry-run`
+   (writing nothing — `--dry-run` stays zero side effects by construction). The pure line-removal
+   logic lives in `core/env-guard.ts`'s `scrubEnvContent` (preserves every other line
+   byte-for-byte, including trailing-newline presence/absence); the edge wiring —
+   `cli/main.ts`'s exported `scrubTargetEnvLocal` — reads/writes the file through `io` and is
+   **best-effort**: any fs error here (a permission error, a mid-flight delete, a read-only
+   mount) is caught and degrades to a console warning rather than crashing the run before
+   `runLoop` is even entered (same contract as `tryWriteReport`/`tryFinalizeRunRecord` below).
+
+Accepted risk (owner-accepted, recorded in the P10 spec): a target repo whose application
+legitimately needs `ANTHROPIC_API_KEY` in its own `.env.local` would have that line silently
+removed on every real run against it. `plugins/tribe/scripts/doctor.sh` reports (never gates on)
+both traps: it never claims "ok" credentials when `ANTHROPIC_API_KEY` is the *only* credential
+source present (that variable is stripped before every spawn, so it is never actually usable),
+and it warns when the target repo's `.env.local` still sets the variable.
+
 ## Exit codes
 
 Read from `EXIT_*` in `loop.ts`, plus `run.ts`'s own `EXIT_ERROR`:
@@ -499,8 +526,10 @@ names, no filename convention required — enforced executably by `structure.tes
   "Known limitations" below), `core/loop/card-actions.ts` (per-card escalate/ship/session
   work), and `core/loop/run-loop.ts` (the pass + `runLoop` entry point).
 - **everything else in `core/`** — pure logic: `state.ts`, `verify.ts`, `report.ts`,
-  `brief.ts`, `session.ts`, `paths.ts` (pure campaign-home path helpers, spec §4), and
-  `run-record.ts` (the `run.json` schema). Every world-touching effect is reached through a
+  `brief.ts`, `session.ts`, `paths.ts` (pure campaign-home path helpers, spec §4),
+  `run-record.ts` (the `run.json` schema), and `env-guard.ts` (`scrubEnvContent` — the
+  `ANTHROPIC_API_KEY` line-removal logic, fix-list P10; see "ANTHROPIC_API_KEY guard" above).
+  Every world-touching effect is reached through a
   `ports/ports.ts` seam, never a direct import; each of these modules re-exports the seam
   type(s) its own tests/importers pull from it (e.g. `verify.ts` re-exports `VerifyIO`).
 - **`adapters/*.adapter.ts`** — the only files allowed to import a world-touching module

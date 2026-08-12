@@ -16,10 +16,11 @@ import {
 } from '../core/loop.ts';
 import { loadState } from '../core/state.ts';
 import { campaignStatePathOf, reportDirOf } from '../core/paths.ts';
-import { buildRealIo } from '../adapters/run-io.adapter.ts';
+import { buildRealIo, unsetAnthropicApiKeyEnv } from '../adapters/run-io.adapter.ts';
 import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from '../core/report.ts';
 import { EXIT_ERROR } from '../core/types.ts';
 import { finalizeRunRecord, generateRunId, runRecordPathOf, serializeRunRecord } from '../core/run-record.ts';
+import { scrubEnvContent } from '../core/env-guard.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 
@@ -180,6 +181,37 @@ async function tryWriteReport(config: RunLoopConfig, io: LoopIO, run: ReportRunI
   }
 }
 
+/** P10 (fix-list): scrub a stray ANTHROPIC_API_KEY line out of the target repo's
+ * `.env.local` — the incident vector (Bun auto-loads `.env.local` from cwd). Real run:
+ * delete without asking (owner ruling). Dry run: warn only — stays zero side effects by
+ * construction. Best-effort, same contract as tryWriteReport/tryFinalizeRunRecord below: a
+ * transient fs error here (EACCES, a mid-flight delete between the exists-check and the
+ * read, a read-only mount) must never crash the run before `runLoop` is even entered — this
+ * is a hygiene step, not part of the campaign's actual progress, so it degrades to a warning
+ * rather than an uncaught exception. Exported for `cli/main.test.ts` (takes only the FsPort
+ * slice of `LoopIO` it actually needs, so a test can inject a throwing mock without building
+ * a full `LoopIO`). */
+export async function scrubTargetEnvLocal(
+  repoRoot: string,
+  dryRun: boolean,
+  io: Pick<LoopIO, 'fileExists' | 'readFile' | 'writeFile'>,
+): Promise<void> {
+  const envLocalPath = join(repoRoot, '.env.local');
+  try {
+    if (!io.fileExists(envLocalPath)) return;
+    const { cleaned, removed } = scrubEnvContent(String(await io.readFile(envLocalPath)));
+    if (removed === 0) return;
+    if (dryRun) {
+      console.error(`campaign runner: ${envLocalPath} has ${removed} ANTHROPIC_API_KEY line(s) — would remove (--dry-run, not written)`);
+      return;
+    }
+    io.writeFile(envLocalPath, cleaned);
+    console.error(`campaign runner: removed ${removed} ANTHROPIC_API_KEY line(s) from ${envLocalPath}`);
+  } catch (err) {
+    console.error(`campaign runner: could not scrub ${envLocalPath} for ANTHROPIC_API_KEY (continuing): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 /** Best-effort, same contract as tryWriteReport: a missing/corrupt run.json (e.g. the
  * startup write itself failed) is swallowed — observability exhaust never crashes the run;
  * an unfinalized record with a dead pid is exactly how the viewer detects a crash. */
@@ -198,6 +230,16 @@ function tryFinalizeRunRecord(
 }
 
 export async function main(): Promise<void> {
+  // P10 (fix-list): the tribe never authenticates via ANTHROPIC_API_KEY — executor
+  // sessions authenticate via Claude Code login. Unset it before anything else runs
+  // (before any session spawn), so an inherited key from the launching shell's env
+  // never reaches a spawned session. The env mutation itself lives in the adapter
+  // (`unsetAnthropicApiKeyEnv`) — cli/main.ts never reads `process.env` directly
+  // (structure.test.ts: "no ambient process.env read outside adapters/").
+  if (unsetAnthropicApiKeyEnv()) {
+    console.error('campaign runner: ANTHROPIC_API_KEY was set in the environment — removed (the tribe authenticates via Claude Code login, never this variable)');
+  }
+
   const runId = generateRunId(new Date().toISOString(), randomBytes(2).toString('hex'));
   const parsed = parseArgs(process.argv.slice(2), runId);
   if ('error' in parsed) {
@@ -208,6 +250,12 @@ export async function main(): Promise<void> {
 
   const io = buildRealIo(parsed.config);
   const startedAt = new Date().toISOString();
+
+  // P10: scrub a stray ANTHROPIC_API_KEY line out of the target repo's .env.local. Routed
+  // through `io` (the composition root's own adapter handle), never a direct fs import here
+  // — cli/main.ts only wires adapters, per structure.test.ts. See scrubTargetEnvLocal's doc
+  // comment above for the best-effort contract (never throws).
+  await scrubTargetEnvLocal(parsed.config.repoRoot, parsed.config.dryRun, io);
 
   let result: LoopResult | undefined;
   let thrown: unknown;

@@ -6,7 +6,7 @@
 // two protocol-level defaults spec §2 itself documents; `--home` (Task 2, spec §4) is the
 // campaign's machine-local operational home — also a REQUIRED input, never derived here.
 import { describe, expect, test } from 'bun:test';
-import { parseArgs } from './main.ts';
+import { parseArgs, scrubTargetEnvLocal } from './main.ts';
 
 const RUN_ID = '2026-07-24T00-00-00-000Z-beef';
 
@@ -189,5 +189,63 @@ describe('parseArgs — stateless-capability wall', () => {
     const result = parseArgs(validArgv(), RUN_ID);
     if ('error' in result) throw new Error(result.error);
     expect(JSON.stringify(result.config)).not.toContain('ai-dict');
+  });
+});
+
+// Skinner audit (P10 fix round): the .env.local scrub used to be an unguarded fs read inlined
+// directly in main() — a transient fs error (EACCES, a mid-flight delete, a read-only mount)
+// threw an uncaught exception that bypassed the file's own report-writing seam entirely.
+// Reproduced live before this fix: `bun run.ts --repo <fixture-with-chmod-000-.env.local>
+// --model x --home <home>` crashed with an unhandled EACCES stack trace, exit 1, no report,
+// no "campaign runner: unexpected error" message — none of the documented EXIT_* paths.
+// scrubTargetEnvLocal is the extracted, directly-testable seam that closes that gap.
+describe('scrubTargetEnvLocal — best-effort, never throws (P10 fix round)', () => {
+  test('an io.readFile that throws does not propagate — it degrades to a console warning', async () => {
+    const errors: string[] = [];
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => { errors.push(args.join(' ')); };
+    try {
+      const io = {
+        fileExists: () => true,
+        readFile: () => { throw new Error('EACCES: permission denied'); },
+        writeFile: () => { throw new Error('writeFile should not be called'); },
+      };
+      // The assertion IS that this resolves at all — before the fix, the throw inside
+      // io.readFile propagated out of scrubTargetEnvLocal (and, in main(), out of main()
+      // itself, as an unhandled promise rejection with no .catch() anywhere in the call chain).
+      await expect(scrubTargetEnvLocal('/some/repo', false, io)).resolves.toBeUndefined();
+      expect(errors.some((line) => line.includes('could not scrub') && line.includes('EACCES'))).toBe(true);
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  test('no .env.local present -> no-op, io.readFile/writeFile never called', async () => {
+    const io = {
+      fileExists: () => false,
+      readFile: () => { throw new Error('should not be called'); },
+      writeFile: () => { throw new Error('should not be called'); },
+    };
+    await expect(scrubTargetEnvLocal('/some/repo', false, io)).resolves.toBeUndefined();
+  });
+
+  test('a real run with a key present writes the cleaned content back', async () => {
+    const written: Array<{ path: string; content: string }> = [];
+    const io = {
+      fileExists: () => true,
+      readFile: () => 'ANTHROPIC_API_KEY=sk-ant-x\nFOO=bar\n',
+      writeFile: (path: string, content: string) => { written.push({ path, content }); },
+    };
+    await scrubTargetEnvLocal('/some/repo', false, io);
+    expect(written).toEqual([{ path: '/some/repo/.env.local', content: 'FOO=bar\n' }]);
+  });
+
+  test('--dry-run warns but never calls io.writeFile', async () => {
+    const io = {
+      fileExists: () => true,
+      readFile: () => 'ANTHROPIC_API_KEY=sk-ant-x\nFOO=bar\n',
+      writeFile: () => { throw new Error('writeFile must not be called in dry-run'); },
+    };
+    await expect(scrubTargetEnvLocal('/some/repo', true, io)).resolves.toBeUndefined();
   });
 });
