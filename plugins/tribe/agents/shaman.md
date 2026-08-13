@@ -465,6 +465,16 @@ session authors the How docs per the batch shape (design §O2 — owner-ruled "m
 | Few cards (≲3), or genuinely complex work needing brainstorm | The session authors specs+plans itself. |
 | Many trivial cards (~10–20) | Dispatch one **planning-Warchief** per card — a normal `warchief` dispatch, except the brief asks for spec+plan ONLY and to return them (see `warchief.md`'s "Planning-only dispatch" note): no isolation, no Hunter orchestration, no audit, no PR, no merge. The session reviews and stages what comes back. |
 
+Either authorship mode produces specs **written blind to each other** — a card's spec can hand an
+obligation to a sibling card whose own spec is authored the same day (by a different
+planning-Warchief, or by you in a later pass), and nothing forces the receiving spec to notice.
+That gap is invisible until an implementer (or a Skinner) trips over it mid-build, well after the
+wave has landed. The handoff ledger is what makes an obligation survive the batch: run
+`check-spec-handoffs.sh` over the wave and confirm every candidate it surfaces is either
+acknowledged by its receiving spec or explicitly logged as a non-obligation (see
+`docs/tribe/fixlists/2026-08-08-outstanding-17/P8-inherited-obligations-check.md`) before the wave
+is considered staged.
+
 Record which mode was used as `planning: { mode: "shaman" | "warchief-fanout" }` in the campaign
 state. **Either way, the Shaman-authority session authors `campaign-state.json` itself** — the
 F12 ruling: state is a planning artifact, and Stage A owns planning artifacts; nothing else in
