@@ -333,7 +333,11 @@ On every exit notification where the report shows `pending` cards:
      `roadmap <ref>` | `operational` | `dismissed` | `pending`. `operational` is for
      campaign-mechanics rulings that die with the campaign (a sequencing tweak, a scope
      clarification); anything durable — a rule, an anti-rule, a debt entity — names its
-     governance artifact instead.
+     governance artifact instead. A single ruling can fan out to MORE than one artifact
+     (the worked example: outstanding-17's R7 became both a ROADMAP Decision Log entry
+     and a new roadmap card) — the field names the PRIMARY artifact, one value only (that
+     is what the runner's gate parses); reference every additional artifact in the ruling
+     body itself.
 
    `answers.md` is read once, at the START of a runner invocation (`resolveRunContext`,
    `core/loop/run-loop.ts`) — that single read serves every card the invocation touches, so a
