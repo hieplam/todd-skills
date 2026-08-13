@@ -321,16 +321,33 @@ two-lens Tracker + Scout review (rules conformance and unwritten-convention capt
 conventions ride the same PR, per the ratification duty above) → the Warchief opens the PR,
 waits for every check to conclude green, and merges. You never perform a step of that loop by
 hand — no manual worktree setup, no hand-edits, no bookkeeping commits, no hand-made PRs, not
-even for a docs-only unit — and you never babysit it mid-flight: launch it (step 2 below), wait
-for it to conclude, verify the merged result against evidence (step 3), record it, then move to
-the next unit.
+even for a docs-only unit — and you never babysit it mid-flight: launch it, wait for it to
+conclude, verify the merged result against evidence, record it, then move to the next unit.
 
-> **Mechanism, one illustration only — not the concept.** In a harness that offers a
+**Two dispatch mechanisms carry this one invariant loop — never a third.** Only how you launch
+the loop differs; the loop's shape itself (dispatch → Hunter → two-lens review → PR opened,
+checks green, merged, cleaned up) never changes:
+
+1. **In-session dynamic workflow** — you're working units one at a time inside an open session (a
+   handful of cards, the owner nearby): convert the loop into one dynamic workflow per unit whose
+   agents are the real tribe roles. Steps 0-4 below are this mechanism in detail.
+2. **Campaign runner** — the owner hands you a batch of cards to run unattended: dispatch through
+   the campaign runner, i.e. the `orchestrate-campaign` skill's path (see "Optional: campaign
+   orchestration" below). Each executor session the runner spawns IS one closed loop per card,
+   with on-disk state that survives quota pauses and restarts, an escalation/answers protocol,
+   and campaign-level gates.
+
+Default to the campaign runner for unattended batches; default to the dynamic workflow for
+in-session, unit-at-a-time work. Never a third way — ad-hoc subagents with you babysitting
+mid-loop is the exact failure mode both mechanisms exist to prevent.
+
+> **Mechanism (1), one illustration only — not the concept.** In a harness that offers a
 > dynamic-workflow tool, the loop above compiles into one workflow per unit whose agents are the
 > tribe roles: setup (worktree + dependency bootstrap) → Hunter → parallel Tracker + Scout →
-> bounded fix rounds → ship (open PR, wait for full-green checks, regular merge, cleanup). Embed
-> each agent's brief as a constant inside the workflow script — never pass it through a
-> serialized args payload, which arrives as a string and blanks the briefs.
+> bounded fix rounds → ship (open PR, wait for full-green checks, regular merge, cleanup). Use
+> the real tribe agentTypes (hunter/tracker/scout), and embed each agent's brief as a constant
+> inside the workflow script — never pass it through a serialized args payload, which arrives as
+> a string and blanks the briefs.
 
 0. **Resume before you pick.** Run `resume-check.sh REPO-ROOT` first — resolve its path
    exactly as you resolve `heartbeat-check.sh` under Channels & liveness — every time
