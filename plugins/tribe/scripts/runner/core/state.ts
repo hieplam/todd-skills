@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { Card, CampaignState, NextCardOptions, NextCardResult } from './types.ts';
 import type { StateIO } from '../ports/ports.ts';
+import { escalationPathOf } from './paths.ts';
 
 /** The only major version this runner understands today (D2). */
 export const CURRENT_STATE_VERSION = 1;
@@ -296,14 +297,29 @@ function reconcileBlockedStatuses(
 }
 
 /** D5/D2/Task-1 §O4: the first PROGRESSABLE card in `sequence` — not `shipped`, not
- * `escalated` (unless `includeEscalated`), and (new, Task 1) not `blocked` (a status that is
- * now always up-to-date: `reconcileBlockedStatuses` trues up every card in `state.cards`
- * against `computeBlockedCardIds`'s fixpoint before this walk ever starts — see that
- * function's doc comment for why "set on the way in, but never cleared on the way out" was a
- * bug, not merely an unfinished feature). A card whose `dependsOn` includes a card that is
- * merely unshipped-but-healthy (`staged`/`running`) is skipped with its own status left
- * untouched — it is not `blocked` (its dependency isn't parked), and it may still ship later
- * this same pass, once that dependency ships.
+ * `escalated` (unless `includeEscalated`, OR — P6 fix-list — its escalation has since been
+ * ANSWERED: see below), and (new, Task 1) not `blocked` (a status that is now always
+ * up-to-date: `reconcileBlockedStatuses` trues up every card in `state.cards` against
+ * `computeBlockedCardIds`'s fixpoint before this walk ever starts — see that function's doc
+ * comment for why "set on the way in, but never cleared on the way out" was a bug, not merely
+ * an unfinished feature). A card whose `dependsOn` includes a card that is merely
+ * unshipped-but-healthy (`staged`/`running`) is skipped with its own status left untouched —
+ * it is not `blocked` (its dependency isn't parked), and it may still ship later this same
+ * pass, once that dependency ships.
+ *
+ * P6 fix-list (blocker fix): `card.status === 'escalated'` alone is NOT enough to keep
+ * excluding a card once `--include-escalated` is absent. `card.status` is durable — nothing
+ * ever resets it away from `'escalated'` except the card itself shipping or re-escalating —
+ * while the escalation-answered SIGNAL is the escalation file's presence, exactly the same
+ * fact `deriveCardPhase`'s own short-circuit (`core/loop/phase.ts`) already keys on. Before
+ * this fix, gating on `card.status` alone meant the orchestrate-campaign skill's ruling
+ * ritual (append the ruling to answers.md, archive the escalation file) had ZERO effect on
+ * whether a flag-less re-trigger could ever reach this card again — it stayed silently
+ * skipped forever, the exact B14 "every re-trigger needs --include-escalated" trap this
+ * fix-list entry exists to close. Consulting the file here, the same way `deriveCardPhase`
+ * does, makes "answered" (file archived) behave identically to "shipped" for selection
+ * purposes without ever needing `includeEscalated` — while a genuinely UNANSWERED escalation
+ * (file still present) keeps parking exactly as before.
  *
  * A card with no `dependsOn` (or an empty one) is independent, exactly today's behavior. If
  * the next progressable card's `spec`/`plan` are missing or don't exist on disk (checked via
@@ -322,7 +338,13 @@ export function nextCard(
     const card = state.cards[cardId];
     if (!card) continue;
     if (card.status === 'shipped') continue;
-    if (card.status === 'escalated' && !includeEscalated) continue;
+    if (card.status === 'escalated' && !includeEscalated) {
+      const escalationPath = escalationPathOf(io.homeDir, cardId);
+      if (io.fileExists(escalationPath)) continue; // still unanswered — keep parking.
+      // The escalation file is gone (archived by the skill's ruling ritual, or by
+      // `shipCard`) — the escalation has been answered; fall through and treat this card as
+      // progressable, exactly as `deriveCardPhase` already would for a flag-less re-trigger.
+    }
     if (card.status === 'blocked') continue;
 
     const dependsOn = card.dependsOn ?? [];

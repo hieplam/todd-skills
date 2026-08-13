@@ -15,6 +15,7 @@ import {
 } from './state.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { StateIO } from '../ports/ports.ts';
+import { escalationPathOf } from './paths.ts';
 
 function fixtureState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -64,10 +65,11 @@ function fixtureState(overrides: Record<string, unknown> = {}): Record<string, u
   };
 }
 
-function io(existingPaths: string[], repoRoot = '/repo'): StateIO {
+function io(existingPaths: string[], repoRoot = '/repo', homeDir = '/th'): StateIO {
   const existing = new Set(existingPaths);
   return {
     repoRoot,
+    homeDir,
     fileExists: (resolvedPath: string) => existing.has(resolvedPath),
   };
 }
@@ -91,8 +93,8 @@ function cardFixture(overrides: Partial<Card> = {}): Card {
 
 /** An `io` that reports every card's recorded spec/plan as present on disk, so `nextCard`
  * tests below exercise only the dependsOn/blocked logic, never the PLANNING_NEEDED path. */
-function allFilesExistIo(repoRoot = '/repo'): StateIO {
-  return { repoRoot, fileExists: () => true };
+function allFilesExistIo(repoRoot = '/repo', homeDir = '/th'): StateIO {
+  return { repoRoot, homeDir, fileExists: () => true };
 }
 
 describe('parseState / serializeState round-trip', () => {
@@ -198,9 +200,14 @@ describe('nextCard', () => {
       }),
     ) as CampaignState;
 
+    // The escalation file is still present on disk (`escalationPathOf('/th', 'C2')`) — this
+    // is what an UNANSWERED escalation actually looks like (P6 fix-list: `nextCard` now
+    // consults the file, not merely `card.status`, so this fixture must model "unanswered"
+    // explicitly rather than relying on an absent path meaning the same thing by accident).
     const fakeIo = io([
       '/repo/docs/superpowers/specs/2026-01-01-c2-spec.md',
       '/repo/docs/superpowers/plans/2026-01-01-c2-plan.md',
+      escalationPathOf('/th', 'C2'),
     ]);
 
     const skipped = nextCard(state, fakeIo);
@@ -209,6 +216,49 @@ describe('nextCard', () => {
 
     const included = nextCard(state, fakeIo, { includeEscalated: true });
     expect(included).toEqual({ kind: 'card', cardId: 'C2', card: state.cards.C2 });
+  });
+
+  // P6 audit fix-round (blocker, skinnerA + scout): `deriveCardPhase` was already
+  // file-driven (`core/loop/phase.ts`), but `nextCard` gated an `escalated` card on
+  // `card.status` ALONE — a status nothing ever resets except the card shipping or
+  // re-escalating. That meant the orchestrate-campaign skill's ruling ritual (append the
+  // ruling, archive the escalation file) had ZERO effect on a flag-less re-trigger: the card
+  // stayed silently skipped forever, exactly the B14 "every re-trigger needs
+  // --include-escalated" trap this fix-list entry exists to close. This test reproduces that
+  // exact defect: `card.status === 'escalated'`, but the escalation FILE has already been
+  // archived (does not exist at its original path) — `nextCard` must now select the card
+  // without `includeEscalated`, matching `deriveCardPhase`'s own file-driven short-circuit.
+  test('an escalated card whose escalation file has already been archived (answered) becomes eligible again WITHOUT --include-escalated', () => {
+    const state = parseState(
+      fixtureState({
+        sequence: ['C2'],
+        cards: {
+          C2: {
+            status: 'escalated',
+            spec: 'docs/superpowers/specs/2026-01-01-c2-spec.md',
+            plan: 'docs/superpowers/plans/2026-01-01-c2-plan.md',
+            branch: null,
+            baseSha: null,
+            pr: null,
+            mergeSha: null,
+            sessionId: null,
+            updatedAt: null,
+          },
+        },
+      }),
+    ) as CampaignState;
+
+    // The escalation file is deliberately ABSENT — `escalationPathOf('/th', 'C2')` is not in
+    // the existing-paths list — simulating the skill having archived it (renamed away) as
+    // part of writing its ruling, exactly as `plugins/tribe/skills/orchestrate-campaign/
+    // SKILL.md`'s ritual now does.
+    const fakeIo = io([
+      '/repo/docs/superpowers/specs/2026-01-01-c2-spec.md',
+      '/repo/docs/superpowers/plans/2026-01-01-c2-plan.md',
+    ]);
+
+    const result = nextCard(state, fakeIo); // no includeEscalated flag at all
+    expect(result).toEqual({ kind: 'card', cardId: 'C2', card: state.cards.C2 });
   });
 
   test('returns PLANNING_NEEDED when the next card has no spec/plan recorded', () => {

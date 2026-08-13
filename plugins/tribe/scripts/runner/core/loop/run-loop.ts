@@ -92,7 +92,11 @@ function filteredNextCard(
       : state.sequence
   ).filter((id) => !attempted.has(id));
   const view: CampaignState = { ...state, sequence };
-  const stateIO: StateIO = { repoRoot: config.repoRoot, fileExists: (p) => io.fileExists(p) };
+  const stateIO: StateIO = {
+    repoRoot: config.repoRoot,
+    homeDir: config.homeDir,
+    fileExists: (p) => io.fileExists(p),
+  };
   return nextCard(view, stateIO, { includeEscalated: config.includeEscalated });
 }
 
