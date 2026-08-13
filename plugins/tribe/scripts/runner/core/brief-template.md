@@ -87,6 +87,10 @@ Every dispatched worker (Hunter, Skinner) writes its report to:
 Before raising any question, check whether it is already answered here. If it is, follow
 the ruling; do not ask again.
 
+These rulings are a snapshot taken when this session started. If your session is
+resumed or re-spawned, re-read this section — it may carry rulings newer than your
+earlier context.
+
 {{ANSWERS_CONTENT}}
 
 ## Definition of Done (preconditions for SHIPPED)

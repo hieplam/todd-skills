@@ -126,6 +126,10 @@ ${FIXTURE_REPORT_PATH}
 Before raising any question, check whether it is already answered here. If it is, follow
 the ruling; do not ask again.
 
+These rulings are a snapshot taken when this session started. If your session is
+resumed or re-spawned, re-read this section — it may carry rulings newer than your
+earlier context.
+
 ${FIXTURE_ANSWERS}
 
 ## Definition of Done (preconditions for SHIPPED)
@@ -177,6 +181,20 @@ describe('executorBrief', () => {
       FIXTURE_CAMPAIGN_SLUG,
     );
     expect(rendered).toContain(distinctiveRuling);
+  });
+
+  test('warns that the embedded rulings are a spawn-time snapshot (P7 fix-list)', () => {
+    const rendered = executorBrief(
+      fixtureCard(),
+      fixtureState(),
+      FIXTURE_ANSWERS,
+      TEMPLATE,
+      FIXTURE_REPORT_PATH,
+      FIXTURE_CAMPAIGN_SLUG,
+    );
+    expect(rendered).toContain(
+      'These rulings are a snapshot taken when this session started.',
+    );
   });
 
   test('states the merge command the executor lands with', () => {

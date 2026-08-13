@@ -319,6 +319,11 @@ On every exit notification where the report shows `pending` cards:
      `escalation_pending` (the B14 trap, P6 fix-list) — archiving it the moment you rule is what
      lets the re-trigger below skip `--include-escalated` for this card. Note the card as
      answered.
+
+     A ruling reaches executors at SPAWN time only — a session already running keeps its
+     snapshot. If a new rule must apply to an in-flight card, either let it land on the card's
+     next resume/re-spawn (the normal case), or stop and re-trigger the card when the rule is
+     load-bearing for its correctness.
    - **Owner-only** (anything on the state file's own `ownerOnlyEscalations` list — data shapes,
      product promises, new permissions, privacy) **or genuinely too hard to call** — leave it
      parked (escalation file untouched, unanswered). Never rule on an owner-only trigger
