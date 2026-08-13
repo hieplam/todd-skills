@@ -169,5 +169,262 @@ EOF
 bash "$SCRIPT" "$F4" > "$TMP/out4.json"
 check "commit-and-push does not count" "$(find_check "$TMP/out4.json" tasks_single_commit_step)" "fail"
 
+# --- P9: --schema-lock-paths (schema-lock opt-outs validated at authoring) ---
+
+LOCK_PATH="packages/app/src/ports.ts"
+
+# fixture: task line touching the lock path, no front-matter -> fail, non-zero exit,
+# message names the plan, the matched task line, and the fix (ruling UC-3).
+F5="$TMP/lock-no-frontmatter.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.ts
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5"
+set +e
+out5="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5" 2>&1)"
+code5=$?
+set -e
+check "lock path + no front-matter: non-zero exit" "$code5" "1"
+if [[ "$out5" == *"$F5"* && "$out5" == *"Modify: packages/app/src/ports.ts"* \
+      && "$out5" == *"allowsSchemaChange: true"* && "$out5" == *"UC-3"* ]]; then
+  ok "lock path + no front-matter: message names plan, task line, and fix"
+else
+  bad "lock path + no front-matter: message names plan, task line, and fix (got: $out5)"
+fi
+
+# fixture: task line touching the lock path, backtick-wrapped (this repo's own
+# writing-plans convention: "- Modify: `path/to/file.ts`"), no front-matter -> fail,
+# non-zero exit. A bare-path-only pattern would miss this real-world form entirely.
+F5B="$TMP/lock-backtick.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface, backtick-wrapped
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: `packages/app/src/ports.ts`
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5B"
+set +e
+out5b="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5B" 2>&1)"
+code5b=$?
+set -e
+check "backtick-wrapped lock path + no front-matter: non-zero exit" "$code5b" "1"
+
+# fixture: task line touching the lock path, backtick-wrapped WITH a trailing
+# ":line-range" suffix inside the backticks ("- Modify: `path.ts:12-34`"), no
+# front-matter -> fail, non-zero exit.
+F5C="$TMP/lock-backtick-linerange.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface, backtick-wrapped with line range
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: `packages/app/src/ports.ts:12-34`
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5C"
+set +e
+out5c="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5C" 2>&1)"
+code5c=$?
+set -e
+check "backtick-wrapped + line-range lock path + no front-matter: non-zero exit" "$code5c" "1"
+
+# fixture: task line touching the lock path, plain (no backticks) WITH a trailing
+# parenthetical note ("- Modify: path.ts (replace the parse loop)"), no front-matter ->
+# fail, non-zero exit.
+F5D="$TMP/lock-parenthetical.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface, with a trailing note
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.ts (replace the parse loop)
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5D"
+set +e
+out5d="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5D" 2>&1)"
+code5d=$?
+set -e
+check "plain lock path + trailing parenthetical + no front-matter: non-zero exit" "$code5d" "1"
+
+# fixture: the schema-lock-violation exit path (exit 1) must still print the FULL JSON
+# summary to stdout, per the script's own documented output contract ("prints a JSON
+# summary on stdout (only). Logs go to stderr.") — capture stdout and stderr SEPARATELY
+# (not merged with 2>&1) so a regression that exits before the print cannot hide behind
+# a test that only checks the combined stream.
+F5E_OUT="$TMP/f5e.stdout"
+F5E_ERR="$TMP/f5e.stderr"
+set +e
+bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5" >"$F5E_OUT" 2>"$F5E_ERR"
+code5e=$?
+set -e
+check "lock violation: non-zero exit" "$code5e" "1"
+stdout_bytes="$(wc -c < "$F5E_OUT" | tr -d ' ')"
+if [[ "$stdout_bytes" -gt 0 ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$F5E_OUT" >/dev/null 2>&1; then
+  ok "lock violation: full JSON summary still printed to stdout"
+else
+  bad "lock violation: full JSON summary still printed to stdout (stdout bytes: $stdout_bytes)"
+fi
+check "lock violation: JSON summary's schema_lock_declared check recorded as fail" \
+  "$(find_check "$F5E_OUT" schema_lock_declared)" "fail"
+if [[ -s "$F5E_ERR" ]]; then
+  ok "lock violation: error message present on stderr"
+else
+  bad "lock violation: error message present on stderr"
+fi
+
+# fixture: task line touching the lock path, WITH allowsSchemaChange: true front-matter -> pass
+F6="$TMP/lock-with-frontmatter.md"
+cat <<'EOF' > "$F6"
+---
+allowsSchemaChange: true
+---
+
+# Fixture Plan
+
+## Global Constraints
+
+- Implementer: dispatch each implementation/fix task to the hunter subagent.
+
+### Task 1: Touches the locked port surface, declared
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.ts
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports, declared"
+```
+EOF
+set +e
+out6="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F6" 2>&1)"
+code6=$?
+set -e
+check "lock path + allowsSchemaChange: true: zero exit" "$code6" "0"
+
+# fixture: only a PROSE mention of the lock path (no task line) -> pass, no front-matter needed
+F7="$TMP/lock-prose-only.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Discusses but does not touch the locked port surface
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL. Note: packages/app/src/ports.ts is the interface this task exercises,
+but this task does not modify it.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: prose mention only"
+```
+EOF
+} > "$F7"
+set +e
+out7="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F7" 2>&1)"
+code7=$?
+set -e
+check "prose-only mention: zero exit" "$code7" "0"
+
+# fixture: same task-line-touching-lock-path plan as F5, but with NO --schema-lock-paths flag
+# at all -> check is skipped entirely (legacy invocations unaffected)
+set +e
+out8="$(bash "$SCRIPT" "$F5" 2>&1)"
+code8=$?
+set -e
+check "no --schema-lock-paths flag: legacy invocation unaffected (zero exit)" "$code8" "0"
+
+# fixture: EXACT-path rule — the lock path packages/app/src/ports.ts must NOT be tripped by
+# a task line touching packages/app/src/ports.test.ts (a longer path that merely contains the
+# lock path as a substring of its name, not the same path).
+F9="$TMP/lock-exact-path.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches only the test file, not the locked port surface
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.test.ts
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports test file only"
+```
+EOF
+} > "$F9"
+set +e
+out9="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F9" 2>&1)"
+code9=$?
+set -e
+check "exact-path rule: ports.test.ts does not trip ports.ts lock (zero exit)" "$code9" "0"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))

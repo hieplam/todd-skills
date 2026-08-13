@@ -1,6 +1,6 @@
 # P11 — baseSha invariants: stale bases can no longer produce false schemaGuard trips
 
-- **Status:** RATIFIED 2026-08-12 (delegated).
+- **Status:** SHIPPED — PR #85, merge `9d9b502` (2026-08-13).
 - **Incident:** log lines 200–210. Cards hand-reset to `staged` (with `sessionId: null`)
   kept their campaign-start `baseSha`; `recordBaseSha` never overwrites an existing value
   (`core/loop/card-actions.ts:262`, `if (card.baseSha) return`), so B13's verify diffed

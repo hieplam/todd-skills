@@ -183,6 +183,30 @@ It exits 0 when every prerequisite is present, or exits 1 naming each gap and it
 non-zero exit, relay the gaps to the owner and stop — do not start a campaign on a machine that
 cannot finish it.
 
+**Also validate every card's plan against the campaign's schema-lock paths — once per campaign,
+before the first launch.** This shifts the schema guard left, from verify-time (post-merge) to
+authoring/preflight-time: a plan that schedules a locked-path change without declaring
+`allowsSchemaChange: true` front-matter fails here, before any session spawns, instead of being
+discovered by the runner's `schemaGuard` verify check after the card's PR already merged. Run it
+for EVERY card in the state file's `sequence`, over that card's own `plan` path, passing the state
+file's own `schemaLockPaths` (comma-joined):
+
+```sh
+bash "$(dirname "$(dirname "$runner_dir")")/scripts/validate-plan.sh" \
+  --schema-lock-paths <campaign schemaLockPaths, comma-joined> \
+  <card's plan path>
+```
+
+It exits 0 when the plan either does not touch a locked path or declares
+`allowsSchemaChange: true`, or non-zero naming the plan, the matched task line, and the fix. Run
+this over **every** card before judging anything — same as `doctor.sh` above, this check is
+additive and never fatal-on-first-miss: a non-zero exit on card 2 of 17 is not a reason to skip
+checking cards 3-17, it is one entry to collect and keep going. Only once every card has been
+checked, relay the FULL consolidated list of violating cards (plan, matched task line, and fix
+for each) to the owner in one message and stop — do not launch a campaign that will only fail
+this same guard later, post-merge, one card at a time, after PR #185's incident (08-08 campaign,
+ruling UC-3).
+
 1. **Always `--dry-run` first** — zero side effects (no lock acquired, nothing written, no
    session spawned). Sanity-check the derived next action before committing to a real run:
 
