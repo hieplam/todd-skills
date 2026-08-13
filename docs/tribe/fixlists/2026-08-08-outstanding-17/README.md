@@ -51,7 +51,7 @@ that loop; they do not replace it.
 | P9  | schemaGuard front-matter patched post-hoc, not at authoring | 1 escalation + world-fix PR #185 | **SHIPPED** — PR #86, `0ecd207` → [spec](P9-schema-lock-at-authoring.md) |
 | P10 | `ANTHROPIC_API_KEY` env trap kills all sessions        | 13 sessions dead in 36s              | **SHIPPED** — PR #78, `177ca3a` → [spec](P10-anthropic-api-key-guard.md) |
 | P11 | Stale `baseSha` on hand-edited state resets            | 1 false-positive escalation (B13)    | **SHIPPED** — PR #85, `9d9b502` → [spec](P11-basesha-invariants.md) |
-| P12 | Skill doc claims sequential default; runner is parallel | Hand-authoring a 17-link dependsOn chain | **RATIFIED (docs+skill only)** → [spec](P12-concurrency-truth.md) |
+| P12 | Skill doc claims sequential default; runner is parallel | Hand-authoring a 17-link dependsOn chain | **SHIPPED** — PR #87, `d57feeb` → [spec](P12-concurrency-truth.md) |
 | P13 | Harness externally kills background runner tasks       | ×2, ~2 min recovery each             | WON'T-FIX (ratified — mitigation works)      |
 | P14 | Quota pause kills the running session                  | 27 min dead time                     | WON'T-FIX (ratified — cron heartbeat = design) |
 | P15 | Repo-wide pre-commit cost + `bun install` worktree trap | ~40s per docs commit; 1 failed commit | RATIFIED — tribe clause folded into [P3](P3-definition-of-done-brief.md); rest is ai-dict's |
@@ -256,8 +256,8 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
   (PR #80, merge `e226209`). **P4 SHIPPED** (PR #81, merge `1865704`). **P1 SHIPPED**
   (PR #82, merge `5768e9a`). **P6 SHIPPED** (PR #83, merge `2beb0a9`). **P5 SHIPPED** (PR #84, merge `e367e9d`).
   **P11 SHIPPED** (PR #85, merge `9d9b502`). **P9 SHIPPED** (PR #86, merge `0ecd207`).
-  Now implementing: **P12** (branch `fixlist/p12-concurrency-truth`). Remaining order:
-  P12 → P8 → P7.
+  **P12 SHIPPED** (PR #87, merge `d57feeb`). Now implementing: **P8** (branch
+  `fixlist/p8-inherited-obligations`). Remaining order: P8 → P7.
 - Owner's rewind protocol is active (see memory `tribe-fixlist-rewind-protocol`): each
   round = read this README → brainstorm one P → ratify → persist spec + flip table →
   owner rewinds the conversation.
