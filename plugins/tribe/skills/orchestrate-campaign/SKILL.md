@@ -124,7 +124,13 @@ every optional field may simply be omitted rather than written as `null`/`[]` wh
   `dependsOn`) must have a matching entry under `cards`.
 - Every card you write starts `"status": "staged"`, `"autoAnswerRounds": 0`, and no `dependsOn`
   unless that card genuinely must not start before another one ships — an undeclared dependency
-  behaves as pure sequential order (today's default), so only declare one you mean.
+  runs IN PARALLEL — the runner spawns every card whose declared dependencies are satisfied, all
+  at once. Sequence order alone does NOT serialize execution; only `dependsOn` does. So only
+  declare one you mean.
+- **Serial campaigns:** when the owner's directive is one-card-at-a-time (or cards merge to the
+  same branch and each should build on the previous card's merged master), author the full
+  sequential chain — every card `dependsOn` its sequence predecessor. Default to the chain when
+  in doubt: parallel spawning is the exception an owner asks for, not the default they expect.
 - `ownerOnlyEscalations` is *your* Stage-A authored list — carry over the roadmap's own
   Escalation register verbatim (irreversible data shapes, product-promise changes, new
   permissions, privacy). A trigger name on this list escalates to the owner unconditionally in
