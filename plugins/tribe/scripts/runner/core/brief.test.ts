@@ -101,6 +101,25 @@ type-checker/tests) green before commit, and a real commit carrying the code, it
 the plan's ticked checkboxes together. Claims of done are worthless without the gate output
 that proves them — paste gate output verbatim into worker reports.
 
+## Harness gaps and governance (per-card duties)
+
+Your agent Method already carries these; they are walls here because campaigns
+starve them silently:
+
+- Dispatch the Tracker at every audit round (Method step 6.0b) and reconcile any
+  HG-candidates via the gap-reconcile script (Method step 7) — never by hand.
+- The debt burn-down gate and debt-backfill run on EVERY PR, unconditionally.
+- Scout's governance proposals ride THIS card's PR: rule/anti-rule drafts as reviewable
+  text, a debt proposal as its recorded check command + description only — the debt
+  entity itself is created later, by ratified \`gap-rule.ts\` execution, never here. Do
+  not park the card waiting for ratification, do not
+  self-ratify, and leave the registry's \`ruled\` events unwritten — the campaign's
+  closing pass rules on the whole batch. Record each proposal and its proposed
+  disposition in your worker report and under a \`## Harness gaps\` heading in the
+  PR body; that record is what the closing pass reads.
+- Only a gap needing an owner-only decision (see the owner-only list above)
+  escalates NEEDS_DIRECTION.
+
 ## Merge order
 
 Land the PR with \`gh pr merge --merge\`.
