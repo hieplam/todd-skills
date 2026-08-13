@@ -1,6 +1,6 @@
 # P6 — escalation lifecycle: answered/shipped escalations stop haunting re-triggers
 
-- **Status:** RATIFIED 2026-08-12 (delegated).
+- **Status:** SHIPPED — PR #83, merge `2beb0a9` (2026-08-13).
 - **Incident:** log lines 315–321. The escalation FILE's existence short-circuits the card
   to `escalation_pending` (`core/loop/phase.ts:145`) and nothing removes the file when a
   ruling lands — so every re-trigger of an ever-escalated card needs `--include-escalated`
