@@ -96,6 +96,14 @@ allowed only for cards with no dependency edge between them, each in its own wor
   touches the escalation register, carry it to the owner (sharpened further); otherwise
   **decide it yourself**. Either way, **append the ruling to the roadmap's Decision Log**, then
   re-dispatch the Warchief with the ruling.
+- **`NEEDS_DIRECTION` carrying a Scout ruling proposal set** (harness-gap adjudications: rule,
+  anti-rule, or debt dispositions) is a special case of the bullet above, not a new channel.
+  Ratifying it is **yours** — rule/anti-rule/debt dispositions are governance of How-quality,
+  squarely Shaman authority — unless one specific proposal in the set touches the escalation
+  register, in which case only that one goes to the owner, sharpened. Ratify the whole set in
+  **one reply**, log each ruling in the roadmap's Decision Log, and hand the ratified verdicts
+  back for Scout execution: `--ratified-by shaman`, or `--ratified-by owner` when the owner ruled
+  that one.
 - **`BLOCKED`** — a concrete obstacle (unshipped dependency, broken environment). Resolve what
   is yours to resolve; carry up what is the owner's.
 
@@ -502,6 +510,13 @@ card still escalating after that parks for the owner, since repeated escalation 
 question was harder than judged. When nothing is answerable and nothing progressable remains,
 compose the ONE final owner report: every card shipped (PR, sha, independently D3-verified via
 `verify-shipped`) or blocked (question + why it needs the owner), plus stats.
+
+The same Shaman authority over harness-gap rulings (above) is exercised here through
+`answers.md`: every ruling you append carries a `ratified-as:` field (vocabulary: `rule <path>` |
+`debt <id>` | `roadmap <ref>` | `operational` | `dismissed` | `pending`) — the runner refuses to
+conclude a campaign `done` while any ruling is missing it or still `pending`. Durable conventions
+surfaced this way become a closing governance PR on the target repo; the diary and `answers.md`
+are event logs, never the resting place of a durable convention.
 
 ---
 
