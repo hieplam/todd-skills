@@ -46,7 +46,7 @@ that loop; they do not replace it.
 | P4  | Runner escalates instead of self-healing safe residue  | Same B6 escalation                   | **SHIPPED** — PR #81, `1865704` → [spec](P4-self-heal-safe-residue.md) |
 | P5  | Escalations don't say answerable vs world-fixable      | 1 wasted round-trip (A1)             | **SHIPPED** — PR #84, `e367e9d` → [spec](P5-escalation-reason-kinds.md) |
 | P6  | `--include-escalated` must be remembered by hand       | B14 parked 1 cycle                   | **SHIPPED** — PR #83, `2beb0a9` → [spec](P6-escalation-lifecycle.md) |
-| P7  | Rulings can't reach a running session                  | A12 carried 5+ soon-invalid commits  | **RATIFIED (accept + document)** → [spec](P7-mid-flight-rulings.md) |
+| P7  | Rulings can't reach a running session                  | A12 carried 5+ soon-invalid commits  | **SHIPPED** — PR #89, `eba7b41` → [spec](P7-mid-flight-rulings.md) |
 | P8  | Batch-authored specs drop inherited obligations        | 2 escalation rounds (B13→B14)        | **SHIPPED** — PR #88, `57ad095` → [spec](P8-inherited-obligations-check.md) |
 | P9  | schemaGuard front-matter patched post-hoc, not at authoring | 1 escalation + world-fix PR #185 | **SHIPPED** — PR #86, `0ecd207` → [spec](P9-schema-lock-at-authoring.md) |
 | P10 | `ANTHROPIC_API_KEY` env trap kills all sessions        | 13 sessions dead in 36s              | **SHIPPED** — PR #78, `177ca3a` → [spec](P10-anthropic-api-key-guard.md) |
@@ -257,7 +257,19 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
   (PR #82, merge `5768e9a`). **P6 SHIPPED** (PR #83, merge `2beb0a9`). **P5 SHIPPED** (PR #84, merge `e367e9d`).
   **P11 SHIPPED** (PR #85, merge `9d9b502`). **P9 SHIPPED** (PR #86, merge `0ecd207`).
   **P12 SHIPPED** (PR #87, merge `d57feeb`). **P8 SHIPPED** (PR #88, merge `57ad095`).
-  Now implementing: **P7** (branch `fixlist/p7-mid-flight-rulings`) — the FINAL item.
+  **P7 SHIPPED** (PR #89, merge `eba7b41`).
+- **CAMPAIGN COMPLETE (2026-08-13): 12/12 items shipped**, PRs #78–#89, serial order
+  P10 → P2 → P3 → P4 → P1 → P6 → P5 → P11 → P9 → P12 → P8 → P7. Every item ran the full
+  Tribe cell (hunter → two-lens skinners + scout in parallel → bounded fix rounds →
+  gated merge) via a dynamic workflow; 85 audit findings were raised and adjudicated
+  across the campaign, every item took exactly 1 fix round except P2 (2). Runner test
+  suite grew 220 → 312 tests (0 fail throughout); `tsc --noEmit` clean after every
+  merge. Recorded follow-ups for the owner (deliberately NOT built): a `reset-card` CLI
+  subcommand (P11 out-of-scope note), a `--max-concurrent N` runner flag (P12
+  not-chosen option), and the deferred hook design for mid-flight ruling delivery (P7
+  spec). A separate peer-session analysis (harness-gap loop unwired, breaks B1–B7) was
+  received near campaign end — flagged to the owner as its own follow-up stack,
+  pending owner approval, orthogonal to this fixlist.
 - Owner's rewind protocol is active (see memory `tribe-fixlist-rewind-protocol`): each
   round = read this README → brainstorm one P → ratify → persist spec + flip table →
   owner rewinds the conversation.

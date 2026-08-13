@@ -1,6 +1,6 @@
 # P7 — rulings and running sessions: accept the spawn-time snapshot, document it
 
-- **Status:** RATIFIED 2026-08-12 (delegated) — **option (a): accept + document.**
+- **Status:** SHIPPED — PR #89, merge `eba7b41` (2026-08-13) — option (a): accept + document.
 - **Incident:** log lines 267–279. The Conventional Commits gate landed on master while
   A12 was mid-flight with 5+ soon-to-be-rejected commits. The answers digest is injected
   once, at spawn (`core/brief.ts:58,77`) — a running session cannot receive new rulings.
