@@ -46,7 +46,7 @@ Shaman  ──(vision: what/why)──▶  Warchief
 
 **Answers:** *What?* and *Why?*
 
-**What it actually does:** Generates ideas, sets the direction and the meaning for the whole tribe. The Shaman does **not** pick up a weapon and hunt (no writing code, no detailed tactics). It sees far, interprets "why this is worth doing" and "what needs to be achieved," then hands it off to the Warchief. When a PR is merged, the Warchief reports back up to the Shaman to close the vision → outcome loop.
+**What it actually does:** Generates ideas, sets the direction and the meaning for the whole tribe. The Shaman does **not** pick up a weapon and hunt (no writing code, no detailed tactics). It sees far, interprets "why this is worth doing" and "what needs to be achieved," then hands it off to the Warchief. When a PR is merged, the Warchief reports back up to the Shaman to close the vision → outcome loop. Each approved unit is delegated to the tribe's closed loop (Warchief → Hunter → Tracker + Scout lenses → PR + merge) as ONE deterministic unit — the Shaman launches it, waits, and verifies SHIPPED; it never reviews diffs, commits, or merges inside the loop.
 
 **Why the name Shaman:** In a tribe, the Shaman (medicine man / seer) is the one who "reads the omens" — interpreting the *meaning* (why) and pointing out the *direction* (what) for the whole tribe, without personally going on the hunt. This fits the role of generating ideas + vision, without touching the *how*.
 
