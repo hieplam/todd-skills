@@ -545,7 +545,11 @@ another reviewer's prose is never contract-class evidence (D9). You use it in ex
 - **A `BLOCK` verdict is a red gate, same class as a red pre-gate.** Rule violations with
   concrete fixes are the Hunter's unfinished work, not an audit round: route the Tracker's
   findings back to a fixer Hunter and re-run both gates; this consumes no fix round, and no
-  Skinner is dispatched against a branch still violating written rules.
+  Skinner is dispatched against a branch still violating written rules. A finding is routed to
+  the fixer on the strength of its **rule citation**, never the Tracker's confidence — you
+  overrule any Tracker finding that cites no written rule, or that asserts a correctness bug it
+  did not substantiate; what makes the `BLOCK` a gate is the citation (Law 4: no lens, including
+  the Tracker's, holds a verdict — you do).
 - **The final whole-branch audit's Tracker report is step 7's input.** Carry it forward
   verbatim — its `### Harness gaps` section in particular, even under an APPROVE verdict — as
   the Tracker report step 7's reconciliation consumes. Dropping it between here and step 7
@@ -588,6 +592,7 @@ This list is exhaustive and it is a rule, not a preference:
 | commit messages, the branch name, the PR body, task titles | each is a compressed restatement of the contract |
 | the other Skinner's findings, verdict, report path, or existence | Law 2, unchanged |
 | an un-scoped full-range diff | the tribe's contract documents live in-repo, so the full range hands the cold lens the contract |
+| the Tracker's report (Step 6.0b), its verdict, or its `### Harness gaps` section | another reviewer's prose is never contract-class evidence (D9); it enters neither Skinner brief |
 
 The cold lens is **not blind to the codebase**: it may read any source file and run read-only
 commands to understand the code and to falsify its own hypotheses. What it is denied is the
@@ -1186,11 +1191,27 @@ suspicious one — do not go hunting for something to change in order to feel li
      editorializing.
   4. **Dispatch Scout to adjudicate the open gaps.** Once reconciliation names which gaps are
      still un-ruled, dispatch Scout with each open gap's id, category, fingerprint, and evidence,
-     exactly as reconciled. **In an unattended campaign** (no owner in the loop this session):
-     Scout returns proposals only, never self-ratifies — escalate the whole proposal set to the
-     Shaman for ratification in **one escalation** (never one round-trip per gap), then hand the
-     ratified verdicts straight back to Scout for execution. In an attended session the owner
-     rules through the Shaman and Scout executes the same way once ratified.
+     exactly as reconciled. Scout returns proposals only, never self-ratifies. What happens to the
+     proposal set next depends on which dispatch channel you are in:
+     - **Live Shaman reachable mid-card** (a Shaman session dispatched you and answers you): keep
+       today's behavior verbatim — escalate the whole proposal set to the Shaman for ratification
+       in **one escalation** (never one round-trip per gap), then hand the ratified verdicts
+       straight back to Scout for execution. In an attended session the owner rules through the
+       Shaman and Scout executes the same way once ratified.
+     - **Headless campaign executor** (your dispatch brief is a campaign card and no one answers
+       mid-card): never park the card waiting on ratification, and never self-ratify. Land only
+       rule/anti-rule **draft text** in THIS card's PR as a reviewable draft — never a `debt`
+       entity: `gap-rule.ts` itself creates the debt entity as part of ratified execution
+       (its own artifacts-first step), so pre-creating one here would collide with the closing
+       pass. For a `debt` proposal, the PR body carries the proposed check command and
+       description only — thin by design, nothing for `c3` to create yet. Record every proposal
+       and its proposed disposition in your worker report and under the PR body's `## Harness
+       gaps` heading, and leave the registry's `ruled` events **unwritten**: ratification and
+       `gap-rule.ts` execution belong to the campaign's closing pass, under Shaman/owner
+       authority. The one exception is a gap whose ruling genuinely needs an owner-only decision
+       (per this campaign's owner-only escalation list) — that one still escalates
+       `NEEDS_DIRECTION`, because the card is then truly blocked on a human, not merely waiting
+       on ratification.
 
   **You never mint or match a `G-NNN` id by your own judgment — identity is the script's job
   alone, every time, mechanically.** And, verbatim: **you never edit
@@ -1208,8 +1229,8 @@ suspicious one — do not go hunting for something to change in order to feel li
 - **Run `debt-backfill.ts` on every PR** (default ref `master`), resolved the same way, and
   list any issues it created in the PR body, exactly as the script reported them — no
   editorializing.
-- **Close what the snapshot says is closable.** For every entry a `debt-count.ts` snapshot
-  flags `closable`, run `c3 set <id> status closed` yourself, on the branch.
+- **Close what the snapshot says is closable, on every PR.** For every entry a `debt-count.ts`
+  snapshot flags `closable`, run `c3 set <id> status closed` yourself, on the branch.
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
   evidence embedded, the gate results with numbers, the review outcome, and the `## Harness gaps`
   section above when the Tracker report carried any candidates.

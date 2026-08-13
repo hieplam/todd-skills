@@ -323,6 +323,14 @@ On every exit notification where the report shows `pending` cards:
      product promises, new permissions, privacy) **or genuinely too hard to call** — leave it
      parked (escalation file untouched, unanswered). Never rule on an owner-only trigger
      yourself, no matter how confident you are.
+   - **Every ruling you append to `answers.md` carries a `ratified-as:` field** — this applies
+     whether the ruling answers an `escalated` card's ordinary question or adjudicates a
+     harness-gap proposal, surfaced either by an escalation or by a `shipped` card's
+     `## Harness gaps` PR record. Frozen vocabulary: `rule <path>` | `debt <id>` |
+     `roadmap <ref>` | `operational` | `dismissed` | `pending`. `operational` is for
+     campaign-mechanics rulings that die with the campaign (a sequencing tweak, a scope
+     clarification); anything durable — a rule, an anti-rule, a debt entity — names its
+     governance artifact instead.
 
    `answers.md` is read once, at the START of a runner invocation (`resolveRunContext`,
    `core/loop/run-loop.ts`) — that single read serves every card the invocation touches, so a
@@ -380,7 +388,18 @@ build the single message the owner reads:
    worktree path. This is the design's no-cascade read: the runner's own claim that a card
    shipped is not evidence on its own. Treat a `verify-shipped` failure as `blocked`, not
    `shipped`, in your final report.
-2. **You can also recover which commits belong to this campaign directly from git.** Every
+2. **The ratification pass.** Collect every convention surfaced across the whole campaign: each
+   `shipped` card's `## Harness gaps` PR record (proposals its Warchief landed as reviewable
+   drafts but did not self-ratify, per its brief) plus every ruling already in `answers.md`.
+   Every one of them must end this pass non-`pending`. Durable dispositions (`rule`, `anti-rule`,
+   `debt`) do not stay as prose in a PR body or a diary line — land them as **ONE closing
+   governance PR** on the target repo (the rule/anti-rule files, the debt entity, the
+   ROADMAP Decision Log entries), then mark each ruling's `ratified-as:` accordingly. The
+   runner's `rulings_unratified` exit is the mechanical backstop for skipping this step — it is
+   not the primary mechanism, do not rely on it to catch what this pass should catch by
+   judgment. A ruling left `pending` means the campaign is **not done**, full stop, no matter how
+   many cards shipped.
+3. **You can also recover which commits belong to this campaign directly from git.** Every
    commit a card's executor session made should carry a `Campaign: <campaign-slug>` git trailer
    — the runner's executor brief instructs it (see the runner README's "Campaign commit
    trailer" section). `git log --grep="Campaign: <campaign-slug>"` in `<target-repo>` lists
@@ -388,10 +407,12 @@ build the single message the owner reads:
    `verify-shipped` confirm the trailer is present, so a missing trailer is a documentation gap
    worth noting, never proof a card didn't ship — `verify-shipped` (item 1) stays the actual
    acceptance gate.
-3. **Compose ONE report** to the owner, covering every card in the campaign:
+4. **Compose ONE report** to the owner, covering every card in the campaign:
    - **Shipped** — PR number, merge sha, and the `verify-shipped` verdict.
    - **Escalated / blocked** — the question (or `blockedOn` dependency), why it needs the owner,
      and how many auto-answer rounds it already used.
+   - **Harness-gap rulings** — every ruling the ratification pass closed, each with where it was
+     ratified to (the rule/debt/roadmap reference, or `operational`/`dismissed`).
    - Overall `stats` (shipped / escalated / blocked / not-reached counts) and pointers to the
      report files and escalation files, so the owner can go deeper without you re-deriving
      anything.
@@ -417,5 +438,10 @@ and its memory never live inside you.
 - **W3 — judgment stays in sessions.** `answers.md` is written only by you (a session) or the
   owner — never by the runner. If you ever see the runner's own commits touching that file,
   something is badly wrong; stop and report it rather than continuing the loop.
+- **The diary and `answers.md` are event logs and operational state, never the resting place of
+  a durable convention.** Durable means a governance surface of the target repo — a rule file,
+  an anti-rule, a debt entity, a ROADMAP Decision Log entry — reached through a PR. A ruling that
+  never leaves `answers.md` is exactly the failure the ratification pass (Stage D) exists to
+  catch.
 - **W7 — bounded auto-answer.** At most 2 auto-answer rounds per card. A card still escalating
   after that parks for the owner, full stop — do not attempt a third ruling.
