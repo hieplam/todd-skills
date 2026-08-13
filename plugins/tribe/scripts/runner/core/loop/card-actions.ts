@@ -288,6 +288,15 @@ export async function shipCard(ctx: CardCtx, verifyResult: VerifyResult): Promis
   card.updatedAt = io.now();
   persistLocalState(state, resolved, io);
 
+  // P6 (fix-list): a shipped card must never re-park on a leftover escalation file — archive
+  // it (never delete: the ruling trail stays inspectable) rather than leave it to short-circuit
+  // `deriveCardPhase` on some future flag-less re-trigger (spec: "answered/shipped escalations
+  // stop haunting re-triggers").
+  const escalationPath = escalationPathOf(resolved.homeDir, cardId);
+  if (io.fileExists(escalationPath)) {
+    io.renameFile(escalationPath, `${escalationPath}.resolved-shipped`);
+  }
+
   return { kind: 'shipped', cardId };
 }
 

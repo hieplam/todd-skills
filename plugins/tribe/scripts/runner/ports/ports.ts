@@ -25,6 +25,10 @@ export interface FsPort {
   fileExists(resolvedPath: string): boolean;
   readFile(resolvedPath: string): Promise<string> | string;
   writeFile(resolvedPath: string, content: string): void;
+  /** P6 (fix-list): renames/moves a file already on disk — used to archive a resolved
+   * escalation file (`<path>.resolved-shipped`) rather than delete it, so the ruling trail
+   * stays inspectable after the fact. */
+  renameFile(from: string, to: string): void;
 }
 export interface LogPort {
   appendLog(logPath: string, line: string): void;

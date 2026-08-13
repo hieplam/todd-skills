@@ -23,7 +23,7 @@ import {
 } from './loop.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { BRIEF_TEMPLATE_PATH } from './brief.ts';
-import { answersPathOf, campaignStatePathOf } from './paths.ts';
+import { answersPathOf, campaignStatePathOf, escalationPathOf } from './paths.ts';
 import type { Card, CampaignState, ResolvedConfig } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
 import { verifyShipped } from './verify.ts';
@@ -32,7 +32,7 @@ import type { VerifyConfig, VerifyResult } from './verify.ts';
 // use to self-heal safe residue between a first failed verify and the retry — exercised
 // directly here (same `CardCtx` shape `runPass` builds) so the healed retry detail is
 // observable, which `CardOutcome`'s `shipped` variant deliberately does not carry.
-import { healSafeResidue, CONTINUE_UNKNOWN_STATE_PROMPT } from './loop/card-actions.ts';
+import { healSafeResidue, CONTINUE_UNKNOWN_STATE_PROMPT, shipCard, escalateCard } from './loop/card-actions.ts';
 import type { CardCtx } from './loop/card-actions.ts';
 // P4 audit fix-round: proving the "report notes the heal" acceptance criterion at the ONLY
 // artifact an orchestrating session actually reads (report.ts), not just at healSafeResidue's
@@ -417,6 +417,7 @@ interface MockLoopIoResult {
   lockCalls: string[];
   ensuredDirs: string[];
   atomicWrites: Array<{ path: string; content: string }>;
+  renameCalls: Array<{ from: string; to: string }>;
 }
 
 function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
@@ -429,6 +430,7 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
   const lockCalls: string[] = [];
   const ensuredDirs: string[] = [];
   const atomicWrites: Array<{ path: string; content: string }> = [];
+  const renameCalls: Array<{ from: string; to: string }> = [];
   let lock = opts.lock ?? null;
   const spawnQueue = [...(opts.spawnQueue ?? [])];
   const escalationFiles = new Set(opts.escalationFiles ?? []);
@@ -476,6 +478,16 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     writeFile: mock((p: string, content: string) => {
       writtenFiles.set(p, content);
     }),
+    // P6 (fix-list): records every rename (archive) so tests can assert `shipCard` archived
+    // a leftover escalation file — and mutates `escalationFiles` so a subsequent `fileExists`
+    // check on the ORIGINAL path reflects the file having moved away (the archived name never
+    // matches the `/escalations/<cardId>.md` pattern `fileExists` above keys on, since it no
+    // longer ends in `.md`).
+    renameFile: mock((from: string, to: string) => {
+      renameCalls.push({ from, to });
+      const cardMatch = /([^/]+)\.md$/.exec(from);
+      if (cardMatch) escalationFiles.delete(cardMatch[1] as string);
+    }),
     readLock: mock(() => lock),
     writeLock: mock((info: LockInfo) => {
       lockCalls.push(`write:${info.pid}`);
@@ -503,7 +515,7 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     }),
   };
 
-  return { io, calls, writtenFiles, spawnBriefs, lockCalls, ensuredDirs, atomicWrites };
+  return { io, calls, writtenFiles, spawnBriefs, lockCalls, ensuredDirs, atomicWrites, renameCalls };
 }
 
 function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
@@ -1411,6 +1423,105 @@ describe('runLoop — self-heals safe residue between the first failed verify an
     // A failed `git status --porcelain` must never be read as "clean" -> no removal attempted.
     expect(calls.some((c) => c[0] === 'git' && c[1] === 'worktree' && c[2] === 'remove')).toBe(false);
     expect(calls.some((c) => c[0] === 'git' && c[1] === 'branch' && c[2] === '-D')).toBe(false);
+  });
+});
+
+// ===========================================================================================
+// P6 (fix-list): shipCard archives a leftover escalation file on ship — "answered/shipped
+// escalations stop haunting re-triggers".
+// ===========================================================================================
+
+describe('shipCard — archives a leftover escalation file on ship (P6)', () => {
+  test('card ships while an escalation file exists -> renameFile is called with the escalation ' +
+    'path and its `.resolved-shipped` twin', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    const { io, renameCalls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+    });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+    const escalationPath = escalationPathOf('/th', 'C1');
+
+    const outcome = await shipCard(ctx, { shipped: true, points: [], failedPoints: [] });
+
+    expect(outcome).toEqual({ kind: 'shipped', cardId: 'C1' });
+    expect(renameCalls).toEqual([{ from: escalationPath, to: `${escalationPath}.resolved-shipped` }]);
+  });
+
+  test('card ships with no escalation file -> renameFile is never called', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    const { io, renameCalls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      // No escalation file for C1 this time.
+    });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    await shipCard(ctx, { shipped: true, points: [], failedPoints: [] });
+
+    expect(renameCalls).toEqual([]);
+  });
+
+  test('escalated/stopped outcomes never rename anything — only shipCard archives', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    const { io, renameCalls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+    });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    // `escalateCard` runs the OTHER outcome branch — it must never touch `renameFile`
+    // (archiving is exclusively a ship-time action; an escalation WRITES the file, it never
+    // removes/renames one).
+    const outcome = await escalateCard(ctx, 'needs_direction', 'some detail');
+
+    expect(outcome.kind).toBe('escalated');
+    expect(renameCalls).toEqual([]);
+  });
+
+  test('B14 regression: an escalated card with an unresolved escalation file ships under ' +
+    '--include-escalated (archiving the file); a SECOND, flag-less run reaches `done` instead ' +
+    'of parking on `escalation_pending` — the exact trap that wasted a cycle on B14', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      // A pre-assigned branch (not `branch: null`) so a plain fresh ship needs no `gh pr view`
+      // branch-discovery round trip — the same "pre-assigned branch, no PR/worktree trace yet"
+      // convention several other park-and-continue fixtures above already use.
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', status: 'escalated' }) },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+      execHandlers: cleanCommitAndVerifyHandlers('deadb14e'),
+      spawnQueue: [() => messages(shippedMessages(14, 'deadb14e', 'sess-b14'))],
+    });
+    const escalationPath = escalationPathOf('/th', 'C1');
+
+    const firstRun = await runLoop(baseLoopConfig({ includeEscalated: true }), io);
+    expect(firstRun.processed).toEqual([{ kind: 'shipped', cardId: 'C1' }]);
+    // The trap this guards: a shipped card's escalation file left on disk is exactly what
+    // "haunts" a later re-trigger (the decision doc: "a shipped card must never re-park").
+    // `shipCard` must have archived it as part of this very run.
+    expect(io.fileExists(escalationPath)).toBe(false);
+
+    const secondRun = await runLoop(baseLoopConfig({ includeEscalated: false }), io);
+    expect(secondRun.exitCode).toBe(EXIT_OK);
+    expect(secondRun.processed).toEqual([]);
   });
 });
 

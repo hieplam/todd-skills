@@ -256,24 +256,38 @@ or to have an in-flight run finish its current card and stop before starting the
 On every exit notification where the report shows `pending` cards:
 
 1. **For each `escalated` card**, read its `escalationFile`. Two outcomes:
-   - **Within your Shaman authority** (scope clarifications, How tradeoffs, sequencing) — append
-     your ruling to `answers.md` (under the campaign home) yourself (this is the only writer of
-     that file besides the owner; the runner itself never writes there — wall W3). Note the card
-     as answered.
+   - **Within your Shaman authority** (scope clarifications, How tradeoffs, sequencing) — rule on
+     it as ONE atomic ritual, not a bare `answers.md` write: append your ruling to `answers.md`
+     (under the campaign home, tagged `R<n>`) yourself (this is the only writer of that file
+     besides the owner; the runner itself never writes there — wall W3), **then archive the
+     escalation file in the same step** by renaming it to `<card>.md.resolved-R<n>` (never
+     delete it — the ruling trail stays inspectable):
+
+     ```sh
+     mv "<home>/escalations/<card>.md" "<home>/escalations/<card>.md.resolved-R<n>"
+     ```
+     An escalation file left in place is exactly what makes the runner's own `deriveCardPhase`
+     short-circuit any FUTURE flag-less re-trigger of this card straight back to
+     `escalation_pending` (the B14 trap, P6 fix-list) — archiving it the moment you rule is what
+     lets the re-trigger below skip `--include-escalated` for this card. Note the card as
+     answered.
    - **Owner-only** (anything on the state file's own `ownerOnlyEscalations` list — data shapes,
      product promises, new permissions, privacy) **or genuinely too hard to call** — leave it
-     parked. Never rule on an owner-only trigger yourself, no matter how confident you are.
+     parked (escalation file untouched, unanswered). Never rule on an owner-only trigger
+     yourself, no matter how confident you are.
 2. **If you answered at least one card**, re-trigger the runner scoped to exactly the cards that
    can now progress — the ones you just answered plus every `not_reached` card from the report
-   (so the rest of the sequence keeps moving, not just the answered card):
+   (so the rest of the sequence keeps moving, not just the answered card). Every card you just
+   archived above needs no flag at all now; `--include-escalated` is needed ONLY when this batch
+   also includes a card whose escalation file you deliberately left in place (still unanswered)
+   and you are choosing to force a retry of it anyway:
 
    ```sh
    bun "$runner_dir/run.ts" \
      --repo <target-repo> \
      --model <model> \
      --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
-     --cards <answered-card-id>,<...>,<not-reached-card-id>,<...> \
-     --include-escalated
+     --cards <answered-card-id>,<...>,<not-reached-card-id>,<...>
    ```
    (`$runner_dir` — resolved once in Stage B; re-use it here rather than re-resolving. `--home`
    resolves to the SAME campaign home every time — it is re-computed rather than cached because

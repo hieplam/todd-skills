@@ -531,6 +531,7 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
       writeFile: (p, content) => {
         written.set(p, content);
       },
+      renameFile: () => {},
       readLock: () => null,
       writeLock: () => {},
       removeLock: () => {},
