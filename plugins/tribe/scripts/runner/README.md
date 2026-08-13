@@ -57,6 +57,7 @@ All paths below that are relative are relative to `--repo` unless noted otherwis
 | `--dry-run` | no | Derive and print the next action with **zero side effects** — no lock, no writes, no session, no report file (see the report contract below). |
 | `--cards` | no | Comma-separated list of card ids — restricts the loop to only these ids, in the state's own `sequence` order. Default: the full sequence. |
 | `--max-cards` | no | Positive integer — stop after WORKING this many cards in this run (a card actually `shipped`/`escalated`/`stopped` this pass — see D5′ below; a card merely parked on a prior run's escalation, or skipped as `blocked`, does not consume this budget). Default: unbounded (run until `done` or the budget is spent — an escalation no longer stops the run, see D5′). |
+| `--max-concurrent` | no | Integer ≥ 1 — how many cards' executor sessions may be IN FLIGHT at once this pass. Bounds WIDTH only, never ORDER: `dependsOn` still owns ordering (see "Concurrency" below). Default: `1`, i.e. **today's exactly-one-card-at-a-time behavior** — this is a strict opt-in; omitting the flag changes nothing. |
 | `--include-escalated` | no | Bypass the escalation-file short-circuit for a card the human has already ruled on, and let `nextCard`/`deriveCardPhase` reconsider it. This is exactly the flag the Stage C round-trip re-triggers with (spec §O6). |
 | `--remote` | no | The git remote this repo's canonical upstream/PR-target actually is — resolved once and threaded everywhere the runner queries or pushes to a remote (base-branch resolution, verify-phase ancestry/diff checks, branch-existence checks). Default: `'origin'`. See [`docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md`](../../../../docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md). |
 
@@ -405,6 +406,51 @@ this field existed.
   `blocked`; a card that stores a stale `blocked` but no longer has an unmet dependency is reset
   to `staged`. A card's parking status is therefore always current, even for a card the
   selection walk itself never reaches this pass.
+
+## Concurrency (`--max-concurrent`, P12 follow-up)
+
+**Default (`--max-concurrent 1`, or the flag omitted): exactly one card's session runs at a
+time, in `sequence` order, awaited to full completion before the next card is even selected.**
+This is the runner's original, unconditional behavior — `--max-concurrent` does not exist yet as
+far as a run that never passes it is concerned.
+
+**`--max-concurrent N` (N > 1)** bounds how many cards' executor sessions may be *in flight at
+once* this pass — a small worker pool over progressable cards, not a rewrite of card selection:
+
+- **Width only, never order.** `dependsOn` (above) is still the ONLY thing that orders cards. A
+  dependent card is never selected while its dependency is mid-flight, for the same reason it's
+  never selected while merely `staged`: `nextCard` treats any non-`shipped` status — including a
+  card another worker currently has claimed — as "not shipped yet". Declaring `dependsOn` is
+  still how you force strict one-by-one ordering (see the previous section and the
+  `orchestrate-campaign` skill's own "Serial campaigns" guidance) — `--max-concurrent` never
+  substitutes for it; it only bounds how many *independent* cards may overlap.
+- **No two workers are ever handed the same card.** Selection (`nextCard`/`filteredNextCard`) is
+  synchronous and pure; a card is marked claimed in the SAME synchronous step it's selected, with
+  no `await` in between — so concurrent selection can't race.
+- **State writes stay consistent.** Every card mutation (`card.status`, `card.pr`, ...) is
+  immediately followed, in the same synchronous span, by a full-state write
+  (`persistLocalState`) — JS's single-threaded, run-to-completion semantics make each
+  mutate-then-flush pair atomic, and because `campaign-state.json` is always serialized WHOLE
+  (never a per-card patch) from one shared, in-memory `CampaignState` object, later writes always
+  include every mutation any worker had applied by that point — never a lost update, regardless
+  of which card's session happens to finish first.
+- **`--max-cards` under concurrency is an optimistic ceiling, not an exact stop.** The pool
+  cannot know a freshly-claimed card will turn out to be a no-op park
+  (`escalation_pending`/answered-and-parked) until it actually checks, so a batch can occasionally
+  claim slightly fewer REAL work-units than `--max-cards` allows before recognizing the budget is
+  spent — it can never exceed it.
+- **Not solved by this flag: merge races on a shared base branch.** Two cards that both merge to
+  the SAME base branch can still contend at the actual `gh pr merge` step — this runner does not
+  add any merge-queue/serialization logic beyond what git/GitHub already do (a stale-base merge
+  fails or re-queues on the GitHub side). If your cards merge to the same branch and each should
+  build on the previous one's merged result, use `dependsOn` to force the ordering `--max-concurrent`
+  deliberately does not provide — this was already the prior campaign's own recommendation (see
+  the P12 fixlist note) before this flag existed, and it still applies at any `N`.
+
+Use `--max-concurrent` when a campaign genuinely wants bounded parallelism (independent cards,
+no shared base branch, no ordering requirement) — for anything requiring strict one-by-one
+execution, author the full sequential `dependsOn` chain instead, exactly as before this flag
+existed.
 
 ## Escalation / answers workflow (spec §D5) and D5′ park-and-continue (spec §O4)
 

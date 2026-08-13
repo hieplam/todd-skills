@@ -58,6 +58,7 @@ const KNOWN_FLAGS = new Set([
   '--session-timeout',
   '--logs-dir',
   '--max-cards',
+  '--max-concurrent',
   '--cards',
   '--dry-run',
   '--include-escalated',
@@ -127,6 +128,22 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
     maxCards = parsed;
   }
 
+  // P12 follow-up: `--max-concurrent` bounds width (how many cards' sessions may run at
+  // once), never order — `dependsOn` still owns ordering (see run-loop.ts's `runPassPool`).
+  // Default 1 == today's exactly-one-card-at-a-time behavior, set explicitly here (not left
+  // `undefined`) so `result.config.maxConcurrent` always carries a concrete, reasoned value —
+  // unlike `--max-cards`, "no limit" has no integer to fall back to, but "how many at once"
+  // always does.
+  let maxConcurrent = 1;
+  const maxConcurrentRaw = raw.get('--max-concurrent');
+  if (typeof maxConcurrentRaw === 'string') {
+    const parsed = Number(maxConcurrentRaw);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return { error: `--max-concurrent: expected an integer >= 1, got "${maxConcurrentRaw}"` };
+    }
+    maxConcurrent = parsed;
+  }
+
   let cardsFilter: string[] | undefined;
   const cardsRaw = raw.get('--cards');
   if (typeof cardsRaw === 'string') {
@@ -150,6 +167,7 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
       model,
       sessionTimeoutMs,
       maxCards,
+      maxConcurrent,
       cardsFilter,
       includeEscalated,
       dryRun,

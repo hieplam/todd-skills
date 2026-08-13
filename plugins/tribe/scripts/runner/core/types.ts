@@ -125,6 +125,15 @@ export interface RunLoopConfig {
   maxCards?: number;
   /** `--include-escalated` */
   includeEscalated: boolean;
+  /** `--max-concurrent` (P12 follow-up): bounds how many cards' executor sessions may be in
+   * flight AT ONCE this pass — it bounds WIDTH, never ORDER (`dependsOn` still owns ordering;
+   * see `core/loop/run-loop.ts`'s `runPassPool` doc comment). OPTIONAL, and reads as `?? 1`
+   * everywhere it's consumed (never a bare field access) so every existing `RunLoopConfig`
+   * literal — every test fixture, every other caller — that omits it keeps behaving exactly
+   * like today's one-card-at-a-time pass with zero code changes. `1` (omitted or explicit) is
+   * the default AND must stay behaviorally identical to the pre-P12-follow-up runner: N=1
+   * always takes the original serial `runPass` code path, never `runPassPool`. */
+  maxConcurrent?: number;
   /** `--dry-run` */
   dryRun: boolean;
   /** `--remote` — the git remote name this repo's PR-target/canonical-upstream actually is.

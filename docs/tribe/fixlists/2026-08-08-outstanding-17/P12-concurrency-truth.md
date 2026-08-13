@@ -19,6 +19,11 @@
 - **Not chosen (recorded):** a `--max-concurrent N` runner flag — genuinely useful, but
   (a)+(c) closes the observed trap with zero runner risk; revisit if a campaign actually
   wants bounded parallelism.
+- **Update (2026-08-13, P12 follow-up):** the owner approved building it. `--max-concurrent N`
+  now exists (default `1` == this doc's own "one card's session at a time" behavior, unchanged
+  unless the flag is passed) — see the runner README's "Concurrency" section and this skill's
+  "The runner's concurrency model" section for the current, TRUE contract. (a)+(c) above remain
+  correct and unchanged: `dependsOn` is still the only thing that orders cards, at any `N`.
 
 ## Implementation guide (fresh session, smaller model — docs-only change)
 

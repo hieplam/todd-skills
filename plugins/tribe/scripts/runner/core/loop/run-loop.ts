@@ -1,6 +1,6 @@
 // The pass + entry: derive-and-act until `done`, honoring STOP and the `--max-cards` budget,
 // tied together with the §D2 lock.
-import type { CampaignState, NextCardResult, ResolvedConfig, RunLoopConfig } from '../types.ts';
+import type { CampaignState, CardResult, NextCardResult, ResolvedConfig, RunLoopConfig } from '../types.ts';
 import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_RULINGS_UNRATIFIED, EXIT_SESSION_INCOMPLETE } from '../types.ts';
 import { loadState, nextCard } from '../state.ts';
 import { BRIEF_TEMPLATE_PATH } from '../brief.ts';
@@ -156,6 +156,35 @@ async function resolveRunContext(config: RunLoopConfig, io: LoopIO): Promise<Res
   return { ...config, baseBranch, answersContent, briefTemplate };
 }
 
+/** A single card's phase-derive → (park on `escalation_pending`) → `actOnCard`-with-bounded-
+ * retry turn — extracted out of `runPass`'s while-loop body so the N=1 serial pass and the
+ * N>1 concurrent pool (`runPassPool`, below) share EXACTLY one implementation of this logic.
+ * A behavior fixed here is fixed identically for both; there is no second copy that could
+ * silently drift. `worked` mirrors `runPass`'s own attempted/worked split (see that function's
+ * doc comment): `false` only for `escalation_pending` (nothing done this pass, no budget
+ * spent), `true` for every other outcome (`shipped`/`escalated`/`stopped` — real work
+ * happened, even a `stopped` session that ran out of retries). */
+async function runCardTurn(ctx: CardCtx, nc: CardResult): Promise<{ outcome: CardOutcome; worked: boolean }> {
+  const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(ctx.resolved), ctx.io);
+
+  if (phase.kind === 'escalation_pending') {
+    return {
+      outcome: { kind: 'escalation_pending', cardId: nc.cardId, escalationPath: phase.escalationPath },
+      worked: false,
+    };
+  }
+
+  let outcome = await actOnCard(ctx, phase);
+  let retries = 0;
+  while (outcome.kind === 'stopped' && outcome.retryable && retries < 2) {
+    retries += 1;
+    const retryPhase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(ctx.resolved), ctx.io);
+    if (retryPhase.kind === 'escalation_pending') break;
+    outcome = await actOnCard(ctx, retryPhase);
+  }
+  return { outcome, worked: true };
+}
+
 /** One D5′ park-and-continue pass over the campaign: derive-and-act until `done`, STOP, or
  * the --max-cards budget is spent. `reachedDone` records WHICH of the three ended the pass:
  * true only when `filteredNextCard` itself returned `{ kind: 'done' }` (no progressable card
@@ -210,18 +239,6 @@ async function runPass(
       continue;
     }
 
-    const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(resolved), io);
-
-    if (phase.kind === 'escalation_pending') {
-      // D5′: an unanswered escalation from a PRIOR run — nothing to do this pass but park
-      // it (see the `CardOutcome.escalation_pending` doc) and move to the next card. Marks
-      // `attempted` (never re-select it this pass) but NOT `worked` (no budget spent — see
-      // the audit-fix comment above `attempted`'s declaration).
-      attempted.add(nc.cardId);
-      processed.push({ kind: 'escalation_pending', cardId: nc.cardId, escalationPath: phase.escalationPath });
-      continue;
-    }
-
     // P1 fix-list "wait-aware liveness" (containment layer): a `stopped` outcome whose
     // session ended with `error` (never `timeout`) is exactly what a human re-trigger fixed
     // on 08-08 — the card's sessionId is already recorded locally (written by `onSessionStart`
@@ -230,21 +247,118 @@ async function runPass(
     // a branch was already known, or the P1 audit fix-round's `session_only` reason
     // (`phase.ts`) when it wasn't — never a blind second `fresh` spawn on top of possibly-
     // still-open work. Bounded to 2 retries per card per pass so a persistently-erroring card
-    // still surfaces as `stopped` rather than looping forever.
-    let outcome = await actOnCard(ctx, phase);
-    let retries = 0;
-    while (outcome.kind === 'stopped' && outcome.retryable && retries < 2) {
-      retries += 1;
-      const retryPhase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(resolved), io);
-      if (retryPhase.kind === 'escalation_pending') break;
-      outcome = await actOnCard(ctx, retryPhase);
-    }
+    // still surfaces as `stopped` rather than looping forever. (`escalation_pending` — D5′: an
+    // unanswered escalation from a PRIOR run — is also handled inside `runCardTurn`; nothing
+    // to do this pass but park it and move to the next card.)
+    const { outcome, worked: didWork } = await runCardTurn(ctx, nc);
     attempted.add(nc.cardId);
     processed.push(outcome);
-    worked += 1;
+    if (didWork) worked += 1;
     // D5′: `escalated`/`stopped` no longer `break` the pass — the next tick naturally
     // re-derives the next progressable card (excluding this one, now `attempted`) via
     // `filteredNextCard`/`nextCard`'s own blocked-cascade reconciliation (W6).
+  }
+
+  return { exitCode: computeExitCode(processed), processed, reachedDone };
+}
+
+/** P12 follow-up (`--max-concurrent N`, N > 1): the SAME per-card turn (`runCardTurn`) as the
+ * N=1 serial `runPass` above, but up to `maxConcurrent` cards run their turns concurrently —
+ * cooperatively, via JS's single-threaded event loop (never true parallel execution: every
+ * synchronous span still runs to completion with no other worker's code interleaved inside
+ * it). `runLoop` routes N=1 to `runPass` unconditionally (see that call site) — this function
+ * is never invoked, let alone tested, for the default width, so N=1 cannot regress through it.
+ *
+ * Safety argument (P12 follow-up brief: "either serialize state mutations ... or prove
+ * per-card field disjointness"):
+ *
+ * 1. Selection never double-hands a card. `filteredNextCard`/`nextCard` (`state.ts`) are pure,
+ *    SYNCHRONOUS functions — no `await` sits between reading a freshly-selected `nc.cardId`
+ *    and `attempted.add(nc.cardId)` below, so two fill iterations can never observe the same
+ *    unclaimed card. `attempted` is claimed at SELECTION time here — unlike `runPass`'s N=1
+ *    loop, which can safely claim after the fact because it never selects a second card until
+ *    the first is fully done — the one deliberate behavioral difference from `runPass`,
+ *    required for concurrency to be safe at all.
+ * 2. `dependsOn` still orders correctly with NO extra bookkeeping. `nextCard` already treats
+ *    any non-`shipped` status — including a claimed-but-still-`staged`/`running` in-flight
+ *    card — as "not shipped", so a dependent card is never selected while its dependency is
+ *    mid-flight, exactly like an ordinary not-yet-selected `staged` dependency behaves today.
+ * 3. Two in-flight cards never touch the same mutable sub-object. `state.cards[cardId]` is a
+ *    distinct object per card id, and point 1 guarantees no two workers ever share a `cardId`
+ *    — so every `card.status = ...`/`card.pr = ...`-style mutation `card-actions.ts` makes is
+ *    disjoint across concurrently-running workers by construction.
+ * 4. `persistLocalState` writes are never torn or regressed. `commit-guard.ts`'s
+ *    `persistLocalState` synchronously serializes and writes the WHOLE `state` object (never a
+ *    per-card patch), and every mutation site in `card-actions.ts` calls it in the SAME
+ *    synchronous span as the mutation (no `await` in between) — JS run-to-completion semantics
+ *    make each mutate-then-flush pair atomic. `state` is one shared object, never copied per
+ *    card, so the strict total order JS's single thread imposes on these atomic spans makes
+ *    the writes that actually reach disk MONOTONIC: whichever flush lands last always includes
+ *    every mutation any worker had applied by that point, in flight or finished — never a lost
+ *    update, regardless of which worker happened to finish first.
+ *
+ * Budget bookkeeping (`--max-cards`, `worked`) is necessarily OPTIMISTIC under concurrency: the
+ * fill loop cannot know whether a freshly-claimed card will turn out to be real work or an
+ * `escalation_pending` park (that only resolves once `runCardTurn` itself runs), so it treats
+ * every in-flight claim as a potential unit of budget (`worked + active.size < limit`) — this
+ * can never OVERSHOOT the limit (a park simply leaves `worked` short of the number of workers
+ * launched, self-correcting on the next fill tick) but a batch can undershoot by up to
+ * `maxConcurrent - 1` cards' worth of parks before the budget is recognized as spent.
+ *
+ * NOT solved here (documented limitation — the runner README and SKILL.md carry the same
+ * note): two cards that both merge to the SAME base branch can still race at the actual `gh pr
+ * merge` step — git itself is what serializes (or rejects/re-queues) that, not this pool.
+ * `N > 1` bounds WIDTH only; it is never an ordering promise beyond what `dependsOn` declares. */
+async function runPassPool(
+  state: CampaignState,
+  resolved: ResolvedConfig,
+  io: LoopIO,
+  maxConcurrent: number,
+): Promise<LoopResult & { reachedDone: boolean }> {
+  const processed: CardOutcome[] = [];
+  const attempted = new Set<string>();
+  let worked = 0;
+  let reachedDone = false;
+  const limit = resolved.maxCards ?? Infinity;
+  const active = new Set<Promise<void>>();
+
+  const launch = (nc: CardResult): void => {
+    const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
+    const task: Promise<void> = runCardTurn(ctx, nc).then((result) => {
+      processed.push(result.outcome);
+      if (result.worked) worked += 1;
+      active.delete(task);
+    });
+    active.add(task);
+  };
+
+  for (;;) {
+    if (!isStopRequested(stopFilePathOf(resolved), io)) {
+      // Top up to `maxConcurrent` in-flight workers, never claiming past the (optimistic)
+      // --max-cards budget — see this function's own doc comment.
+      while (active.size < maxConcurrent && worked + active.size < limit) {
+        const nc = filteredNextCard(state, resolved, io, attempted);
+        if (nc.kind === 'done') {
+          // Genuinely done only when nothing is still in flight to possibly unblock a later
+          // card (e.g. by shipping a dependency) — see point 2 of the doc comment above.
+          if (active.size === 0) reachedDone = true;
+          break;
+        }
+        if (nc.kind === 'planning_needed') {
+          attempted.add(nc.cardId);
+          const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
+          const outcome = await escalateCard(ctx, 'planning_needed', `Missing on disk: ${nc.missing.join(', ')}`);
+          processed.push(outcome);
+          worked += 1;
+          continue;
+        }
+        attempted.add(nc.cardId); // Claim BEFORE any await below — see point 1 of the doc comment.
+        launch(nc);
+      }
+    }
+
+    if (active.size === 0) break;
+    await Promise.race(active);
   }
 
   return { exitCode: computeExitCode(processed), processed, reachedDone };
@@ -333,7 +447,14 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
       () => io.readFile(campaignStatePathOf(config.homeDir)),
       (warning) => console.error(`[tribe-runner] ${warning}`),
     );
-    const result = await runPass(state, resolved, io);
+    // P12 follow-up: N=1 (omitted or explicit) always takes the ORIGINAL `runPass` code path
+    // — never `runPassPool`, even with maxConcurrent read as `?? 1` — so the default behavior
+    // this whole runner shipped with cannot regress through the new pool path. Only N > 1
+    // routes to `runPassPool`; see that function's own doc comment for the concurrency-safety
+    // argument.
+    const maxConcurrent = resolved.maxConcurrent ?? 1;
+    const result =
+      maxConcurrent > 1 ? await runPassPool(state, resolved, io, maxConcurrent) : await runPass(state, resolved, io);
     // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
     // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable
     // card) — that tick never reaches `actOnCard`/`escalateCard`/`shipCard`, so the mutation
