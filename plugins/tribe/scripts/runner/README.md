@@ -157,7 +157,7 @@ the safe (fails-closed) default, not a silent free pass for code diffs.
 | `spec` | `string \| null` | yes (nullable) | Path (relative to `--repo`) to the card's spec file. Missing on disk (or `null`) when the card is next up triggers `PLANNING_NEEDED`, which the loop escalates. |
 | `plan` | `string \| null` | yes (nullable) | Same, for the plan file. |
 | `branch` | `string \| null` | yes (nullable) | The card's git branch, once work starts. `null` at authoring time — this is exactly what makes the D4 resume matrix classify a freshly-authored card `fresh`. The loop fills it in from the card's own PR (`gh pr view --json headRefName`) as soon as a PR number is known, because the executor session picks the branch name itself and never reports it back. |
-| `baseSha` | `string \| null` | yes (nullable) | The commit the card's branch is built from; D3's schema-lock diff is taken from this. `null` at authoring time; the loop records `origin/<baseBranch>` into it immediately **before** spawning the card's session, and never overwrites an existing value (a resumed card keeps the base it originally started from). |
+| `baseSha` | `string \| null` | yes (nullable) | The commit the card's branch is built from; D3's schema-lock diff is taken from this. `null` at authoring time; the loop records `origin/<baseBranch>` into it immediately **before** spawning the card's session, and never overwrites an existing value (a resumed card keeps the base it originally started from) — except a blind-fresh spawn (no prior session/PR/digest), which always re-stamps it (P11, ruling R3). To retry a card from scratch, use the `reset-card` subcommand below — never hand-edit this field; a hand-reset card that keeps a stale `baseSha` is the exact incident R3 exists to prevent. |
 | `pr` | `number \| null` | yes (nullable) | The card's PR number, once opened. `null` at authoring time. |
 | `mergeSha` | `string \| null` | yes (nullable) | The merge commit sha, once shipped. `null` until shipped. |
 | `sessionId` | `string \| null` | yes (nullable) | The SDK-assigned executor session id, written the instant a session starts (crash-safe write, before anything else). `null` at authoring time. |
@@ -244,6 +244,70 @@ runs, never discovered card-by-card mid-campaign:
 | `UndefinedSequenceCardError` | `sequence` names a card id with no matching entry under `cards` (e.g. a typo). |
 | `UndefinedDependencyCardError` | A card's `dependsOn` names an id with no matching entry under `cards`. |
 | `CircularDependencyError` | The `dependsOn` graph contains a cycle — a direct self-dependency (`A -> A`) or an indirect one (`A -> B -> A`). The error carries the full cycle path. |
+
+## `reset-card` subcommand (P11 fix-list follow-up)
+
+**Never hand-edit `campaign-state.json` to retry a card — use this subcommand.** It exists
+because hand-editing was the exact incident (P11, ruling R3, "a stale base is worse than no
+base"): a card hand-reset to `status: "staged"` kept its old `baseSha`, and the next verify
+diffed from before a designed change and tripped a false-positive schemaGuard failure on a PR
+that never touched the locked path. `reset-card` is the front door that makes that hand-edit
+unnecessary.
+
+```sh
+bun plugins/tribe/scripts/runner/run.ts reset-card \
+  --home <path-to-campaign-home> \
+  --card <card-id>
+```
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--home` | yes | The same campaign home a normal run uses — `reset-card` operates on `<home>/campaign-state.json`. |
+| `--card` | yes | The id of exactly one card (a key under `cards`) to reset. |
+
+No other flag is recognized (`--repo`/`--model`/`--remote`/... are all `unknown flag` errors
+here — this subcommand's contract has nothing to do with running a campaign pass).
+
+**Refuses (exit `1`, a diagnostic prefixed `reset-card:` on stderr, nothing written) when:**
+
+- a **live** process holds `.runner.lock` — a reset while a pass is mid-flight on that very
+  card is exactly the race this guard exists to prevent (a lock held by a dead process is
+  reclaimed the same way `acquireLock` reclaims it — it never blocks a reset);
+- `<home>/campaign-state.json` is missing, unreadable, or fails to parse/validate (any of the
+  Validation errors above);
+- `--card` names an id with no entry under `cards`.
+
+**On success (exit `0`):** writes the reset state back and prints ONE line of JSON to stdout —
+`{"cardId":...,"previousStatus":...,"status":"staged","clearedFields":[...]}` — so an
+orchestrating session can quote exactly what changed without re-deriving it from a diff.
+
+**What a reset actually changes**, field by field (full rationale — including why `branch`/
+`pr`/`dependsOn` are or aren't treated alike — lives on `resetCard`'s doc comment in
+`core/state.ts`):
+
+| Field | After reset | Why |
+| --- | --- | --- |
+| `status` | `"staged"` | The contract. |
+| `sessionId` | `null` | The contract — also what marks "no world exists yet" for the two fields below. |
+| `baseSha` | `null` | Ruling R3 itself — the incident this subcommand exists to prevent. |
+| `pr` | `null` | A stale `pr` is a silent fallback target (`card.pr = sessionResult.pr ?? card.pr` in `card-actions.ts`) if a future ship ever fails to report a fresh PR number — same "trusted without a reality-check" shape `baseSha` had before P11. |
+| `mergeSha` | `null` | Same stale-fallback shape, one line over; also purely observational once the card isn't `shipped`. |
+| `updatedAt` | `null` | Bookkeeping only, never read to decide anything. |
+| `autoAnswerRounds`, `healedResidue` | **deleted** (become absent, not `0`/`[]`) | Both fields are schema-optional specifically so "never happened" means absent — a stale count/record from the discarded attempt would misreport the new one. |
+| `branch` | **unchanged** | Never trusted blindly — `deriveCardPhase` re-derives the true phase from live `gh`/`git` every time `branch` is non-null. Clearing it would skip that reality-check and the resume matrix's own residue-cleanup path (`revert_and_redo`), reopening the duplicate-PR hazard a blind fresh spawn over a still-open PR creates. |
+| `dependsOn`, `spec`, `plan` | **unchanged** | Structural (this card's declared dependencies and doc paths), not a per-run value — a reset of one card must never rewire the campaign's dependency graph. |
+| any unknown field (top-level or per-card) | **unchanged, byte-faithful** | `state.ts`'s `looseObject` schemas already guarantee this for every load→save cycle; `reset-card` is no exception. |
+
+**Escalation files are not touched.** An escalation lives in a sibling file
+(`<home>/escalations/<card-id>.md`), never a `Card` field, so `reset-card` has nothing to
+clear there — but if that file is still present after a reset, `deriveCardPhase` will keep
+short-circuiting this card straight back to `escalation_pending` on the next run (see "Resume
+semantics" below), even though the state file now says `staged`. `reset-card` warns about this
+(a second stderr line, still exit `0`) rather than silently leaving it inconsistent, and
+deliberately does **not** auto-archive the file: archiving is coupled 1:1 to an actual ruling
+recorded in `answers.md` (see "Escalation / answers workflow" below) — a plain reset makes no
+ruling, so it must not fabricate one. To actually unblock such a card, either rule on it and
+archive the file per that section's ritual, or pass `--include-escalated` on the next run.
 
 ## How this is normally triggered
 

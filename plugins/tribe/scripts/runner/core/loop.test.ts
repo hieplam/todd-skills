@@ -10,6 +10,7 @@ import {
   deriveCardPhase,
   extractMergeSha,
   isStopRequested,
+  liveLockHolder,
   releaseLock,
   resolveBaseBranch,
   runLoop,
@@ -296,6 +297,46 @@ describe('acquireLock / releaseLock — §D2 single-instance lock', () => {
     const calls: string[] = [];
     releaseLock({ removeLock: () => calls.push('removed') });
     expect(calls).toEqual(['removed']);
+  });
+});
+
+// P11 fix-list follow-up: `liveLockHolder` is the read-only half of `acquireLock` extracted so
+// the `reset-card` CLI subcommand can ask "is a pass currently mid-flight on this campaign?"
+// WITHOUT claiming the lock itself (unlike `acquireLock`, it never calls `writeLock`).
+describe('liveLockHolder — the read-only lock check reset-card needs (P11 follow-up)', () => {
+  test('no existing lock -> null, writeLock never called', () => {
+    const io = { readLock: () => null, isProcessAlive: () => true };
+    expect(liveLockHolder(io)).toBeNull();
+  });
+
+  test('existing lock held by a LIVE pid -> returns it verbatim', () => {
+    const lock = { pid: 123, startedAt: '2026-07-15T00:00:00Z' };
+    const io = { readLock: () => lock, isProcessAlive: (pid: number) => pid === 123 };
+    expect(liveLockHolder(io)).toEqual(lock);
+  });
+
+  test('existing lock held by a DEAD pid -> null (dead-process debris, not a live claim)', () => {
+    const io = { readLock: () => ({ pid: 123, startedAt: '2026-07-15T00:00:00Z' }), isProcessAlive: () => false };
+    expect(liveLockHolder(io)).toBeNull();
+  });
+
+  test('acquireLock refuses using the exact same liveness check (no drift between the two)', () => {
+    const lock = { pid: 123, startedAt: '2026-07-15T00:00:00Z' };
+    const io: LockIO = {
+      readLock: () => lock,
+      writeLock: () => {},
+      removeLock: () => {},
+      isProcessAlive: (pid) => pid === 123,
+      currentPid: () => 999,
+      now: () => '2026-07-16T00:00:00Z',
+    };
+    const acquireResult = acquireLock(io);
+    const held = liveLockHolder(io);
+    expect(acquireResult.ok).toBe(false);
+    expect(held).not.toBeNull();
+    if (!acquireResult.ok && held) {
+      expect(acquireResult.heldBy).toEqual(held);
+    }
   });
 });
 

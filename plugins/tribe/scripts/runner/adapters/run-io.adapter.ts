@@ -44,7 +44,15 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-export function buildRealIo(config: RunLoopConfig): LoopIO {
+/** P11 fix-list follow-up: takes only `{ homeDir }` (a structural `Pick`, not a nominal
+ * narrower type) rather than a full `RunLoopConfig` — `homeDir` is the only field this
+ * function actually reads (for the lock path below); every other member is a fixed closure.
+ * Every existing call site (`main()`'s normal run path) still passes a full `RunLoopConfig`,
+ * which trivially satisfies this narrower shape, so this widening is behavior-preserving.
+ * Widened specifically so the `reset-card` CLI subcommand — which has no `--repo`/`--model`/
+ * `--remote`/... to fabricate — can call this same production adapter with just the one value
+ * it actually has, instead of a second bespoke IO builder duplicating fs/lock wiring. */
+export function buildRealIo(config: Pick<RunLoopConfig, 'homeDir'>): LoopIO {
   const lockPath = join(reportDirOf(config.homeDir), '.runner.lock');
 
   return {

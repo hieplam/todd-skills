@@ -84,6 +84,21 @@ export interface CardResult {
 
 export type NextCardResult = NoCardResult | PlanningNeededResult | CardResult;
 
+/** P11 fix-list follow-up ("out of scope" note: a `reset-card` CLI subcommand "so humans
+ * never hand-edit state.json"). Return shape of `state.ts`'s `resetCard` — a one-line-JSON-
+ * printable digest of what a reset actually changed, so an orchestrating session (or a human)
+ * can quote it instead of re-deriving it from a diff of state.json before/after. `status` is
+ * always `'staged'` (the only status a reset ever produces); `clearedFields` names exactly the
+ * fields whose value changed (nulled or, for the two optional/absent-by-default fields,
+ * deleted) — a field already at its reset value contributes nothing, so a reset of an
+ * already-clean staged card reports an empty list. */
+export interface ResetCardSummary {
+  cardId: string;
+  previousStatus: CardStatus;
+  status: 'staged';
+  clearedFields: string[];
+}
+
 /** The orchestrator's (`core/loop/`) full config, assembled by `cli/main.ts`'s `parseArgs`
  * from CLI flags. Homed in the kernel (not `core/loop/run-loop.ts`) because every
  * `core/loop/*` module needs it — `phase.ts`, `lock.ts`, and `commit-guard.ts` would

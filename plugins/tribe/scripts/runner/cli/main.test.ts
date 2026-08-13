@@ -6,7 +6,8 @@
 // two protocol-level defaults spec §2 itself documents; `--home` (Task 2, spec §4) is the
 // campaign's machine-local operational home — also a REQUIRED input, never derived here.
 import { describe, expect, test } from 'bun:test';
-import { parseArgs, scrubTargetEnvLocal } from './main.ts';
+import { parseArgs, parseResetCardArgs, performResetCard, scrubTargetEnvLocal } from './main.ts';
+import { campaignStatePathOf, escalationPathOf } from '../core/paths.ts';
 
 const RUN_ID = '2026-07-24T00-00-00-000Z-beef';
 
@@ -247,5 +248,234 @@ describe('scrubTargetEnvLocal — best-effort, never throws (P10 fix round)', ()
       writeFile: () => { throw new Error('writeFile must not be called in dry-run'); },
     };
     await expect(scrubTargetEnvLocal('/some/repo', true, io)).resolves.toBeUndefined();
+  });
+});
+
+// P11 fix-list follow-up: `reset-card` — "so humans never hand-edit state.json." Pure arg
+// parsing first (mirrors `parseArgs`'s own required/unknown-flag tests at a smaller scale).
+describe('parseResetCardArgs — the reset-card subcommand\'s own tiny flag set', () => {
+  test('valid --home + --card parses successfully', () => {
+    const result = parseResetCardArgs(['--home', '/th/campaigns/camp', '--card', 'C1']);
+    expect(result).toEqual({ homeDir: '/th/campaigns/camp', cardId: 'C1' });
+  });
+
+  test('missing --home -> error naming it', () => {
+    const result = parseResetCardArgs(['--card', 'C1']);
+    expect(result).toEqual({ error: 'missing required flag: --home' });
+  });
+
+  test('missing --card -> error naming it', () => {
+    const result = parseResetCardArgs(['--home', '/th/campaigns/camp']);
+    expect(result).toEqual({ error: 'missing required flag: --card' });
+  });
+
+  test('an unrecognized flag (e.g. --repo) is rejected by name', () => {
+    const result = parseResetCardArgs(['--home', '/th', '--card', 'C1', '--repo', '/repo']);
+    expect(result).toEqual({ error: 'unknown flag: --repo' });
+  });
+
+  test('a flag with no following value -> error', () => {
+    const result = parseResetCardArgs(['--home', '/th', '--card']);
+    expect(result).toEqual({ error: '--card requires a value' });
+  });
+});
+
+/** A well-formed campaign state fixture (bypasses parseState's schema by hand-authoring
+ * every required field) — used only by `performResetCard`'s tests below. Deliberately neutral
+ * values, matching this file's own stateless-capability wall. */
+function stateFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    v: 1,
+    campaign: 'sample-campaign',
+    mergePolicy: 'merge',
+    sequence: ['C1'],
+    schemaLockPaths: [],
+    docsOnlyPaths: [],
+    ownerOnlyEscalations: [],
+    cards: {
+      C1: {
+        status: 'escalated',
+        spec: 'docs/x-spec.md',
+        plan: 'docs/x-plan.md',
+        branch: 'feat/c1',
+        baseSha: 'aaaaaaa',
+        pr: 10,
+        mergeSha: null,
+        sessionId: 'sess-c1',
+        updatedAt: '2026-01-02T00:00:00Z',
+      },
+    },
+    ...overrides,
+  };
+}
+
+/** Builds a `performResetCard` io double over an in-memory file map, plus an optional lock.
+ * Mirrors `scrubTargetEnvLocal`'s tests: no real fs, everything observable via `written`. */
+function resetCardIo(opts: {
+  files?: Record<string, string>;
+  lock?: { pid: number; startedAt: string } | null;
+  alivePids?: number[];
+}) {
+  const files = { ...(opts.files ?? {}) };
+  const written: Array<{ path: string; content: string }> = [];
+  return {
+    written,
+    io: {
+      fileExists: (p: string) => p in files,
+      readFile: (p: string) => {
+        if (!(p in files)) throw new Error(`ENOENT: no such file, open '${p}'`);
+        return files[p] as string;
+      },
+      writeFile: (p: string, content: string) => {
+        files[p] = content;
+        written.push({ path: p, content });
+      },
+      readLock: () => opts.lock ?? null,
+      isProcessAlive: (pid: number) => (opts.alivePids ?? []).includes(pid),
+    },
+  };
+}
+
+/** Captures console.error/console.log for the duration of `fn`, restoring both afterward
+ * even if `fn` throws — same pattern `scrubTargetEnvLocal`'s tests already use for
+ * console.error alone. */
+async function captureConsole<T>(fn: () => Promise<T>): Promise<{ result: T; errors: string[]; logs: string[] }> {
+  const errors: string[] = [];
+  const logs: string[] = [];
+  const originalError = console.error;
+  const originalLog = console.log;
+  console.error = (...args: unknown[]) => { errors.push(args.join(' ')); };
+  console.log = (...args: unknown[]) => { logs.push(args.join(' ')); };
+  try {
+    const result = await fn();
+    return { result, errors, logs };
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+  }
+}
+
+describe('performResetCard — the reset-card subcommand\'s execution (P11 follow-up)', () => {
+  test('a LIVE lock refuses the reset: exit 1, named diagnostic, state file untouched', async () => {
+    const home = '/th/camp';
+    const statePath = campaignStatePathOf(home);
+    const { io, written } = resetCardIo({
+      files: { [statePath]: `${JSON.stringify(stateFixture())}\n` },
+      lock: { pid: 123, startedAt: '2026-07-15T00:00:00Z' },
+      alivePids: [123],
+    });
+
+    const { result, errors } = await captureConsole(() => performResetCard(home, 'C1', io));
+
+    expect(result).toBe(1);
+    expect(errors.some((e) => e.includes('reset-card') && e.includes('.runner.lock') && e.includes('123'))).toBe(true);
+    expect(written).toEqual([]);
+  });
+
+  test('a DEAD lock does not refuse (reclaimed, same as acquireLock)', async () => {
+    const home = '/th/camp';
+    const statePath = campaignStatePathOf(home);
+    const { io } = resetCardIo({
+      files: { [statePath]: `${JSON.stringify(stateFixture())}\n` },
+      lock: { pid: 123, startedAt: '2026-07-15T00:00:00Z' },
+      alivePids: [], // 123 is not alive
+    });
+
+    const { result } = await captureConsole(() => performResetCard(home, 'C1', io));
+    expect(result).toBe(0);
+  });
+
+  test('missing state file -> exit 1, named diagnostic, no lock claimed', async () => {
+    const home = '/th/camp';
+    const { io, written } = resetCardIo({ files: {} });
+
+    const { result, errors } = await captureConsole(() => performResetCard(home, 'C1', io));
+
+    expect(result).toBe(1);
+    expect(errors.some((e) => e.includes('reset-card') && e.includes('could not load'))).toBe(true);
+    expect(written).toEqual([]);
+  });
+
+  test('unparseable state file (bad JSON) -> exit 1, named diagnostic', async () => {
+    const home = '/th/camp';
+    const statePath = campaignStatePathOf(home);
+    const { io } = resetCardIo({ files: { [statePath]: 'not json{' } });
+
+    const { result, errors } = await captureConsole(() => performResetCard(home, 'C1', io));
+
+    expect(result).toBe(1);
+    expect(errors.some((e) => e.includes('reset-card') && e.includes('could not load'))).toBe(true);
+  });
+
+  test('unknown card id -> exit 1, named diagnostic naming the id, state file untouched', async () => {
+    const home = '/th/camp';
+    const statePath = campaignStatePathOf(home);
+    const { io, written } = resetCardIo({
+      files: { [statePath]: `${JSON.stringify(stateFixture())}\n` },
+    });
+
+    const { result, errors } = await captureConsole(() => performResetCard(home, 'does-not-exist', io));
+
+    expect(result).toBe(1);
+    expect(errors.some((e) => e.includes('reset-card') && e.includes('does-not-exist'))).toBe(true);
+    expect(written).toEqual([]);
+  });
+
+  test('a successful reset writes the updated state and prints a one-line JSON summary', async () => {
+    const home = '/th/camp';
+    const statePath = campaignStatePathOf(home);
+    const { io, written } = resetCardIo({
+      files: { [statePath]: `${JSON.stringify(stateFixture())}\n` },
+    });
+
+    const { result, logs } = await captureConsole(() => performResetCard(home, 'C1', io));
+
+    expect(result).toBe(0);
+    expect(written).toHaveLength(1);
+    expect(written[0]?.path).toBe(statePath);
+    const writtenState = JSON.parse(written[0]?.content as string);
+    expect(writtenState.cards.C1.status).toBe('staged');
+    expect(writtenState.cards.C1.sessionId).toBeNull();
+    expect(writtenState.cards.C1.baseSha).toBeNull();
+    expect(writtenState.cards.C1.pr).toBeNull();
+    // Structural field survives, per resetCard's own contract.
+    expect(writtenState.cards.C1.branch).toBe('feat/c1');
+
+    expect(logs).toHaveLength(1);
+    const summary = JSON.parse(logs[0] as string);
+    expect(summary).toEqual({
+      cardId: 'C1',
+      previousStatus: 'escalated',
+      status: 'staged',
+      clearedFields: ['sessionId', 'baseSha', 'pr', 'updatedAt'],
+    });
+  });
+
+  test('a still-present escalation file prints a warning note but still succeeds', async () => {
+    const home = '/th/camp';
+    const statePath = campaignStatePathOf(home);
+    const escalationPath = escalationPathOf(home, 'C1');
+    const { io } = resetCardIo({
+      files: {
+        [statePath]: `${JSON.stringify(stateFixture())}\n`,
+        [escalationPath]: '# unanswered escalation',
+      },
+    });
+
+    const { result, errors } = await captureConsole(() => performResetCard(home, 'C1', io));
+
+    expect(result).toBe(0);
+    expect(errors.some((e) => e.includes('reset-card') && e.includes(escalationPath))).toBe(true);
+  });
+
+  test('no escalation file -> no note printed', async () => {
+    const home = '/th/camp';
+    const statePath = campaignStatePathOf(home);
+    const { io } = resetCardIo({
+      files: { [statePath]: `${JSON.stringify(stateFixture())}\n` },
+    });
+
+    const { errors } = await captureConsole(() => performResetCard(home, 'C1', io));
+    expect(errors).toEqual([]);
   });
 });

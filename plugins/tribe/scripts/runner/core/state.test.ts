@@ -4,12 +4,14 @@
 import { describe, expect, test } from 'bun:test';
 import {
   CURRENT_STATE_VERSION,
+  CardNotFoundError,
   CircularDependencyError,
   UndefinedDependencyCardError,
   UndefinedSequenceCardError,
   UnsupportedStateVersionError,
   loadState,
   parseState,
+  resetCard,
   serializeState,
   nextCard,
 } from './state.ts';
@@ -663,5 +665,132 @@ describe('loadState/serializeState — unknown top-level keys survive a round tr
     expect((state as unknown as { planning?: unknown }).planning).toEqual({ mode: 'shaman' });
     const roundTripped = JSON.parse(serializeState(state));
     expect(roundTripped.planning).toEqual({ mode: 'shaman' });
+  });
+});
+
+// P11 fix-list "out of scope" note: `resetCard` is the pure core transform behind the
+// `reset-card` CLI subcommand — "so humans never hand-edit state.json." Field-by-field
+// decisions (see the doc comment on `resetCard` in state.ts for the full rationale):
+// status -> staged, sessionId/baseSha/pr/mergeSha/updatedAt -> null, autoAnswerRounds/
+// healedResidue -> deleted (absent, matching their own schema default). `branch`, `pr`'s
+// sibling `dependsOn`/`spec`/`plan`, and every unknown field are left exactly as they were.
+describe('resetCard — pure core transform (P11 follow-up)', () => {
+  test('unknown card id throws CardNotFoundError, naming the id', () => {
+    const raw = fixtureState();
+    const state = parseState(raw) as CampaignState;
+    expect(() => resetCard(state, 'does-not-exist')).toThrow(CardNotFoundError);
+    try {
+      resetCard(state, 'does-not-exist');
+    } catch (err) {
+      expect((err as CardNotFoundError).cardId).toBe('does-not-exist');
+    }
+  });
+
+  test('a fully-populated escalated card resets to staged with every per-run field cleared', () => {
+    const raw = fixtureState({
+      cards: {
+        ...(fixtureState().cards as Record<string, unknown>),
+        C1: {
+          status: 'escalated',
+          spec: 'docs/superpowers/specs/2026-01-01-c1-spec.md',
+          plan: 'docs/superpowers/plans/2026-01-01-c1-plan.md',
+          branch: 'feat/c1-widget',
+          baseSha: 'aaaaaaa',
+          pr: 10,
+          mergeSha: 'bbbbbbb',
+          sessionId: 'sess-c1',
+          updatedAt: '2026-01-02T00:00:00Z',
+          dependsOn: ['C2'],
+          autoAnswerRounds: 2,
+          healedResidue: ['remove_worktree'],
+        },
+        C2: cardFixture(),
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+
+    const { state: next, summary } = resetCard(state, 'C1');
+    const card = next.cards.C1 as Card;
+
+    expect(card.status).toBe('staged');
+    expect(card.sessionId).toBeNull();
+    expect(card.baseSha).toBeNull();
+    expect(card.pr).toBeNull();
+    expect(card.mergeSha).toBeNull();
+    expect(card.updatedAt).toBeNull();
+    expect(card.autoAnswerRounds).toBeUndefined();
+    expect(card.healedResidue).toBeUndefined();
+    expect('autoAnswerRounds' in card).toBe(false);
+    expect('healedResidue' in card).toBe(false);
+
+    // Structural / reality-checked fields survive untouched — see doc comment for why.
+    expect(card.branch).toBe('feat/c1-widget');
+    expect(card.spec).toBe('docs/superpowers/specs/2026-01-01-c1-spec.md');
+    expect(card.plan).toBe('docs/superpowers/plans/2026-01-01-c1-plan.md');
+    expect(card.dependsOn).toEqual(['C2']);
+
+    expect(summary).toEqual({
+      cardId: 'C1',
+      previousStatus: 'escalated',
+      status: 'staged',
+      clearedFields: ['sessionId', 'baseSha', 'pr', 'mergeSha', 'updatedAt', 'autoAnswerRounds', 'healedResidue'],
+    });
+  });
+
+  test('an already-clean staged card resets idempotently with an empty clearedFields list', () => {
+    const raw = fixtureState({
+      cards: { ...(fixtureState().cards as Record<string, unknown>), C1: cardFixture() },
+    });
+    const state = parseState(raw) as CampaignState;
+
+    const { state: next, summary } = resetCard(state, 'C1');
+
+    expect(next.cards.C1).toEqual(cardFixture());
+    expect(summary).toEqual({
+      cardId: 'C1',
+      previousStatus: 'staged',
+      status: 'staged',
+      clearedFields: [],
+    });
+  });
+
+  test('unknown top-level and per-card fields survive resetCard byte-faithfully', () => {
+    const raw = fixtureState({ note: 'unknown-top-level-field' }) as Record<string, unknown>;
+    (raw.cards as Record<string, Record<string, unknown>>).C1 = {
+      ...(raw.cards as Record<string, Record<string, unknown>>).C1,
+      status: 'escalated',
+      sessionId: 'sess-c1',
+      reviewer: 'unknown-per-card-field',
+    };
+    const state = parseState(raw) as CampaignState;
+
+    const { state: next } = resetCard(state, 'C1');
+
+    expect((next as unknown as Record<string, unknown>).note).toBe('unknown-top-level-field');
+    expect((next.cards.C1 as unknown as Record<string, unknown>).reviewer).toBe(
+      'unknown-per-card-field',
+    );
+
+    const reparsed = JSON.parse(serializeState(next));
+    expect(reparsed.note).toBe('unknown-top-level-field');
+    expect(reparsed.cards.C1.reviewer).toBe('unknown-per-card-field');
+  });
+
+  test('does not mutate the input state (new object returned)', () => {
+    const raw = fixtureState({
+      cards: {
+        ...(fixtureState().cards as Record<string, unknown>),
+        C1: { ...cardFixture(), status: 'escalated', sessionId: 'sess-c1' },
+      },
+    });
+    const state = parseState(raw) as CampaignState;
+    const originalCard = state.cards.C1 as Card;
+
+    const { state: next } = resetCard(state, 'C1');
+
+    expect(originalCard.status).toBe('escalated');
+    expect(originalCard.sessionId).toBe('sess-c1');
+    expect(next).not.toBe(state);
+    expect(next.cards.C1).not.toBe(originalCard);
   });
 });
