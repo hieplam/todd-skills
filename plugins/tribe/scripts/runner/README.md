@@ -425,8 +425,10 @@ once* this pass — a small worker pool over progressable cards, not a rewrite o
   `orchestrate-campaign` skill's own "Serial campaigns" guidance) — `--max-concurrent` never
   substitutes for it; it only bounds how many *independent* cards may overlap.
 - **No two workers are ever handed the same card.** Selection (`nextCard`/`filteredNextCard`) is
-  synchronous and pure; a card is marked claimed in the SAME synchronous step it's selected, with
-  no `await` in between — so concurrent selection can't race.
+  synchronous — and mutating (`nextCard` reconciles derived `blocked`/`staged` statuses in place
+  on every call), but never touches an in-flight card's status, only cards that do/don't
+  transitively depend on an `escalated` one — a card is marked claimed in the SAME synchronous
+  step it's selected, with no `await` in between, so concurrent selection can't race.
 - **State writes stay consistent.** Every card mutation (`card.status`, `card.pr`, ...) is
   immediately followed, in the same synchronous span, by a full-state write
   (`persistLocalState`) — JS's single-threaded, run-to-completion semantics make each
@@ -434,18 +436,36 @@ once* this pass — a small worker pool over progressable cards, not a rewrite o
   (never a per-card patch) from one shared, in-memory `CampaignState` object, later writes always
   include every mutation any worker had applied by that point — never a lost update, regardless
   of which card's session happens to finish first.
+- **Runner-side git worktree/branch mutations are serialized too.** `git worktree add/remove` and
+  `git branch -D` mutate git's shared, repo-wide bookkeeping (`.git/worktrees/`, `.git/refs/`),
+  not per-card state — REVERT_AND_REDO and residue-heal (`performRevertAndRedo`,
+  `executeHealActions`, `gatherWorktreeResidueFacts`, `core/loop/card-actions.ts`) queue behind a
+  single in-process promise chain (`serializeRepoGitMutation`) so two cards' calls into that
+  shared bookkeeping never interleave. A no-op at N=1 by construction (nothing is ever queued
+  ahead of the one caller in flight).
+- **One card's crash never takes down the pass.** An uncaught exception anywhere in a card's turn
+  is caught and reported as that ONE card's own `stopped`/non-retryable outcome — every other
+  in-flight card keeps running to completion; the pass still ends cleanly.
 - **`--max-cards` under concurrency is an optimistic ceiling, not an exact stop.** The pool
   cannot know a freshly-claimed card will turn out to be a no-op park
   (`escalation_pending`/answered-and-parked) until it actually checks, so a batch can occasionally
   claim slightly fewer REAL work-units than `--max-cards` allows before recognizing the budget is
   spent — it can never exceed it.
-- **Not solved by this flag: merge races on a shared base branch.** Two cards that both merge to
-  the SAME base branch can still contend at the actual `gh pr merge` step — this runner does not
-  add any merge-queue/serialization logic beyond what git/GitHub already do (a stale-base merge
-  fails or re-queues on the GitHub side). If your cards merge to the same branch and each should
-  build on the previous one's merged result, use `dependsOn` to force the ordering `--max-concurrent`
-  deliberately does not provide — this was already the prior campaign's own recommendation (see
-  the P12 fixlist note) before this flag existed, and it still applies at any `N`.
+- **Not solved by this flag (two documented limitations):**
+  - *Merge races on a shared base branch.* Two cards that both merge to the SAME base branch can
+    still contend at the actual `gh pr merge` step — this runner does not add any merge-queue/
+    serialization logic beyond what git/GitHub already do (a stale-base merge fails or re-queues
+    on the GitHub side). If your cards merge to the same branch and each should build on the
+    previous one's merged result, use `dependsOn` to force the ordering `--max-concurrent`
+    deliberately does not provide — this was already the prior campaign's own recommendation (see
+    the P12 fixlist note) before this flag existed, and it still applies at any `N`.
+  - *Each card's own executor session runs its own git commands* (worktree add, checkout, commit,
+    push, ...) with the SAME repo root as its `cwd`, independent of the runner-side serialization
+    above — this runner has no seam into a session's own spawned process to queue those calls too.
+    Git's own locking mostly prevents outright corruption, but a lock-contention failure can
+    surface as an ordinary non-zero exit from a git command inside a session — read that as
+    transient contention worth a retry, not repo corruption worth escalating on sight. Giving
+    every session its own isolated `cwd`/worktree is real future hardening, not done here.
 
 Use `--max-concurrent` when a campaign genuinely wants bounded parallelism (independent cards,
 no shared base branch, no ordering requirement) — for anything requiring strict one-by-one

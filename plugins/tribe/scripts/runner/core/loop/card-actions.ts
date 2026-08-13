@@ -59,12 +59,63 @@ export interface CardCtx {
   io: LoopIO;
 }
 
+// ---------------------------------------------------------------------------------------
+// P12 follow-up hardening (panel finding, `--max-concurrent N > 1`): a 3-lens adversarial
+// review of the pool (run-loop.ts's `runPassPool`) proved the pool's OWN safety argument only
+// covers the shared in-memory `CampaignState` object — it never addressed the filesystem/git
+// layer. Under N > 1, more than one card's turn can be mid-flight at once, and three functions
+// below mutate git's shared, repo-wide bookkeeping (`.git/worktrees/`, `.git/refs/heads/`)
+// against the SAME `resolved.repoRoot`: `git worktree add/remove`, `git branch -D`, and a
+// `git worktree list --porcelain` snapshot that can go stale the instant another card's
+// `git worktree remove` runs before this card acts on what it read. Git's own locking mostly
+// prevents outright corruption, but a lock-contention failure surfaces as an ordinary non-zero
+// exit — exactly the shape this module already treats as a real git-state problem elsewhere
+// (see `gatherWorktreeResidueFacts`'s own `exitCode === 0` comment) — so left unserialized, a
+// transient race could misfire as a false residue-heal refusal or a spurious REVERT_AND_REDO
+// failure.
+//
+// `serializeRepoGitMutation` queues exactly these three functions relative to EACH OTHER,
+// across every card — nothing else in this module needs it: every other git call here is
+// either read-only against GitHub (`recordBranchFromPr`) or scoped to a path/branch no other
+// card can also be touching (`recordBaseSha`'s `rev-parse` reads a ref, it doesn't mutate
+// worktree/branch bookkeeping).
+//
+// A promise-chain queue is enough — NOT a real OS-level lock — because JS is single-threaded:
+// the only thing that can interleave two "logically atomic" async call sequences is an `await`
+// inside one of them yielding to the event loop mid-way, which is exactly what queuing behind
+// one shared "last enqueued" promise prevents. At `--max-concurrent 1` this is a permanent
+// no-op by construction (there is only ever one caller in flight, so a fresh `enqueue` never
+// has anything queued ahead of it to wait on) — deliberately always-on rather than branching on
+// `maxConcurrent`, so there is no separate N=1/N>1 code path to keep in sync or regress.
+let repoGitMutationQueue: Promise<unknown> = Promise.resolve();
+
+function serializeRepoGitMutation<T>(fn: () => Promise<T>): Promise<T> {
+  const run = repoGitMutationQueue.then(fn, fn);
+  // However `fn` settles, the QUEUE ITSELF must keep moving — a rejected `fn` still resolves
+  // the queue's own chained value (swallowed here) so the NEXT caller isn't wedged behind a
+  // permanently-rejected promise; the rejection still reaches whoever awaited `run` (this
+  // function's own return value) unchanged.
+  repoGitMutationQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 /** Gathers the facts `decideResidueHeal` needs about worktree residue — ONLY when the
  * failing point's detail actually names a worktree problem (`"worktree still present"`);
  * an absent worktree needs no `git status`/`git merge-base` probe at all. Reuses
  * `findWorktreePathForBranch` (the same `git worktree list --porcelain` parser
  * `performRevertAndRedo` uses) rather than re-deriving worktree discovery. */
-async function gatherWorktreeResidueFacts(
+function gatherWorktreeResidueFacts(
+  ctx: CardCtx,
+  branch: string,
+  worktreeDetail: string,
+): Promise<{ worktreePath: string | null; worktreeStatusClean: boolean; tipIsAncestorOfBase: boolean }> {
+  return serializeRepoGitMutation(() => gatherWorktreeResidueFactsImpl(ctx, branch, worktreeDetail));
+}
+
+async function gatherWorktreeResidueFactsImpl(
   ctx: CardCtx,
   branch: string,
   worktreeDetail: string,
@@ -111,7 +162,11 @@ async function gatherWorktreeResidueFacts(
  * `git branch -D` UNCONDITIONALLY even when the `worktree remove` was refused — a refused
  * (dirty) removal now short-circuits the branch delete entirely, so a dirty worktree is never
  * left orphaned with no branch pointing at it. */
-async function executeHealActions(ctx: CardCtx, actions: HealAction[]): Promise<HealAction[]> {
+function executeHealActions(ctx: CardCtx, actions: HealAction[]): Promise<HealAction[]> {
+  return serializeRepoGitMutation(() => executeHealActionsImpl(ctx, actions));
+}
+
+async function executeHealActionsImpl(ctx: CardCtx, actions: HealAction[]): Promise<HealAction[]> {
   const { resolved, io } = ctx;
   const succeeded: HealAction[] = [];
   for (const action of actions) {
@@ -445,8 +500,14 @@ export function sessionConfigFor(cardId: string, resolved: ResolvedConfig): RunS
 }
 
 /** REVERT_AND_REDO: delete the stale worktree + branch (local and remote) so a fresh session
- * starts from a clean slate — the doctrine B5's executor proved (spec §D4). */
-export async function performRevertAndRedo(ctx: CardCtx): Promise<void> {
+ * starts from a clean slate — the doctrine B5's executor proved (spec §D4). Serialized against
+ * every other card's own worktree/branch mutation (`serializeRepoGitMutation`, above this
+ * file's `gatherWorktreeResidueFacts`) — see that helper's doc comment. */
+export function performRevertAndRedo(ctx: CardCtx): Promise<void> {
+  return serializeRepoGitMutation(() => performRevertAndRedoImpl(ctx));
+}
+
+async function performRevertAndRedoImpl(ctx: CardCtx): Promise<void> {
   const { cardId, state, resolved, io } = ctx;
   const card = state.cards[cardId];
   const branch = card.branch;

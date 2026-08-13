@@ -39,6 +39,7 @@ import {
   recordBaseSha,
   shipCard,
   escalateCard,
+  performRevertAndRedo,
 } from './loop/card-actions.ts';
 import type { CardCtx } from './loop/card-actions.ts';
 // P4 audit fix-round: proving the "report notes the heal" acceptance criterion at the ONLY
@@ -2463,6 +2464,236 @@ describe('runLoop — --max-concurrent N (P12 follow-up: bounded card parallelis
       ]),
     );
     expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ===========================================================================================
+// P12 follow-up hardening — panel findings from the --max-concurrent review
+// ===========================================================================================
+
+describe('serializeRepoGitMutation (card-actions.ts) — runner-side git worktree/branch ' +
+  'mutations serialize across concurrent cards (panel finding #1)', () => {
+  test('two concurrent performRevertAndRedo calls (different cards) never interleave their exec calls', async () => {
+    const callOrder: string[] = [];
+    let releaseA!: () => void;
+    const gateA = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+
+    const state = fixtureState({
+      sequence: ['A', 'B'],
+      cards: {
+        A: fixtureCard({ branch: 'feat/a-widget' }),
+        B: fixtureCard({ branch: 'feat/b-widget' }),
+      },
+    });
+    const { io } = buildMockLoopIo({ stateJson: JSON.stringify(state) });
+
+    // Every default-fallback command in buildMockLoopIo resolves near-instantly (no real
+    // delay) — wrap `exec` to (a) record every call's argv, in order, and (b) hold the FIRST
+    // "git worktree list" call open on `gateA` until the test proves the SECOND card's calls
+    // haven't started. Whichever card's `performRevertAndRedo` the mutex lets run first will be
+    // the one that hits this gate (see below: it's launched first, so it's A's).
+    const realExec = io.exec;
+    let gated = false;
+    io.exec = (async (cmd: string[], opts?: { cwd?: string }) => {
+      callOrder.push(cmd.join(' '));
+      const isFirstWorktreeList = !gated && cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list';
+      if (isFirstWorktreeList) {
+        gated = true;
+        await gateA;
+      }
+      return realExec(cmd, opts);
+    }) as LoopIO['exec'];
+
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctxA: CardCtx = { cardId: 'A', state, resolved, io };
+    const ctxB: CardCtx = { cardId: 'B', state, resolved, io };
+
+    // Fired back-to-back, unawaited — exactly how `runPassPool` would launch two cards'
+    // `runCardTurn`s concurrently.
+    const pA = performRevertAndRedo(ctxA);
+    const pB = performRevertAndRedo(ctxB);
+
+    await waitForCondition(() => callOrder.length >= 1);
+    // Give B's call every chance it would need to (wrongly) start while A is gated mid-call.
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(callOrder).toEqual(['git worktree list --porcelain']); // only A's first call fired.
+
+    releaseA();
+    await Promise.all([pA, pB]);
+
+    // A's entire 3-call sequence completes before B's even begins — no interleaving.
+    expect(callOrder).toEqual([
+      'git worktree list --porcelain',
+      'git branch -D feat/a-widget',
+      'git ls-remote --heads origin feat/a-widget',
+      'git worktree list --porcelain',
+      'git branch -D feat/b-widget',
+      'git ls-remote --heads origin feat/b-widget',
+    ]);
+  });
+
+  test('--max-concurrent 1 (today\'s only caller today) is unaffected: the queue is a permanent no-op with one card in flight', async () => {
+    // Regression guard for the "always-on, no branching on maxConcurrent" design choice — a
+    // single card's own performRevertAndRedo must behave exactly as before this hardening PR:
+    // no extra await, no change to call order or count.
+    const state = fixtureState({ sequence: ['A'], cards: { A: fixtureCard({ branch: 'feat/a-widget' }) } });
+    const { io, calls } = buildMockLoopIo({ stateJson: JSON.stringify(state) });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+
+    await performRevertAndRedo({ cardId: 'A', state, resolved, io });
+
+    expect(calls.map((c) => c.join(' '))).toEqual([
+      'git worktree list --porcelain',
+      'git branch -D feat/a-widget',
+      'git ls-remote --heads origin feat/a-widget',
+    ]);
+  });
+});
+
+describe('runPassPool — panel finding #2: one card\'s thrown exception must not abort the pass or abandon siblings', () => {
+  test('a card whose turn throws mid-pool is reported stopped/non-retryable; the other card still ships; the pass ends cleanly', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: [
+        ...cleanCommitAndVerifyHandlers('deadbee'),
+        (cmd) => {
+          // C1's very first phase-derive call throws — simulating an unexpected exception deep
+          // in a card's turn (e.g. a thrown error the SDK/exec layer doesn't itself convert to
+          // a typed result).
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view' && cmd[3] === 'feat/c1-widget') {
+            throw new Error('simulated unexpected exception mid-turn');
+          }
+          return null;
+        },
+      ],
+      spawnQueue: [() => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    // The pass ends cleanly (no uncaught rejection out of runLoop) with BOTH cards accounted
+    // for — C2 was never abandoned mid-flight because of C1's crash.
+    expect(result.processed).toHaveLength(2);
+    const c1 = result.processed.find((o) => o.cardId === 'C1');
+    const c2 = result.processed.find((o) => o.cardId === 'C2');
+    expect(c1).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: false });
+    expect((c1 as { reason: string }).reason).toContain('simulated unexpected exception mid-turn');
+    expect(c2).toMatchObject({ kind: 'shipped', cardId: 'C2' });
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+  });
+});
+
+describe('runPassPool — panel findings #3/#4: rulings gate and mid-pass STOP under N>1', () => {
+  test('genuine done with an unratified ruling -> EXIT_RULINGS_UNRATIFIED through the pool path (N=2)', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '## Some ruling\nBody text, no ratified-as line.\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    expect(result.processed).toHaveLength(2);
+    expect(result.exitCode).toBe(EXIT_RULINGS_UNRATIFIED);
+  });
+
+  test('a card still in flight when nextCard first reports done does NOT wrongly gate on rulings (companion case)', async () => {
+    // maxConcurrent 2 but only ONE card is ever selectable (C2's spec/plan are missing, so it
+    // resolves as PLANNING_NEEDED the very first time it's picked, not a live in-flight worker)
+    // — this test's real point is `reachedDone`'s own two-part condition (`nc.kind === 'done'`
+    // AND `active.size === 0`): it must still end up EXIT_OK/gated exactly like the N=1 path
+    // once every card is genuinely accounted for, never fire the rulings gate a tick early
+    // while something was still active. Covered end-to-end via the single-card overlap case
+    // above; this test pins the OK case (no unratified ruling) so a regression that starts
+    // gating early would flip this from EXIT_OK to EXIT_RULINGS_UNRATIFIED and fail loudly.
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+  });
+
+  test('STOP armed while N=2 workers are mid-flight: both in-flight cards drain to completion, no third card is claimed, reachedDone stays false', async () => {
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const spawnedFor: string[] = [];
+
+    function gatedShippedSession(label: string, pr: number, sha: string, sessionId: string) {
+      return async function* (): AsyncGenerator<SessionMessage> {
+        spawnedFor.push(label);
+        yield { type: 'system', subtype: 'init', session_id: sessionId };
+        await gate;
+        yield { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId };
+      };
+    }
+
+    // A third, independent card — must NEVER be claimed once STOP is armed, even though the
+    // pool has spare capacity (maxConcurrent 2, only 2 workers active) once C1/C2 drain.
+    const state = fixtureState({
+      sequence: ['C1', 'C2', 'C3'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+        C3: fixtureCard({ branch: 'feat/c3-widget', spec: 'docs/specs/c3.md', plan: 'docs/plans/c3.md' }),
+      },
+    });
+
+    let stopArmed = false;
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => gatedShippedSession('C1', 1, 'aaaaaaa', 'sess-c1')(),
+        () => gatedShippedSession('C2', 2, 'bbbbbbb', 'sess-c2')(),
+        () => messages(shippedMessages(3, 'ccccccc', 'sess-c3')),
+      ],
+    });
+    const realFileExists = io.fileExists;
+    io.fileExists = ((p: string) => (p.endsWith('STOP') ? stopArmed : realFileExists(p))) as LoopIO['fileExists'];
+
+    const runPromise = runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    // Both C1 and C2 start (maxConcurrent 2, both independent, both fit) — THEN arm STOP while
+    // they're still gated mid-session, before releasing them.
+    await waitForCondition(() => spawnedFor.length === 2);
+    stopArmed = true;
+    for (let i = 0; i < 50; i++) await Promise.resolve(); // give the pool every chance to (wrongly) claim C3 anyway.
+    expect(io.spawnSession).toHaveBeenCalledTimes(2); // C3 never claimed.
+
+    releaseGate();
+    const result = await runPromise;
+
+    // Both in-flight cards drained to completion; C3 was never even attempted; the pass did
+    // NOT reach genuine `done` (STOP truncated it), so the rulings gate never fires either.
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed.map((o) => o.cardId).sort()).toEqual(['C1', 'C2']);
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(io.spawnSession).toHaveBeenCalledTimes(2);
   });
 });
 
