@@ -44,7 +44,7 @@ that loop; they do not replace it.
 | P2  | Merge gate verified only AFTER merge                   | 1 written-rule breach, 42 min red master | **SHIPPED** — PR #79, `f11c83d` → [spec](P2-pre-merge-check-gate.md) |
 | P3  | Definition of Done (post-merge cleanup) not in brief   | First escalation of the campaign (B6) | **SHIPPED** — PR #80, `e226209` → [spec](P3-definition-of-done-brief.md) |
 | P4  | Runner escalates instead of self-healing safe residue  | Same B6 escalation                   | **SHIPPED** — PR #81, `1865704` → [spec](P4-self-heal-safe-residue.md) |
-| P5  | Escalations don't say answerable vs world-fixable      | 1 wasted round-trip (A1)             | **RATIFIED** → [spec](P5-escalation-reason-kinds.md) |
+| P5  | Escalations don't say answerable vs world-fixable      | 1 wasted round-trip (A1)             | **SHIPPED** — PR #84, `e367e9d` → [spec](P5-escalation-reason-kinds.md) |
 | P6  | `--include-escalated` must be remembered by hand       | B14 parked 1 cycle                   | **SHIPPED** — PR #83, `2beb0a9` → [spec](P6-escalation-lifecycle.md) |
 | P7  | Rulings can't reach a running session                  | A12 carried 5+ soon-invalid commits  | **RATIFIED (accept + document)** → [spec](P7-mid-flight-rulings.md) |
 | P8  | Batch-authored specs drop inherited obligations        | 2 escalation rounds (B13→B14)        | **RATIFIED** → [spec](P8-inherited-obligations-check.md) |
@@ -254,9 +254,9 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
   hunter → two-lens skinners + scout → bounded fix rounds → merged PR). **P10 SHIPPED**
   (PR #78, merge `177ca3a`). **P2 SHIPPED** (PR #79, merge `f11c83d`). **P3 SHIPPED**
   (PR #80, merge `e226209`). **P4 SHIPPED** (PR #81, merge `1865704`). **P1 SHIPPED**
-  (PR #82, merge `5768e9a`). **P6 SHIPPED** (PR #83, merge `2beb0a9`). Now implementing:
-  **P5** (branch `fixlist/p5-escalation-reason-kinds`). Remaining order: P5 → P11 → P9 →
-  P12 → P8 → P7.
+  (PR #82, merge `5768e9a`). **P6 SHIPPED** (PR #83, merge `2beb0a9`). **P5 SHIPPED** (PR #84, merge `e367e9d`).
+  Now implementing: **P11** (branch `fixlist/p11-basesha-invariants`). Remaining order:
+  P11 → P9 → P12 → P8 → P7.
 - Owner's rewind protocol is active (see memory `tribe-fixlist-rewind-protocol`): each
   round = read this README → brainstorm one P → ratify → persist spec + flip table →
   owner rewinds the conversation.

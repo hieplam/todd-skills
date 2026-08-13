@@ -1,6 +1,6 @@
 # P5 — escalation files say what actually unblocks them
 
-- **Status:** RATIFIED 2026-08-12 (delegated).
+- **Status:** SHIPPED — PR #84, merge `e367e9d` (2026-08-13).
 - **Incident:** log lines 165–189. A schemaGuard escalation was "answered" with an
   answers.md ruling, but the guard mechanically reads the PLAN FILE's front-matter — only
   changing a file in the world clears it. The generic Options list

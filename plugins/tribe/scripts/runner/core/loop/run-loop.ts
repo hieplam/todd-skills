@@ -101,7 +101,15 @@ function filteredNextCard(
 }
 
 async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult> {
-  const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
+  // P11 audit fix: `--dry-run` is a diagnostic tool (see this function's zero-side-effects
+  // doc comment on `runLoop`) — exactly what an operator reaches for to inspect a suspected
+  // R3 stale-baseSha incident (the B13 shape) WITHOUT touching state. It must still surface
+  // the warning, same as the two other `loadState` call sites (run-loop.ts's runLoop,
+  // cli/main.ts) — state.ts stays pure; this is still just the edge printing it.
+  const state = await loadState(
+    () => io.readFile(campaignStatePathOf(config.homeDir)),
+    (warning) => console.error(`[tribe-runner] ${warning}`),
+  );
   const nc = filteredNextCard(state, config, io);
 
   if (nc.kind === 'done') {
@@ -268,7 +276,13 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
 
     const resolved = await resolveRunContext(config, io);
 
-    const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
+    // P11 fix-list: surfaces `loadState`'s R3-invariant normalization warnings at the edge —
+    // state.ts stays pure (it only computes the warning strings; it never imports `console`
+    // itself), this is the one place a real run actually prints them.
+    const state = await loadState(
+      () => io.readFile(campaignStatePathOf(config.homeDir)),
+      (warning) => console.error(`[tribe-runner] ${warning}`),
+    );
     const result = await runPass(state, resolved, io);
     // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
     // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable

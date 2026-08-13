@@ -168,7 +168,13 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
  * outermost safety net for "state itself never loaded". */
 async function tryWriteReport(config: RunLoopConfig, io: LoopIO, run: ReportRunInfo): Promise<void> {
   try {
-    const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
+    // P11 fix-list: surfaces `loadState`'s R3-invariant normalization warnings here too —
+    // state.ts stays pure (it only computes the warning strings; it never imports `console`
+    // itself), this is the edge that prints them for the report-writing path.
+    const state = await loadState(
+      () => io.readFile(campaignStatePathOf(config.homeDir)),
+      (warning) => console.error(`[tribe-runner] ${warning}`),
+    );
     await writeReport(
       state,
       run,

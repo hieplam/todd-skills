@@ -143,6 +143,77 @@ describe('parseState / serializeState round-trip', () => {
   });
 });
 
+// P11 fix-list (ruling R3: a stale base is worse than no base): `status: 'staged'` +
+// `sessionId: null` + `baseSha` set is an impossible combo by invariant — `staged` +
+// `sessionId: null` means no world exists yet for this card, so any `baseSha` it's still
+// carrying can only be stale or hand-authored (the exact shape of the B13 incident: a
+// hand-reset-to-`staged` card that kept its old campaign-start `baseSha`). `loadState`
+// normalizes it to `null` on every load and reports a warning through the optional
+// `onWarning` out-param (never a hard fail: the fix is deterministic and safe) — the actual
+// printing happens at the edge (`run-loop.ts`/`cli/main.ts`), never inside this pure module.
+describe('loadState — R3 invariant: staged + sessionId null + baseSha set is normalized on load', () => {
+  test('status staged + sessionId null + baseSha set -> baseSha nulled and a warning is emitted', async () => {
+    const raw = fixtureState({
+      cards: {
+        ...(fixtureState().cards as Record<string, unknown>),
+        C2: {
+          status: 'staged',
+          spec: 'docs/superpowers/specs/2026-01-01-c2-spec.md',
+          plan: 'docs/superpowers/plans/2026-01-01-c2-plan.md',
+          branch: null,
+          baseSha: 'stale-hand-reset-sha',
+          pr: null,
+          mergeSha: null,
+          sessionId: null,
+          updatedAt: null,
+        },
+      },
+    });
+
+    const warnings: string[] = [];
+    const state = await loadState(() => JSON.stringify(raw), (w) => warnings.push(w));
+
+    expect(state.cards.C2?.baseSha).toBeNull();
+    expect(warnings).toEqual(['C2: cleared stale baseSha on staged card (R3 invariant)']);
+  });
+
+  test('a running card with baseSha set is left untouched (only staged + sessionId-null qualifies)', async () => {
+    const raw = fixtureState({
+      cards: {
+        ...(fixtureState().cards as Record<string, unknown>),
+        C2: {
+          status: 'running',
+          spec: 'docs/superpowers/specs/2026-01-01-c2-spec.md',
+          plan: 'docs/superpowers/plans/2026-01-01-c2-plan.md',
+          branch: 'feat/c2-widget',
+          baseSha: 'legit-running-base',
+          pr: null,
+          mergeSha: null,
+          sessionId: 'sess-c2',
+          updatedAt: null,
+        },
+      },
+    });
+
+    const warnings: string[] = [];
+    const state = await loadState(() => JSON.stringify(raw), (w) => warnings.push(w));
+
+    expect(state.cards.C2?.baseSha).toBe('legit-running-base');
+    expect(warnings).toEqual([]);
+  });
+
+  test('a staged card with baseSha already null is left untouched and emits no warning', async () => {
+    // fixtureState()'s own C2 is already status: 'staged', sessionId: null, baseSha: null.
+    const raw = fixtureState();
+
+    const warnings: string[] = [];
+    const state = await loadState(() => JSON.stringify(raw), (w) => warnings.push(w));
+
+    expect(state.cards.C2?.baseSha).toBeNull();
+    expect(warnings).toEqual([]);
+  });
+});
+
 describe('version rejection', () => {
   test('rejects an unknown major version with a typed error, not a silent parse', () => {
     const raw = fixtureState({ v: 2 });
