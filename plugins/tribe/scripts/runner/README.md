@@ -383,6 +383,54 @@ ruling to `answers.md`. Once archived, a flag-less re-trigger of that card proce
 `--include-escalated` is needed only to force a retry of a card whose escalation file is still
 present (i.e. genuinely unanswered).
 
+## Rulings gate (harness-gap-wiring PR C)
+
+**Postmortem (campaign outstanding-17):** a ruling appended to `answers.md` that captured a
+durable convention was never carried into the target repo's own governance files (a rule, a
+debt entry, a roadmap card) — nothing mechanically gated on it, so it was silently dropped.
+Every other step in the campaign runner's loop is mechanically forced (the D3 verify replay,
+the D2 lock, the report contract below); this was the one step that ran 0% of the time because
+nothing checked it. This gate closes that gap.
+
+**When it fires:** only on the pass that would otherwise conclude `EXIT_OK`/`done` — every
+requested card `shipped`/`blocked`/`escalated`, nothing left to do. An
+`escalations_pending`/`session_incomplete`/`stop_requested` exit is completely unaffected; the
+gate never runs on those paths at all (`core/loop/run-loop.ts`'s `applyRulingsGate`, called once,
+right before `runLoop` returns).
+
+**What it checks:** every `## `-headed block in `answers.md` is a "ruling" (the outstanding-17
+convention is `## R<n> — <title>`, but ANY `## ` heading counts). A ruling is **ratified** once
+its block carries a `ratified-as:` line (case-insensitive key; a leading `-`/`*` bullet and
+`**bold**` markers around the key are all tolerated) whose value is one of:
+
+| Value | Meaning |
+| --- | --- |
+| `rule <path>` | Landed as a rule file at `<path>` (e.g. a project rule under `plugins/tribe/rules/` or `.c3/`). |
+| `debt <id>` | Recorded as a harness-gap debt entry with that id (`plugins/tribe/scripts/gaps/`). |
+| `roadmap <ref>` | Carried forward as a roadmap card (`<ref>` names it). |
+| `operational` | A one-off operational decision — deliberately not durable, no governance artifact expected. |
+| `dismissed` | Considered and explicitly rejected — no further action. |
+| `pending` | Explicitly not yet ratified. Valid vocabulary, but **does not** clear the gate. |
+
+Any other value, and a ruling block with **no** `ratified-as:` line at all, both classify as
+unratified — this is strict by design (the gate exists to force the discipline the postmortem
+found missing, not to guess intent). The pure classification lives in `core/rulings.ts`
+(`parseRulings`/`isRulingRatified`/`unratifiedRulingIds`); the gate itself is `core/loop/
+run-loop.ts`'s `applyRulingsGate`, applied to `resolved.answersContent` — the same `answers.md`
+read the loop already performs for every executor brief, not a second file read.
+
+**What happens when it fires:** the exit code becomes `5` (`EXIT_RULINGS_UNRATIFIED`) and the
+report's `run.reason` becomes `'rulings_unratified'`. This is **campaign-level state, not a
+per-card escalation** — no single card owns it, so it is folded into the report's existing
+"## Pending (needs the owner)" section (`renderRulingsUnratifiedNote`, `report.ts`) rather than
+a per-card `escalations/<card>.md` file in the shape "Escalation / answers workflow" above
+describes — `core/loop/card-actions.ts` is untouched by this gate. The note is labeled
+**"answerable"** (the same vocabulary the P5 fix-list uses for reasons a ruling alone clears,
+as opposed to a mechanical verify failure) and names every unratified ruling id verbatim. To
+resolve: add `ratified-as:` to each named block in `answers.md` (or ratify it via the
+governance path it names) and re-trigger; nothing else about the campaign's cards is touched by
+this gate.
+
 ## Report contract (spec §O5)
 
 On **every** exit path except `--dry-run` (zero side effects, by construction — nothing is
@@ -409,9 +457,12 @@ the report is the truth.**
 ```
 
 - **`run.reason`** — one of `done` | `stop_requested` | `escalations_pending` |
-  `session_incomplete` | `error` (`report.ts`'s `deriveExitReason`). `error` covers an unhandled
-  exception thrown after `runLoop` was entered (`run.ts`'s own `EXIT_ERROR = 4` — see Exit codes
-  below; not one of `loop.ts`'s `EXIT_*` constants).
+  `session_incomplete` | `error` | `rulings_unratified` (`report.ts`'s `deriveExitReason`).
+  `error` covers an unhandled exception thrown after `runLoop` was entered (`run.ts`'s own
+  `EXIT_ERROR = 4` — see Exit codes below; not one of `loop.ts`'s `EXIT_*` constants).
+  `rulings_unratified` is the rulings gate (see that section above) — its `run` object also
+  carries `unratifiedRulings: string[]`, and the `.md` twin renders them inside the existing
+  "## Pending (needs the owner)" section (a campaign-level note, not a per-card entry).
 - **Per-card `outcome`** is one of `shipped | escalated | blocked | not_reached`, read entirely
   from the final `CampaignState` on disk (never from `loop.ts`'s own `CardOutcome[]`) —
   `main()` reloads state fresh from disk to build the report rather than reusing `runLoop`'s
@@ -442,6 +493,7 @@ the report is the truth.**
 | `EXIT_OK` (`done`, or startup `STOP`) | Yes — `reason: 'done'` or `'stop_requested'`. |
 | `EXIT_ESCALATED` | Yes — `reason: 'escalations_pending'`. |
 | `EXIT_SESSION_INCOMPLETE` | Yes — `reason: 'session_incomplete'`. |
+| `EXIT_RULINGS_UNRATIFIED` (the rulings gate overrode a would-be `done`) | Yes — `reason: 'rulings_unratified'`. |
 | An unhandled exception after `runLoop` was entered | Yes (best-effort) — `reason: 'error'`, exit code `4`. |
 
 ## STOP file and the lock file (spec §D2)
@@ -498,6 +550,7 @@ Read from `EXIT_*` in `loop.ts`, plus `run.ts`'s own `EXIT_ERROR`:
 | `2` | `EXIT_ESCALATED` | D5′: the pass finished and **at least one card is `escalated`** — a fresh escalation this pass, or one still parked, unanswered, from a prior run. Not "aborted at the first question"; other cards in the same pass may have shipped. Read `campaign-report.json`'s `pending` for which card(s) need an answer. |
 | `3` | `EXIT_SESSION_INCOMPLETE` | D5′: at least one card's session ended `error`/`timeout` with no further D4 fallback (no card in this pass escalated); state was already recorded locally, so the next start resumes it — this is not a human-decision escalation. |
 | `4` | `EXIT_ERROR` (`run.ts`, not a `loop.ts` constant) | An unhandled exception surfaced after `runLoop` was entered. The report's `run.reason` is `'error'` — per §O3, treat the report as authoritative over this numeric code. |
+| `5` | `EXIT_RULINGS_UNRATIFIED` | The rulings gate (see "Rulings gate" above): the pass would otherwise have concluded `done`, but `answers.md` carries ≥1 ruling with no recognized `ratified-as:` disposition. `campaign-report.json`'s `run.unratifiedRulings` names them. |
 
 ## Structure
 
@@ -537,8 +590,10 @@ names, no filename convention required — enforced executably by `structure.tes
   work), and `core/loop/run-loop.ts` (the pass + `runLoop` entry point).
 - **everything else in `core/`** — pure logic: `state.ts`, `verify.ts`, `report.ts`,
   `brief.ts`, `session.ts`, `paths.ts` (pure campaign-home path helpers, spec §4),
-  `run-record.ts` (the `run.json` schema), and `env-guard.ts` (`scrubEnvContent` — the
-  `ANTHROPIC_API_KEY` line-removal logic, fix-list P10; see "ANTHROPIC_API_KEY guard" above).
+  `run-record.ts` (the `run.json` schema), `env-guard.ts` (`scrubEnvContent` — the
+  `ANTHROPIC_API_KEY` line-removal logic, fix-list P10; see "ANTHROPIC_API_KEY guard" above),
+  and `rulings.ts` (`answers.md` ruling parsing/classification, harness-gap-wiring PR C; see
+  "Rulings gate" above).
   Every world-touching effect is reached through a
   `ports/ports.ts` seam, never a direct import; each of these modules re-exports the seam
   type(s) its own tests/importers pull from it (e.g. `verify.ts` re-exports `VerifyIO`).
