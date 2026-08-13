@@ -272,13 +272,19 @@ async function runPass(
  * Safety argument (P12 follow-up brief: "either serialize state mutations ... or prove
  * per-card field disjointness"):
  *
- * 1. Selection never double-hands a card. `filteredNextCard`/`nextCard` (`state.ts`) are pure,
- *    SYNCHRONOUS functions — no `await` sits between reading a freshly-selected `nc.cardId`
- *    and `attempted.add(nc.cardId)` below, so two fill iterations can never observe the same
- *    unclaimed card. `attempted` is claimed at SELECTION time here — unlike `runPass`'s N=1
- *    loop, which can safely claim after the fact because it never selects a second card until
- *    the first is fully done — the one deliberate behavioral difference from `runPass`,
- *    required for concurrency to be safe at all.
+ * 1. Selection never double-hands a card. `filteredNextCard`/`nextCard` (`state.ts`) are
+ *    SYNCHRONOUS — and MUTATING (`nextCard` calls `reconcileBlockedStatuses`, which flips
+ *    `card.status` between `'blocked'`/`'staged'` in place on every call — never "pure" in the
+ *    no-side-effects sense, just synchronous and side-effect-free w.r.t. the OUTSIDE world) — no
+ *    `await` sits between reading a freshly-selected `nc.cardId` and `attempted.add(nc.cardId)`
+ *    below, so two fill iterations can never observe the same unclaimed card. Nor can this
+ *    in-place reconciliation itself race: it only ever flips a card TO `blocked` when it
+ *    (transitively) depends on one that's `escalated`/already-blocked, and TO `staged` when it
+ *    no longer does — an in-flight (claimed but unshipped) card is neither, so it is never a
+ *    target these mutations touch while a worker holds it. `attempted` is claimed at SELECTION
+ *    time here — unlike `runPass`'s N=1 loop, which can safely claim after the fact because it
+ *    never selects a second card until the first is fully done — the one deliberate behavioral
+ *    difference from `runPass`, required for concurrency to be safe at all.
  * 2. `dependsOn` still orders correctly with NO extra bookkeeping. `nextCard` already treats
  *    any non-`shipped` status — including a claimed-but-still-`staged`/`running` in-flight
  *    card — as "not shipped", so a dependent card is never selected while its dependency is
@@ -296,6 +302,17 @@ async function runPass(
  *    the writes that actually reach disk MONOTONIC: whichever flush lands last always includes
  *    every mutation any worker had applied by that point, in flight or finished — never a lost
  *    update, regardless of which worker happened to finish first.
+ * 5. (P12 follow-up hardening) The FILESYSTEM/git layer, which points 1-4 above deliberately do
+ *    not cover, is handled separately: `card-actions.ts`'s `serializeRepoGitMutation` queues
+ *    every runner-side `git worktree`/`branch -D` mutation (`performRevertAndRedo`,
+ *    `executeHealActions`, `gatherWorktreeResidueFacts`) behind one promise chain so two cards'
+ *    calls into git's shared, repo-wide bookkeeping never interleave — see that helper's own
+ *    doc comment for why a promise queue is enough (no real OS lock needed) and what it does
+ *    NOT cover (an executor session's own git commands, which this queue cannot reach).
+ * 6. (P12 follow-up hardening) One card's turn throwing an uncaught exception can never abort
+ *    the whole pass or abandon other in-flight cards: `launch`'s `.catch` converts it to a
+ *    `stopped`/non-retryable `CardOutcome` for THAT card only, and `.finally` unconditionally
+ *    clears its `active` slot — see `launch`, below.
  *
  * Budget bookkeeping (`--max-cards`, `worked`) is necessarily OPTIMISTIC under concurrency: the
  * fill loop cannot know whether a freshly-claimed card will turn out to be real work or an
@@ -305,9 +322,18 @@ async function runPass(
  * launched, self-correcting on the next fill tick) but a batch can undershoot by up to
  * `maxConcurrent - 1` cards' worth of parks before the budget is recognized as spent.
  *
- * NOT solved here (documented limitation — the runner README and SKILL.md carry the same
- * note): two cards that both merge to the SAME base branch can still race at the actual `gh pr
- * merge` step — git itself is what serializes (or rejects/re-queues) that, not this pool.
+ * NOT solved here (documented limitations — the runner README and SKILL.md carry the same
+ * notes):
+ * - Two cards that both merge to the SAME base branch can still race at the actual `gh pr
+ *   merge` step — git itself is what serializes (or rejects/re-queues) that, not this pool.
+ * - Each card's OWN executor session runs its own git commands (worktree add, checkout,
+ *   commit, push, ...) with `cwd: resolved.repoRoot` too (`session.ts`'s pinned SDK options) —
+ *   point 5 above serializes only the RUNNER's own git calls; it cannot reach into a session's
+ *   independently-spawned process. Git's own locking mostly prevents outright corruption there,
+ *   but a lock-contention failure can surface as an ordinary non-zero exit from a git command —
+ *   read that as transient contention, not repo corruption, and retry rather than escalate on
+ *   sight. Re-plumbing every session to its own isolated `cwd` is real future hardening, out of
+ *   scope for this pass.
  * `N > 1` bounds WIDTH only; it is never an ordering promise beyond what `dependsOn` declares. */
 async function runPassPool(
   state: CampaignState,
@@ -324,11 +350,34 @@ async function runPassPool(
 
   const launch = (nc: CardResult): void => {
     const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
-    const task: Promise<void> = runCardTurn(ctx, nc).then((result) => {
-      processed.push(result.outcome);
-      if (result.worked) worked += 1;
-      active.delete(task);
-    });
+    const task: Promise<void> = runCardTurn(ctx, nc)
+      // Panel finding #2 (P12 follow-up hardening): an uncaught exception from ANYWHERE in a
+      // card's turn (deriveCardPhase, actOnCard, or anything either calls) must be contained to
+      // THIS card — never left to reject `task` and blow up the awaited `Promise.race(active)`
+      // below, which would abort the whole pool pass and abandon every OTHER card still
+      // in-flight mid-session. Converted to the same `stopped` shape a session ending with
+      // outcome `'error'` already produces; `retryable: false` because a thrown exception (as
+      // opposed to a typed `SessionResult`) leaves no known-safe state to resume from — treated
+      // as the SAFER, non-retryable case, exactly like `CardOutcome.stopped`'s own doc comment
+      // already distinguishes `'error'`/retryable from `'timeout'`/not.
+      .catch((err: unknown): { outcome: CardOutcome; worked: boolean } => ({
+        outcome: {
+          kind: 'stopped',
+          cardId: nc.cardId,
+          reason: `card turn threw: ${err instanceof Error ? err.message : String(err)}`,
+          retryable: false,
+        },
+        worked: true,
+      }))
+      .then((result) => {
+        processed.push(result.outcome);
+        if (result.worked) worked += 1;
+      })
+      // ALWAYS runs, whether the turn shipped, escalated, parked, or (now) threw — a card can
+      // never wedge a permanent slot in `active` and starve the pool of capacity.
+      .finally(() => {
+        active.delete(task);
+      });
     active.add(task);
   };
 
