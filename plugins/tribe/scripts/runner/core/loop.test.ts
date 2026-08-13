@@ -1698,6 +1698,34 @@ describe('runLoop — --dry-run: zero side effects', () => {
     expect(result.dryRunPlan?.cardId).toBe('B3');
     expect(result.dryRunPlan?.phase).toEqual({ kind: 'fresh' });
   });
+
+  // Audit fix (P11 fix round, skinnerA/skinnerB/scout): `runDryRun`'s own `loadState` call was
+  // the ONE call site left without the `onWarning` callback, so an operator diagnosing a
+  // suspected R3 stale-baseSha incident (the B13 shape) via `--dry-run` got zero warning —
+  // unlike a real run (run-loop.ts's runPass path) or `cli/main.ts`'s report path, both of
+  // which print the warning today. Reproduces the exact B13 combo (`staged` + `sessionId: null`
+  // + a stale `baseSha`) through `--dry-run` and asserts the warning reaches `console.error`.
+  test('surfaces the R3 stale-baseSha warning even on --dry-run (no writes, still a warning)', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: null, baseSha: 'stale-hand-reset-sha' }) },
+    });
+    const { io } = buildMockLoopIo({ stateJson: JSON.stringify(state), answers: '' });
+    const guarded = noMutationIo(io);
+
+    const errors: string[] = [];
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => { errors.push(args.join(' ')); };
+    try {
+      const result = await runLoop(baseLoopConfig({ dryRun: true }), guarded);
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(errors.some((line) => line.includes('C1: cleared stale baseSha on staged card (R3 invariant)'))).toBe(
+        true,
+      );
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
 });
 
 describe('runLoop — session error/timeout without a resume attempt: stops for external retry', () => {

@@ -101,7 +101,15 @@ function filteredNextCard(
 }
 
 async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult> {
-  const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
+  // P11 audit fix: `--dry-run` is a diagnostic tool (see this function's zero-side-effects
+  // doc comment on `runLoop`) — exactly what an operator reaches for to inspect a suspected
+  // R3 stale-baseSha incident (the B13 shape) WITHOUT touching state. It must still surface
+  // the warning, same as the two other `loadState` call sites (run-loop.ts's runLoop,
+  // cli/main.ts) — state.ts stays pure; this is still just the edge printing it.
+  const state = await loadState(
+    () => io.readFile(campaignStatePathOf(config.homeDir)),
+    (warning) => console.error(`[tribe-runner] ${warning}`),
+  );
   const nc = filteredNextCard(state, config, io);
 
   if (nc.kind === 'done') {
