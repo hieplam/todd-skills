@@ -5,7 +5,13 @@
 // `child_process`, or performs network I/O.
 import { join } from 'node:path';
 import { z } from 'zod';
-import type { Card, CampaignState, NextCardOptions, NextCardResult } from './types.ts';
+import type {
+  Card,
+  CampaignState,
+  NextCardOptions,
+  NextCardResult,
+  ResetCardSummary,
+} from './types.ts';
 import type { StateIO } from '../ports/ports.ts';
 import { escalationPathOf } from './paths.ts';
 
@@ -79,6 +85,21 @@ export class CircularDependencyError extends Error {
     super(`Campaign state's dependsOn graph contains a cycle: ${path.join(' -> ')}.`);
     this.name = 'CircularDependencyError';
     this.path = path;
+  }
+}
+
+/** P11 fix-list follow-up ("out of scope" note): thrown by `resetCard` when `cardId` names no
+ * entry under `cards` — the CLI-level analog of `UndefinedSequenceCardError`/
+ * `UndefinedDependencyCardError` above, one level further out (a human's `--card` selection,
+ * not a cross-reference inside the state file itself), so it gets its own class rather than
+ * reusing either. */
+export class CardNotFoundError extends Error {
+  readonly cardId: string;
+
+  constructor(cardId: string) {
+    super(`Campaign state has no card with id ${JSON.stringify(cardId)}.`);
+    this.name = 'CardNotFoundError';
+    this.cardId = cardId;
   }
 }
 
@@ -248,6 +269,106 @@ export async function loadState(
  * fields carried through `parseState`'s loose schemas. */
 export function serializeState(state: CampaignState): string {
   return `${JSON.stringify(state, null, 2)}\n`;
+}
+
+/** P11 fix-list follow-up ("out of scope" note): the pure core of the `reset-card` CLI
+ * subcommand — "so humans never hand-edit state.json." Resets exactly one card (`cardId`) to
+ * a clean, re-runnable `staged` state and returns the NEW state (the input `state` and its
+ * card are never mutated — a plain `{ ...spread }` at both the state and card level, so every
+ * unknown field `parseState`'s `looseObject` schemas carried through — top-level AND per-card
+ * — survives byte-faithfully; see `state.test.ts`'s `resetCard` suite for the round-trip
+ * proof). Throws `CardNotFoundError` if `cardId` has no entry under `cards` — never silently
+ * a no-op, the same "refuse loudly" precedent `parseState`'s own referential-integrity checks
+ * set above.
+ *
+ * Field-by-field decisions (ruling R3, P11: "a stale base is worse than no base" — the same
+ * tiebreak extended to every field below, not just `baseSha`):
+ *
+ * - `status` -> `'staged'`, `sessionId` -> `null`, `baseSha` -> `null`: the contract's own
+ *   three required outcomes. `sessionId: null` is also what `recordBaseSha`'s `blindFresh`
+ *   check and this module's own `normalizeStaleBaseShas` treat as "no world exists yet for
+ *   this card" — the precondition every other field below is chosen to make TRUE, not just
+ *   asserted.
+ * - `pr` -> `null`: `actOnCard` (`core/loop/card-actions.ts`) writes a freshly-shipped card's
+ *   PR with `card.pr = sessionResult.pr ?? card.pr` — a stale `card.pr` left in place is a
+ *   silent fallback target if a future ship ever reports no PR number, attributing a BRAND NEW
+ *   ship to a PR from the run this reset is discarding. Exactly R3's shape (a value trusted
+ *   directly, with no reality-check, that can silently outlive the run it described) —
+ *   `baseSha` had this bug before P11; `pr` still does, so it gets the same treatment here.
+ * - `mergeSha` -> `null`: same stale-fallback shape, one line over (`card.mergeSha =
+ *   extractMergeSha(verifyResult) ?? card.mergeSha`) — and purely observational once the card
+ *   is no longer `shipped`, so nothing legitimate is lost.
+ * - `updatedAt` -> `null`: bookkeeping only (`io.now()`, stamped on every card mutation) —
+ *   never read to decide anything, so `null` truthfully records "no activity in this
+ *   incarnation." (Also: this function takes no clock, by design — a pure `state in -> state
+ *   out` transform per the fix-list brief, so it could not fabricate a real timestamp even if
+ *   one were wanted here.)
+ * - `autoAnswerRounds`, `healedResidue` -> DELETED (become absent), never set to `0`/`[]`: both
+ *   fields are schema-optional with NO `.default(...)` specifically so "never happened" means
+ *   absent, not a zero/empty value (see `CardSchema`'s own doc comments) — callers already read
+ *   them as `autoAnswerRounds ?? 0`. A stale round-count or heal record from the discarded run
+ *   would misreport this card's fresh attempt (report.ts surfaces `healedResidue` verbatim).
+ * - `branch` -> UNCHANGED (deliberately NOT cleared): unlike every field above, `branch` is
+ *   never trusted blindly — `deriveCardPhase` (`core/loop/phase.ts`) re-derives the actual
+ *   phase from gh/git reality every time `branch` is non-null, and `recordBranchFromPr` only
+ *   ever OVERWRITES it (no stale-fallback). Clearing it would skip that reality-check entirely
+ *   (`deriveCardPhase` returns a blind `{ kind: 'fresh' }` the instant `branch` is null),
+ *   throwing away the resume-matrix's own residue-cleanup path (`revert_and_redo`) and
+ *   reopening exactly the duplicate-PR hazard `phase.ts`'s own "F8" comment documents for a
+ *   blind fresh spawn over a branch/PR that still exists. R3 doesn't apply here: a "stale"
+ *   `branch` self-heals on the very next read, so leaving it is safe and clearing it is not.
+ * - `dependsOn`, `spec`, `plan` -> UNCHANGED: structural (this card's declared dependencies and
+ *   spec/plan doc paths), never a per-run/per-attempt value — resetting one card must never
+ *   silently rewire the campaign's dependency graph or detach it from its own spec/plan.
+ * - Any unknown field (top-level or per-card) the schema doesn't know about -> UNCHANGED.
+ *
+ * Escalation pointers: NOT a `Card` field at all — an escalation lives in a sibling file
+ * (`escalationPathOf(homeDir, cardId)`), tracked purely by presence/absence, never by anything
+ * in `state.cards[cardId]`. `resetCard` therefore has nothing to clear here; the CLI edge
+ * (`cli/main.ts`'s `performResetCard`) is the layer that can see the filesystem and warns
+ * (never auto-archives — archiving is coupled 1:1 to an actual ruling recorded in
+ * `answers.md` by the orchestrate-campaign SKILL's ritual, which a plain reset never performs)
+ * when a reset card's escalation file is still present. */
+export function resetCard(
+  state: CampaignState,
+  cardId: string,
+): { state: CampaignState; summary: ResetCardSummary } {
+  const card = state.cards[cardId];
+  if (!card) {
+    throw new CardNotFoundError(cardId);
+  }
+
+  const clearedFields: string[] = [];
+  const next: Card = { ...card, status: 'staged' };
+
+  if (next.sessionId !== null) clearedFields.push('sessionId');
+  next.sessionId = null;
+
+  if (next.baseSha !== null) clearedFields.push('baseSha');
+  next.baseSha = null;
+
+  if (next.pr !== null) clearedFields.push('pr');
+  next.pr = null;
+
+  if (next.mergeSha !== null) clearedFields.push('mergeSha');
+  next.mergeSha = null;
+
+  if (next.updatedAt !== null) clearedFields.push('updatedAt');
+  next.updatedAt = null;
+
+  if ('autoAnswerRounds' in next) {
+    clearedFields.push('autoAnswerRounds');
+    delete next.autoAnswerRounds;
+  }
+  if ('healedResidue' in next) {
+    clearedFields.push('healedResidue');
+    delete next.healedResidue;
+  }
+
+  return {
+    state: { ...state, cards: { ...state.cards, [cardId]: next } },
+    summary: { cardId, previousStatus: card.status, status: 'staged', clearedFields },
+  };
 }
 
 function resolveMissing(card: Card, repoRoot: string, io: StateIO): Array<'spec' | 'plan'> {
