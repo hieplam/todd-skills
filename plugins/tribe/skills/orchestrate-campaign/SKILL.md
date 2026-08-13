@@ -123,14 +123,21 @@ every optional field may simply be omitted rather than written as `null`/`[]` wh
 - `sequence` is the dependency-ordered card order; every id in it (and every id named in a
   `dependsOn`) must have a matching entry under `cards`.
 - Every card you write starts `"status": "staged"`, `"autoAnswerRounds": 0`, and no `dependsOn`
-  unless that card genuinely must not start before another one ships — an undeclared dependency
-  runs IN PARALLEL — the runner spawns every card whose declared dependencies are satisfied, all
-  at once. Sequence order alone does NOT serialize execution; only `dependsOn` does. So only
-  declare one you mean.
+  unless that card genuinely must not start before another one ships. The runner never spawns two
+  sessions concurrently — v1 runs exactly one card's session at a time, awaiting it to full
+  completion before selecting the next (`docs/superpowers/specs/2026-07-16-campaign-runner-design.md`'s
+  non-goals; `docs/superpowers/specs/2026-07-16-campaign-orchestration-design.md` §O7: "never runs
+  two cards concurrently"). What an undeclared dependency actually risks is ORDER, not concurrency:
+  absent parking, the runner walks `sequence` top to bottom and ships cards in exactly that order —
+  but park-and-continue means a card ahead in `sequence` that escalates or gets blocked is skipped
+  rather than halting the run, so a later card with no `dependsOn` on it can ship before that
+  earlier, now-parked card does. `sequence` position alone does not guarantee card A completes
+  before card B; only `dependsOn` does. So only declare one you mean.
 - **Serial campaigns:** when the owner's directive is one-card-at-a-time (or cards merge to the
   same branch and each should build on the previous card's merged master), author the full
-  sequential chain — every card `dependsOn` its sequence predecessor. Default to the chain when
-  in doubt: parallel spawning is the exception an owner asks for, not the default they expect.
+  sequential chain — every card `dependsOn` its sequence predecessor. Default to the chain when in
+  doubt: relying on `sequence` position alone to guarantee ordering is the trap this note exists to
+  close, not a safe shortcut.
 - `ownerOnlyEscalations` is *your* Stage-A authored list — carry over the roadmap's own
   Escalation register verbatim (irreversible data shapes, product-promise changes, new
   permissions, privacy). A trigger name on this list escalates to the owner unconditionally in
