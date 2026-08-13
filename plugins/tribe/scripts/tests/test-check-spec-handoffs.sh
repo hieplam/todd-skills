@@ -60,4 +60,53 @@ printf '%s\n' "$out_e" | grep -q "^check-spec-handoffs: 2 hit(s) across 2 dir(s)
   && ok "(e) summary counts hits across both dirs" \
   || bad "(e) summary counts hits across both dirs (got: $out_e)"
 
+# (f) unreadable .md file with a real handoff hit -> scan must NOT be silently reported as
+# clean; a real, unacknowledged handoff must not become invisible because grep hit a read
+# error. Exit non-zero and the "N hit(s)" summary line must not print at all (i.e. the tool
+# must not report a completed scan for a partial one), in both plain and --strict modes.
+if [[ "$(id -u)" -ne 0 ]]; then
+  specs_f="$TMP/f-specs"; mkdir -p "$specs_f"
+  printf 'deferred to a future spec.\n' > "$specs_f/spec.md"
+  chmod 000 "$specs_f/spec.md"
+  set +e
+  out_f="$(bash "$SCRIPT" "$specs_f" 2>"$TMP/f.err")"; code_f=$?
+  set -e
+  [[ "$code_f" -ne 0 ]] && ok "(f) plain: unreadable file -> non-zero exit" \
+    || bad "(f) plain: unreadable file -> non-zero exit (got exit $code_f)"
+  printf '%s\n' "$out_f" | grep -q "^check-spec-handoffs: 0 hit" \
+    && bad "(f) plain: unreadable file must not be reported as a clean 0-hit scan" \
+    || ok "(f) plain: unreadable file must not be reported as a clean 0-hit scan"
+  grep -qi "permission denied" "$TMP/f.err" \
+    && ok "(f) plain: grep's read error is surfaced" \
+    || bad "(f) plain: grep's read error is surfaced (got: $(cat "$TMP/f.err"))"
+
+  set +e
+  out_fs="$(bash "$SCRIPT" --strict "$specs_f" 2>"$TMP/fs.err")"; code_fs=$?
+  set -e
+  [[ "$code_fs" -ne 0 ]] && ok "(f) --strict: unreadable file -> non-zero exit" \
+    || bad "(f) --strict: unreadable file -> non-zero exit (got exit $code_fs)"
+  printf '%s\n' "$out_fs" | grep -q "^check-spec-handoffs: 0 hit" \
+    && bad "(f) --strict: unreadable file must not be reported as a clean 0-hit scan" \
+    || ok "(f) --strict: unreadable file must not be reported as a clean 0-hit scan"
+
+  # (g) unreadable file alongside a readable file with a hit -> must not silently undercount;
+  # scan is still incomplete and must be flagged, not reported as "1 hit(s)" complete.
+  specs_g="$TMP/g-specs"; mkdir -p "$specs_g"
+  printf 'deferred to a future spec.\n' > "$specs_g/unreadable.md"
+  printf 'deferred to a future spec too.\n' > "$specs_g/readable.md"
+  chmod 000 "$specs_g/unreadable.md"
+  set +e
+  out_g="$(bash "$SCRIPT" "$specs_g" 2>"$TMP/g.err")"; code_g=$?
+  set -e
+  [[ "$code_g" -ne 0 ]] && ok "(g) partial scan (unreadable + readable hit) -> non-zero exit" \
+    || bad "(g) partial scan (unreadable + readable hit) -> non-zero exit (got exit $code_g)"
+  printf '%s\n' "$out_g" | grep -q "^check-spec-handoffs: 1 hit(s)" \
+    && bad "(g) partial scan must not be reported as a complete '1 hit(s)' scan" \
+    || ok "(g) partial scan must not be reported as a complete '1 hit(s)' scan"
+
+  chmod 644 "$specs_f/spec.md" "$specs_g/unreadable.md"
+else
+  printf 'skip - (f)/(g) running as root, chmod 000 has no effect (no coverage)\n'
+fi
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"; [[ "$FAIL" -eq 0 ]]

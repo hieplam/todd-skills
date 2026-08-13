@@ -35,7 +35,24 @@ for d in "${DIRS[@]}"; do
   [ -d "$d" ] || { echo "check-spec-handoffs: not a directory: $d" >&2; exit 2; }
 done
 
-hits="$(grep -rinE --include='*.md' "$PATTERN" "${DIRS[@]}" | sed -E 's/^([^:]+:[0-9]+):/\1: /' || true)"
+grep_out="$(mktemp)"; grep_err="$(mktemp)"
+trap 'rm -f "$grep_out" "$grep_err"' EXIT
+set +e
+grep -rinE --include='*.md' "$PATTERN" "${DIRS[@]}" >"$grep_out" 2>"$grep_err"
+grep_status=$?
+set -e
+
+# grep exit codes: 0 = matches found, 1 = no matches (expected, not an error).
+# Anything else (e.g. 2 = permission denied / read error on a scanned file) means the
+# scan was incomplete and must not be silently reported as a clean zero/undercount.
+if [ "$grep_status" -gt 1 ]; then
+  cat "$grep_err" >&2
+  echo "check-spec-handoffs: grep failed (exit $grep_status) — scan incomplete, aborting" >&2
+  exit "$grep_status"
+fi
+cat "$grep_err" >&2
+
+hits="$(sed -E 's/^([^:]+:[0-9]+):/\1: /' "$grep_out")"
 
 count=0
 if [ -n "$hits" ]; then
