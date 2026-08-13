@@ -87,6 +87,11 @@ Every dispatched worker (Hunter, Skinner) writes its report to:
 Before raising any question, check whether it is already answered here. If it is, follow
 the ruling; do not ask again.
 
+These rulings are a snapshot taken when this session started. A resume never re-sends
+this section — you keep this exact snapshot for the life of this session, resumed or
+not. Only a brand-new session, never this one, can ever see a ruling added after you
+started.
+
 {{ANSWERS_CONTENT}}
 
 ## Definition of Done (preconditions for SHIPPED)
