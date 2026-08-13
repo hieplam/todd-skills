@@ -5,7 +5,7 @@
 import type { Card, CampaignState, ResolvedConfig } from '../types.ts';
 import type { LoopIO } from '../../ports/ports.ts';
 import { verifyShipped } from '../verify.ts';
-import type { VerifyConfig, VerifyResult } from '../verify.ts';
+import type { VerifyConfig, VerifyPointId, VerifyResult } from '../verify.ts';
 import { runSession } from '../session.ts';
 import type { RunSessionConfig, SessionIO, SessionResult } from '../session.ts';
 import { executorBrief, reportPathFor } from '../brief.ts';
@@ -234,27 +234,71 @@ export function formatVerifyFailure(result: VerifyResult): string {
     .join('\n');
 }
 
-/** P5 fix-list: `verify_failed_twice`'s known verify-point ids, each paired with the
- * world-fix instruction to render — a ruling alone can never clear a mechanical verify
- * failure, so the "Options" section must never lead with the ruling path for this reason
- * (incident: a `schemaGuard` escalation was "answered" with an answers.md ruling that the
- * guard, which only reads the plan file's front-matter, could never observe). Keyed by the
- * `VerifyResult` point id so only the bullet(s) whose id actually appears in `detail`
- * (built by `formatVerifyFailure` as `- <id>: ...` lines) get rendered. */
-const VERIFY_FAILURE_BULLETS: Record<string, string> = {
+/** P5 audit fix-round (blocker, skinnerB): `VERIFY_FAILURE_BULLETS` is now typed
+ * `Record<VerifyPointId, string>` (was `Record<string, string>` keyed by only 3 of
+ * `verify.ts`'s 5 real point ids) so the compiler — not a reviewer — refuses to let this map
+ * fall out of sync with `VerifyPointId` again: adding/removing a point id in `verify.ts`
+ * forces a matching edit here. This closes the "zero bullets, worse than the pre-P5 generic
+ * fallback" gap for `merged`/`mergeShaAncestorOfMaster`, which `checkMerged`/`checkAncestor`
+ * (verify.ts) produce for real and which the original P5 implementation had no bullet for at
+ * all. `worktreeAndBranchGone` is handled separately in `escalationOptionsSection` (its
+ * instruction depends on whether `merged` ALSO failed — see that function's comment) so it is
+ * NOT a static string here. */
+const VERIFY_FAILURE_BULLETS: Record<Exclude<VerifyPointId, 'worktreeAndBranchGone'>, string> = {
+  merged:
+    '- merged: the PR is not merged yet. Merge it (or find out what is blocking review/CI) ' +
+    'and re-run.',
+  mergeShaAncestorOfMaster:
+    '- mergeShaAncestorOfMaster: the merge commit is not (yet) an ancestor of the base ' +
+    "branch. Wait for it to propagate, or check whether the base branch moved/was rewritten, " +
+    'then re-run.',
+  checksGreen: '- checksGreen: master/CI is genuinely red — fix master first (own PR), then re-run.',
   schemaGuard:
     '- schemaGuard: the plan file lacks `allowsSchemaChange: true` front-matter, or the ' +
     "card's baseSha is stale. Designed change → land a PR adding the front-matter to the " +
     'plan. Stale base → correct `baseSha` in the campaign state (see P11).',
-  checksGreen: '- checksGreen: master/CI is genuinely red — fix master first (own PR), then re-run.',
-  worktreeAndBranchGone: '- worktreeAndBranchGone: delete the leftover remote branch / worktree by hand.',
 };
 
-function escalationOptionsSection(reason: string, detail: string, resolved: ResolvedConfig): string[] {
+/** P5 audit fix-round (blocker, skinnerB): `worktreeAndBranchGone`'s bullet used to fire from
+ * an unqualified substring match on `detail`, so it printed unconditional "delete it by hand"
+ * instructions even when `merged` itself had failed (the branch/worktree are naturally still
+ * present because the PR simply hasn't merged yet — deleting them would discard open,
+ * un-merged work) and even when `merged` passed but `residue.ts`'s `decideResidueHeal` had
+ * already refused to auto-heal because the worktree was dirty or its tip wasn't an ancestor
+ * of base (deleting by hand risks the same data loss the auto-heal path was built to avoid).
+ * Mirrors `decideResidueHeal`'s own `mergedPassed` gate (residue.ts:46) instead of duplicating
+ * a third independent copy of "is this safe" logic. */
+function worktreeAndBranchGoneBullet(mergedFailed: boolean): string {
+  if (mergedFailed) {
+    return (
+      '- worktreeAndBranchGone: expected while the PR above is unmerged — a leftover ' +
+      'worktree/branch on an unmerged PR is not residue. Merge the PR first (see the `merged` ' +
+      'bullet); do not delete anything yet.'
+    );
+  }
+  return (
+    '- worktreeAndBranchGone: the runner only auto-deletes this when the worktree is clean ' +
+    'and its tip is merged into the base branch (see `residue.ts`). Check for uncommitted or ' +
+    'unmerged work FIRST, then delete the leftover remote branch / worktree by hand.'
+  );
+}
+
+/** P5 audit fix-round (should-fix, scout): reads the typed `VerifyResult.failedPoints` the
+ * caller already computed (verify.ts:53-56, documented as existing precisely "to feed the
+ * escalation file directly") instead of re-deriving which points failed by substring-matching
+ * the flattened `detail` string — the fragility that let the two blocker findings above ship
+ * with no type-level guard against it. `failedPoints` is `[]` for every reason other than
+ * `verify_failed_twice` (nothing to render from it). */
+function escalationOptionsSection(
+  reason: string,
+  resolved: ResolvedConfig,
+  failedPoints: VerifyPointId[],
+): string[] {
   if (reason === 'verify_failed_twice') {
-    const bullets = Object.entries(VERIFY_FAILURE_BULLETS)
-      .filter(([id]) => detail.includes(id))
-      .map(([, bullet]) => bullet);
+    const mergedFailed = failedPoints.includes('merged');
+    const bullets = failedPoints.map((id) =>
+      id === 'worktreeAndBranchGone' ? worktreeAndBranchGoneBullet(mergedFailed) : VERIFY_FAILURE_BULLETS[id],
+    );
     return [
       '## How to unblock (a ruling alone CANNOT clear this)',
       'This is a mechanical verify failure: the runner re-checks the WORLD, not answers.md.',
@@ -277,6 +321,7 @@ export function buildEscalationMarkdown(
   reason: string,
   detail: string,
   resolved: ResolvedConfig,
+  failedPoints: VerifyPointId[] = [],
 ): string {
   return [
     `# Escalation: ${cardId}`,
@@ -286,15 +331,20 @@ export function buildEscalationMarkdown(
     '## Context',
     detail,
     '',
-    ...escalationOptionsSection(reason, detail, resolved),
+    ...escalationOptionsSection(reason, resolved, failedPoints),
     '',
   ].join('\n');
 }
 
-export async function escalateCard(ctx: CardCtx, reason: string, detail: string): Promise<CardOutcome> {
+export async function escalateCard(
+  ctx: CardCtx,
+  reason: string,
+  detail: string,
+  failedPoints: VerifyPointId[] = [],
+): Promise<CardOutcome> {
   const { cardId, state, resolved, io } = ctx;
   const escalationPath = escalationPathOf(resolved.homeDir, cardId);
-  const markdown = buildEscalationMarkdown(cardId, reason, detail, resolved);
+  const markdown = buildEscalationMarkdown(cardId, reason, detail, resolved, failedPoints);
   // D5: the local escalation file + exit code stand alone — write it FIRST, unconditionally.
   io.writeFile(escalationPath, markdown);
 
@@ -551,7 +601,7 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     if (result.shipped) {
       return shipCard(ctx, result);
     }
-    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result));
+    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result), result.failedPoints);
   }
 
   if (phase.kind === 'revert_and_redo') {
@@ -575,7 +625,7 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     if (result.shipped) {
       return shipCard(ctx, result);
     }
-    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result));
+    return escalateCard(ctx, 'verify_failed_twice', formatVerifyFailure(result), result.failedPoints);
   }
 
   if (sessionResult.outcome === 'needs_direction') {
