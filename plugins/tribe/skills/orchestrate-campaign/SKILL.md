@@ -76,12 +76,23 @@ value belongs in the campaign's own docs, not here.
    markdown file. Only you (or the owner) ever append rulings to this file, in every stage below —
    the runner never writes to it (wall W3: judgment stays in sessions, never migrates into the
    runner).
-5. **Land specs/plans ONLY** — into the host repo's **existing, discovered** convention (e.g.
+5. **Cross-check inherited obligations before landing.** Batch-authored specs are written blind
+   to each other — a spec finished today can hand an obligation to a card whose own spec is
+   authored the same day, and the receiving spec never sees it. Run
+   `plugins/tribe/scripts/check-spec-handoffs.sh <wave's spec dir> <dir of already-shipped
+   specs>` over the wave's own spec dir and the repo's existing (already-shipped) specs dir; for
+   every candidate hit, confirm the receiving spec acknowledges it and produce/refresh a
+   `handoffs.md` ledger (one row per hit, or a listed non-obligation with a reason) committed
+   next to the wave's specs — see
+   `docs/tribe/fixlists/2026-08-08-outstanding-17/P8-inherited-obligations-check.md` for the
+   ledger format. A wave with unacknowledged handoffs does not launch.
+6. **Land specs/plans ONLY** — into the host repo's **existing, discovered** convention (e.g.
    `docs/specs/` + `docs/plans/` where present, or `.c3/adr/`) — as a normal PR to
    `<target-repo>`'s master via `gh pr merge --merge`. Cards are now `staged`. Never invent a
    `docs/tribe/planning/`-style namespace of your own: look for what this repo already uses for
    specs/plans and use that. Campaign state and `answers.md` are never committed — they live only
-   under `--home`, per step 3/4 above.
+   under `--home`, per step 3/4 above. `handoffs.md` DOES land in the repo, alongside the specs
+   it covers.
 
 #### The campaign state file (`campaign-state.json`, under `--home`)
 

@@ -1,6 +1,6 @@
 # P12 — concurrency: the docs tell the truth, the skill authors the chain
 
-- **Status:** RATIFIED 2026-08-12 (delegated) — options (a)+(c); no runner change.
+- **Status:** SHIPPED — PR #87, merge `d57feeb` (2026-08-13) — options (a)+(c); no runner change.
 - **Incident:** log lines 93–103. The skill doc claims "an undeclared dependency behaves
   as pure sequential order (today's default)"
   (`plugins/tribe/skills/orchestrate-campaign/SKILL.md:127`) — empirically FALSE: the
