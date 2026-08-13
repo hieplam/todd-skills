@@ -534,6 +534,24 @@ them — it still independently runs any check the pre-gate did not cover (`tsc`
 and any suite outside the pre-gate's range) and may still re-run a specific suite to falsify a
 hypothesis.
 
+**Step 6.0b — dispatch the Tracker on the same range, every audit round.** Alongside the
+pre-gate, dispatch one **Tracker** (`subagent_type: tracker`) against the range under audit. The
+Tracker reads every written rule source fresh, reviews the diff against it, and returns an
+advisory verdict (BLOCK / APPROVE-WITH-COMMENTS / APPROVE) plus — whenever the rule set is
+silent on a diff-anchored, risk-scoped pattern — a `### Harness gaps` section of HG-candidates.
+Its report comes to **you**, and it enters neither Skinner brief: the cold lens stays cold, and
+another reviewer's prose is never contract-class evidence (D9). You use it in exactly two ways:
+
+- **A `BLOCK` verdict is a red gate, same class as a red pre-gate.** Rule violations with
+  concrete fixes are the Hunter's unfinished work, not an audit round: route the Tracker's
+  findings back to a fixer Hunter and re-run both gates; this consumes no fix round, and no
+  Skinner is dispatched against a branch still violating written rules.
+- **The final whole-branch audit's Tracker report is step 7's input.** Carry it forward
+  verbatim — its `### Harness gaps` section in particular, even under an APPROVE verdict — as
+  the Tracker report step 7's reconciliation consumes. Dropping it between here and step 7
+  starves the gap-ratchet loop: candidates that reach no registry are captured without action,
+  exactly the failure this step exists to prevent.
+
 **Law 1 — two lenses, two briefs, one message.** Every discovery round dispatches **two `skinner`
 instances as two tool uses in the same message** (that is what makes them concurrent), both
 `model: sonnet`, both **against the diff**. That much is the cell. What differs is **what each one
@@ -1133,10 +1151,10 @@ suspicious one — do not go hunting for something to change in order to feel li
 - **Capture before/after evidence** through the repo's real harness (e.g. its e2e/browser
   harness): BEFORE from a base-branch build, AFTER from the branch build. Host it per the repo's
   rules and verify the links resolve.
-- **Reconcile harness gaps, whenever the Tracker report under audit carries any.** This is a
-  standing capability you carry into every card — nothing about it is specific to any one
-  campaign. When the Tracker report you audited (the diff under review, or whichever review fed
-  the pre-gate/Hunter dispatch) contains a `### Harness gaps` section with one or more
+- **Reconcile harness gaps whenever the Tracker report carries any.** This is a standing
+  capability you carry into every card — nothing about it is specific to any one campaign.
+  Step 6.0b guarantees a Tracker report exists for every audited range; when the final
+  whole-branch audit's report contains a `### Harness gaps` section with one or more
   `HG-candidate` entries:
   1. **Extract, don't re-author.** Turn each candidate into the structured JSON
      `gap-reconcile.ts` expects — `[{category, paths, fingerprint, hits, description}, ...]` —
@@ -1173,23 +1191,25 @@ suspicious one — do not go hunting for something to change in order to feel li
      Shaman for ratification in **one escalation** (never one round-trip per gap), then hand the
      ratified verdicts straight back to Scout for execution. In an attended session the owner
      rules through the Shaman and Scout executes the same way once ratified.
-  5. **Run the burn-down gate — `debt-count.ts --diff <merge-base>`, resolved from the plugin
-     root exactly like `gap-reconcile.ts` above** (same resolution pattern, swapping in
-     `scripts/gaps/debt-count.ts`). Its exit code is a gate, not a report: **non-zero exit means
-     the gate failed — do not open the PR.** Instead route the diff output's `new_hits` back to a
-     Hunter to remove, then re-run the gate before trying again. A negative delta (debt shrank)
-     becomes exactly **one burn-note line** in the PR body; a zero delta adds nothing to the PR
-     body at all.
-  6. **Run `debt-backfill.ts`** (default ref `master`) and list any issues it created in the PR
-     body, exactly as the script reported them — no editorializing.
-  7. **Close what the snapshot says is closable.** For every entry a `debt-count.ts` snapshot
-     flags `closable`, run `c3 set <id> status closed` yourself, on the branch.
 
   **You never mint or match a `G-NNN` id by your own judgment — identity is the script's job
   alone, every time, mechanically.** And, verbatim: **you never edit
   `.tribe/harness-gaps.jsonl` or any `.c3/documents/debt/` file directly; `gap-rule.ts` and
   `debt-backfill.ts` are the only writers, and you never run `gap-rule.ts` yourself —
   adjudication execution belongs to Scout.**
+- **Run the burn-down gate on every PR — `debt-count.ts --diff <merge-base>`, resolved from the
+  plugin root exactly like `gap-reconcile.ts` above** (same resolution pattern, swapping in
+  `scripts/gaps/debt-count.ts`). Unconditional: it meters the open debt blacklist against this
+  diff, so it runs whether or not any HG-candidate was reconciled above. Its exit code is a
+  gate, not a report: **non-zero exit means the gate failed — do not open the PR.** Instead
+  route the diff output's `new_hits` back to a Hunter to remove, then re-run the gate before
+  trying again. A negative delta (debt shrank) becomes exactly **one burn-note line** in the PR
+  body; a zero delta adds nothing to the PR body at all.
+- **Run `debt-backfill.ts` on every PR** (default ref `master`), resolved the same way, and
+  list any issues it created in the PR body, exactly as the script reported them — no
+  editorializing.
+- **Close what the snapshot says is closable.** For every entry a `debt-count.ts` snapshot
+  flags `closable`, run `c3 set <id> status closed` yourself, on the branch.
 - **Open a PR** with a contextful body: why, what changed (scope fence honored), the before/after
   evidence embedded, the gate results with numbers, the review outcome, and the `## Harness gaps`
   section above when the Tracker report carried any candidates.
