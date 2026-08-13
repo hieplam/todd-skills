@@ -319,15 +319,27 @@ On every exit notification where the report shows `pending` cards:
      `escalation_pending` (the B14 trap, P6 fix-list) — archiving it the moment you rule is what
      lets the re-trigger below skip `--include-escalated` for this card. Note the card as
      answered.
-
-     A ruling reaches executors at SPAWN time only — a session already running keeps its
-     snapshot. If a new rule must apply to an in-flight card, either let it land on the card's
-     next resume/re-spawn (the normal case), or stop and re-trigger the card when the rule is
-     load-bearing for its correctness.
    - **Owner-only** (anything on the state file's own `ownerOnlyEscalations` list — data shapes,
      product promises, new permissions, privacy) **or genuinely too hard to call** — leave it
      parked (escalation file untouched, unanswered). Never rule on an owner-only trigger
      yourself, no matter how confident you are.
+
+   `answers.md` is read once, at the START of a runner invocation (`resolveRunContext`,
+   `core/loop/run-loop.ts`) — that single read serves every card the invocation touches, so a
+   card spawned fresh later in the SAME `--cards` batch still sees whatever `answers.md` held
+   when the batch started, not a ruling added mid-batch. And within one card's own session, a
+   ruling reaches the executor ONLY on a freshly-rendered brief (a blind spawn, a digest-
+   carrying spawn, or the fresh-session fallback after a failed resume) — never on a successful
+   `resume`, which sends nothing but a short continuation prompt with no Answers section at all
+   (`core/loop/card-actions.ts`'s `runCardSession`). The card you just ruled on above needs none
+   of this: its prior session already ended (that is what produced the escalation), so step 2's
+   re-trigger below spawns it fresh against today's `answers.md` unconditionally. This matters
+   only for a DIFFERENT card still mid-flight in the same batch, or for the owner editing
+   `answers.md` directly while a multi-card run is active: either let the rule land on that
+   card's own next fresh spawn (the normal case — e.g. a phrasing clarification that is fine to
+   arrive next cycle), or stop the run and re-trigger once the rule is load-bearing for
+   correctness — e.g. a scope or data-shape ruling an in-flight card would otherwise ship
+   without, the same class of stakes as the B14 trap cited above.
 2. **If you answered at least one card**, re-trigger the runner scoped to exactly the cards that
    can now progress — the ones you just answered plus every `not_reached` card from the report
    (so the rest of the sequence keeps moving, not just the answered card). Every card you just

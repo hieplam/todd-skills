@@ -126,9 +126,10 @@ ${FIXTURE_REPORT_PATH}
 Before raising any question, check whether it is already answered here. If it is, follow
 the ruling; do not ask again.
 
-These rulings are a snapshot taken when this session started. If your session is
-resumed or re-spawned, re-read this section — it may carry rulings newer than your
-earlier context.
+These rulings are a snapshot taken when this session started. A resume never re-sends
+this section — you keep this exact snapshot for the life of this session, resumed or
+not. Only a brand-new session, never this one, can ever see a ruling added after you
+started.
 
 ${FIXTURE_ANSWERS}
 
