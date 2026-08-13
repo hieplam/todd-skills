@@ -1,6 +1,6 @@
 # P1 — wait-aware liveness: stop losing sessions that end their turn to wait
 
-- **Status:** RATIFIED 2026-08-12 (delegated).
+- **Status:** SHIPPED — PR #82, merge `5768e9a` (2026-08-13).
 - **Incident:** ×4 (B9, A1, B10, B14 — log lines 135–144, 156–161, 319, 331). An executor
   opens its PR, arms a Monitor (async-notification tool) or waits for a background task,
   then ends its turn — the SDK returns a result with no `SHIPPED`/`NEEDS_DIRECTION` line,

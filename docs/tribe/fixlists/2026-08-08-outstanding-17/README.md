@@ -40,7 +40,7 @@ that loop; they do not replace it.
 
 | #   | Problem (short)                                        | Observed cost (08-08)                | Status                                       |
 | --- | ------------------------------------------------------ | ------------------------------------ | -------------------------------------------- |
-| P1  | Executor waits look dead to the runner                 | ×4 incidents, ~5 min round-trip each | **RATIFIED** → [spec](P1-wait-aware-liveness.md) |
+| P1  | Executor waits look dead to the runner                 | ×4 incidents, ~5 min round-trip each | **SHIPPED** — PR #82, `5768e9a` → [spec](P1-wait-aware-liveness.md) |
 | P2  | Merge gate verified only AFTER merge                   | 1 written-rule breach, 42 min red master | **SHIPPED** — PR #79, `f11c83d` → [spec](P2-pre-merge-check-gate.md) |
 | P3  | Definition of Done (post-merge cleanup) not in brief   | First escalation of the campaign (B6) | **SHIPPED** — PR #80, `e226209` → [spec](P3-definition-of-done-brief.md) |
 | P4  | Runner escalates instead of self-healing safe residue  | Same B6 escalation                   | **SHIPPED** — PR #81, `1865704` → [spec](P4-self-heal-safe-residue.md) |
@@ -253,9 +253,9 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
   [IMPLEMENTATION.md](IMPLEMENTATION.md) (serial dynamic loop, Tribe-style cell per item:
   hunter → two-lens skinners + scout → bounded fix rounds → merged PR). **P10 SHIPPED**
   (PR #78, merge `177ca3a`). **P2 SHIPPED** (PR #79, merge `f11c83d`). **P3 SHIPPED**
-  (PR #80, merge `e226209`). **P4 SHIPPED** (PR #81, merge `1865704`). Now implementing:
-  **P1** (branch `fixlist/p1-wait-aware-liveness`). Remaining order: P1 → P6 → P5 → P11 →
-  P9 → P12 → P8 → P7.
+  (PR #80, merge `e226209`). **P4 SHIPPED** (PR #81, merge `1865704`). **P1 SHIPPED**
+  (PR #82, merge `5768e9a`). Now implementing: **P6** (branch
+  `fixlist/p6-escalation-lifecycle`). Remaining order: P6 → P5 → P11 → P9 → P12 → P8 → P7.
 - Owner's rewind protocol is active (see memory `tribe-fixlist-rewind-protocol`): each
   round = read this README → brainstorm one P → ratify → persist spec + flip table →
   owner rewinds the conversation.
