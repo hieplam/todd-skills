@@ -268,7 +268,13 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
 
     const resolved = await resolveRunContext(config, io);
 
-    const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
+    // P11 fix-list: surfaces `loadState`'s R3-invariant normalization warnings at the edge —
+    // state.ts stays pure (it only computes the warning strings; it never imports `console`
+    // itself), this is the one place a real run actually prints them.
+    const state = await loadState(
+      () => io.readFile(campaignStatePathOf(config.homeDir)),
+      (warning) => console.error(`[tribe-runner] ${warning}`),
+    );
     const result = await runPass(state, resolved, io);
     // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
     // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable

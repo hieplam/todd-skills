@@ -196,14 +196,52 @@ export function parseState(raw: unknown): CampaignState {
   return state;
 }
 
+/** P11 fix-list (ruling R3: a stale base is worse than no base): `status: 'staged'` +
+ * `sessionId: null` + `baseSha` set is an impossible combo by invariant — `staged` with no
+ * `sessionId` means no world has ever existed for this card, so any `baseSha` it's still
+ * carrying can only be stale or hand-authored (the B13 incident's exact shape: a card
+ * hand-reset to `staged` that kept its old campaign-start `baseSha`, which then diffed
+ * schemaGuard from before a designed change and tripped a false positive on a PR that never
+ * touched the locked path). Normalizes `baseSha` to `null` for every card matching the combo
+ * and returns one warning string per affected card — never hard-fails, since the fix is
+ * deterministic and safe (see `card-actions.ts`'s `recordBaseSha` for the write-time half of
+ * this fix, which re-stamps a blind-fresh spawn's base). Mutates `cards` in place, the same
+ * style `reconcileBlockedStatuses` already uses; pure otherwise (no I/O) — printing the
+ * warnings happens at the edge (`loadState`'s caller), never here. */
+function normalizeStaleBaseShas(cards: CampaignState['cards']): string[] {
+  const warnings: string[] = [];
+  for (const [cardId, card] of Object.entries(cards)) {
+    if (card.status === 'staged' && card.sessionId == null && card.baseSha != null) {
+      card.baseSha = null;
+      warnings.push(`${cardId}: cleared stale baseSha on staged card (R3 invariant)`);
+    }
+  }
+  return warnings;
+}
+
 /** Loads and validates campaign state through an injected `readFile` seam — this module
- * never touches `fs` itself. `readFile` returns the raw file contents (sync or async). */
+ * never touches `fs` itself. `readFile` returns the raw file contents (sync or async).
+ *
+ * P11 fix-list: after parsing, normalizes the R3 invariant (see `normalizeStaleBaseShas`)
+ * and reports any warnings through the optional `onWarning` out-param — added rather than
+ * changing the return shape, since `loadState`'s callers (and `CampaignState`'s own
+ * byte-identical round-trip contract via `serializeState`) both depend on it resolving to
+ * `CampaignState` directly. `onWarning` stays optional and unused-by-default so every
+ * existing call site is unaffected; callers that want the warnings surfaced (`run-loop.ts`,
+ * `cli/main.ts`) pass one that prints at their own edge — this module still never imports
+ * `console` itself. */
 export async function loadState(
   readFile: () => string | Promise<string>,
+  onWarning?: (warning: string) => void,
 ): Promise<CampaignState> {
   const text = await readFile();
   const raw = JSON.parse(text);
-  return parseState(raw);
+  const state = parseState(raw);
+  const warnings = normalizeStaleBaseShas(state.cards);
+  if (onWarning) {
+    for (const warning of warnings) onWarning(warning);
+  }
+  return state;
 }
 
 /** Serializes state back to the exact JSON shape `loadState` reads, including any unknown

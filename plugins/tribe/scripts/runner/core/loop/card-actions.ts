@@ -533,13 +533,24 @@ export async function runCardSession(ctx: CardCtx, phase: CardPhase): Promise<Se
 
 /** Records the commit the card's work is being cut from, BEFORE its session spawns — the
  * schemaGuard check diffs `baseSha..<remote>/<baseBranch>`, so a card that never recorded one
- * can never be verified. Crash-safe (persisted immediately) and idempotent: a resumed card
- * keeps the base it originally started from rather than silently re-basing onto a moved
- * master. */
-export async function recordBaseSha(ctx: CardCtx): Promise<void> {
+ * can never be verified. Crash-safe (persisted immediately).
+ *
+ * P11 fix-list (ruling R3: a stale base is worse than no base): idempotent for every
+ * resume-class phase (`resume`, and `fresh` carrying an F8 digest) — those genuinely started
+ * from the base they already recorded, so it is kept unchanged, exactly as before. A BLIND
+ * fresh (`phase.kind === 'fresh'` with no digest — no session, no PR, no worktree trace at
+ * all: no prior world exists for this card) is the one case that now RE-STAMPS any
+ * pre-existing `baseSha`: by construction such a card can only be carrying a stale or
+ * hand-authored base (the B13 incident's exact shape — a card hand-reset to `staged` that
+ * kept its old campaign-start `baseSha`, which then diffed schemaGuard from before a designed
+ * change and tripped a false positive). See also `state.ts`'s `loadState`, which normalizes
+ * the same invariant from the other direction (a hand-edited `staged`+`sessionId: null` card
+ * caught at load time, before it ever reaches this function). */
+export async function recordBaseSha(ctx: CardCtx, phase: CardPhase): Promise<void> {
   const { cardId, state, resolved, io } = ctx;
   const card = state.cards[cardId];
-  if (card.baseSha) return;
+  const blindFresh = phase.kind === 'fresh' && !phase.digest;
+  if (card.baseSha && !blindFresh) return;
 
   const result = await io.exec(['git', 'rev-parse', `${resolved.remote}/${resolved.baseBranch}`], {
     cwd: resolved.repoRoot,
@@ -608,7 +619,7 @@ export async function actOnCard(ctx: CardCtx, phase: CardPhase): Promise<CardOut
     await performRevertAndRedo(ctx);
   }
 
-  await recordBaseSha(ctx);
+  await recordBaseSha(ctx, phase);
   const sessionResult = await runCardSession(ctx, phase);
 
   if (sessionResult.outcome === 'shipped') {

@@ -32,7 +32,13 @@ import type { VerifyConfig, VerifyResult } from './verify.ts';
 // use to self-heal safe residue between a first failed verify and the retry — exercised
 // directly here (same `CardCtx` shape `runPass` builds) so the healed retry detail is
 // observable, which `CardOutcome`'s `shipped` variant deliberately does not carry.
-import { healSafeResidue, CONTINUE_UNKNOWN_STATE_PROMPT, shipCard, escalateCard } from './loop/card-actions.ts';
+import {
+  healSafeResidue,
+  CONTINUE_UNKNOWN_STATE_PROMPT,
+  recordBaseSha,
+  shipCard,
+  escalateCard,
+} from './loop/card-actions.ts';
 import type { CardCtx } from './loop/card-actions.ts';
 // P4 audit fix-round: proving the "report notes the heal" acceptance criterion at the ONLY
 // artifact an orchestrating session actually reads (report.ts), not just at healSafeResidue's
@@ -664,6 +670,67 @@ describe('runLoop — recordBaseSha rev-parses the resolved <remote>/<baseBranch
 
     const revParseCall = calls.find((c) => c[0] === 'git' && c[1] === 'rev-parse');
     expect(revParseCall).toEqual(['git', 'rev-parse', 'upstream/main']);
+  });
+});
+
+// P11 fix-list: `recordBaseSha` now learns the phase — a BLIND-FRESH spawn (no prior world at
+// all: no session, no PR, no digest) re-stamps any pre-existing `baseSha`, because a card with
+// no world can only be carrying a stale/hand-authored one (ruling R3: a stale base is worse
+// than no base — see the incident this fix-list item closes). Resume/fresh-with-digest phases
+// keep the existing base unchanged: the card genuinely started from it. Exercised by calling
+// `recordBaseSha` directly (same `CardCtx` shape `runPass` builds, the same pattern
+// `healSafeResidue`'s tests above already use) rather than through the full `runLoop`, so this
+// stays isolated from `state.ts`'s OWN separate load-time normalization of the impossible
+// `staged`+`sessionId: null`+`baseSha` combo (tested independently in `state.test.ts`) — a
+// fresh-with-digest card is, by definition, `sessionId: null` too, so routing it through
+// `loadState` first would strip its `baseSha` before `recordBaseSha` ever saw it, conflating
+// the two layers this fix-list item deliberately keeps separate.
+describe('recordBaseSha — learns the phase (P11, ruling R3)', () => {
+  function ctxFor(card: Card, execHandlers: Array<(cmd: string[]) => ExecResult | null> = []): {
+    ctx: CardCtx;
+    calls: string[][];
+  } {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: card } });
+    const { io, calls } = buildMockLoopIo({ stateJson: JSON.stringify(state), execHandlers });
+    const resolved: ResolvedConfig = {
+      ...baseLoopConfig(),
+      baseBranch: 'master',
+      answersContent: '',
+      briefTemplate: '',
+    };
+    return { ctx: { cardId: 'C1', state, resolved, io }, calls };
+  }
+
+  test('blind fresh (phase.kind "fresh", no digest) + a stale pre-existing baseSha -> overwritten with the current rev-parse result', async () => {
+    const card = fixtureCard({ branch: null, sessionId: null, baseSha: 'stale-hand-reset-sha' });
+    const { ctx, calls } = ctxFor(card, [
+      (cmd) => (cmd[0] === 'git' && cmd[1] === 'rev-parse' ? ok('freshbase01\n') : null),
+    ]);
+
+    await recordBaseSha(ctx, { kind: 'fresh' });
+
+    expect(ctx.state.cards.C1?.baseSha).toBe('freshbase01');
+    expect(calls).toContainEqual(['git', 'rev-parse', 'origin/master']);
+  });
+
+  test('fresh-with-digest (F8: open PR, no sessionId recorded) + an existing baseSha -> kept, not overwritten (no rev-parse call at all)', async () => {
+    const card = fixtureCard({ sessionId: null, baseSha: 'existing-base-abc' });
+    const { ctx, calls } = ctxFor(card);
+
+    await recordBaseSha(ctx, { kind: 'fresh', digest: '## Crash-recovery digest for C1\n...' });
+
+    expect(ctx.state.cards.C1?.baseSha).toBe('existing-base-abc');
+    expect(calls.find((c) => c[0] === 'git' && c[1] === 'rev-parse')).toBeUndefined();
+  });
+
+  test('resume phase (PR open, sessionId recorded) + an existing baseSha -> kept, not overwritten (no rev-parse call at all)', async () => {
+    const card = fixtureCard({ sessionId: 'sess-old', baseSha: 'existing-base-xyz' });
+    const { ctx, calls } = ctxFor(card);
+
+    await recordBaseSha(ctx, { kind: 'resume', sessionId: 'sess-old', reason: 'pr_open', pr: 7 });
+
+    expect(ctx.state.cards.C1?.baseSha).toBe('existing-base-xyz');
+    expect(calls.find((c) => c[0] === 'git' && c[1] === 'rev-parse')).toBeUndefined();
   });
 });
 
