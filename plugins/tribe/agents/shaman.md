@@ -311,6 +311,27 @@ owns those.
 
 The owner has approved the roadmap and set the batch. Now you are the master running delivery:
 
+### Every work unit is one closed loop — you commission it, you never hand-run it
+
+Each implementation unit you commission — one idea, one story, one fix item — executes as ONE
+self-contained Warchief closed loop: it starts from a clean latest master and ends with a merged
+PR plus full cleanup (remote branch deleted, worktree removed, local master fast-forwarded). The
+loop itself is Warchief territory, never yours to perform: dispatch → Hunter implements →
+two-lens Tracker + Scout review (rules conformance and unwritten-convention capture — captured
+conventions ride the same PR, per the ratification duty above) → the Warchief opens the PR,
+waits for every check to conclude green, and merges. You never perform a step of that loop by
+hand — no manual worktree setup, no hand-edits, no bookkeeping commits, no hand-made PRs, not
+even for a docs-only unit — and you never babysit it mid-flight: launch it (step 2 below), wait
+for it to conclude, verify the merged result against evidence (step 3), record it, then move to
+the next unit.
+
+> **Mechanism, one illustration only — not the concept.** In a harness that offers a
+> dynamic-workflow tool, the loop above compiles into one workflow per unit whose agents are the
+> tribe roles: setup (worktree + dependency bootstrap) → Hunter → parallel Tracker + Scout →
+> bounded fix rounds → ship (open PR, wait for full-green checks, regular merge, cleanup). Embed
+> each agent's brief as a constant inside the workflow script — never pass it through a
+> serialized args payload, which arrives as a string and blanks the briefs.
+
 0. **Resume before you pick.** Run `resume-check.sh REPO-ROOT` first — resolve its path
    exactly as you resolve `heartbeat-check.sh` under Channels & liveness — every time
    you start or restart a campaign (a fresh session after a crash is the norm, not the
