@@ -234,6 +234,44 @@ export function formatVerifyFailure(result: VerifyResult): string {
     .join('\n');
 }
 
+/** P5 fix-list: `verify_failed_twice`'s known verify-point ids, each paired with the
+ * world-fix instruction to render — a ruling alone can never clear a mechanical verify
+ * failure, so the "Options" section must never lead with the ruling path for this reason
+ * (incident: a `schemaGuard` escalation was "answered" with an answers.md ruling that the
+ * guard, which only reads the plan file's front-matter, could never observe). Keyed by the
+ * `VerifyResult` point id so only the bullet(s) whose id actually appears in `detail`
+ * (built by `formatVerifyFailure` as `- <id>: ...` lines) get rendered. */
+const VERIFY_FAILURE_BULLETS: Record<string, string> = {
+  schemaGuard:
+    '- schemaGuard: the plan file lacks `allowsSchemaChange: true` front-matter, or the ' +
+    "card's baseSha is stale. Designed change → land a PR adding the front-matter to the " +
+    'plan. Stale base → correct `baseSha` in the campaign state (see P11).',
+  checksGreen: '- checksGreen: master/CI is genuinely red — fix master first (own PR), then re-run.',
+  worktreeAndBranchGone: '- worktreeAndBranchGone: delete the leftover remote branch / worktree by hand.',
+};
+
+function escalationOptionsSection(reason: string, detail: string, resolved: ResolvedConfig): string[] {
+  if (reason === 'verify_failed_twice') {
+    const bullets = Object.entries(VERIFY_FAILURE_BULLETS)
+      .filter(([id]) => detail.includes(id))
+      .map(([, bullet]) => bullet);
+    return [
+      '## How to unblock (a ruling alone CANNOT clear this)',
+      'This is a mechanical verify failure: the runner re-checks the WORLD, not answers.md.',
+      'Fix the failing condition, then re-run with `--include-escalated`:',
+      ...bullets,
+    ];
+  }
+  // needs_direction / planning_needed (and any other answerable reason): a human judgment is
+  // the unblock, so the ruling path leads.
+  return [
+    '## Options',
+    `- Append a ruling to \`${answersPathOf(resolved.homeDir)}\` and re-run with \`--include-escalated\`.`,
+    "- If the question is owner-only (see the campaign's ownerOnlyEscalations), park it for " +
+      'the owner instead.',
+  ];
+}
+
 export function buildEscalationMarkdown(
   cardId: string,
   reason: string,
@@ -248,9 +286,7 @@ export function buildEscalationMarkdown(
     '## Context',
     detail,
     '',
-    '## Options',
-    `- Append a ruling to \`${answersPathOf(resolved.homeDir)}\` and re-run with \`--include-escalated\`.`,
-    '- Fix the underlying issue (plan, code, CI) directly and re-run.',
+    ...escalationOptionsSection(reason, detail, resolved),
     '',
   ].join('\n');
 }
