@@ -1,6 +1,6 @@
 # P9 — schema-lock opt-outs validated at authoring/preflight, not discovered at verify
 
-- **Status:** RATIFIED 2026-08-12 (delegated).
+- **Status:** SHIPPED — PR #86, merge `0ecd207` (2026-08-13).
 - **Incident:** log lines 165–189. Five plans scheduled explicit `Modify:
   packages/app/src/ports.ts` tasks but were authored before the schemaGuard existed, so
   none carried `allowsSchemaChange: true` front-matter. A1 tripped the guard post-merge;
