@@ -133,6 +133,15 @@ describe('parseArgs — defaults (spec §2 protocol defaults, never campaign val
     expect(result.config.cardsFilter).toBeUndefined();
     expect(result.config.maxCards).toBeUndefined();
   });
+
+  // P12 follow-up: unlike --max-cards ("no limit" has no integer), --max-concurrent's natural
+  // default IS a concrete integer (1 == today's one-card-at-a-time behavior) — so, unlike
+  // maxCards, it is never left `undefined`.
+  test('--max-concurrent defaults to 1 (today\'s one-card-at-a-time behavior)', () => {
+    const result = parseArgs(validArgv(), RUN_ID);
+    if ('error' in result) throw new Error(result.error);
+    expect(result.config.maxConcurrent).toBe(1);
+  });
 });
 
 describe('parseArgs — explicit overrides', () => {
@@ -183,6 +192,28 @@ describe('parseArgs — explicit overrides', () => {
     const result = parseArgs([...validArgv(), '--max-cards', 'not-a-number'], RUN_ID);
     expect('error' in result).toBe(true);
   });
+
+  test('--max-concurrent parses to an integer', () => {
+    const result = parseArgs([...validArgv(), '--max-concurrent', '4'], RUN_ID);
+    if ('error' in result) throw new Error(result.error);
+    expect(result.config.maxConcurrent).toBe(4);
+  });
+
+  test('--max-concurrent 1 is accepted (the explicit form of the default)', () => {
+    const result = parseArgs([...validArgv(), '--max-concurrent', '1'], RUN_ID);
+    if ('error' in result) throw new Error(result.error);
+    expect(result.config.maxConcurrent).toBe(1);
+  });
+
+  for (const invalid of ['0', '-1', '1.5', 'not-a-number']) {
+    test(`--max-concurrent "${invalid}" -> error naming the flag`, () => {
+      const result = parseArgs([...validArgv(), '--max-concurrent', invalid], RUN_ID);
+      expect('error' in result).toBe(true);
+      if ('error' in result) {
+        expect(result.error).toContain('--max-concurrent');
+      }
+    });
+  }
 });
 
 describe('parseArgs — stateless-capability wall', () => {

@@ -2213,6 +2213,259 @@ describe('runLoop — D5′ Warchief audit fix: --max-cards budgets only cards a
   });
 });
 
+// ===========================================================================================
+// P12 follow-up — `--max-concurrent N`: bounded card parallelism
+// ===========================================================================================
+
+/** Polls a synchronous condition by yielding to the microtask queue — used to observe
+ * in-flight pool state (e.g. "both sessions have started") without a real timer. Bounded so a
+ * genuine bug (the condition never becomes true) fails the test instead of hanging it. */
+async function waitForCondition(check: () => boolean, maxTicks = 500): Promise<void> {
+  for (let i = 0; i < maxTicks; i++) {
+    if (check()) return;
+    await Promise.resolve();
+  }
+  throw new Error('condition not met within the microtask budget');
+}
+
+describe('runLoop — --max-concurrent N (P12 follow-up: bounded card parallelism)', () => {
+  test('N=1 (explicit) is byte-identical to the pre-existing default (omitted) serial pass', async () => {
+    const { io: ioDefault } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+    const withoutFlag = await runLoop(baseLoopConfig({ maxCards: 2 }), ioDefault);
+
+    const { io: ioExplicit } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+    const withFlag = await runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 1 }), ioExplicit);
+
+    expect(withFlag.exitCode).toBe(withoutFlag.exitCode);
+    expect(withFlag.processed).toEqual(withoutFlag.processed);
+    expect(withFlag.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(withFlag.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C2' });
+  });
+
+  test('N=2: two independent cards genuinely overlap in flight — both spawnSession calls fire before either session resolves', async () => {
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const spawnedFor: string[] = [];
+
+    function gatedShippedSession(label: string, pr: number, sha: string, sessionId: string) {
+      return async function* (): AsyncGenerator<SessionMessage> {
+        spawnedFor.push(label);
+        yield { type: 'system', subtype: 'init', session_id: sessionId };
+        // Held open until the test has already proven BOTH sessions started — if the pool
+        // were secretly serial, C2's generator would never even be entered while C1 is
+        // parked here, since C1's `runSession` call wouldn't have returned yet.
+        await gate;
+        yield { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId };
+      };
+    }
+
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => gatedShippedSession('C1', 1, 'aaaaaaa', 'sess-c1')(),
+        () => gatedShippedSession('C2', 2, 'bbbbbbb', 'sess-c2')(),
+      ],
+    });
+
+    const runPromise = runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 2 }), io);
+
+    await waitForCondition(() => spawnedFor.length === 2);
+    expect([...spawnedFor].sort()).toEqual(['C1', 'C2']);
+
+    releaseGate();
+    const result = await runPromise;
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed.map((o) => o.cardId).sort()).toEqual(['C1', 'C2']);
+  });
+
+  test('dependsOn still orders correctly under N=2: the dependent card never starts before its dependency ships', async () => {
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const spawnedFor: string[] = [];
+
+    function gatedShippedSession(label: string, pr: number, sha: string, sessionId: string) {
+      return async function* (): AsyncGenerator<SessionMessage> {
+        spawnedFor.push(label);
+        yield { type: 'system', subtype: 'init', session_id: sessionId };
+        await gate;
+        yield { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId };
+      };
+    }
+
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({
+          branch: 'feat/c2-widget',
+          spec: 'docs/specs/c2.md',
+          plan: 'docs/plans/c2.md',
+          dependsOn: ['C1'],
+        }),
+      },
+    });
+
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => gatedShippedSession('C1', 1, 'aaaaaaa', 'sess-c1')(),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const runPromise = runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 2 }), io);
+
+    // Give the pool every chance it would need to (wrongly) start C2 concurrently with C1 —
+    // several dozen microtask-queue drains, all while C1 (its declared dependency) sits
+    // unshipped behind `gate`.
+    await waitForCondition(() => spawnedFor.length >= 1);
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(spawnedFor).toEqual(['C1']);
+
+    releaseGate();
+    const result = await runPromise;
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    // C2 ships too, via the plain (non-gated) spawn queued for it — `spawnedFor` only ever
+    // records the gated generator's own entries (C1), so the session COUNT is what proves C2
+    // was actually reached after C1 shipped.
+    expect(io.spawnSession).toHaveBeenCalledTimes(2);
+    expect(result.processed.map((o) => o.cardId)).toEqual(['C1', 'C2']);
+  });
+
+  test('never hands the same card to two workers: 5 available slots, 2 independent cards -> exactly 2 sessions spawned', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 5, maxConcurrent: 5 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(io.spawnSession).toHaveBeenCalledTimes(2);
+    expect(result.processed.map((o) => o.cardId).sort()).toEqual(['C1', 'C2']);
+  });
+
+  test('--max-cards budget is never overshot under concurrency: max-concurrent 3, max-cards 1, two independent cards -> only one worked', async () => {
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [() => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1, maxConcurrent: 3 }), io);
+
+    expect(result.processed).toHaveLength(1);
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
+    // C2 was never even claimed this pass — still exactly as staged as before the run.
+    expect(finalState.cards.C2.status).toBe('staged');
+  });
+
+  test('STOP file present at startup: N>1 spawns nothing, same contract as N=1', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '',
+      stopFile: true,
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 4 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed).toEqual([]);
+    expect(io.spawnSession).not.toHaveBeenCalled();
+  });
+
+  test('escalation_pending under N>1 parks without consuming a session — independent card still ships', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        // Only the escalation FILE (not `card.status`) marks C1 pending — exactly
+        // `deriveCardPhase`'s `escalation_pending` short-circuit, same fixture shape as the
+        // dedicated N=1 test above.
+        C1: fixtureCard({ branch: null }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+      execHandlers: cleanCommitAndVerifyHandlers('abc0002'),
+      spawnQueue: [() => messages(shippedMessages(2, 'abc0002', 'sess-c2'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 3 }), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toEqual(
+      expect.arrayContaining([
+        { kind: 'escalation_pending', cardId: 'C1', escalationPath: expect.stringContaining('C1.md') },
+        { kind: 'shipped', cardId: 'C2' },
+      ]),
+    );
+    // No session was ever spawned for the parked card C1 — only C2's, same as the N=1 test.
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+
+  test('planning_needed under N>1 is handled without spawning a session for that card — independent card still ships', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [() => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2'))],
+    });
+    // C1's spec/plan (fixtureCard's defaults: docs/specs/c1.md, docs/plans/c1.md) are the only
+    // ones treated as missing — C2's own (docs/specs/c2.md, docs/plans/c2.md) still resolve.
+    const realFileExists = io.fileExists;
+    io.fileExists = ((p: string) =>
+      p.includes('docs/specs/c1.md') || p.includes('docs/plans/c1.md') ? false : realFileExists(p)) as LoopIO['fileExists'];
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 3 }), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'escalated', cardId: 'C1', reason: 'planning_needed' }),
+        expect.objectContaining({ kind: 'shipped', cardId: 'C2' }),
+      ]),
+    );
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('runLoop — D5′: exit-code precedence (escalation outranks session-incomplete)', () => {
   test('one card escalates and another stops (session error); exit code is ESCALATED, not SESSION_INCOMPLETE', async () => {
     const state = fixtureState({

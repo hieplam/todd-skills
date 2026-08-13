@@ -134,21 +134,40 @@ every optional field may simply be omitted rather than written as `null`/`[]` wh
 - `sequence` is the dependency-ordered card order; every id in it (and every id named in a
   `dependsOn`) must have a matching entry under `cards`.
 - Every card you write starts `"status": "staged"`, `"autoAnswerRounds": 0`, and no `dependsOn`
-  unless that card genuinely must not start before another one ships. The runner never spawns two
-  sessions concurrently — v1 runs exactly one card's session at a time, awaiting it to full
-  completion before selecting the next (`docs/superpowers/specs/2026-07-16-campaign-runner-design.md`'s
-  non-goals; `docs/superpowers/specs/2026-07-16-campaign-orchestration-design.md` §O7: "never runs
-  two cards concurrently"). What an undeclared dependency actually risks is ORDER, not concurrency:
-  absent parking, the runner walks `sequence` top to bottom and ships cards in exactly that order —
-  but park-and-continue means a card ahead in `sequence` that escalates or gets blocked is skipped
-  rather than halting the run, so a later card with no `dependsOn` on it can ship before that
-  earlier, now-parked card does. `sequence` position alone does not guarantee card A completes
-  before card B; only `dependsOn` does. So only declare one you mean.
+  unless that card genuinely must not start before another one ships.
+
+#### The runner's concurrency model (P12 / P12 follow-up)
+
+**By default (`--max-concurrent` never passed, or passed as `1`) the runner never spawns two
+sessions concurrently — it runs exactly one card's session at a time, awaiting it to full
+completion before selecting the next**
+(`docs/superpowers/specs/2026-07-16-campaign-runner-design.md`'s non-goals;
+`docs/superpowers/specs/2026-07-16-campaign-orchestration-design.md` §O7: "never runs two cards
+concurrently" — both describe the DEFAULT, not an absolute ceiling; see below). What an undeclared
+dependency risks under the default is ORDER, not concurrency: absent parking, the runner walks
+`sequence` top to bottom and ships cards in exactly that order — but park-and-continue means a
+card ahead in `sequence` that escalates or gets blocked is skipped rather than halting the run, so
+a later card with no `dependsOn` on it can ship before that earlier, now-parked card does.
+`sequence` position alone does not guarantee card A completes before card B; only `dependsOn`
+does. So only declare one you mean.
+
+**`--max-concurrent N` (N > 1)** is an explicit opt-in that bounds how many cards' sessions may
+run at once — WIDTH only, never ORDER. `dependsOn` is still the only thing that orders cards at
+any `N`: a dependent card is never selected while its dependency is mid-flight, exactly like it's
+never selected while merely `staged` today. Passing this flag does not change how you author
+`dependsOn` — it changes how many *independent*, undeclared-dependency cards the runner is allowed
+to work on at once.
+
 - **Serial campaigns:** when the owner's directive is one-card-at-a-time (or cards merge to the
   same branch and each should build on the previous card's merged master), author the full
-  sequential chain — every card `dependsOn` its sequence predecessor. Default to the chain when in
-  doubt: relying on `sequence` position alone to guarantee ordering is the trap this note exists to
-  close, not a safe shortcut.
+  sequential chain — every card `dependsOn` its sequence predecessor — REGARDLESS of whether
+  `--max-concurrent` is passed. Default to the chain when in doubt: relying on `sequence` position
+  alone to guarantee ordering is the trap this note exists to close, not a safe shortcut, and
+  `--max-concurrent` does not close it either — it bounds width, it does not order. Only reach for
+  `--max-concurrent N` (N > 1) when the owner's directive genuinely wants bounded parallelism over
+  cards that are actually independent and don't share a base branch (the runner does not add any
+  merge-queue serialization beyond what git/GitHub already do — see the runner README's
+  "Concurrency" section for the full contract and its documented limitations).
 - `ownerOnlyEscalations` is *your* Stage-A authored list — carry over the roadmap's own
   Escalation register verbatim (irreversible data shapes, product-promise changes, new
   permissions, privacy). A trigger name on this list escalates to the owner unconditionally in
@@ -272,6 +291,7 @@ ruling UC-3).
 | `--dry-run` | no | Derive and print the next action with zero side effects. |
 | `--cards` | no | Comma-separated card ids — restrict the loop to only these. |
 | `--max-cards` | no | Stop after processing this many cards this run. |
+| `--max-concurrent` | no | Integer ≥ 1 — how many cards' sessions may run at once this pass. Default `1` (today's one-card-at-a-time behavior); bounds WIDTH only, never ORDER — `dependsOn` still owns ordering (see "The runner's concurrency model" below). Only pass this when the owner's directive genuinely wants bounded parallelism; the default is correct for every other campaign. |
 | `--include-escalated` | no | Reconsider a card whose escalation file already exists. |
 
 The three required flags have **no default** — omitting any of them is a usage error, not a value
