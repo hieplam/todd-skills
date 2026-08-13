@@ -169,5 +169,146 @@ EOF
 bash "$SCRIPT" "$F4" > "$TMP/out4.json"
 check "commit-and-push does not count" "$(find_check "$TMP/out4.json" tasks_single_commit_step)" "fail"
 
+# --- P9: --schema-lock-paths (schema-lock opt-outs validated at authoring) ---
+
+LOCK_PATH="packages/app/src/ports.ts"
+
+# fixture: task line touching the lock path, no front-matter -> fail, non-zero exit,
+# message names the plan, the matched task line, and the fix (ruling UC-3).
+F5="$TMP/lock-no-frontmatter.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.ts
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5"
+set +e
+out5="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5" 2>&1)"
+code5=$?
+set -e
+check "lock path + no front-matter: non-zero exit" "$code5" "1"
+if [[ "$out5" == *"$F5"* && "$out5" == *"Modify: packages/app/src/ports.ts"* \
+      && "$out5" == *"allowsSchemaChange: true"* && "$out5" == *"UC-3"* ]]; then
+  ok "lock path + no front-matter: message names plan, task line, and fix"
+else
+  bad "lock path + no front-matter: message names plan, task line, and fix (got: $out5)"
+fi
+
+# fixture: task line touching the lock path, WITH allowsSchemaChange: true front-matter -> pass
+F6="$TMP/lock-with-frontmatter.md"
+cat <<'EOF' > "$F6"
+---
+allowsSchemaChange: true
+---
+
+# Fixture Plan
+
+## Global Constraints
+
+- Implementer: dispatch each implementation/fix task to the hunter subagent.
+
+### Task 1: Touches the locked port surface, declared
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.ts
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports, declared"
+```
+EOF
+set +e
+out6="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F6" 2>&1)"
+code6=$?
+set -e
+check "lock path + allowsSchemaChange: true: zero exit" "$code6" "0"
+
+# fixture: only a PROSE mention of the lock path (no task line) -> pass, no front-matter needed
+F7="$TMP/lock-prose-only.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Discusses but does not touch the locked port surface
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL. Note: packages/app/src/ports.ts is the interface this task exercises,
+but this task does not modify it.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: prose mention only"
+```
+EOF
+} > "$F7"
+set +e
+out7="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F7" 2>&1)"
+code7=$?
+set -e
+check "prose-only mention: zero exit" "$code7" "0"
+
+# fixture: same task-line-touching-lock-path plan as F5, but with NO --schema-lock-paths flag
+# at all -> check is skipped entirely (legacy invocations unaffected)
+set +e
+out8="$(bash "$SCRIPT" "$F5" 2>&1)"
+code8=$?
+set -e
+check "no --schema-lock-paths flag: legacy invocation unaffected (zero exit)" "$code8" "0"
+
+# fixture: EXACT-path rule — the lock path packages/app/src/ports.ts must NOT be tripped by
+# a task line touching packages/app/src/ports.test.ts (a longer path that merely contains the
+# lock path as a substring of its name, not the same path).
+F9="$TMP/lock-exact-path.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches only the test file, not the locked port surface
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.test.ts
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports test file only"
+```
+EOF
+} > "$F9"
+set +e
+out9="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F9" 2>&1)"
+code9=$?
+set -e
+check "exact-path rule: ports.test.ts does not trip ports.ts lock (zero exit)" "$code9" "0"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 exit $((FAIL > 0))
