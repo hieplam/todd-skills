@@ -208,6 +208,122 @@ else
   bad "lock path + no front-matter: message names plan, task line, and fix (got: $out5)"
 fi
 
+# fixture: task line touching the lock path, backtick-wrapped (this repo's own
+# writing-plans convention: "- Modify: `path/to/file.ts`"), no front-matter -> fail,
+# non-zero exit. A bare-path-only pattern would miss this real-world form entirely.
+F5B="$TMP/lock-backtick.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface, backtick-wrapped
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: `packages/app/src/ports.ts`
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5B"
+set +e
+out5b="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5B" 2>&1)"
+code5b=$?
+set -e
+check "backtick-wrapped lock path + no front-matter: non-zero exit" "$code5b" "1"
+
+# fixture: task line touching the lock path, backtick-wrapped WITH a trailing
+# ":line-range" suffix inside the backticks ("- Modify: `path.ts:12-34`"), no
+# front-matter -> fail, non-zero exit.
+F5C="$TMP/lock-backtick-linerange.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface, backtick-wrapped with line range
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: `packages/app/src/ports.ts:12-34`
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5C"
+set +e
+out5c="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5C" 2>&1)"
+code5c=$?
+set -e
+check "backtick-wrapped + line-range lock path + no front-matter: non-zero exit" "$code5c" "1"
+
+# fixture: task line touching the lock path, plain (no backticks) WITH a trailing
+# parenthetical note ("- Modify: path.ts (replace the parse loop)"), no front-matter ->
+# fail, non-zero exit.
+F5D="$TMP/lock-parenthetical.md"
+{ good_plan_header; cat <<'EOF'
+### Task 1: Touches the locked port surface, with a trailing note
+
+- [ ] **Step 1: Write the failing test**
+
+```bash
+echo test
+```
+
+Expected: FAIL
+
+- Modify: packages/app/src/ports.ts (replace the parse loop)
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -m "feat: touch ports"
+```
+EOF
+} > "$F5D"
+set +e
+out5d="$(bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5D" 2>&1)"
+code5d=$?
+set -e
+check "plain lock path + trailing parenthetical + no front-matter: non-zero exit" "$code5d" "1"
+
+# fixture: the schema-lock-violation exit path (exit 1) must still print the FULL JSON
+# summary to stdout, per the script's own documented output contract ("prints a JSON
+# summary on stdout (only). Logs go to stderr.") — capture stdout and stderr SEPARATELY
+# (not merged with 2>&1) so a regression that exits before the print cannot hide behind
+# a test that only checks the combined stream.
+F5E_OUT="$TMP/f5e.stdout"
+F5E_ERR="$TMP/f5e.stderr"
+set +e
+bash "$SCRIPT" --schema-lock-paths "$LOCK_PATH" "$F5" >"$F5E_OUT" 2>"$F5E_ERR"
+code5e=$?
+set -e
+check "lock violation: non-zero exit" "$code5e" "1"
+stdout_bytes="$(wc -c < "$F5E_OUT" | tr -d ' ')"
+if [[ "$stdout_bytes" -gt 0 ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$F5E_OUT" >/dev/null 2>&1; then
+  ok "lock violation: full JSON summary still printed to stdout"
+else
+  bad "lock violation: full JSON summary still printed to stdout (stdout bytes: $stdout_bytes)"
+fi
+check "lock violation: JSON summary's schema_lock_declared check recorded as fail" \
+  "$(find_check "$F5E_OUT" schema_lock_declared)" "fail"
+if [[ -s "$F5E_ERR" ]]; then
+  ok "lock violation: error message present on stderr"
+else
+  bad "lock violation: error message present on stderr"
+fi
+
 # fixture: task line touching the lock path, WITH allowsSchemaChange: true front-matter -> pass
 F6="$TMP/lock-with-frontmatter.md"
 cat <<'EOF' > "$F6"

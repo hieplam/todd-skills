@@ -37,15 +37,21 @@
 #   - a plan "schedules a locked-path change" when a line outside a fenced code block
 #     matches ^\s*-?\s*(Modify|Create|Delete):\s*<lockPath>$ for one of the given paths
 #     exactly (a prose-only mention of the path, or a task line for a different, merely
-#     similarly-named path, does not count);
+#     similarly-named path, does not count) — the path itself may optionally be
+#     backtick-wrapped, with an optional trailing ":line-range" inside those backticks,
+#     and/or an optional trailing parenthetical note, matching this repo's own
+#     writing-plans task-line convention (e.g. "- Modify: `path/to/file.ts:12-34`
+#     (rewrite the parse loop)"), not just the bare unwrapped path;
 #   - front-matter detection mirrors the campaign runner's own reader exactly
 #     (`readAllowsSchemaChange` in `runner/core/verify.ts`): a leading `---` block
 #     containing a line `allowsSchemaChange: true` — an absent block or absent key means
 #     false;
 #   - a plan that schedules such a change without that front-matter FAILS THE WHOLE
-#     SCRIPT (exit 1, message on stderr naming the plan, the matched task line, and the
-#     fix — ruling UC-3, 08-08 campaign) instead of merely recording a failed check in the
-#     JSON summary, so this is the one check whose failure changes the exit code.
+#     SCRIPT (exit 1 AFTER the JSON summary is printed to stdout as usual, per the
+#     output contract below; the message naming the plan, the matched task line, and the
+#     fix — ruling UC-3, 08-08 campaign — goes to stderr) instead of merely recording a
+#     failed check in the JSON summary, so this is the one check whose failure changes
+#     the exit code.
 #
 # This does not (and cannot) judge whether the plan is *good* — only whether it is mechanically
 # well-formed enough to hand to a Hunter. Judgment stays with the Warchief/Skinner.
@@ -298,29 +304,32 @@ if schema_lock_paths:
         for lock_path in schema_lock_paths:
             # Exact-path match, anchored at both ends of the (trimmed) line, so a longer
             # sibling path (e.g. ports.test.ts) never trips a shorter lock path (ports.ts)
-            # merely because it shares a prefix.
-            pattern = r"^\s*-?\s*(Modify|Create|Delete):\s*" + re.escape(lock_path) + r"\s*$"
+            # merely because it shares a prefix. The path itself may optionally be
+            # backtick-wrapped (this repo's own writing-plans convention: "- Modify:
+            # `path/to/file.ts`"), optionally followed by a ":line-range" suffix inside
+            # those backticks ("`path/to/file.ts:12-34`"), and optionally followed by a
+            # trailing parenthetical note ("- Modify: `path.ts` (rewrite the parse loop)")
+            # — any combination of those, or none of them (the bare "- Modify: path.ts"
+            # form), must all match the same exact path.
+            pattern = (
+                r"^\s*-?\s*(Modify|Create|Delete):\s*"
+                r"`?" + re.escape(lock_path) + r"(?::[\d,\-]+)?`?"
+                r"(?:\s*\([^)]*\))?"
+                r"\s*$"
+            )
             if re.match(pattern, line):
                 schema_lock_hits.append({"line": i, "text": line.strip(), "path": lock_path})
                 break
 
-    if schema_lock_hits and not allows_schema_change:
-        hit = schema_lock_hits[0]
-        print(
-            f"[validate-plan] ERROR: {plan_file}: task line at line {hit['line']} "
-            f"(\"{hit['text']}\") schedules a change to locked path \"{hit['path']}\" — "
-            "add `allowsSchemaChange: true` front-matter — designed schema changes must "
-            "be declared by the card's own plan (ruling UC-3, 08-08 campaign)",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
+    schema_lock_violated = bool(schema_lock_hits) and not allows_schema_change
     checks.append({
         "name": "schema_lock_declared",
-        "status": "pass",
+        "status": "fail" if schema_lock_violated else "pass",
         "detail": f"{len(schema_lock_hits)} schema-lock task line(s) found; "
                   f"allowsSchemaChange={'true' if allows_schema_change else 'false'}",
     })
+else:
+    schema_lock_violated = False
 
 verdict = "pass" if all(c["status"] == "pass" for c in checks) else "fail"
 
@@ -332,4 +341,21 @@ print(json.dumps({
     "placeholder_hits": placeholder_hits,
     "verdict": verdict,
 }, indent=2))
+sys.stdout.flush()
+
+# The exit-code contract (see header) still fails the WHOLE SCRIPT on a schema-lock
+# violation, but only AFTER the JSON summary above has been printed to stdout — every
+# other check path (1-5, and this one when it passes) reaches this same print, so no
+# caller ever gets a truncated/empty stdout on the one path that also changes the exit
+# code.
+if schema_lock_violated:
+    hit = schema_lock_hits[0]
+    print(
+        f"[validate-plan] ERROR: {plan_file}: task line at line {hit['line']} "
+        f"(\"{hit['text']}\") schedules a change to locked path \"{hit['path']}\" — "
+        "add `allowsSchemaChange: true` front-matter — designed schema changes must "
+        "be declared by the card's own plan (ruling UC-3, 08-08 campaign)",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 PY

@@ -198,10 +198,14 @@ bash "$(dirname "$(dirname "$runner_dir")")/scripts/validate-plan.sh" \
 ```
 
 It exits 0 when the plan either does not touch a locked path or declares
-`allowsSchemaChange: true`, or non-zero naming the plan, the matched task line, and the fix. On a
-non-zero exit for any card, relay it to the owner and stop — do not launch a campaign that will
-only fail this same guard later, post-merge, after PR #185's incident (08-08 campaign, ruling
-UC-3).
+`allowsSchemaChange: true`, or non-zero naming the plan, the matched task line, and the fix. Run
+this over **every** card before judging anything — same as `doctor.sh` above, this check is
+additive and never fatal-on-first-miss: a non-zero exit on card 2 of 17 is not a reason to skip
+checking cards 3-17, it is one entry to collect and keep going. Only once every card has been
+checked, relay the FULL consolidated list of violating cards (plan, matched task line, and fix
+for each) to the owner in one message and stop — do not launch a campaign that will only fail
+this same guard later, post-merge, one card at a time, after PR #185's incident (08-08 campaign,
+ruling UC-3).
 
 1. **Always `--dry-run` first** — zero side effects (no lock acquired, nothing written, no
    session spawned). Sanity-check the derived next action before committing to a real run:
