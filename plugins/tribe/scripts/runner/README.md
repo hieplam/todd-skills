@@ -373,6 +373,16 @@ re-runs the script. A card whose escalation file is still present is skipped
 (`escalation_pending`, parked — see the resume matrix above) unless the re-run passes
 `--include-escalated`.
 
+**Escalation-file lifecycle (P6 fix-list — "answered/shipped escalations stop haunting
+re-triggers"):** the escalation file is never deleted automatically, but it IS archived
+(renamed, never removed — the ruling trail stays inspectable) the moment it stops being
+relevant, two ways: (1) `shipCard` archives it to `<card-id>.md.resolved-shipped` the instant
+a card ships — a shipped card must never re-park; (2) the `orchestrate-campaign` skill's Stage-C
+ruling step archives it to `<card-id>.md.resolved-R<n>` in the same atomic step it appends the
+ruling to `answers.md`. Once archived, a flag-less re-trigger of that card proceeds normally —
+`--include-escalated` is needed only to force a retry of a card whose escalation file is still
+present (i.e. genuinely unanswered).
+
 ## Report contract (spec §O5)
 
 On **every** exit path except `--dry-run` (zero side effects, by construction — nothing is

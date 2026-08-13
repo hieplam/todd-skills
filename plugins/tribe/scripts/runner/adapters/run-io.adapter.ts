@@ -57,6 +57,9 @@ export function buildRealIo(config: RunLoopConfig): LoopIO {
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, content);
     },
+    renameFile: (from, to) => {
+      renameSync(from, to);
+    },
 
     readLock: () => {
       if (!existsSync(lockPath)) return null;

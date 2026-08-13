@@ -25,6 +25,10 @@ export interface FsPort {
   fileExists(resolvedPath: string): boolean;
   readFile(resolvedPath: string): Promise<string> | string;
   writeFile(resolvedPath: string, content: string): void;
+  /** P6 (fix-list): renames/moves a file already on disk — used to archive a resolved
+   * escalation file (`<path>.resolved-shipped`) rather than delete it, so the ruling trail
+   * stays inspectable after the fact. */
+  renameFile(from: string, to: string): void;
 }
 export interface LogPort {
   appendLog(logPath: string, line: string): void;
@@ -96,12 +100,19 @@ export interface ReportIO {
 // here instead; state.ts/loop.ts/state.test.ts import it from here).
 // ---------------------------------------------------------------------------------------
 
-/** io seam for nextCard's disk checks (D5 PLANNING_NEEDED detection). state.ts never calls
- * `fs` directly — every world-touching check is injected through this. */
+/** io seam for nextCard's disk checks (D5 PLANNING_NEEDED detection, and the P6 fix-list's
+ * escalation-file check below). state.ts never calls `fs` directly — every world-touching
+ * check is injected through this. */
 export interface StateIO {
   /** The target repo root that `spec`/`plan` paths are resolved against (an input, per
    * spec §2 — never hardcoded). */
   repoRoot: string;
+  /** P6 (fix-list): the campaign's machine-local home (`--home`) — needed to resolve an
+   * `escalated` card's escalation-file path (`escalationPathOf(homeDir, cardId)`), the same
+   * way `deriveCardPhase` already does, so `nextCard` can tell an UNANSWERED escalation
+   * (file still present) from an ANSWERED one (file archived/renamed away by the skill's
+   * ruling ritual or by `shipCard`) instead of gating solely on `card.status`. */
+  homeDir: string;
   /** Returns true if the given (already-resolved) path exists on disk. */
   fileExists(resolvedPath: string): boolean;
 }
