@@ -47,7 +47,7 @@ that loop; they do not replace it.
 | P5  | Escalations don't say answerable vs world-fixable      | 1 wasted round-trip (A1)             | **SHIPPED** — PR #84, `e367e9d` → [spec](P5-escalation-reason-kinds.md) |
 | P6  | `--include-escalated` must be remembered by hand       | B14 parked 1 cycle                   | **SHIPPED** — PR #83, `2beb0a9` → [spec](P6-escalation-lifecycle.md) |
 | P7  | Rulings can't reach a running session                  | A12 carried 5+ soon-invalid commits  | **RATIFIED (accept + document)** → [spec](P7-mid-flight-rulings.md) |
-| P8  | Batch-authored specs drop inherited obligations        | 2 escalation rounds (B13→B14)        | **RATIFIED** → [spec](P8-inherited-obligations-check.md) |
+| P8  | Batch-authored specs drop inherited obligations        | 2 escalation rounds (B13→B14)        | **SHIPPED** — PR #88, `57ad095` → [spec](P8-inherited-obligations-check.md) |
 | P9  | schemaGuard front-matter patched post-hoc, not at authoring | 1 escalation + world-fix PR #185 | **SHIPPED** — PR #86, `0ecd207` → [spec](P9-schema-lock-at-authoring.md) |
 | P10 | `ANTHROPIC_API_KEY` env trap kills all sessions        | 13 sessions dead in 36s              | **SHIPPED** — PR #78, `177ca3a` → [spec](P10-anthropic-api-key-guard.md) |
 | P11 | Stale `baseSha` on hand-edited state resets            | 1 false-positive escalation (B13)    | **SHIPPED** — PR #85, `9d9b502` → [spec](P11-basesha-invariants.md) |
@@ -256,8 +256,8 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
   (PR #80, merge `e226209`). **P4 SHIPPED** (PR #81, merge `1865704`). **P1 SHIPPED**
   (PR #82, merge `5768e9a`). **P6 SHIPPED** (PR #83, merge `2beb0a9`). **P5 SHIPPED** (PR #84, merge `e367e9d`).
   **P11 SHIPPED** (PR #85, merge `9d9b502`). **P9 SHIPPED** (PR #86, merge `0ecd207`).
-  **P12 SHIPPED** (PR #87, merge `d57feeb`). Now implementing: **P8** (branch
-  `fixlist/p8-inherited-obligations`). Remaining order: P8 → P7.
+  **P12 SHIPPED** (PR #87, merge `d57feeb`). **P8 SHIPPED** (PR #88, merge `57ad095`).
+  Now implementing: **P7** (branch `fixlist/p7-mid-flight-rulings`) — the FINAL item.
 - Owner's rewind protocol is active (see memory `tribe-fixlist-rewind-protocol`): each
   round = read this README → brainstorm one P → ratify → persist spec + flip table →
   owner rewinds the conversation.

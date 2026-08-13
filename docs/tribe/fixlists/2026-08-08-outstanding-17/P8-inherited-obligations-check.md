@@ -1,6 +1,6 @@
 # P8 — inherited-obligations cross-check for batch-authored spec waves
 
-- **Status:** RATIFIED 2026-08-12 (delegated).
+- **Status:** SHIPPED — PR #88, merge `57ad095` (2026-08-13).
 - **Incident:** log lines 299–314. B13's design doc explicitly handed an obligation to
   "B14's own future spec" (b13-related-words-design.md:869-871); B14's spec — authored the
   SAME DAY — never received it. Skinner B caught it at implementation time, costing two
