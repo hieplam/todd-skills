@@ -117,9 +117,46 @@ function assembleScratch(input: { scratchDir: string; fixtureRoot: string; plan:
 // can kill them instead of leaving orphaned, real-API-calling processes running.
 const liveChildren = new Set<ReturnType<typeof Bun.spawn>>();
 
+// `Bun.spawn` does not put the child in its own process group, and claude -p runs with Bash tool
+// use enabled by default (the detector port passes no --tools restriction) — so a single-PID
+// signal to the direct child never reaches any grandchild process claude spawns internally (e.g.
+// a backgrounded shell command). This walks the full descendant tree via `pgrep -P` (BFS) and
+// kills every PID in it, deepest-first, so no grandchild survives an interrupt/timeout.
+function killProcessTree(pid: number, signal: string = 'SIGKILL'): void {
+  const descendants: number[] = [];
+  const queue: number[] = [pid];
+  const seen = new Set<number>([pid]);
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    let result;
+    try {
+      result = Bun.spawnSync(['pgrep', '-P', String(current)]);
+    } catch (err) {
+      console.error(`WARNING: killProcessTree — pgrep unavailable, falling back to direct-child kill only: ${err instanceof Error ? err.message : String(err)}`);
+      try { process.kill(pid, signal as NodeJS.Signals); } catch { /* already exited */ }
+      return;
+    }
+    if (result.exitCode !== 0) continue; // no children found for `current` — base case
+    const stdout = result.stdout.toString().trim();
+    if (stdout === '') continue;
+    for (const line of stdout.split('\n')) {
+      const childPid = Number(line.trim());
+      if (!Number.isFinite(childPid) || seen.has(childPid)) continue;
+      seen.add(childPid);
+      descendants.push(childPid);
+      queue.push(childPid);
+    }
+  }
+  // Kill leaves first (reverse discovery order), then the root pid itself.
+  for (const descendantPid of [...descendants].reverse()) {
+    try { process.kill(descendantPid, signal as NodeJS.Signals); } catch { /* already exited */ }
+  }
+  try { process.kill(pid, signal as NodeJS.Signals); } catch { /* already exited */ }
+}
+
 function killLiveChildren(): void {
   for (const proc of liveChildren) {
-    try { proc.kill(); } catch { /* already exited */ }
+    try { killProcessTree(proc.pid); } catch { /* already exited */ }
   }
 }
 
@@ -151,7 +188,7 @@ async function runClaude(input: { prompt: string; cwd: string; agentsJson?: Reco
     await proc.exited;
     return stdout.split('\n');
   } catch (err) {
-    proc.kill();
+    killProcessTree(proc.pid);
     const message = err instanceof Error ? err.message : String(err);
     return [JSON.stringify({ type: 'result', is_error: true, result: message })];
   } finally {
