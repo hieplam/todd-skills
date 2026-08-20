@@ -1,4 +1,7 @@
 import { describe, expect, spyOn, test } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   classifyOutcome,
   decodeHtmlEntities,
@@ -158,6 +161,76 @@ describe('main() CLI — clean verdicts on bad input (F14)', () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+});
+
+// F15: --html-glob is fed straight into Bun's Glob.scan(), which walks the filesystem
+// relative to cwd — so an absolute-path pattern never matches and the CLI falsely
+// reports "0 diagrams found" (INVALID) for a real, valid artifact.
+describe('--html-glob finds artifacts regardless of pattern form (F15)', () => {
+  const HTML = '<!DOCTYPE html><html><body><div class="mermaid">flowchart TD\n' +
+    '  A --> B</div></body></html>';
+
+  function withArtifact<T>(run: (dir: string) => Promise<T>): Promise<T> {
+    const dir = mkdtempSync(join(tmpdir(), 'validate-mermaid-f15-'));
+    mkdirSync(join(dir, 'sub'));
+    writeFileSync(join(dir, 'out.html'), HTML);
+    writeFileSync(join(dir, 'sub', 'out.html'), HTML);
+    return run(dir).finally(() => rmSync(dir, { recursive: true, force: true }));
+  }
+
+  async function runMain(cwd: string, argv: string[]): Promise<number> {
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      return await main(argv);
+    } finally {
+      process.chdir(originalCwd);
+      logSpy.mockRestore();
+    }
+  }
+
+  test('form 1: an absolute path to a specific file', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, ['--html-glob', join(dir, 'out.html')]);
+      expect(exitCode).toBe(EXIT_CODE.VALID);
+    });
+  });
+
+  test('form 2: an absolute glob with a wildcard', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, ['--html-glob', join(dir, '*.html')]);
+      expect(exitCode).toBe(EXIT_CODE.VALID);
+    });
+  });
+
+  test('form 3: a relative path with a directory component', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, ['--html-glob', 'sub/out.html']);
+      expect(exitCode).toBe(EXIT_CODE.VALID);
+    });
+  });
+
+  test('form 4: a bare relative filename (must still work)', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, ['--html-glob', 'out.html']);
+      expect(exitCode).toBe(EXIT_CODE.VALID);
+    });
+  });
+
+  test('form 5: a relative wildcard, the eval harness usage (must still work)', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, ['--html-glob', '*.html']);
+      expect(exitCode).toBe(EXIT_CODE.VALID);
+    });
+  });
+
+  test('an absolute pattern that matches no file is still the no-artifact INVALID path', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, ['--html-glob', join(dir, 'nope-*.html')]);
+      expect(exitCode).toBe(EXIT_CODE.INVALID);
+    });
   });
 });
 

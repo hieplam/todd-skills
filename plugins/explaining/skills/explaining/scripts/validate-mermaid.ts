@@ -7,7 +7,7 @@
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Glob } from 'bun';
 
@@ -269,9 +269,17 @@ async function collectSources(htmlGlob: string, file: string | null): Promise<{
     return { artifacts: 1, sources: trimmed.length > 0 ? [trimmed] : [] };
   }
 
-  const glob = new Glob(htmlGlob);
+  // Glob.scan() always walks relative to `cwd`. An absolute pattern with NO wildcard
+  // characters (e.g. `/tmp/f15/out.html`) never matches under that scheme — Bun does
+  // not special-case "the pattern is already an absolute path". Normalize by scanning
+  // from the pattern's own directory when it is absolute, so both a literal absolute
+  // file and an absolute wildcard resolve correctly; a relative pattern (bare filename,
+  // a relative path with a directory component, or a relative wildcard) is untouched.
+  const scanCwd = isAbsolute(htmlGlob) ? dirname(htmlGlob) : process.cwd();
+  const scanPattern = isAbsolute(htmlGlob) ? basename(htmlGlob) : htmlGlob;
+  const glob = new Glob(scanPattern);
   const matches: string[] = [];
-  for await (const match of glob.scan({ cwd: process.cwd(), absolute: true })) {
+  for await (const match of glob.scan({ cwd: scanCwd, absolute: true })) {
     matches.push(match);
   }
   let sources: string[] = [];
