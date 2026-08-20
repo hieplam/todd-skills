@@ -51,7 +51,7 @@ Worktree: `/Users/hip/repo/todd-skills-explaining-illustration` · Branch: `warc
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Create `scripts/evals/tests/test_run_evals.py`:
+- [x] **Step 1: Write the failing test.** Create `scripts/evals/tests/test_run_evals.py`:
 
 ```python
 """Unit tests for scripts/evals/run_evals.py.
@@ -119,7 +119,7 @@ python3 -m unittest discover -s scripts/evals/tests -t . -v
   Expected: one failure reading
   `explaining: resolved skill_dir .../plugins/explaining has no SKILL.md`.
 
-- [ ] **Step 2: Move the fixture.**
+- [x] **Step 2: Move the fixture.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-explaining-illustration
@@ -128,12 +128,12 @@ git mv plugins/explaining/evals/evals.json plugins/explaining/skills/explaining/
 rmdir plugins/explaining/evals
 ```
 
-- [ ] **Step 3: Fix the pointer in SKILL.md.** Its last line reads
+- [x] **Step 3: Fix the pointer in SKILL.md.** Its last line reads
   ``Regression fixtures: `../../evals/evals.json` `` — from
   `plugins/explaining/skills/explaining/SKILL.md` the fixture is now one level up, so the correct
   text is ``Regression fixtures: `../evals/evals.json` ``. Change only that path.
 
-- [ ] **Step 4: Prove it green.**
+- [x] **Step 4: Prove it green.**
 
 ```bash
 python3 -m unittest discover -s scripts/evals/tests -t . -v
@@ -141,7 +141,7 @@ python3 -m unittest discover -s scripts/evals/tests -t . -v
 
   Expected: `OK`, with the `explaining` subTest passing and no other test regressing.
 
-- [ ] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 1/10`.
+- [x] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 1/10`.
 
 ---
 

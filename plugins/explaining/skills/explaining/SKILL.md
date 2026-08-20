@@ -43,4 +43,4 @@ A/B eval, 2026-07-18: 5 arms × isolated `claude -p` runs (`--setting-sources pr
 
 Model transfer (measured, not assumed): the −67% effect was measured on Opus 4.8. A same-design transfer grid on Fable 5 found its *baseline* already near the rules' level (M1 8.92 baseline vs 8.20 with rules — within noise); there the pair mainly narrowed variance (±3.49 → ±1.34) with no measured harm. Expect the largest gains on models/subagents with jargon-heavy defaults, and consistency gains elsewhere.
 
-Known limits: n=4 clean runs/arm (directional, not statistical); the pair still over-explains slightly vs no-rules baseline (M3 0.75 vs 0.25). Regression fixtures: `../../evals/evals.json` — re-run with the repo eval harness before editing these rules, and keep a rule only if the numbers still back it.
+Known limits: n=4 clean runs/arm (directional, not statistical); the pair still over-explains slightly vs no-rules baseline (M3 0.75 vs 0.25). Regression fixtures: `../evals/evals.json` — re-run with the repo eval harness before editing these rules, and keep a rule only if the numbers still back it.
