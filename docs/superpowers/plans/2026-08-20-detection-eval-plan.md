@@ -1821,7 +1821,7 @@ Steps:
 ```bash
 cd plugins/tribe/evals/detection/fixtures/orderly && bun test && bunx tsc --noEmit
 ```
-Expected: `bun test` → `23 pass, 0 fail` (whole fixture suite, all tasks so far); `bunx tsc
+Expected: `bun test` → `28 pass, 0 fail` (whole fixture suite, all tasks so far); `bunx tsc
 --noEmit` exits 0.
 
 ---
