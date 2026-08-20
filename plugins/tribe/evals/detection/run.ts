@@ -65,7 +65,12 @@ function loadAgentPayload(agentMdPath: string): { name: string; description: str
   const descMatch = fm.match(/^description:\s*>?-?\s*\n([\s\S]*?)\n\S/m);
   const modelMatch = fm.match(/^model:\s*(.+)$/m);
   const name = nameMatch ? nameMatch[1].trim() : 'eval-agent';
-  const description = descMatch ? descMatch[1].replace(/^\s+/gm, ' ').trim() : `Role under test: ${name}.`;
+  // A YAML `>-` block-scalar folds into ONE line (spaces between what were separate lines), so
+  // each captured line must have its newline removed, not just its leading whitespace collapsed
+  // — same precedent as scripts/evals/run_evals.py's parse_frontmatter.
+  const description = descMatch
+    ? descMatch[1].split('\n').map((l) => l.trim()).filter(Boolean).join(' ')
+    : `Role under test: ${name}.`;
   // `inherit` (Claude Code's own frontmatter convention for "use the caller's model") or a
   // missing field both mean "no model resolved from frontmatter" — same precedent as
   // scripts/evals/run_evals.py's resolve_exec_model.
