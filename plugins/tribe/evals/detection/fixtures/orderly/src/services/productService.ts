@@ -8,7 +8,7 @@ import type { Product, Result } from '../types';
 export function createProductService(deps: { productRepo: ProductRepository; clock: Clock }) {
   return {
     createProduct(input: { name: string; priceCents: number; internalCostCents: number }): Result<Product> {
-      if (input.priceCents <= 0) return { ok: false, reason: errorCodes.INVALID_PRICE };
+      if (!Number.isFinite(input.priceCents) || input.priceCents <= 0) return { ok: false, reason: errorCodes.INVALID_PRICE };
       const product: Product = {
         id: mintId('product'),
         name: input.name,

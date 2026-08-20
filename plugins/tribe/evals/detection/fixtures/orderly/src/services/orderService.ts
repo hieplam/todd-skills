@@ -15,7 +15,7 @@ export interface CreateOrderInput {
 export function createOrderService(deps: { orderRepo: OrderRepository; clock: Clock }) {
   return {
     createOrder(input: CreateOrderInput): Result<Order> {
-      if (input.quantity <= 0) {
+      if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
         // DEVIATION (C6): ad-hoc string reason instead of an errorCodes member.
         return { ok: false, reason: 'order total must be positive' };
       }

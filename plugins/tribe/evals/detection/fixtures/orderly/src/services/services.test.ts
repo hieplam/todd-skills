@@ -25,6 +25,13 @@ describe('orderService', () => {
     const result = service.createOrder({ customerId: 'cus_1', productId: 'prd_1', quantity: 0, unitPriceCents: 500 });
     expect(result).toEqual({ ok: false, reason: 'order total must be positive' });
   });
+
+  test('createOrder rejects a NaN quantity instead of silently persisting it', () => {
+    const db = createDb();
+    const service = createOrderService({ orderRepo: createOrderRepository(db), clock: systemClock });
+    const result = service.createOrder({ customerId: 'cus_1', productId: 'prd_1', quantity: NaN, unitPriceCents: 500 });
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe('customerService', () => {
@@ -43,6 +50,13 @@ describe('productService (clean)', () => {
     const service = createProductService({ productRepo: createProductRepository(db), clock: systemClock });
     const result = service.createProduct({ name: 'Widget', priceCents: 999, internalCostCents: 400 });
     expect(result.ok).toBe(true);
+  });
+
+  test('createProduct rejects a NaN priceCents instead of silently persisting it', () => {
+    const db = createDb();
+    const service = createProductService({ productRepo: createProductRepository(db), clock: systemClock });
+    const result = service.createProduct({ name: 'Widget', priceCents: NaN, internalCostCents: 400 });
+    expect(result.ok).toBe(false);
   });
 });
 
