@@ -1980,15 +1980,15 @@ describe('orderly.json manifest', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/fixture-meta.test.ts`
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/fixture-meta.test.ts`
   fails (manifest file does not exist yet).
-- [ ] **Step 2: GREEN** — run the grep above, fill in every `deviation.line`, write
+- [x] **Step 2: GREEN** — run the grep above, fill in every `deviation.line`, write
   `manifest/orderly.json`, add `core/fixture-meta.test.ts`; iterate the line numbers until green
   (a `DEVIATION` marker line is a comment one line above the offending statement in most files
   above — adjust `deviation.line` to point at whichever line the meta-test's "nearby" window
   finds, i.e. the offending statement itself works since the marker comment sits immediately
   above it).
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && bun test core/fixture-meta.test.ts
