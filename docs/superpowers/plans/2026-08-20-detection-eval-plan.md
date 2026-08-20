@@ -509,9 +509,9 @@ describe('buildGraderPrompt', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/scratch-plan.test.ts core/prompts.test.ts` fails (modules missing).
-- [ ] **Step 2: GREEN** — add all four files; re-run.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/scratch-plan.test.ts core/prompts.test.ts` fails (modules missing).
+- [x] **Step 2: GREEN** — add all four files; re-run.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && bun test core/scratch-plan.test.ts core/prompts.test.ts
