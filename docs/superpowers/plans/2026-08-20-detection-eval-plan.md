@@ -2359,9 +2359,9 @@ describe('runCell', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/claude-transcript.test.ts core/orchestrate.test.ts` fails.
-- [ ] **Step 2: GREEN** — add all four files; re-run.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/claude-transcript.test.ts core/orchestrate.test.ts` fails.
+- [x] **Step 2: GREEN** — add all four files; re-run.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && bun test core/claude-transcript.test.ts core/orchestrate.test.ts
