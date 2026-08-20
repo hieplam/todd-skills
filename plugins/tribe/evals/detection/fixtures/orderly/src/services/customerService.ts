@@ -1,6 +1,5 @@
 // module: src/services/customerService
 import { errorCodes } from '../errorCodes';
-import { mintId } from '../ids';
 import type { CustomerRepository } from '../repositories/customerRepository';
 import type { Customer, Result } from '../types';
 
@@ -9,7 +8,8 @@ export function createCustomerService(deps: { customerRepo: CustomerRepository }
     createCustomer(name: string): Result<Customer> {
       if (!name) return { ok: false, reason: errorCodes.VALIDATION_FAILED };
       const customer: Customer = {
-        id: mintId('customer'),
+        // DEVIATION (C5): mints a bare id with no type prefix instead of mintId('customer').
+        id: crypto.randomUUID(),
         name,
         // DEVIATION (C4): calls Date.now() directly instead of taking an injected Clock.
         createdAtUtc: new Date(Date.now()).toISOString(),

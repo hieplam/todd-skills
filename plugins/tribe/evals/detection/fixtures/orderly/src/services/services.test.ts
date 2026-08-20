@@ -42,6 +42,14 @@ describe('customerService', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(typeof result.value.createdAtUtc).toBe('string');
   });
+
+  test('createCustomer mints an id without the cus_ prefix (seeded C5 deviation)', () => {
+    const db = createDb();
+    const service = createCustomerService({ customerRepo: createCustomerRepository(db) });
+    const result = service.createCustomer('Ada');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.id.startsWith('cus_')).toBe(false);
+  });
 });
 
 describe('productService (clean)', () => {
