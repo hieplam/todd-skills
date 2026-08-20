@@ -2149,12 +2149,12 @@ describe('mem-arm memory fixture', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/memory-overlap.test.ts`
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/memory-overlap.test.ts`
   fails (files don't exist yet).
-- [ ] **Step 2: GREEN** — add both files; if the overlap assertion fails on first try, edit
+- [x] **Step 2: GREEN** — add both files; if the overlap assertion fails on first try, edit
   `CLAUDE.md`'s wording (never the stopword list, never the manifest) until the set is empty,
   then re-run.
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && bun test core/memory-overlap.test.ts
