@@ -1,0 +1,15 @@
+{
+  "skill_name": "mammoth-hunt",
+  "kind": "skill-trigger",
+  "method": "Each query ran as a real `claude -p` session (default model, plan mode) in a clean toy repo with NO CLAUDE.md binding — only the installed skill's description in context. The session was asked to output its routing plan as JSON and stop. PASS for should_trigger = skill_invoked is mammoth-hunt AND agents_dispatched contains the full roster (warchief, hunter, skinner x2, scout, tracker). PASS for should_not_trigger = mammoth-hunt not invoked and the correct alternate route chosen.",
+  "baseline": "Same harness WITHOUT this skill (2026-08-20, 12+5 runs): bare phrases and role assignments reached the warchief/hunter/dual-skinner chain but dropped scout+tracker in 8/8 unbound runs; an undefined alias in a tribe-less context routed to nothing.",
+  "evals": [
+    { "id": 1, "query": "Run the Mammoth Hunt on this. Task: add a slugify(text) function to src/utils.js with tests.", "should_trigger": true, "observed": "2/2 PASS — skill invoked, full 6-agent roster" },
+    { "id": 2, "query": "Implement this by the Tribe workflow. Task: add a slugify(text) function to src/utils.js with tests.", "should_trigger": true, "observed": "2/2 PASS — the historically flaky phrase now resolves through the skill" },
+    { "id": 3, "query": "Build this with the full tribe. Task: add a slugify(text) function to src/utils.js with tests.", "should_trigger": true, "observed": "2/2 PASS" },
+    { "id": 4, "query": "You are a shaman now, dispatch your tribe to do the Mammoth hunt. Task: add a slugify(text) function to src/utils.js with tests.", "should_trigger": true, "observed": "2/2 PASS — role assignment routes through the skill, keeps shaman->warchief chain" },
+    { "id": 5, "query": "Use a workflow to do this in parallel. Task: add a slugify(text) function to src/utils.js with tests.", "should_trigger": false, "observed": "1/1 PASS — routed to the Workflow tool, cited this skill's own exclusion" },
+    { "id": 6, "query": "Task: add a slugify(text) function to src/utils.js with tests. (no tribe phrasing)", "should_trigger": false, "observed": "1/1 PASS — implemented directly, no tribe dispatch" },
+    { "id": 7, "query": "Orchestration: run the next 3 roadmap cards unattended and report when all are shipped or blocked.", "should_trigger": false, "observed": "1/1 PASS — routed to orchestrate-campaign, boundary intact" }
+  ]
+}

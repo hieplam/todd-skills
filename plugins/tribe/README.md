@@ -157,6 +157,20 @@ backs up conflicting files), so the repo stays the single source of truth
 
 ---
 
+## Skills — named entry points
+
+The agents above define *roles*; two skills define *invocations* — phrases the owner can
+say in any session and get a deterministic dispatch, because a skill's description is
+always in the model's context (an eval-backed property: a bare codename with no binding
+routes to nothing, see `skills/mammoth-hunt/evals/`):
+
+| Skill | Invocation | What it runs |
+|---|---|---|
+| [`mammoth-hunt`](skills/mammoth-hunt/SKILL.md) | "Run the Mammoth Hunt", "Tribe workflow", "full tribe", a tribe role assignment | The full chain on **one** piece of work: warchief orchestrates, hunters implement (TDD), **2 skinners** audit, **scout** surveys unwritten conventions, **tracker** gates the diff — the scout/tracker legs ride as standing constraints in the warchief brief, since the warchief's own definition dispatches scout only conditionally |
+| [`orchestrate-campaign`](skills/orchestrate-campaign/SKILL.md) | "orchestration", "run these N cards" | A **batch** of roadmap cards unattended via the campaign runner, one consolidated report |
+
+---
+
 ## Campaign runner
 
 Alongside the six agents, the plugin ships a **stateless capability script** —
