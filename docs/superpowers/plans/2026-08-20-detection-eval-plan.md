@@ -843,9 +843,9 @@ describe('memDelta', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/gates.test.ts` fails.
-- [ ] **Step 2: GREEN** — add both files; re-run.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/gates.test.ts` fails.
+- [x] **Step 2: GREEN** — add both files; re-run.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && bun test core/gates.test.ts
