@@ -56,7 +56,7 @@ def load(path: Path) -> dict:
         raise SystemExit(f"ERROR: {path} is not valid JSON: {e}")
 
 
-def index_runs(bench: dict, configuration: str) -> dict[tuple, list[bool]]:
+def index_runs(bench: dict, configuration: str, arm: str = "clean") -> dict[tuple, list[bool]]:
     """(skill, eval_id, eval_name, agent) -> [passed?] across that case's runs.
 
     A run whose result is `ungraded` (run_evals.py's grader subprocess failed or
@@ -65,10 +65,20 @@ def index_runs(bench: dict, configuration: str) -> dict[tuple, list[bool]]:
     would misattribute a harness outage to the agent/prompt being compared, and
     could even manufacture a CONFIRMED regression out of a grader hiccup. It is
     a missing sample, exactly like a case present in only one of the two runs.
+
+    Filtered on `arm` (default "clean", mirroring the runner's own default) so a
+    single benchmark.json holding both the clean and mem arms never blends a
+    case's clean and mem with_skill runs into one average — that would turn a
+    mem-arm suppression into a fake regression in a prompt A/B that never
+    touched the mem arm at all. A run with no "arm" key at all (every
+    benchmark.json written before the arm axis existed) counts as "clean", so
+    every pre-existing benchmark still compares.
     """
     out: dict[tuple, list[bool]] = defaultdict(list)
     for r in bench.get("runs", []):
         if r.get("configuration") != configuration:
+            continue
+        if r.get("arm", "clean") != arm:
             continue
         if r.get("result", {}).get("ungraded"):
             continue
@@ -92,11 +102,16 @@ def main() -> int:
     ap.add_argument("--configuration", default="with_skill",
                     choices=["with_skill", "without_skill"],
                     help="Which leg to compare (default: with_skill — the one a trim moves)")
+    ap.add_argument("--arm", default="clean", choices=["clean", "mem"],
+                    help="Which ambient-memory arm to compare (default: clean, mirroring the "
+                         "runner's own default). A run with no 'arm' key (pre-arm-axis "
+                         "benchmark.json) counts as clean.")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     base_b, cand_b = load(Path(args.baseline)), load(Path(args.candidate))
-    base, cand = index_runs(base_b, args.configuration), index_runs(cand_b, args.configuration)
+    base = index_runs(base_b, args.configuration, args.arm)
+    cand = index_runs(cand_b, args.configuration, args.arm)
 
     if not base or not cand:
         print(f"ERROR: no '{args.configuration}' runs in "
@@ -156,6 +171,7 @@ def main() -> int:
         "baseline_label": base_b.get("metadata", {}).get("label"),
         "candidate_label": cand_b.get("metadata", {}).get("label"),
         "configuration": args.configuration,
+        "arm": args.arm,
         "cases_compared": len(set(base) & set(cand)),
         "cases_only_in_one_run": [list(x) for x in only_in_one],
         "confirmed_regressions": confirmed,
@@ -180,7 +196,8 @@ def main() -> int:
     cl = report["candidate_label"] or "(unlabeled)"
     print(f"Baseline : {bl}  ({args.baseline})")
     print(f"Candidate: {cl}  ({args.candidate})")
-    print(f"Configuration: {args.configuration}   cases compared: {report['cases_compared']}\n")
+    print(f"Configuration: {args.configuration}   Arm: {args.arm}   "
+          f"cases compared: {report['cases_compared']}\n")
 
     if size_rows:
         print("Prompt size")

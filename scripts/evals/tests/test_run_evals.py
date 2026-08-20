@@ -163,5 +163,103 @@ class RunCaseFixtureSetupGuard(unittest.TestCase):
             self.assertIn("fixture setup failed", result["error"])
 
 
+class ArmPlanning(unittest.TestCase):
+    def test_mem_arm_runs_with_skill_leg_only(self):
+        self.assertEqual(
+            run_evals.plan_arm_configurations("mem", ("with_skill", "without_skill")),
+            ("with_skill",))
+
+    def test_clean_arm_runs_both_legs(self):
+        self.assertEqual(
+            run_evals.plan_arm_configurations("clean", ("with_skill", "without_skill")),
+            ("with_skill", "without_skill"))
+
+    def test_clean_arm_asserts_no_memory_and_writes_none(self):
+        plan = run_evals.plan_memory_files("clean", Path("/x/CLAUDE.md"))
+        self.assertEqual(plan["memory_files"], [])
+        self.assertTrue(plan["assert_no_memory"])
+
+    def test_mem_arm_writes_the_fixture_as_claude_md(self):
+        plan = run_evals.plan_memory_files("mem", Path("/x/CLAUDE.md"))
+        self.assertEqual(plan["memory_files"], [("CLAUDE.md", Path("/x/CLAUDE.md"))])
+        self.assertFalse(plan["assert_no_memory"])
+
+    def test_mem_arm_without_a_fixture_is_skipped_with_a_note(self):
+        jobs, notes = run_evals.plan_jobs(
+            cases=[{"id": 1}], configurations=("with_skill", "without_skill"),
+            arms=("clean", "mem"), runs=1, has_memory_fixture=False)
+        self.assertEqual([j["arm"] for j in jobs], ["clean", "clean"])
+        self.assertEqual(len(notes), 1)
+        self.assertIn("memory_fixture", notes[0])
+
+    def test_both_arms_produce_three_cells_when_a_fixture_exists(self):
+        jobs, notes = run_evals.plan_jobs(
+            cases=[{"id": 1}], configurations=("with_skill", "without_skill"),
+            arms=("clean", "mem"), runs=1, has_memory_fixture=True)
+        self.assertEqual(
+            sorted((j["arm"], j["configuration"]) for j in jobs),
+            [("clean", "with_skill"), ("clean", "without_skill"), ("mem", "with_skill")])
+        self.assertEqual(notes, [])
+
+    def test_runs_multiplies_every_cell(self):
+        jobs, _ = run_evals.plan_jobs(
+            cases=[{"id": 1}], configurations=("with_skill",),
+            arms=("clean",), runs=3, has_memory_fixture=False)
+        self.assertEqual([j["run_idx"] for j in jobs], [0, 1, 2])
+
+
+class ArmRollup(unittest.TestCase):
+    @staticmethod
+    def _run(arm, pass_rate, configuration="with_skill"):
+        return {"arm": arm, "configuration": configuration,
+                "result": {"pass_rate": pass_rate, "passed": int(pass_rate), "ungraded": 0,
+                            "total": 1, "time_seconds": 1.0, "tokens": 10}}
+
+    def test_delta_is_mem_minus_clean_on_the_with_skill_leg(self):
+        by_arm = run_evals.summarize_with_skill_by_arm(
+            [self._run("clean", 1.0), self._run("mem", 0.0),
+             self._run("clean", 0.0, "without_skill")])
+        self.assertEqual(by_arm["clean"]["pass_rate"]["mean"], 1.0)
+        self.assertEqual(by_arm["mem"]["pass_rate"]["mean"], 0.0)
+        delta = run_evals.arm_delta(by_arm)
+        self.assertEqual(delta["pass_rate"], "-1.00")
+
+    def test_delta_is_none_when_one_arm_is_missing(self):
+        by_arm = run_evals.summarize_with_skill_by_arm([self._run("clean", 1.0)])
+        self.assertIsNone(run_evals.arm_delta(by_arm))
+
+
+class CompareArmFiltering(unittest.TestCase):
+    def setUp(self):
+        _cspec = importlib.util.spec_from_file_location(
+            "compare", EVALS_DIR / "compare.py")
+        self.compare = importlib.util.module_from_spec(_cspec)
+        _cspec.loader.exec_module(self.compare)
+
+    @staticmethod
+    def _bench(runs):
+        return {"runs": runs}
+
+    @staticmethod
+    def _run(arm, passed):
+        entry = {"skill_name": "s", "eval_id": 1, "eval_name": "n", "agent": None,
+                  "configuration": "with_skill", "result": {"passed": passed}}
+        if arm is not None:
+            entry["arm"] = arm
+        return entry
+
+    def test_filters_to_the_requested_arm(self):
+        bench = self._bench([self._run("clean", True), self._run("mem", False)])
+        clean = self.compare.index_runs(bench, "with_skill", "clean")
+        self.assertEqual(list(clean.values()), [[True]])
+        mem = self.compare.index_runs(bench, "with_skill", "mem")
+        self.assertEqual(list(mem.values()), [[False]])
+
+    def test_a_run_with_no_arm_key_counts_as_clean(self):
+        bench = self._bench([self._run(None, True)])
+        self.assertEqual(
+            list(self.compare.index_runs(bench, "with_skill", "clean").values()), [[True]])
+
+
 if __name__ == "__main__":
     unittest.main()
