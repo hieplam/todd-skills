@@ -1044,9 +1044,9 @@ describe('createDb', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test` fails (no source files yet).
-- [ ] **Step 2: GREEN** — add all nine files above.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test` fails (no source files yet).
+- [x] **Step 2: GREEN** — add all nine files above.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection/fixtures/orderly && bun test && bunx tsc --noEmit
