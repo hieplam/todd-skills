@@ -129,9 +129,16 @@ rmdir plugins/explaining/evals
 ```
 
 - [x] **Step 3: Fix the pointer in SKILL.md.** Its last line reads
-  ``Regression fixtures: `../../evals/evals.json` `` — from
-  `plugins/explaining/skills/explaining/SKILL.md` the fixture is now one level up, so the correct
-  text is ``Regression fixtures: `../evals/evals.json` ``. Change only that path.
+  ``Regression fixtures: `../../evals/evals.json` ``. `SKILL.md` lives at
+  `plugins/explaining/skills/explaining/SKILL.md` and the fixture now lives at
+  `plugins/explaining/skills/explaining/evals/evals.json` — a subdirectory of `SKILL.md`'s own
+  directory, so the correct text is ``Regression fixtures: `evals/evals.json` `` with no `../`
+  hops at all. Change only that path.
+
+  *(Correction, 2026-08-20: this step originally said "one level up" and prescribed
+  `../evals/evals.json`, which resolves to the nonexistent
+  `plugins/explaining/skills/evals/evals.json`. The Tracker and the cold-lens reviewer both caught
+  it on the task-1 diff; the fix landed in the task-1 follow-up commit.)*
 
 - [x] **Step 4: Prove it green.**
 
@@ -478,7 +485,52 @@ def arm_delta(by_arm: dict) -> dict | None:
         run_summary["arm_delta"] = delta
 ```
 
-- [ ] **Step 5: Prove it green.**
+- [ ] **Step 5: Keep `compare.py` from blending the two arms.** `index_runs`
+  (`scripts/evals/compare.py:59-78`) keys each run on
+  `(skill_name, eval_id, eval_name, agent)` and filters only on `configuration`. Once a single
+  `benchmark.json` can hold both arms, that key silently averages a case's clean and mem
+  `with_skill` runs together, so a mem-arm suppression would show up as a fake regression in a
+  prompt A/B that never involved the mem arm at all. Add an `--arm` option (default `clean`,
+  mirroring the runner's default) and filter on it, treating a run with **no** `arm` key as
+  `clean` so every benchmark recorded before this change still compares. Record the arm in the
+  report dict next to `configuration`, and cover it with these tests appended to the Python suite:
+
+```python
+class CompareArmFiltering(unittest.TestCase):
+    def setUp(self):
+        _cspec = importlib.util.spec_from_file_location(
+            "compare", EVALS_DIR / "compare.py")
+        self.compare = importlib.util.module_from_spec(_cspec)
+        _cspec.loader.exec_module(self.compare)
+
+    @staticmethod
+    def _bench(runs):
+        return {"runs": runs}
+
+    @staticmethod
+    def _run(arm, passed):
+        entry = {"skill_name": "s", "eval_id": 1, "eval_name": "n", "agent": None,
+                  "configuration": "with_skill", "result": {"passed": passed}}
+        if arm is not None:
+            entry["arm"] = arm
+        return entry
+
+    def test_filters_to_the_requested_arm(self):
+        bench = self._bench([self._run("clean", True), self._run("mem", False)])
+        clean = self.compare.index_runs(bench, "with_skill", "clean")
+        self.assertEqual(list(clean.values()), [[True]])
+        mem = self.compare.index_runs(bench, "with_skill", "mem")
+        self.assertEqual(list(mem.values()), [[False]])
+
+    def test_a_run_with_no_arm_key_counts_as_clean(self):
+        bench = self._bench([self._run(None, True)])
+        self.assertEqual(
+            list(self.compare.index_runs(bench, "with_skill", "clean").values()), [[True]])
+```
+
+  Expected: both tests fail first (`index_runs` takes two arguments), then pass.
+
+- [ ] **Step 6: Prove it green.**
 
 ```bash
 python3 -m unittest discover -s scripts/evals/tests -t . -v
@@ -489,7 +541,7 @@ scripts/evals/run_evals.py --all --arm both --dry-run
   Expected: unittest `OK`; both dry runs exit 0 and list the same cases (no fixture declares a
   `memory_fixture` yet, so `--arm both` prints the skip note and plans no mem cell).
 
-- [ ] **Step 6: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 3/10`.
+- [ ] **Step 7: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 3/10`.
 
 ---
 
