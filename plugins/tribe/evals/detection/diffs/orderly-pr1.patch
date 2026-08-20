@@ -1,0 +1,39 @@
+diff --git a/src/handlers/refundHandler.ts b/src/handlers/refundHandler.ts
+new file mode 100644
+index 0000000..ea521be
+--- /dev/null
++++ b/src/handlers/refundHandler.ts
+@@ -0,0 +1,6 @@
++// module: src/handlers/refundHandler
++import type { createRefundService } from '../services/refundService';
++
++export function refundHandler(refundService: ReturnType<typeof createRefundService>) {
++  return (orderId: string, amountCents: number) => refundService.refund(orderId, amountCents);
++}
+diff --git a/src/services/refundService.ts b/src/services/refundService.ts
+new file mode 100644
+index 0000000..9670558
+--- /dev/null
++++ b/src/services/refundService.ts
+@@ -0,0 +1,21 @@
++// module: src/services/refundService
++import type { OrderRepository } from '../repositories/orderRepository';
++
++export function createRefundService(deps: { orderRepo: OrderRepository }) {
++  return {
++    refund(orderId: string, amountCents: number) {
++      const found = deps.orderRepo.findById(orderId);
++      if (!found.some) {
++        // violates C1 (throw instead of Result) and C6 (ad-hoc string, not an errorCodes member)
++        throw new Error('cannot refund: order missing');
++      }
++      // violates C4: inline Date.now() instead of an injected Clock
++      const refundedAtUtc = new Date(Date.now()).toISOString();
++      // violates C10: float dollar arithmetic for the restocking fee instead of integer cents
++      const amountDollars = amountCents / 100;
++      const feeDollars = amountDollars * 0.1;
++      const netCents = Math.round((amountDollars - feeDollars) * 100);
++      return { orderId, netCents, refundedAtUtc };
++    },
++  };
++}

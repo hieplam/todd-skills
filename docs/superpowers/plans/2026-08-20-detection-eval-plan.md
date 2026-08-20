@@ -2065,11 +2065,11 @@ rm -rf "$TMP" "$VERIFY"
 Expected: `git apply --check` exits 0 (no output = clean apply).
 
 Steps:
-- [ ] **Step 1: RED** — `test -f plugins/tribe/evals/detection/diffs/orderly-pr1.patch` fails (no
+- [x] **Step 1: RED** — `test -f plugins/tribe/evals/detection/diffs/orderly-pr1.patch` fails (no
   file yet).
-- [ ] **Step 2: GREEN** — run the full sequence above; the patch file now exists and applies
+- [x] **Step 2: GREEN** — run the full sequence above; the patch file now exists and applies
   cleanly.
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && git apply --check --directory=fixtures/orderly diffs/orderly-pr1.patch
