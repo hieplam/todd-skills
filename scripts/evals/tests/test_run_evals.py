@@ -49,5 +49,49 @@ class SubjectResolution(unittest.TestCase):
                     )
 
 
+class FixtureSourceResolution(unittest.TestCase):
+    def test_resolves_repo_relative_path(self):
+        resolved = run_evals.resolve_fixture_source("plugins/tribe/README.md", REPO_ROOT)
+        self.assertTrue(resolved.is_file())
+        self.assertTrue(str(resolved).startswith(str(REPO_ROOT)))
+
+    def test_rejects_absolute_path(self):
+        with self.assertRaises(ValueError):
+            run_evals.resolve_fixture_source("/etc/passwd", REPO_ROOT)
+
+    def test_rejects_escape_above_repo_root(self):
+        with self.assertRaises(ValueError):
+            run_evals.resolve_fixture_source("../../../etc/passwd", REPO_ROOT)
+
+
+class MaterializeFilesWithSource(unittest.TestCase):
+    def test_writes_repo_file_contents_into_scratch(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            written = run_evals.materialize_files(
+                scratch, [{"path": "tribe-README.md", "source": "plugins/tribe/README.md"}])
+            self.assertEqual(written, ["tribe-README.md"])
+            self.assertEqual(
+                (scratch / "tribe-README.md").read_text(),
+                (REPO_ROOT / "plugins/tribe/README.md").read_text(),
+            )
+
+    def test_source_and_content_are_mutually_exclusive(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                run_evals.materialize_files(
+                    Path(tmp),
+                    [{"path": "a.md", "source": "plugins/tribe/README.md", "content": "x"}])
+
+    def test_missing_source_file_raises(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(FileNotFoundError):
+                run_evals.materialize_files(
+                    Path(tmp), [{"path": "a.md", "source": "plugins/nope/nothing.md"}])
+
+
 if __name__ == "__main__":
     unittest.main()

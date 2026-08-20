@@ -163,7 +163,7 @@ the report names.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing tests.** Append to `scripts/evals/tests/test_run_evals.py`:
+- [x] **Step 1: Write the failing tests.** Append to `scripts/evals/tests/test_run_evals.py`:
 
 ```python
 class FixtureSourceResolution(unittest.TestCase):
@@ -212,7 +212,7 @@ class MaterializeFilesWithSource(unittest.TestCase):
 
   Expected: all five fail with `AttributeError` / no such behavior.
 
-- [ ] **Step 2: Implement.** In `scripts/evals/run_evals.py`, add the pure resolver above
+- [x] **Step 2: Implement.** In `scripts/evals/run_evals.py`, add the pure resolver above
   `materialize_files`:
 
 ```python
@@ -250,7 +250,7 @@ def resolve_fixture_source(rel: str, repo_root: Path) -> Path:
                 pairs = [(entry["path"], entry.get("content", ""))]
 ```
 
-- [ ] **Step 3: Make a bad fixture a setup error, not a crash.** `materialize_files` is called at
+- [x] **Step 3: Make a bad fixture a setup error, not a crash.** `materialize_files` is called at
   the top of `run_case`; an exception there currently escapes through `pool.map` and kills the
   whole invocation. Wrap that one call so it becomes the harness-failure signal the runner already
   has:
@@ -262,7 +262,7 @@ def resolve_fixture_source(rel: str, repo_root: Path) -> Path:
             return {"error": f"fixture setup failed: {e}", "configuration": configuration}
 ```
 
-- [ ] **Step 4: Prove it green.**
+- [x] **Step 4: Prove it green.**
 
 ```bash
 python3 -m unittest discover -s scripts/evals/tests -t . -v
@@ -270,7 +270,7 @@ python3 -m unittest discover -s scripts/evals/tests -t . -v
 
   Expected: `OK`, all tests from task 1 still passing.
 
-- [ ] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 2/10`.
+- [x] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 2/10`.
 
 ---
 

@@ -455,6 +455,24 @@ def resolve_exec_model(exec_model: str | None, agent_fields: dict | None) -> str
     return None
 
 
+def resolve_fixture_source(rel: str, repo_root: Path) -> Path:
+    """Pure: resolve a fixture `source` against the repo root, confined to it.
+
+    A fixture may name a real repo file instead of inlining its bytes, so a large
+    document (e.g. plugins/tribe/README.md) stays reviewable in the diff and cannot
+    silently rot away from the file the eval claims to measure. Absolute paths and
+    paths escaping the repo root are refused, mirroring the scratch-escape guard
+    materialize_files already applies to `path`.
+    """
+    if os.path.isabs(rel):
+        raise ValueError(f"fixture source must be repo-relative, got: {rel}")
+    root = repo_root.resolve()
+    dest = (root / rel).resolve()
+    if dest != root and not str(dest).startswith(str(root) + os.sep):
+        raise ValueError(f"fixture source escapes repo root: {rel}")
+    return dest
+
+
 def materialize_files(scratch: Path, files: list) -> list[str]:
     """Write a case's `files` fixtures into the scratch cwd before the executor runs.
 
@@ -473,7 +491,16 @@ def materialize_files(scratch: Path, files: list) -> list[str]:
     written: list[str] = []
     for entry in files or []:
         if isinstance(entry, dict) and "path" in entry:
-            pairs = [(entry["path"], entry.get("content", ""))]
+            if "source" in entry and "content" in entry:
+                raise ValueError(
+                    f"fixture {entry['path']}: 'source' and 'content' are mutually exclusive")
+            if "source" in entry:
+                src = resolve_fixture_source(entry["source"], REPO_ROOT)
+                if not src.is_file():
+                    raise FileNotFoundError(f"fixture source not found: {entry['source']}")
+                pairs = [(entry["path"], src.read_text())]
+            else:
+                pairs = [(entry["path"], entry.get("content", ""))]
         elif isinstance(entry, dict):
             pairs = list(entry.items())
         else:
@@ -495,7 +522,10 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
              permission_mode: str | None = None) -> dict:
     scratch = Path(tempfile.mkdtemp(prefix="todd-skills-eval-"))
     try:
-        fixtures = materialize_files(scratch, case.get("files"))
+        try:
+            fixtures = materialize_files(scratch, case.get("files"))
+        except (ValueError, FileNotFoundError, OSError) as e:
+            return {"error": f"fixture setup failed: {e}", "configuration": configuration}
         if verbose and fixtures:
             print(f"    [{configuration}] fixtures: {', '.join(fixtures)}", file=sys.stderr)
         agents_json = None
