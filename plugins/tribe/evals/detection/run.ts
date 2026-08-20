@@ -7,7 +7,7 @@ import { runCell, type DetectorPort, type GraderPort } from './core/orchestrate'
 import { buildDetectorPrompt } from './core/prompts';
 import { planScratch } from './core/scratch-plan';
 import { score } from './core/scoring';
-import type { Arm, Leg, Manifest, ScratchPlan } from './core/types';
+import type { Arm, Leg, Manifest, ScoreResult, ScratchPlan } from './core/types';
 
 const DETECTION_ROOT = import.meta.dir;
 
@@ -18,13 +18,21 @@ function parseArgs(argv: string[]) {
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--dry-run') { args['dry-run'] = true; continue; }
-    if (a.startsWith('--')) {
-      const key = a.slice(2);
-      const next = argv[i + 1];
-      args[key] = next;
-      i++;
+    if (!a.startsWith('--')) continue;
+    const body = a.slice(2);
+    const eqIdx = body.indexOf('=');
+    if (eqIdx !== -1) {
+      // `--flag=value` form: key/value both come from this single token — never
+      // consume argv[i+1], or the next real flag silently becomes this flag's value.
+      const key = body.slice(0, eqIdx);
+      const value = body.slice(eqIdx + 1);
+      args[key] = key === 'dry-run' ? value === 'true' : value;
+      continue;
     }
+    if (body === 'dry-run') { args['dry-run'] = true; continue; }
+    const next = argv[i + 1];
+    args[body] = next;
+    i++;
   }
   return args;
 }
@@ -47,16 +55,22 @@ function loadMemoryFiles(): { path: string; content: string }[] {
   return existsSync(memoryPath) ? [{ path: 'CLAUDE.md', content: readFileSync(memoryPath, 'utf8') }] : [];
 }
 
-function loadAgentPayload(agentMdPath: string): { name: string; description: string; prompt: string } {
+function loadAgentPayload(agentMdPath: string): { name: string; description: string; prompt: string; model?: string } {
   const text = readFileSync(agentMdPath, 'utf8');
   const end = text.indexOf('\n---', 3);
   const fm = text.slice(3, end);
   const body = text.slice(end + 4).trimStart();
   const nameMatch = fm.match(/^name:\s*(.+)$/m);
   const descMatch = fm.match(/^description:\s*>?-?\s*\n([\s\S]*?)\n\S/m);
+  const modelMatch = fm.match(/^model:\s*(.+)$/m);
   const name = nameMatch ? nameMatch[1].trim() : 'eval-agent';
   const description = descMatch ? descMatch[1].replace(/^\s+/gm, ' ').trim() : `Role under test: ${name}.`;
-  return { name, description, prompt: body.trim() };
+  // `inherit` (Claude Code's own frontmatter convention for "use the caller's model") or a
+  // missing field both mean "no model resolved from frontmatter" — same precedent as
+  // scripts/evals/run_evals.py's resolve_exec_model.
+  const rawModel = modelMatch ? modelMatch[1].trim() : undefined;
+  const model = rawModel && rawModel !== 'inherit' ? rawModel : undefined;
+  return { name, description, prompt: body.trim(), model };
 }
 
 function agentPathFor(leg: Leg): string {
@@ -99,6 +113,22 @@ function assembleScratch(input: { scratchDir: string; fixtureRoot: string; plan:
   }
 }
 
+// Tracks every claude -p child process currently in flight so an interrupted run (SIGINT/SIGTERM)
+// can kill them instead of leaving orphaned, real-API-calling processes running.
+const liveChildren = new Set<ReturnType<typeof Bun.spawn>>();
+
+function killLiveChildren(): void {
+  for (const proc of liveChildren) {
+    try { proc.kill(); } catch { /* already exited */ }
+  }
+}
+
+process.on('SIGINT', () => { killLiveChildren(); process.exit(130); });
+process.on('SIGTERM', () => { killLiveChildren(); process.exit(143); });
+
+// A real Scout/Tracker survey or grading call should never legitimately take longer than this.
+const CLAUDE_TIMEOUT_MS = 300_000;
+
 async function runClaude(input: { prompt: string; cwd: string; agentsJson?: Record<string, unknown>; model?: string; tools?: string }): Promise<string[]> {
   const cmd = ['claude', '-p', input.prompt, '--output-format', 'stream-json', '--verbose',
     '--setting-sources', 'project', '--strict-mcp-config'];
@@ -106,18 +136,38 @@ async function runClaude(input: { prompt: string; cwd: string; agentsJson?: Reco
   if (input.model) cmd.push('--model', input.model);
   if (input.tools !== undefined) cmd.push('--tools', input.tools);
   const proc = Bun.spawn(cmd, { cwd: input.cwd, stdout: 'pipe', stderr: 'pipe' });
-  const stdout = await new Response(proc.stdout).text();
-  await proc.exited;
-  return stdout.split('\n');
+  liveChildren.add(proc);
+  try {
+    // Race the actual read against a hard timeout. On timeout we kill the child and return a
+    // synthetic `result`/`is_error` transcript line (the same shape a real claude -p emits) so
+    // extractFinalResult reports ok:false with our timeout message intact, instead of throwing
+    // and crashing the whole run for a single hung cell.
+    const stdout = await Promise.race([
+      new Response(proc.stdout).text(),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`claude -p timed out after ${CLAUDE_TIMEOUT_MS}ms`)), CLAUDE_TIMEOUT_MS);
+      }),
+    ]);
+    await proc.exited;
+    return stdout.split('\n');
+  } catch (err) {
+    proc.kill();
+    const message = err instanceof Error ? err.message : String(err);
+    return [JSON.stringify({ type: 'result', is_error: true, result: message })];
+  } finally {
+    liveChildren.delete(proc);
+  }
 }
 
 function makeDetectorPort(): DetectorPort {
   return {
     async run({ leg, scratchDir, agentPath, model }) {
       const agent = loadAgentPayload(agentPath);
+      // CLI --model always overrides the agent's own frontmatter model: field.
+      const resolvedModel = model ?? agent.model;
       const lines = await runClaude({
         prompt: buildDetectorPrompt(leg), cwd: scratchDir,
-        agentsJson: { [agent.name]: { description: agent.description, prompt: agent.prompt } }, model,
+        agentsJson: { [agent.name]: { description: agent.description, prompt: agent.prompt } }, model: resolvedModel,
       });
       const { extractFinalResult } = await import('./core/claude-transcript');
       const parsed = extractFinalResult(lines);
@@ -164,6 +214,32 @@ async function printDryRun(legs: Leg[], arms: Arm[], manifest: Manifest, minReca
   console.log('(dry run — zero API calls made)');
 }
 
+// Aggregates a cell's per-rep ScoreResults into a single mean recall/precision pair for
+// memDelta's purposes. memDelta only reads recall/precision (see core/gates.ts), so the other
+// ScoreResult fields are zeroed/defaulted — they are never inspected by memDelta.
+function meanScoreResult(scores: ReturnType<typeof score>[]): ScoreResult {
+  const n = scores.length;
+  const meanRecall = n === 0 ? 0 : scores.reduce((sum, s) => sum + s.recall, 0) / n;
+  const meanPrecision = n === 0 ? 0 : scores.reduce((sum, s) => sum + s.precision, 0) / n;
+  return {
+    recall: meanRecall, precision: meanPrecision, easyTierRecall: null,
+    caught: 0, partial: 0, missed: 0, decoysFlagged: 0, invented: 0, seeded: 0,
+  };
+}
+
+// Computes the mem-arm delta for a leg only when BOTH its clean and mem cells were actually
+// run (present with at least one rep); otherwise null (that leg wasn't run with both arms).
+function computeMemDeltaFor(
+  cellResults: Record<string, { scores: ReturnType<typeof score>[] }>,
+  cleanKey: string,
+  memKey: string,
+): { deltaRecall: number; deltaPrecision: number } | null {
+  const cleanCell = cellResults[cleanKey];
+  const memCell = cellResults[memKey];
+  if (!cleanCell || !memCell || cleanCell.scores.length === 0 || memCell.scores.length === 0) return null;
+  return memDelta(meanScoreResult(memCell.scores), meanScoreResult(cleanCell.scores));
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const manifest: Manifest = JSON.parse(readFileSync(join(DETECTION_ROOT, 'manifest', `${args.fixture}.json`), 'utf8'));
@@ -201,6 +277,12 @@ async function main() {
           leg, arm, scratchDir, agentPath: agentPathFor(leg), model: args.model as string | undefined,
           manifest, detector: makeDetectorPort(), grader: makeGraderPort(args['grader-model'] as string | undefined),
         });
+        if (cell.ungraded) {
+          // grading.json already carries the full `cell` (including ungraded/error) — this is
+          // the loud, impossible-to-miss terminal signal that grading itself failed, distinct
+          // from the detector genuinely finding nothing.
+          console.error(`WARNING: leg=${leg} arm=${arm} rep=${rep} — grading pipeline failed (ungraded): ${cell.error}`);
+        }
         const seeded = leg === 'scout'
           ? manifest.conventions.map((c) => ({ id: c.id, tier: c.tier }))
           : manifest.conventions.filter((c) => manifest.legB.violates.includes(c.id)).map((c) => ({ id: c.id, tier: c.tier }));
@@ -221,7 +303,11 @@ async function main() {
   const legAClean = cellResults['scout-clean']?.pass ?? false;
   const legBClean = cellResults['tracker-clean']?.pass ?? false;
   const pass = topLevelPass({ legAClean, legBClean });
-  const benchmark = { cells: cellResults, pass };
+  const deltas = {
+    scout: computeMemDeltaFor(cellResults, 'scout-clean', 'scout-mem'),
+    tracker: computeMemDeltaFor(cellResults, 'tracker-clean', 'tracker-mem'),
+  };
+  const benchmark = { cells: cellResults, pass, deltas };
   writeFileSync(join(outDir, 'benchmark.json'), JSON.stringify(benchmark, null, 2));
   console.log(JSON.stringify(benchmark, null, 2));
   return pass ? 0 : 1;
