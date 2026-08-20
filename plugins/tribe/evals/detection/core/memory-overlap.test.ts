@@ -9,16 +9,16 @@ const memoryText = readFileSync(join(DETECTION_ROOT, 'memory-fixture/CLAUDE.md')
 
 const STOPWORDS = new Set([
   'the', 'and', 'for', 'with', 'that', 'this', 'never', 'always', 'every', 'each', 'file',
-  'files', 'code', 'test', 'tests', 'project', 'module', 'convention', 'conventions', 'field',
-  'fields', 'named', 'name', 'names', 'across', 'boundary', 'instead', 'exactly', 'same',
-  'member', 'members', 'string', 'strings', 'shape', 'pattern', 'used', 'uses', 'throughout',
+  'files', 'code', 'test', 'tests', 'project', 'convention', 'conventions', 'field',
+  'fields', 'named', 'across', 'instead', 'exactly',
+  'shape', 'pattern', 'used', 'uses',
 ]);
 
 function significantWords(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
-      .replace(/[`*_#\-().,:;{}[\]|]/g, ' ')
+      .replace(/[`*_#\-().,:;{}[\]|'"]/g, ' ')
       .split(/\s+/)
       .filter((w) => w.length >= 4 && !STOPWORDS.has(w)),
   );
