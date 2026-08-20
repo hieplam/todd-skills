@@ -1,8 +1,8 @@
 // module: src/index
 import { systemClock } from './clock';
 import { createDb } from './db';
-import { createOrderRepository } from './repositories/orderRepository';
 import { createCustomerRepository } from './repositories/customerRepository';
+import { createOrderRepository } from './repositories/orderRepository';
 import { createProductRepository } from './repositories/productRepository';
 import { createCustomerService } from './services/customerService';
 import { createOrderService } from './services/orderService';

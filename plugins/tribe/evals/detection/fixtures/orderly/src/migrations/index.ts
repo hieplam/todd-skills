@@ -1,8 +1,8 @@
 // module: src/migrations/index
+import type { Db } from '../db';
 import { down001, up001 } from './001_create_orders';
 import { down002, up002 } from './002_create_customers';
 import { down003, up003 } from './003_create_products';
-import type { Db } from '../db';
 
 export interface Migration {
   name: string;
