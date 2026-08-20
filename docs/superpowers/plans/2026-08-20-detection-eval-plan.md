@@ -2647,9 +2647,9 @@ the Shaman after this harness merges.
 ````
 
 Steps:
-- [ ] **Step 1: RED** — `test -f plugins/tribe/evals/detection/README.md` fails.
-- [ ] **Step 2: GREEN** — add the file above.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `test -f plugins/tribe/evals/detection/README.md` fails.
+- [x] **Step 2: GREEN** — add the file above.
+- [x] **Step 3: Commit**
 
 ```bash
 test -f plugins/tribe/evals/detection/README.md && echo present
