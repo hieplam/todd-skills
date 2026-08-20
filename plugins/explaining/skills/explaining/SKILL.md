@@ -30,12 +30,31 @@ For example: "Best-effort" is a label from the OKRA frame. At the code, a reader
 Avoid: // Best-effort: persists the snapshot; on ANY failure it logs (no PII) and swallows — it NEVER throws.
 Follow:  // Never throws: persists the snapshot, or logs and swallows on failure.
 
+## Rule 4 — Illustrate a flow instead of narrating it
+
+**When.** A flow with multiple actors or conditional paths gets a diagram. Linear prose, a single-actor sequence, or a list of facts does not — a diagram there is noise.
+
+**What.** A mermaid diagram, rendered into one self-contained HTML file written to disk. A fenced code block alone is not the deliverable: it renders in some clients and not others.
+
+**How.** Build the file with `scripts/render-illustration.ts --title T --diagram D.mmd --out out.html`, then validate it with `scripts/validate-mermaid.ts --html-glob out.html`. The diagram must sit in an element with `class="mermaid"` (the renderer does this).
+
+**The three validator outcomes.** Exit `0`: ship it. Exit `1`: fix the diagram using the printed hint and re-validate. Exit `2`: the validator could not run (no dependency, no network) — ship the file anyway and say the diagram is unvalidated. A validator that cannot run is not a failing diagram.
+
+**Offer it.** The file on disk is the deliverable; offering it is a best-effort second step. Use an MCP preview or download tool when one exists, otherwise state the path.
+
+**Mermaid safe syntax:**
+
+- Write dotted link ends in full: `-.-x` and `-.-o`, never an abbreviated form.
+- Wrap a label in double quotes when it contains `(` `)` `[` `]` `{` `}` `|` or `"`, or when it starts with `/` or `\`.
+- Write a literal double quote inside a quoted label as `#quot;`.
+
 ## Self-check before finishing
 
 Scan the draft once and fix:
 
 1. Any technical term at first use without a lead-in or definition? (Rule 1)
 2. Any abstract claim with no code/example/fact anchor and no "unverified" marker? (Rule 2)
+3. Any multi-actor or conditional flow that got narrated instead of drawn? (Rule 4)
 
 ## Evidence — why exactly these two rules
 
