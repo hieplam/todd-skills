@@ -63,6 +63,28 @@ class FixtureSourceResolution(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_evals.resolve_fixture_source("../../../etc/passwd", REPO_ROOT)
 
+    def test_rejects_non_string_source(self):
+        """A plausible authoring typo (e.g. "source": 123) must raise the ValueError
+        run_case's guard already names, not a bare TypeError from os.path.isabs()."""
+        with self.assertRaises(ValueError):
+            run_evals.resolve_fixture_source(123, REPO_ROOT)
+
+    def test_rejects_symlink_loop(self):
+        """A symlink loop reachable from `source` must raise, not hang/crash uncaught
+        with a Python-version-specific exception type (RuntimeError on 3.9, OSError
+        with errno ELOOP on 3.10+)."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            a, b = root / "a", root / "b"
+            try:
+                a.symlink_to(b)
+                b.symlink_to(a)
+            except (OSError, NotImplementedError):
+                self.skipTest("platform cannot create symlinks")
+            with self.assertRaises((RuntimeError, OSError)):
+                run_evals.resolve_fixture_source("a/x", root)
+
 
 class MaterializeFilesWithSource(unittest.TestCase):
     def test_writes_repo_file_contents_into_scratch(self):
@@ -91,6 +113,54 @@ class MaterializeFilesWithSource(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 run_evals.materialize_files(
                     Path(tmp), [{"path": "a.md", "source": "plugins/nope/nothing.md"}])
+
+
+class RunCaseFixtureSetupGuard(unittest.TestCase):
+    """run_case's fixture-setup guard must swallow ANY fixture-setup exception into
+    the {"error": ...} signal, never let one escape.
+
+    run_case is driven by pool.map(execute, jobs) inside a ThreadPoolExecutor with no
+    enclosing handler up to main(), and benchmark.json is only written after that loop
+    completes — an exception escaping run_case discards every already-completed case's
+    results, each backed by a real, paid `claude -p` subprocess call. A narrow except
+    clause that misses a plausible fixture-authoring mistake (a non-string `source`, a
+    symlink loop reachable from `source`) turns one bad case into a total-loss batch.
+    """
+
+    def test_non_string_source_becomes_setup_error_not_a_raised_exception(self):
+        case = {"id": 1, "name": "x", "prompt": "p", "expected_output": "e",
+                "files": [{"path": "a.md", "source": 123}]}
+        result = run_evals.run_case(
+            case, "skill", None, None, "with_skill", timeout=1, exec_model=None,
+            grader_model=None, out_dir=Path("/tmp/unused-run-case-guard-test"), verbose=False)
+        self.assertIn("error", result)
+        self.assertIn("fixture setup failed", result["error"])
+
+    def test_symlink_loop_source_becomes_setup_error_not_a_raised_exception(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            a, b = root / "a", root / "b"
+            try:
+                a.symlink_to(b)
+                b.symlink_to(a)
+            except (OSError, NotImplementedError):
+                self.skipTest("platform cannot create symlinks")
+
+            original_repo_root = run_evals.REPO_ROOT
+            run_evals.REPO_ROOT = root
+            try:
+                case = {"id": 2, "name": "y", "prompt": "p", "expected_output": "e",
+                        "files": [{"path": "a.md", "source": "a/x"}]}
+                result = run_evals.run_case(
+                    case, "skill", None, None, "with_skill", timeout=1, exec_model=None,
+                    grader_model=None, out_dir=Path("/tmp/unused-run-case-guard-test"),
+                    verbose=False)
+            finally:
+                run_evals.REPO_ROOT = original_repo_root
+
+            self.assertIn("error", result)
+            self.assertIn("fixture setup failed", result["error"])
 
 
 if __name__ == "__main__":

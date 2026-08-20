@@ -464,6 +464,8 @@ def resolve_fixture_source(rel: str, repo_root: Path) -> Path:
     paths escaping the repo root are refused, mirroring the scratch-escape guard
     materialize_files already applies to `path`.
     """
+    if not isinstance(rel, str):
+        raise ValueError(f"fixture source must be a string, got: {rel!r}")
     if os.path.isabs(rel):
         raise ValueError(f"fixture source must be repo-relative, got: {rel}")
     root = repo_root.resolve()
@@ -524,7 +526,17 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
     try:
         try:
             fixtures = materialize_files(scratch, case.get("files"))
-        except (ValueError, FileNotFoundError, OSError) as e:
+        except Exception as e:  # noqa: BLE001 - deliberately broad, see below
+            # A fixture-setup failure is by definition a harness failure, not an
+            # agent/grading outcome, so ANY exception here (ValueError/FileNotFoundError
+            # from the checks above, or something unanticipated like a symlink-loop
+            # RuntimeError on Python 3.9 or a bad-type TypeError from a malformed
+            # `source`) must become this case's {"error": ...} setup-error signal —
+            # never escape. run_case is driven by pool.map(execute, jobs) with no
+            # enclosing handler up to main(), and benchmark.json is only written after
+            # that loop completes, so an exception escaping here would discard every
+            # already-completed case's results in the batch, each backed by a real,
+            # paid `claude -p` subprocess call.
             return {"error": f"fixture setup failed: {e}", "configuration": configuration}
         if verbose and fixtures:
             print(f"    [{configuration}] fixtures: {', '.join(fixtures)}", file=sys.stderr)
