@@ -84,6 +84,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -402,7 +403,7 @@ def install_skill(scratch_dir: Path, skill_dir: Path, skill_name: str) -> Path:
     """
     dest = scratch_dir / ".claude" / "skills" / skill_name
     dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(skill_dir, dest, ignore=shutil.ignore_patterns("evals"))
+    shutil.copytree(skill_dir, dest, ignore=shutil.ignore_patterns("evals", "node_modules"))
     return dest
 
 
@@ -578,6 +579,75 @@ def materialize_files(scratch: Path, files: list) -> list[str]:
     return written
 
 
+CHECK_PASS, CHECK_FAIL, CHECK_UNGRADED = "pass", "fail", "ungraded"
+
+
+def classify_check_outcome(returncode: int) -> str:
+    """Pure: a check's exit code, in the harness's own three-outcome vocabulary.
+
+    0 = the artifact is right. 1 = the artifact is wrong, which is a BEHAVIORAL
+    failure the agent owns. Anything else = the check could not run (missing
+    dependency, no network, crashed) — a HARNESS failure, routed to UNGRADED and
+    excluded from the pass/total denominator, never scored as an agent failure.
+    """
+    if returncode == 0:
+        return CHECK_PASS
+    if returncode == 1:
+        return CHECK_FAIL
+    return CHECK_UNGRADED
+
+
+def plan_checks(case: dict, skill_dir: Path | None, scratch: Path) -> list:
+    """Pure: resolve each declared check into an argv list.
+
+    Placeholder substitution is literal replacement (not str.format) so a command
+    containing other braces is never mangled, and the argv is split with shlex so
+    no shell is involved.
+    """
+    planned = []
+    for spec in case.get("checks") or []:
+        command = (spec["command"]
+                    .replace("{skill_dir}", str(skill_dir) if skill_dir else "")
+                    .replace("{scratch}", str(scratch)))
+        planned.append({"name": spec["name"], "argv": shlex.split(command)})
+    return planned
+
+
+def run_checks(planned: list, scratch: Path, timeout: int) -> dict:
+    """Impure edge: run each planned check in the scratch dir, first non-pass wins."""
+    for check in planned:
+        try:
+            proc = subprocess.run(check["argv"], cwd=str(scratch), capture_output=True,
+                                   text=True, timeout=timeout)
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+            return {"outcome": CHECK_UNGRADED, "name": check["name"],
+                    "evidence": f"check could not run: {e}"}
+        outcome = classify_check_outcome(proc.returncode)
+        if outcome != CHECK_PASS:
+            tail = (proc.stdout + proc.stderr).strip()[-1000:]
+            return {"outcome": outcome, "name": check["name"],
+                    "evidence": f"exit {proc.returncode}: {tail}"}
+    return {"outcome": CHECK_PASS, "name": None, "evidence": ""}
+
+
+def collect_artifacts(scratch: Path, patterns: list, dest: Path) -> list:
+    """Impure edge: preserve the executor's output files before the scratch dir dies.
+
+    run_case deletes the scratch dir in its finally block, so without this an
+    artifact the case is graded on can never be linked as evidence.
+    """
+    collected = []
+    for pattern in patterns or []:
+        for src in sorted(scratch.glob(pattern)):
+            if not src.is_file():
+                continue
+            target = dest / src.relative_to(scratch)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, target)
+            collected.append(str(src.relative_to(scratch)))
+    return collected
+
+
 def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | None,
              configuration: str, timeout: int, exec_model: str | None,
              grader_model: str | None, out_dir: Path, verbose: bool, run_idx: int = 0,
@@ -661,10 +731,20 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         if verbose:
             print(f"    [{configuration}] grading...", file=sys.stderr)
         grader_start = time.time()
-        verdict = grade(
-            case["prompt"], case["expected_output"], parsed["transcript"],
-            parsed["final_result"], cwd=scratch, timeout=timeout, model=grader_model,
-        )
+        check_result = run_checks(plan_checks(case, skill_dir, scratch), scratch, timeout)
+        if check_result["outcome"] == CHECK_FAIL:
+            verdict = {"passed": False,
+                        "evidence": f"machine check '{check_result['name']}' failed — "
+                                    f"{check_result['evidence']}"}
+        elif check_result["outcome"] == CHECK_UNGRADED:
+            verdict = {"ungraded": True,
+                        "evidence": f"machine check '{check_result['name']}' could not run — "
+                                    f"{check_result['evidence']}"}
+        else:
+            verdict = grade(
+                case["prompt"], case["expected_output"], parsed["transcript"],
+                parsed["final_result"], cwd=scratch, timeout=timeout, model=grader_model,
+            )
         grader_seconds = time.time() - grader_start
 
         # `run-{N}` (1-based) is always part of the path — not only when --runs > 1 —
@@ -674,6 +754,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         # card requires).
         run_dir = out_dir / f"eval-{case['id']}-{case['name']}" / arm / configuration / f"run-{run_idx + 1}"
         run_dir.mkdir(parents=True, exist_ok=True)
+        artifacts = collect_artifacts(scratch, case.get("artifacts"), run_dir / "artifacts")
         (run_dir / "transcript.md").write_text(
             f"# {case['name']} — {configuration}\n\n## Prompt\n{case['prompt']}\n\n"
             f"## Transcript\n{parsed['transcript']}\n\n## Final result\n{parsed['final_result']}\n"
@@ -711,6 +792,8 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
                 "grader_duration_seconds": round(grader_seconds, 1),
                 "total_duration_seconds": round(exec_run["wall_seconds"] + grader_seconds, 1),
             },
+            "artifacts": artifacts,
+            "check": check_result["name"],
         }
         (run_dir / "grading.json").write_text(json.dumps(grading_json, indent=2))
 
