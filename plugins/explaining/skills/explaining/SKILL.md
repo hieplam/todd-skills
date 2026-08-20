@@ -36,9 +36,9 @@ Follow:  // Never throws: persists the snapshot, or logs and swallows on failure
 
 **What.** A mermaid diagram, rendered into one self-contained HTML file written to disk. A fenced code block alone is not the deliverable: it renders in some clients and not others.
 
-**How.** Build the file with `scripts/render-illustration.ts --title T --diagram D.mmd --out out.html`, then validate it with `scripts/validate-mermaid.ts --html-glob out.html`. The diagram must sit in an element with `class="mermaid"` (the renderer does this).
+**How.** Run both from the directory where you wrote the file (the `--diagram`/`--out`/`--html-glob` paths are relative). Build the file with `bun scripts/render-illustration.ts --title T --diagram D.mmd --out out.html`, then validate it with `bun scripts/validate-mermaid.ts --html-glob out.html`. The diagram must sit in an element with `class="mermaid"` (the renderer does this).
 
-**The three validator outcomes.** Exit `0`: ship it. Exit `1`: fix the diagram using the printed hint and re-validate. Exit `2`: the validator could not run (no dependency, no network) — ship the file anyway and say the diagram is unvalidated. A validator that cannot run is not a failing diagram.
+**The three validator outcomes.** Exit `0`: ship it. Exit `1` with a printed hint: fix the diagram using the hint and re-validate. Exit `1` with no hint (`0 diagram(s) found`): no artifact was found — confirm the render step ran and the HTML file exists with the rendered diagram, then re-validate. Exit `2`: the validator could not run (no dependency, no network) — ship the file anyway and say the diagram is unvalidated. A validator that cannot run is not a failing diagram.
 
 **Offer it.** The file on disk is the deliverable; offering it is a best-effort second step. Use an MCP preview or download tool when one exists, otherwise state the path.
 
