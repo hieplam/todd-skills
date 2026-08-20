@@ -1,6 +1,6 @@
 ---
 id: adr-20260730-scout-ruling-loop
-c3-seal: b6e3d2756f15e41364971bc6a964e36ce28e03d59e7eafc7ba414b981d5e0d04
+c3-seal: 1019cd043e9b8bfb84f6108a87fa03205a7fc0a1e893ffc4ccef706de9a48137
 title: scout-ruling-loop
 type: adr
 goal: |-
@@ -150,7 +150,7 @@ The patches land as a work order for a future session with a working CLI to appl
 | --- | --- | --- | --- | --- |
 | c3-215 | component | Contract gains 4 new IN/OUT rows (gap-rule.ts, debt-count.ts, debt-backfill.ts, the debt-entity location + shipped canvas); Business Flow's ruling-loop row is superseded by the closed loop | c3-215#n1225@v1:sha256:f467fd1ec102c55b693524d1b29fda35cba5ac48b31be638a9f6a38cc5b3aef8 "Deliver features through a 5-agent chain of command — Shaman (What/Why) → Warchief (How) → Hunter (TDD execution), gated by Tracker (rules review) and Ski" | Parent Delta: updated — this change-unit's two block patches (below); rule-bash-strict-mode + rule-stack-agnostic-agent-prompts + rule-no-squash-merge reviewed below |
 | c3-2 | container | Parent of c3-215; no membership or directory-layout change — scripts/gaps/{gap-rule,debt-count,debt-backfill,debt-tree}.ts and canvases/debt.md live inside the existing tribe plugin, not a new top-level plugin. Included for top-down completeness | c3-2#n931@v1:sha256:f92a1cfb53ada54dba5f5c1154ccef3423fe08276ff6ec199cc745be16f8d3d0 "Claude Code runtime content: the 9 installable plugins — agents and skills that, once symlinked into ~/.claude, extend every Claude Code session with delive" | Parent Delta: none — no new plugin, no container-contract change |
-| c3-101 | component | Root install.sh's component-type whitelist gained canvases alongside the already-pending rules (case statement now agents|skills|claude-md|hooks|rules|canvases|.claude-plugin); linking itself stays delegated to the tribe plugin's own hook, unchanged from the precedent adr-20260728-purity-golden-standard already recorded for rules | c3-101#n883@v1:sha256:8a9563d459545b56a385862bad44876587d4521828684a4ea81c2f950d7b65de "Symlink every plugin's agents and skills into ~/.claude idempotently, and expose the marketplace manifest that registers what exists." | Parent Delta: none — no new link path in the root installer itself; the layout-contract change (a 6th component-directory type) lands in ref-plugin-layout, already deferred there for rules/ and now joined by canvases/ (see Compliance Refs) |
+| c3-101 | component | Root install.sh's component-type whitelist gained canvases alongside the already-pending rules (case statement now agents | skills | claude-md |
 | c3-0 | system | Top-down completeness only: the system ancestor of the affected component. No new top-level installable surface (canvases ship through the existing tribe plugin's install hook, the same mechanism rules/ already uses) | c3-0#n2@v1:sha256:d21dc72fe385cb42ca0b79273dbc1b309b5d308a10754974395b20c7fd30fcc0 "Package Todd Lam's personal Claude Code agents and skills as installable plugins, keep the repo the single source of truth via symlink installs, and benchmark e" | None |
 
 ## Compliance Refs
@@ -166,7 +166,7 @@ The patches land as a work order for a future session with a working CLI to appl
 | Rule | Why required | Evidence | Action |
 | --- | --- | --- | --- |
 | rule-bash-strict-mode | install.sh and plugins/tribe/install.sh were edited (Task 5, canvases mirroring rules/) and plugins/tribe/scripts/tests/test-install-canvases.sh was added — all shell, all keep the set -euo pipefail preamble | rule-bash-strict-mode#n1469@v1:sha256:7a8c286269da63a2ba7b7362b72631a2491addb28a1a4266304605106dbaba9a "All shell scripts start with #!/usr/bin/env bash followed by set -euo pipefail." | comply |
-| rule-stack-agnostic-agent-prompts | scout.md, warchief.md, tracker.md were edited (Tasks 6-7) to add the write role, adjudication duty, debt gate, backfill, and grandfathering read; all edits use stack-neutral language (grep/git grep as illustration only, no toolchain-specific commands) | rule-stack-agnostic-agent-prompts#n1523@v1:sha256:a1a20b05de21d6ac887a4e6fcc020b0fde876fc17aed7fabaad35e79ece9cb2e "Agent prompt files (plugins/*/agents/*.md) never hardcode a language name, toolchain command," | comply |
+| rule-stack-agnostic-agent-prompts | scout.md, warchief.md, tracker.md were edited (Tasks 6-7) to add the write role, adjudication duty, debt gate, backfill, and grandfathering read; all edits use stack-neutral language (grep/git grep as illustration only, no toolchain-specific commands) | rule-stack-agnostic-agent-prompts#n1523@v1:sha256:a1a20b05de21d6ac887a4e6fcc020b0fde876fc17aed7fabaad35e79ece9cb2e "Agent prompt files (plugins//agents/.md) never hardcode a language name, toolchain command," | comply |
 | rule-no-squash-merge | Delivered as one PR per the plan; merge shape (regular, 2-parent) governs whenever it is merged — no agent merges this change-unit's PR | rule-no-squash-merge#n1501@v1:sha256:de99ab791d8de56b2db0a2df30884e92d9f70603716a1384a6965aa0c922273a "A merged PR's merge commit has exactly 2 parents; no capability merges with --squash or" | comply (deferred to merge time, owner-only) |
 
 ## Work Breakdown

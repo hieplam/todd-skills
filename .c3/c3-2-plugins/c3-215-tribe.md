@@ -1,6 +1,6 @@
 ---
 id: c3-215
-c3-seal: ff199a5f15db3b6f214aa232e4ae163308dbf72b5c9d095af6caa8016d9eb55f
+c3-seal: 0676529746618c82b7ba62ccf14a8c4941fae2a35a1faf6a52cf4ab61036c787
 title: tribe
 type: component
 category: feature
@@ -29,7 +29,7 @@ Deliver features through a 5-agent chain of command — Shaman (What/Why) → Wa
 
 ## Purpose
 
-Owns the delivery role contracts: who may talk to whom (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, adjacent ranks only), which question each role answers, how questions flow up as statuses (NEEDS_DIRECTION / NEEDS_CONTEXT / BLOCKED) and decisions flow down as idea cards and briefs, with memory in files (roadmap, Decision Log, spec, plan, reports). Non-goals: none of these agents replaces the owner's judgment on irreversible decisions.
+Owns the delivery role contracts: who may talk to whom (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, adjacent ranks only), which question each role answers, how questions flow up as statuses (NEEDS_DIRECTION / NEEDS_CONTEXT / BLOCKED) and decisions flow down as idea cards and briefs, with memory in files (roadmap, Decision Log, spec, plan, reports). Invocation surface: two skills bind owner phrases to dispatch — `mammoth-hunt` (the full 5-role chain on ONE piece of work, scout + tracker riding as standing constraints in the warchief brief) and `orchestrate-campaign` (a batch of roadmap cards, unattended). Non-goals: none of these agents replaces the owner's judgment on irreversible decisions.
 
 ## Foundational Flow
 
