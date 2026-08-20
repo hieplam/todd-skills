@@ -207,6 +207,20 @@ class ArmPlanning(unittest.TestCase):
             arms=("clean",), runs=3, has_memory_fixture=False)
         self.assertEqual([j["run_idx"] for j in jobs], [0, 1, 2])
 
+    def test_mem_arm_with_only_without_skill_requested_is_skipped_with_a_note(self):
+        # The mem arm only ever runs the with_skill leg (plan_arm_configurations).
+        # Requesting --mode without_skill together with --arm mem intersects to
+        # ZERO configurations for the mem arm even though a memory_fixture exists —
+        # this must be an honest, noted skip (like the no-fixture case), never a
+        # silent zero-job vanish.
+        jobs, notes = run_evals.plan_jobs(
+            cases=[{"id": 1}], configurations=("without_skill",),
+            arms=("mem",), runs=1, has_memory_fixture=True)
+        self.assertEqual(jobs, [])
+        self.assertEqual(len(notes), 1)
+        self.assertIn("mem", notes[0])
+        self.assertIn("with_skill", notes[0])
+
 
 class ArmRollup(unittest.TestCase):
     @staticmethod
