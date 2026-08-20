@@ -291,7 +291,7 @@ memory-free today, so ambient-memory suppression is currently unmeasurable.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing tests.** Append:
+- [x] **Step 1: Write the failing tests.** Append:
 
 ```python
 class ArmPlanning(unittest.TestCase):
@@ -362,7 +362,7 @@ class ArmRollup(unittest.TestCase):
 
   Expected: every test in both classes fails with `AttributeError`.
 
-- [ ] **Step 2: Implement the pure planners** in `run_evals.py`, next to `CONFIGURATIONS`:
+- [x] **Step 2: Implement the pure planners** in `run_evals.py`, next to `CONFIGURATIONS`:
 
 ```python
 ARMS = ("clean", "mem")
@@ -417,7 +417,7 @@ def plan_jobs(cases: list, configurations: tuple, arms: tuple, runs: int,
     return jobs, notes
 ```
 
-- [ ] **Step 3: Implement the rollup** next to `summarize_configuration`:
+- [x] **Step 3: Implement the rollup** next to `summarize_configuration`:
 
 ```python
 def summarize_with_skill_by_arm(runs: list) -> dict:
@@ -450,7 +450,7 @@ def arm_delta(by_arm: dict) -> dict | None:
     }
 ```
 
-- [ ] **Step 4: Wire it into `main()` and `run_case()`.**
+- [x] **Step 4: Wire it into `main()` and `run_case()`.**
   - Add the flag:
     `ap.add_argument("--arm", choices=["clean", "mem", "both"], default="clean", help="Ambient-memory axis: clean (no CLAUDE.md in scratch, the default), mem (the fixture's memory_fixture written to scratch/CLAUDE.md), or both. The mem arm runs the with_skill leg only.")`
   - `arms = ARMS if args.arm == "both" else (args.arm,)`, and record `"arms": list(arms)` in
@@ -485,7 +485,7 @@ def arm_delta(by_arm: dict) -> dict | None:
         run_summary["arm_delta"] = delta
 ```
 
-- [ ] **Step 5: Keep `compare.py` from blending the two arms.** `index_runs`
+- [x] **Step 5: Keep `compare.py` from blending the two arms.** `index_runs`
   (`scripts/evals/compare.py:59-78`) keys each run on
   `(skill_name, eval_id, eval_name, agent)` and filters only on `configuration`. Once a single
   `benchmark.json` can hold both arms, that key silently averages a case's clean and mem
@@ -530,7 +530,7 @@ class CompareArmFiltering(unittest.TestCase):
 
   Expected: both tests fail first (`index_runs` takes two arguments), then pass.
 
-- [ ] **Step 6: Prove it green.**
+- [x] **Step 6: Prove it green.**
 
 ```bash
 python3 -m unittest discover -s scripts/evals/tests -t . -v
@@ -541,7 +541,7 @@ scripts/evals/run_evals.py --all --arm both --dry-run
   Expected: unittest `OK`; both dry runs exit 0 and list the same cases (no fixture declares a
   `memory_fixture` yet, so `--arm both` prints the skip note and plans no mem cell).
 
-- [ ] **Step 7: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 3/10`.
+- [x] **Step 7: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 3/10`.
 
 ---
 

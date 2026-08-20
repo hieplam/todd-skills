@@ -94,6 +94,56 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIGURATIONS = ("with_skill", "without_skill")
+ARMS = ("clean", "mem")
+
+
+def plan_arm_configurations(arm: str, configurations: tuple) -> tuple:
+    """Pure: which legs this arm runs.
+
+    The without_skill baseline is `claude -p --safe-mode`, and --safe-mode disables
+    CLAUDE.md — so a "mem baseline" would silently be a clean baseline wearing a mem
+    label. Rather than weaken the baseline's isolation (c3-301 records that as the
+    "Baseline contamination" risk), the mem arm runs the with_skill leg only and the
+    clean arm's baseline is shared.
+    """
+    if arm == "mem":
+        return tuple(c for c in configurations if c == "with_skill")
+    return tuple(configurations)
+
+
+def plan_memory_files(arm: str, memory_fixture: Path | None) -> dict:
+    """Pure: what ambient memory the scratch dir must (not) contain for this arm.
+
+    Mirrors the detection harness's planScratch(): the clean arm does not merely
+    skip writing memory, it ASSERTS none is present, so a leak is caught rather
+    than quietly measured.
+    """
+    if arm == "mem":
+        return {"memory_files": [("CLAUDE.md", memory_fixture)] if memory_fixture else [],
+                "assert_no_memory": False}
+    return {"memory_files": [], "assert_no_memory": True}
+
+
+def plan_jobs(cases: list, configurations: tuple, arms: tuple, runs: int,
+              has_memory_fixture: bool) -> tuple:
+    """Pure: the (case, configuration, arm, run) grid plus honest skip notes.
+
+    A mem arm requested for a fixture that declares no memory_fixture is SKIPPED
+    with a note — never run as a clean cell labelled `mem`, which would report a
+    number nobody measured.
+    """
+    jobs: list = []
+    notes: list = []
+    for arm in arms:
+        if arm == "mem" and not has_memory_fixture:
+            notes.append("mem arm skipped: fixture declares no memory_fixture")
+            continue
+        for case in cases:
+            for configuration in plan_arm_configurations(arm, configurations):
+                for run_idx in range(runs):
+                    jobs.append({"case": case, "configuration": configuration,
+                                  "arm": arm, "run_idx": run_idx})
+    return jobs, notes
 
 
 # ---------------------------------------------------------------------------
@@ -521,7 +571,8 @@ def materialize_files(scratch: Path, files: list) -> list[str]:
 def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | None,
              configuration: str, timeout: int, exec_model: str | None,
              grader_model: str | None, out_dir: Path, verbose: bool, run_idx: int = 0,
-             permission_mode: str | None = None) -> dict:
+             permission_mode: str | None = None, arm: str = "clean",
+             memory_fixture: Path | None = None) -> dict:
     scratch = Path(tempfile.mkdtemp(prefix="todd-skills-eval-"))
     try:
         try:
@@ -538,6 +589,22 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             # already-completed case's results in the batch, each backed by a real,
             # paid `claude -p` subprocess call.
             return {"error": f"fixture setup failed: {e}", "configuration": configuration}
+
+        try:
+            mem_plan = plan_memory_files(arm, memory_fixture)
+            for rel, src in mem_plan["memory_files"]:
+                shutil.copyfile(src, scratch / rel)
+            if mem_plan["assert_no_memory"] and (scratch / "CLAUDE.md").exists():
+                return {"error": "clean arm: scratch dir unexpectedly contains CLAUDE.md",
+                        "configuration": configuration}
+        except Exception as e:  # noqa: BLE001 - mirrors the materialize_files guard above:
+            # a memory-fixture write failure (declared-but-missing file, permission
+            # error, any OS-specific I/O failure) is a harness failure exactly like a
+            # bad `files` fixture, so it must degrade into this case's {"error": ...}
+            # signal rather than escape through pool.map with no handler up to
+            # main(), which would discard every already-completed, already-paid case.
+            return {"error": f"memory fixture setup failed: {e}", "configuration": configuration}
+
         if verbose and fixtures:
             print(f"    [{configuration}] fixtures: {', '.join(fixtures)}", file=sys.stderr)
         agents_json = None
@@ -595,7 +662,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         # runs of the same case+configuration never overwrite each other's
         # transcript.md/metrics.json/grading.json (the per-run evidence trail the
         # card requires).
-        run_dir = out_dir / f"eval-{case['id']}-{case['name']}" / configuration / f"run-{run_idx + 1}"
+        run_dir = out_dir / f"eval-{case['id']}-{case['name']}" / arm / configuration / f"run-{run_idx + 1}"
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "transcript.md").write_text(
             f"# {case['name']} — {configuration}\n\n## Prompt\n{case['prompt']}\n\n"
@@ -641,6 +708,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
             "eval_id": case["id"],
             "eval_name": case["name"],
             "configuration": configuration,
+            "arm": arm,
             "result": {
                 "pass_rate": grading_json["summary"]["pass_rate"],
                 "passed": grading_json["summary"]["passed"],
@@ -699,6 +767,36 @@ def summarize_configuration(runs: list[dict]) -> dict:
         summary["pass_rate"] = {"mean": round(mean(pass_rates), 3), "stddev": round(stddev(pass_rates), 3),
                                  "min": min(pass_rates), "max": max(pass_rates)}
     return summary
+
+
+def summarize_with_skill_by_arm(runs: list) -> dict:
+    """Pure-ish: per-arm rollup of the with_skill leg only.
+
+    The baseline leg exists only in the clean arm, so including it would compare a
+    two-leg average against a one-leg average.
+    """
+    out: dict = {}
+    for arm in ARMS:
+        arm_runs = [r for r in runs
+                    if r.get("arm") == arm and r["configuration"] == "with_skill"]
+        if arm_runs:
+            out[arm] = summarize_configuration(arm_runs)
+    return out
+
+
+def arm_delta(by_arm: dict) -> dict | None:
+    """Pure: mem minus clean, with_skill leg. REPORTED, NEVER GATED (card G4).
+
+    Realistic ambient memory can suppress a behavior as easily as it can seed it,
+    so a negative delta is a real finding to publish, not a failure to hide.
+    """
+    clean, mem = by_arm.get("clean"), by_arm.get("mem")
+    if not clean or not mem or "pass_rate" not in clean or "pass_rate" not in mem:
+        return None
+    return {
+        "pass_rate": fmt_delta(mem["pass_rate"]["mean"], clean["pass_rate"]["mean"]),
+        "note": "mem minus clean, with_skill leg; reported, never gated",
+    }
 
 
 def fmt_delta(with_val: float, without_val: float) -> str:
@@ -781,6 +879,10 @@ def main() -> int:
     ap.add_argument("--all", action="store_true", help="Discover + run every plugins/**/evals/evals.json")
     ap.add_argument("--eval-id", default=None, help="Comma-separated eval ids to restrict to (default: all)")
     ap.add_argument("--mode", choices=["both", "with_skill", "without_skill"], default="both")
+    ap.add_argument("--arm", choices=["clean", "mem", "both"], default="clean",
+                    help="Ambient-memory axis: clean (no CLAUDE.md in scratch, the default), "
+                         "mem (the fixture's memory_fixture written to scratch/CLAUDE.md), or "
+                         "both. The mem arm runs the with_skill leg only.")
     ap.add_argument("--runs", type=int, default=1, help="Runs per case per configuration")
     ap.add_argument("--timeout", type=int, default=420, help="Seconds per claude -p call (executor or grader)")
     ap.add_argument("--exec-model", default=None, help="Model for the executor (default: user's configured model)")
@@ -818,6 +920,7 @@ def main() -> int:
         wanted_ids = {int(x) for x in args.eval_id.split(",")}
 
     configurations = CONFIGURATIONS if args.mode == "both" else (args.mode,)
+    arms = ARMS if args.arm == "both" else (args.arm,)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_root = Path(args.out_dir) if args.out_dir else REPO_ROOT / "scripts" / "evals" / "runs" / timestamp
@@ -829,6 +932,9 @@ def main() -> int:
     # timeout, ...) as distinct from "a case ran and was graded FAIL on its merits" —
     # see the exit-code decision at the end of main().
     setup_errors: list[str] = []
+    # Honest mem-arm skips ("fixture declares no memory_fixture") — reported in
+    # benchmark.json rather than run as a silently-clean cell labelled "mem".
+    notes: list[str] = []
     total_cases_matched = 0
     agents_dir_override = Path(args.agents_dir).resolve() if args.agents_dir else None
     skill_dir_override = Path(args.skill_dir).resolve() if args.skill_dir else None
@@ -842,6 +948,7 @@ def main() -> int:
         "grader_model": args.grader_model or args.exec_model or "(default)",
         "permission_mode": args.permission_mode,
         "agents_dir": display_path(agents_dir_override) if agents_dir_override else "(default)",
+        "arms": list(arms),
         "evals_run": [],
     }
 
@@ -857,6 +964,18 @@ def main() -> int:
             evals_path, data.get("kind"), agents_dir_override, skill_dir_override)
         cases = [c for c in data["evals"] if wanted_ids is None or c["id"] in wanted_ids]
         total_cases_matched += len(cases)
+
+        # Optional top-level `memory_fixture`, resolved relative to the evals.json's
+        # OWN directory (not REPO_ROOT) — mirrors the detection harness's
+        # memory-fixture/CLAUDE.md layout, one fixture per skill under its evals/.
+        memory_fixture = None
+        if data.get("memory_fixture"):
+            memory_fixture = (evals_path.parent / data["memory_fixture"]).resolve()
+            if not memory_fixture.is_file():
+                msg = (f"{skill_name}: declared memory_fixture "
+                       f"{display_path(memory_fixture)} does not exist")
+                print(f"WARN: {msg}", file=sys.stderr)
+                setup_errors.append(msg)
         # Digest the exact subject text each case will run against. A pass-rate
         # delta between two benchmarks is only attributable to a prompt edit if
         # you can show the prompts actually differed — these hashes are that
@@ -869,20 +988,29 @@ def main() -> int:
 
         print(f"== {skill_name} ({kind}) — {len(cases)} case(s) from {display_path(evals_path)} ==")
 
-        for case in cases:
-            for configuration in configurations:
-                # For agent evals, without_skill means "no persona at all" — still a
-                # meaningful baseline (does a vanilla Claude do the right thing
-                # anyway?), so it stays in the default `both` mode, not skipped.
-                if args.dry_run:
-                    print(f"  eval {case['id']}: {case['name']}")
-                    print(f"    [dry-run] would execute {configuration}")
-                    continue
-                for run_idx in range(args.runs):
-                    jobs.append({"case": case, "kind": kind, "skill_dir": skill_dir,
-                                  "agents_dir": agents_dir, "configuration": configuration,
-                                  "run_idx": run_idx, "skill_name": skill_name,
-                                  "out_dir": out_root / skill_name})
+        planned_jobs, arm_notes = plan_jobs(
+            cases, configurations, arms, args.runs, has_memory_fixture=memory_fixture is not None)
+        notes.extend(arm_notes)
+        for note in arm_notes:
+            print(f"  NOTE: {note}")
+
+        for planned in planned_jobs:
+            case = planned["case"]
+            configuration = planned["configuration"]
+            arm = planned["arm"]
+            run_idx = planned["run_idx"]
+            # For agent evals, without_skill means "no persona at all" — still a
+            # meaningful baseline (does a vanilla Claude do the right thing
+            # anyway?), so it stays in the default `both` mode, not skipped.
+            if args.dry_run:
+                print(f"  eval {case['id']}: {case['name']}")
+                print(f"    [dry-run] would execute arm={arm} {configuration} run {run_idx + 1}")
+                continue
+            jobs.append({"case": case, "kind": kind, "skill_dir": skill_dir,
+                          "agents_dir": agents_dir, "configuration": configuration,
+                          "arm": arm, "memory_fixture": memory_fixture,
+                          "run_idx": run_idx, "skill_name": skill_name,
+                          "out_dir": out_root / skill_name})
 
     # Each job is an independent `claude -p` subprocess writing to its own scratch
     # temp dir and its own output path, so they share no state and can overlap.
@@ -894,7 +1022,8 @@ def main() -> int:
             job["configuration"], timeout=args.timeout, exec_model=args.exec_model,
             grader_model=args.grader_model or args.exec_model,
             out_dir=job["out_dir"], verbose=args.verbose, run_idx=job["run_idx"],
-            permission_mode=args.permission_mode,
+            permission_mode=args.permission_mode, arm=job["arm"],
+            memory_fixture=job["memory_fixture"],
         )
         return job, result
 
@@ -961,12 +1090,22 @@ def main() -> int:
             "tokens": fmt_delta(with_summary["tokens"]["mean"], without_summary["tokens"]["mean"]),
         }
 
+    # Reported, never gated (G4): arm_delta influences no exit code, no pass/fail,
+    # no threshold. A negative delta (ambient memory SUPPRESSING the behavior) is a
+    # real finding to publish, exactly as honestly as a positive one.
+    by_arm = summarize_with_skill_by_arm(all_runs)
+    if by_arm:
+        run_summary["by_arm"] = by_arm
+    delta = arm_delta(by_arm)
+    if delta:
+        run_summary["arm_delta"] = delta
+
     benchmark = {
         "metadata": metadata,
         "runs": all_runs,
         "run_summary": run_summary,
         "setup_errors": setup_errors,
-        "notes": [],
+        "notes": notes,
     }
 
     out_root.mkdir(parents=True, exist_ok=True)
