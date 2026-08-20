@@ -297,7 +297,7 @@ async function main() {
   const outDir = join(DETECTION_ROOT, 'results', new Date().toISOString().replace(/[:.]/g, '-'));
   mkdirSync(outDir, { recursive: true });
 
-  const cellResults: Record<string, { pass: boolean; scores: ReturnType<typeof score>[] }> = {};
+  const cellResults: Record<string, { pass: boolean; passCount: number; totalReps: number; scores: ReturnType<typeof score>[] }> = {};
   for (const leg of legs) {
     for (const arm of arms) {
       const repPasses: boolean[] = [];
@@ -333,7 +333,12 @@ async function main() {
           : leg === 'tracker' && arm === 'clean' ? evaluateLegBClean(s.recall, s.invented) : [];
         repPasses.push(gates.length === 0 ? true : repetitionPasses(gates));
       }
-      cellResults[`${leg}-${arm}`] = { pass: cellPasses(repPasses), scores };
+      cellResults[`${leg}-${arm}`] = {
+        pass: cellPasses(repPasses),
+        passCount: repPasses.filter(Boolean).length,
+        totalReps: repPasses.length,
+        scores,
+      };
     }
   }
 

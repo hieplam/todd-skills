@@ -11,14 +11,17 @@ cd plugins/tribe/evals/detection
 bun test core                                   # pure core + fixture meta-tests, no network
 (cd fixtures/orderly && bun test && bunx tsc --noEmit)   # the fixture's own suite + typecheck
 bun run.ts --dry-run --leg both --arm both       # print the full plan, zero API calls
-bun run.ts --leg both --arm both --reps 3        # the real benchmark (24 claude -p calls)
+bun run.ts --leg both --arm both --reps 3        # the real benchmark (24 claude -p calls nominally;
+                                                  # a malformed grader reply adds one retry)
 ```
 
 ## CLI
 
 ```
 bun run.ts --leg scout|tracker|both --arm clean|mem|both [--fixture orderly] [--model <id>]
-           [--reps 3] [--dry-run] [--min-recall 0.70] [--min-precision 0.70] [--scratch <dir>]
+           [--grader-model <id>] [--reps 3] [--dry-run] [--min-recall 0.70] [--min-precision 0.70]
+           [--scratch <dir>]  # accepted but NOT YET IMPLEMENTED — run.ts always writes to
+                               # results/<timestamp>, ignoring this flag
 ```
 
 Defaults: `--reps 3`, `--min-recall 0.70`, `--min-precision 0.70` — these match the gate table in
@@ -34,7 +37,11 @@ the design spec; override for a cheaper smoke pass.
 3. Add `diffs/<name>-pr1.patch` if the fixture supports a Tracker (diff) leg.
 4. Add a `core/fixture-meta.test.ts`-style test asserting every manifest exemplar/deviation path
    exists in the fixture and the deviation line matches.
-5. `bun run.ts --fixture <name> --dry-run` to sanity-check the plan before a real run.
+5. `bun run.ts --fixture <name> --dry-run` to sanity-check the plan before a real run. Today
+   `--fixture <name>` only selects which manifest (`manifest/<name>.json`) gets loaded — the
+   copied source directory is hardcoded to `fixtures/orderly` in `run.ts`. Adding a second
+   fixture therefore also requires updating that hardcoded path in `run.ts` before `--fixture
+   <name>` actually switches which codebase gets copied.
 
 ## Output
 
