@@ -8,13 +8,16 @@
 // every external importer (cli/main.ts, adapters/, tests)
 // keeps importing from `./loop.ts`/`../core/loop.ts` unchanged — the directory split under it
 // is an implementation detail. Every export below is exactly what this module exported before
-// the split; nothing here is new surface.
+// the split, plus `liveLockHolder` (P11 fix-list follow-up: the `reset-card` CLI subcommand's
+// read-only lock check, extracted out of `acquireLock` in `./loop/lock.ts` — genuinely new
+// surface, added here rather than duplicated in a second import path).
 export type { RunLoopConfig } from './types.ts';
 export type { DerivePhaseIO, ExecResult, LockIO, LockInfo, LoopIO } from '../ports/ports.ts';
 
 export {
   acquireLock,
   isStopRequested,
+  liveLockHolder,
   lockFilePath,
   releaseLock,
   stateDirOf,

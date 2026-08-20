@@ -10,6 +10,7 @@ import {
   deriveCardPhase,
   extractMergeSha,
   isStopRequested,
+  liveLockHolder,
   releaseLock,
   resolveBaseBranch,
   runLoop,
@@ -21,12 +22,30 @@ import {
   type LoopIO,
   type RunLoopConfig,
 } from './loop.ts';
-import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from './types.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_RULINGS_UNRATIFIED, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import { BRIEF_TEMPLATE_PATH } from './brief.ts';
-import { answersPathOf, campaignStatePathOf } from './paths.ts';
-import type { Card, CampaignState } from './types.ts';
+import { answersPathOf, campaignStatePathOf, escalationPathOf } from './paths.ts';
+import type { Card, CampaignState, ResolvedConfig } from './types.ts';
 import type { SessionMessage, SpawnSessionParams } from './session.ts';
-import type { VerifyResult } from './verify.ts';
+import { verifyShipped } from './verify.ts';
+import type { VerifyConfig, VerifyResult } from './verify.ts';
+// P4 fix-list item: `healSafeResidue` is the ONE helper `actOnCard`'s two verify call sites
+// use to self-heal safe residue between a first failed verify and the retry — exercised
+// directly here (same `CardCtx` shape `runPass` builds) so the healed retry detail is
+// observable, which `CardOutcome`'s `shipped` variant deliberately does not carry.
+import {
+  healSafeResidue,
+  CONTINUE_UNKNOWN_STATE_PROMPT,
+  recordBaseSha,
+  shipCard,
+  escalateCard,
+  performRevertAndRedo,
+} from './loop/card-actions.ts';
+import type { CardCtx } from './loop/card-actions.ts';
+// P4 audit fix-round: proving the "report notes the heal" acceptance criterion at the ONLY
+// artifact an orchestrating session actually reads (report.ts), not just at healSafeResidue's
+// in-memory VerifyResult.
+import { buildCampaignReport, renderReportMarkdown } from './report.ts';
 
 // ---------------------------------------------------------------------------------------
 // Shared fixtures
@@ -138,13 +157,33 @@ describe('deriveCardPhase — §D4 reality table', () => {
     }
   });
 
-  test('genuine no-trace (card.branch null) still yields a plain blind fresh — no bogus digest', async () => {
+  test('genuine no-trace (card.branch null, no sessionId either) still yields a plain blind fresh — no bogus digest', async () => {
     const io = ioWith({});
     const phase = await deriveCardPhase('C1', fixtureCard({ branch: null }), baseConfig, io);
     expect(phase).toEqual({ kind: 'fresh' });
     if (phase.kind === 'fresh') {
       expect(phase.digest).toBeUndefined();
     }
+  });
+
+  // P1 audit fix-round (blocker, skinnerB): the exact incident shape — an executor "opens its
+  // PR ... then ends its turn" with no terminal line — leaves `card.branch`/`card.pr` null
+  // (session.ts's `parseResultMessage` never populates `pr` on an `'error'` outcome, and
+  // `card-actions.ts`'s `recordBranchFromPr` is gated on `card.pr`), even though
+  // `onSessionStart` DID record `card.sessionId` the instant the SDK assigned it. Before this
+  // fix, `!card.branch` short-circuited straight to a blind `{ kind: 'fresh' }` here, silently
+  // discarding that sessionId and risking a duplicate PR/worktree on the very retry the P1
+  // spec exists to make safe. It must instead resume the one thing that DOES know what
+  // happened: the prior SDK session itself.
+  test('no branch/PR recorded, but sessionId IS recorded (P1 incident shape: session opened a PR then errored before reporting) -> resume with reason session_only', async () => {
+    const io = ioWith({});
+    const phase = await deriveCardPhase(
+      'C1',
+      fixtureCard({ branch: null, sessionId: 'sess-c1-try1' }),
+      baseConfig,
+      io,
+    );
+    expect(phase).toEqual({ kind: 'resume', sessionId: 'sess-c1-try1', reason: 'session_only' });
   });
 
   test('branch/worktree exist (worktree present), sessionId recorded -> resume with reason branch_no_pr', async () => {
@@ -262,6 +301,46 @@ describe('acquireLock / releaseLock — §D2 single-instance lock', () => {
   });
 });
 
+// P11 fix-list follow-up: `liveLockHolder` is the read-only half of `acquireLock` extracted so
+// the `reset-card` CLI subcommand can ask "is a pass currently mid-flight on this campaign?"
+// WITHOUT claiming the lock itself (unlike `acquireLock`, it never calls `writeLock`).
+describe('liveLockHolder — the read-only lock check reset-card needs (P11 follow-up)', () => {
+  test('no existing lock -> null, writeLock never called', () => {
+    const io = { readLock: () => null, isProcessAlive: () => true };
+    expect(liveLockHolder(io)).toBeNull();
+  });
+
+  test('existing lock held by a LIVE pid -> returns it verbatim', () => {
+    const lock = { pid: 123, startedAt: '2026-07-15T00:00:00Z' };
+    const io = { readLock: () => lock, isProcessAlive: (pid: number) => pid === 123 };
+    expect(liveLockHolder(io)).toEqual(lock);
+  });
+
+  test('existing lock held by a DEAD pid -> null (dead-process debris, not a live claim)', () => {
+    const io = { readLock: () => ({ pid: 123, startedAt: '2026-07-15T00:00:00Z' }), isProcessAlive: () => false };
+    expect(liveLockHolder(io)).toBeNull();
+  });
+
+  test('acquireLock refuses using the exact same liveness check (no drift between the two)', () => {
+    const lock = { pid: 123, startedAt: '2026-07-15T00:00:00Z' };
+    const io: LockIO = {
+      readLock: () => lock,
+      writeLock: () => {},
+      removeLock: () => {},
+      isProcessAlive: (pid) => pid === 123,
+      currentPid: () => 999,
+      now: () => '2026-07-16T00:00:00Z',
+    };
+    const acquireResult = acquireLock(io);
+    const held = liveLockHolder(io);
+    expect(acquireResult.ok).toBe(false);
+    expect(held).not.toBeNull();
+    if (!acquireResult.ok && held) {
+      expect(acquireResult.heldBy).toEqual(held);
+    }
+  });
+});
+
 // ===========================================================================================
 // STOP file
 // ===========================================================================================
@@ -345,6 +424,21 @@ function needsDirectionMessages(sessionId: string): SessionMessage[] {
   ];
 }
 
+/** A `result` message carrying neither a `SHIPPED` nor a `NEEDS_DIRECTION` terminal line —
+ * `parseResultMessage` (session.ts) classifies this outcome `'error'`, exactly the "ended the
+ * turn without reporting" shape the P1 fix-list's bounded auto-retry targets. */
+function errorMessages(sessionId: string): SessionMessage[] {
+  return [
+    { type: 'system', subtype: 'init', session_id: sessionId },
+    {
+      type: 'result',
+      subtype: 'success',
+      result: 'armed a Monitor and ended the turn without a terminal line',
+      session_id: sessionId,
+    },
+  ];
+}
+
 interface MockLoopIoOptions {
   stateJson: string;
   answers?: string;
@@ -371,6 +465,7 @@ interface MockLoopIoResult {
   lockCalls: string[];
   ensuredDirs: string[];
   atomicWrites: Array<{ path: string; content: string }>;
+  renameCalls: Array<{ from: string; to: string }>;
 }
 
 function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
@@ -383,6 +478,7 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
   const lockCalls: string[] = [];
   const ensuredDirs: string[] = [];
   const atomicWrites: Array<{ path: string; content: string }> = [];
+  const renameCalls: Array<{ from: string; to: string }> = [];
   let lock = opts.lock ?? null;
   const spawnQueue = [...(opts.spawnQueue ?? [])];
   const escalationFiles = new Set(opts.escalationFiles ?? []);
@@ -430,6 +526,16 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     writeFile: mock((p: string, content: string) => {
       writtenFiles.set(p, content);
     }),
+    // P6 (fix-list): records every rename (archive) so tests can assert `shipCard` archived
+    // a leftover escalation file — and mutates `escalationFiles` so a subsequent `fileExists`
+    // check on the ORIGINAL path reflects the file having moved away (the archived name never
+    // matches the `/escalations/<cardId>.md` pattern `fileExists` above keys on, since it no
+    // longer ends in `.md`).
+    renameFile: mock((from: string, to: string) => {
+      renameCalls.push({ from, to });
+      const cardMatch = /([^/]+)\.md$/.exec(from);
+      if (cardMatch) escalationFiles.delete(cardMatch[1] as string);
+    }),
     readLock: mock(() => lock),
     writeLock: mock((info: LockInfo) => {
       lockCalls.push(`write:${info.pid}`);
@@ -457,7 +563,7 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     }),
   };
 
-  return { io, calls, writtenFiles, spawnBriefs, lockCalls, ensuredDirs, atomicWrites };
+  return { io, calls, writtenFiles, spawnBriefs, lockCalls, ensuredDirs, atomicWrites, renameCalls };
 }
 
 function baseLoopConfig(overrides: Partial<RunLoopConfig> = {}): RunLoopConfig {
@@ -606,6 +712,67 @@ describe('runLoop — recordBaseSha rev-parses the resolved <remote>/<baseBranch
 
     const revParseCall = calls.find((c) => c[0] === 'git' && c[1] === 'rev-parse');
     expect(revParseCall).toEqual(['git', 'rev-parse', 'upstream/main']);
+  });
+});
+
+// P11 fix-list: `recordBaseSha` now learns the phase — a BLIND-FRESH spawn (no prior world at
+// all: no session, no PR, no digest) re-stamps any pre-existing `baseSha`, because a card with
+// no world can only be carrying a stale/hand-authored one (ruling R3: a stale base is worse
+// than no base — see the incident this fix-list item closes). Resume/fresh-with-digest phases
+// keep the existing base unchanged: the card genuinely started from it. Exercised by calling
+// `recordBaseSha` directly (same `CardCtx` shape `runPass` builds, the same pattern
+// `healSafeResidue`'s tests above already use) rather than through the full `runLoop`, so this
+// stays isolated from `state.ts`'s OWN separate load-time normalization of the impossible
+// `staged`+`sessionId: null`+`baseSha` combo (tested independently in `state.test.ts`) — a
+// fresh-with-digest card is, by definition, `sessionId: null` too, so routing it through
+// `loadState` first would strip its `baseSha` before `recordBaseSha` ever saw it, conflating
+// the two layers this fix-list item deliberately keeps separate.
+describe('recordBaseSha — learns the phase (P11, ruling R3)', () => {
+  function ctxFor(card: Card, execHandlers: Array<(cmd: string[]) => ExecResult | null> = []): {
+    ctx: CardCtx;
+    calls: string[][];
+  } {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: card } });
+    const { io, calls } = buildMockLoopIo({ stateJson: JSON.stringify(state), execHandlers });
+    const resolved: ResolvedConfig = {
+      ...baseLoopConfig(),
+      baseBranch: 'master',
+      answersContent: '',
+      briefTemplate: '',
+    };
+    return { ctx: { cardId: 'C1', state, resolved, io }, calls };
+  }
+
+  test('blind fresh (phase.kind "fresh", no digest) + a stale pre-existing baseSha -> overwritten with the current rev-parse result', async () => {
+    const card = fixtureCard({ branch: null, sessionId: null, baseSha: 'stale-hand-reset-sha' });
+    const { ctx, calls } = ctxFor(card, [
+      (cmd) => (cmd[0] === 'git' && cmd[1] === 'rev-parse' ? ok('freshbase01\n') : null),
+    ]);
+
+    await recordBaseSha(ctx, { kind: 'fresh' });
+
+    expect(ctx.state.cards.C1?.baseSha).toBe('freshbase01');
+    expect(calls).toContainEqual(['git', 'rev-parse', 'origin/master']);
+  });
+
+  test('fresh-with-digest (F8: open PR, no sessionId recorded) + an existing baseSha -> kept, not overwritten (no rev-parse call at all)', async () => {
+    const card = fixtureCard({ sessionId: null, baseSha: 'existing-base-abc' });
+    const { ctx, calls } = ctxFor(card);
+
+    await recordBaseSha(ctx, { kind: 'fresh', digest: '## Crash-recovery digest for C1\n...' });
+
+    expect(ctx.state.cards.C1?.baseSha).toBe('existing-base-abc');
+    expect(calls.find((c) => c[0] === 'git' && c[1] === 'rev-parse')).toBeUndefined();
+  });
+
+  test('resume phase (PR open, sessionId recorded) + an existing baseSha -> kept, not overwritten (no rev-parse call at all)', async () => {
+    const card = fixtureCard({ sessionId: 'sess-old', baseSha: 'existing-base-xyz' });
+    const { ctx, calls } = ctxFor(card);
+
+    await recordBaseSha(ctx, { kind: 'resume', sessionId: 'sess-old', reason: 'pr_open', pr: 7 });
+
+    expect(ctx.state.cards.C1?.baseSha).toBe('existing-base-xyz');
+    expect(calls.find((c) => c[0] === 'git' && c[1] === 'rev-parse')).toBeUndefined();
   });
 });
 
@@ -1003,6 +1170,519 @@ describe('runLoop — double verify-fail -> escalation', () => {
   });
 });
 
+// ===========================================================================================
+// P4 fix-list item: verify self-heals safe residue instead of escalating
+// (docs/tribe/fixlists/2026-08-08-outstanding-17/P4-self-heal-safe-residue.md)
+// ===========================================================================================
+
+describe('runLoop — self-heals safe residue between the first failed verify and the retry (P4)', () => {
+  test('merged PR + only remote-branch residue -> deletes the branch, ships, no escalation', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', pr: null }) },
+    });
+    let branchDeleted = false;
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view' && cmd[3] === 'feat/c1-widget') {
+            return ok(JSON.stringify({ number: 12, state: 'MERGED' }));
+          }
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') {
+            return branchDeleted ? ok('') : ok('abc123\trefs/heads/feat/c1-widget\n');
+          }
+          if (cmd[0] === 'git' && cmd[1] === 'push' && cmd[2] === 'origin' && cmd[3] === '--delete') {
+            branchDeleted = true;
+            return ok('');
+          }
+          return null;
+        },
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    // The heal exec fired.
+    expect(calls).toContainEqual(['git', 'push', 'origin', '--delete', 'feat/c1-widget']);
+    // The card shipped, not escalated.
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed[0]).toEqual({ kind: 'shipped', cardId: 'C1' });
+  });
+
+  test('dirty worktree residue -> no heal exec, escalates as today', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', pr: null }) },
+    });
+    const worktreePorcelain = [
+      'worktree /repo/.worktrees/c1',
+      'HEAD abcdef0123456789abcdef0123456789abcdef01',
+      'branch refs/heads/feat/c1-widget',
+    ].join('\n');
+    const { io, calls, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view' && cmd[3] === 'feat/c1-widget') {
+            return ok(JSON.stringify({ number: 12, state: 'MERGED' }));
+          }
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok(worktreePorcelain);
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('');
+          // The worktree is DIRTY — `git status --porcelain` reports a pending change.
+          if (cmd[0] === 'git' && cmd[1] === 'status') return ok(' M some-file.txt\n');
+          return null;
+        },
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    // No heal exec fired — neither recipe was invoked.
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'push' && c[2] === 'origin' && c[3] === '--delete')).toBe(
+      false,
+    );
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'worktree' && c[2] === 'remove')).toBe(false);
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'branch' && c[2] === '-D')).toBe(false);
+    // Escalates exactly as before P4.
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1', reason: 'verify_failed_twice' });
+    const escalationOutcome = result.processed[0] as { escalationPath: string };
+    const escalationMarkdown = writtenFiles.get(escalationOutcome.escalationPath) ?? '';
+    expect(escalationMarkdown).not.toContain('healed:');
+    expect(escalationMarkdown).toContain('worktree still present');
+  });
+
+  test('healSafeResidue: merged + remote-branch residue -> retry result detail records "healed: delete_remote_branch"', async () => {
+    const card = fixtureCard({ branch: 'feat/c1-widget', pr: 12 });
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: card } });
+    let branchDeleted = false;
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') {
+            return branchDeleted ? ok('') : ok('abc123\trefs/heads/feat/c1-widget\n');
+          }
+          if (cmd[0] === 'git' && cmd[1] === 'push' && cmd[2] === 'origin' && cmd[3] === '--delete') {
+            branchDeleted = true;
+            return ok('');
+          }
+          return null;
+        },
+      ],
+    });
+
+    const resolved: ResolvedConfig = {
+      ...baseLoopConfig(),
+      baseBranch: 'master',
+      answersContent: '',
+      briefTemplate: '',
+    };
+    const verifyConfig: VerifyConfig = {
+      repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
+      schemaLockPaths: [],
+      docsOnlyPaths: ['docs/'],
+    };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    const first = await verifyShipped(card, verifyConfig, io);
+    expect(first.shipped).toBe(false);
+
+    const healed = await healSafeResidue(ctx, first, verifyConfig);
+
+    expect(healed.shipped).toBe(true);
+    expect(calls).toContainEqual(['git', 'push', 'origin', '--delete', 'feat/c1-widget']);
+    const worktreePoint = healed.points.find((p) => p.id === 'worktreeAndBranchGone');
+    expect(worktreePoint?.detail).toContain('healed:');
+    expect(worktreePoint?.detail).toContain('delete_remote_branch');
+  });
+
+  // P4 audit fix-round (blocker, skinnerA): the acceptance criterion is literally "report notes
+  // the heal" — proved here at the report.ts level (the ONLY artifact a human/orchestrating
+  // session reads), not just at healSafeResidue's in-memory VerifyResult.
+  test('report notes the heal: buildCampaignReport surfaces healed residue for the primary ship-without-escalation scenario', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', pr: null }) },
+    });
+    let branchDeleted = false;
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view' && cmd[3] === 'feat/c1-widget') {
+            return ok(JSON.stringify({ number: 12, state: 'MERGED' }));
+          }
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') {
+            return branchDeleted ? ok('') : ok('abc123\trefs/heads/feat/c1-widget\n');
+          }
+          if (cmd[0] === 'git' && cmd[1] === 'push' && cmd[2] === 'origin' && cmd[3] === '--delete') {
+            branchDeleted = true;
+            return ok('');
+          }
+          return null;
+        },
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+    expect(result.exitCode).toBe(EXIT_OK);
+
+    const finalState = JSON.parse(writtenFiles.get(campaignStatePathOf('/th')) as string) as CampaignState;
+    const report = await buildCampaignReport(
+      finalState,
+      { startedAt: 't0', endedAt: 't1', exitCode: EXIT_OK, reason: 'done' },
+      { homeDir: '/th' },
+      { fileExists: () => false, readFile: async () => '' },
+    );
+
+    const shippedEntry = report.cards.C1 as { outcome: string; healedResidue?: string[] };
+    expect(shippedEntry.outcome).toBe('shipped');
+    // Spec (P4-self-heal-safe-residue.md): "...verify passes on retry, NO escalation, report
+    // notes the heal." Before this fix, `shipCard` discarded the VerifyResult entirely and
+    // `CardOutcome`/`Card`/`CardReportEntry` had no field to carry it — this assertion is the
+    // exact gap made observable at the ONLY artifact an orchestrating session reads.
+    expect(shippedEntry.healedResidue).toEqual(['delete_remote_branch']);
+    expect(renderReportMarkdown(report)).toContain('Healed residue: delete_remote_branch');
+  });
+
+  // P4 audit fix-round (should-fix, skinnerB): a heal action whose exec actually FAILS must
+  // never be labeled "(healed: ...)" — that would contradict the spec's intent that the report
+  // show what was ACTUALLY healed "instead of silently passing".
+  test('heal exec fails -> retry detail does NOT claim it was healed', async () => {
+    const card = fixtureCard({ branch: 'feat/c1-widget', pr: 12 });
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: card } });
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok('');
+          // Remote branch is (and stays) present — the delete never actually lands.
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('abc123\trefs/heads/feat/c1-widget\n');
+          if (cmd[0] === 'git' && cmd[1] === 'push' && cmd[2] === 'origin' && cmd[3] === '--delete') {
+            return fail('network blip: could not delete ref');
+          }
+          return null;
+        },
+      ],
+    });
+
+    const resolved: ResolvedConfig = {
+      ...baseLoopConfig(),
+      baseBranch: 'master',
+      answersContent: '',
+      briefTemplate: '',
+    };
+    const verifyConfig: VerifyConfig = {
+      repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
+      schemaLockPaths: [],
+      docsOnlyPaths: ['docs/'],
+    };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    const first = await verifyShipped(card, verifyConfig, io);
+    expect(first.shipped).toBe(false);
+
+    const healed = await healSafeResidue(ctx, first, verifyConfig);
+
+    // The exec was attempted...
+    expect(calls).toContainEqual(['git', 'push', 'origin', '--delete', 'feat/c1-widget']);
+    // ...but since it failed and the branch is still there on retry, the result must still
+    // show NOT shipped, and its detail must NOT self-contradictorily claim a heal happened.
+    expect(healed.shipped).toBe(false);
+    const worktreePoint = healed.points.find((p) => p.id === 'worktreeAndBranchGone');
+    expect(worktreePoint?.detail).not.toContain('healed:');
+  });
+
+  // P4 audit fix-round (blocker, scout): `git branch -D` must never run when the preceding
+  // `git worktree remove` (no --force) was refused — otherwise the local branch ref gets
+  // force-deleted while the (still dirty/refused) worktree directory is orphaned with nothing
+  // pointing at it.
+  test('worktree remove refused -> branch -D is never called', async () => {
+    const card = fixtureCard({ branch: 'feat/c1-widget', pr: 12 });
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: card } });
+    const worktreePorcelain = [
+      'worktree /repo/.worktrees/c1',
+      'HEAD abcdef0123456789abcdef0123456789abcdef01',
+      'branch refs/heads/feat/c1-widget',
+    ].join('\n');
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok(worktreePorcelain);
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('');
+          // Clean + ancestor, so decideResidueHeal DOES propose remove_worktree...
+          if (cmd[0] === 'git' && cmd[1] === 'status') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          // ...but the actual removal is refused (e.g. a stray write raced the probe).
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'remove') {
+            return fail('fatal: working tree is dirty, use --force');
+          }
+          return null;
+        },
+      ],
+    });
+
+    const resolved: ResolvedConfig = {
+      ...baseLoopConfig(),
+      baseBranch: 'master',
+      answersContent: '',
+      briefTemplate: '',
+    };
+    const verifyConfig: VerifyConfig = {
+      repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
+      schemaLockPaths: [],
+      docsOnlyPaths: ['docs/'],
+    };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    const first = await verifyShipped(card, verifyConfig, io);
+    expect(first.shipped).toBe(false);
+    const worktreeFirstPoint = first.points.find((p) => p.id === 'worktreeAndBranchGone');
+    expect(worktreeFirstPoint?.detail).toContain('worktree still present');
+
+    await healSafeResidue(ctx, first, verifyConfig);
+
+    expect(calls).toContainEqual(['git', 'worktree', 'remove', '/repo/.worktrees/c1']);
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'branch' && c[2] === '-D')).toBe(false);
+  });
+
+  // P4 audit fix-round (blocker, scout): `worktreeStatusClean` must be derived from `git status
+  // --porcelain`'s EXIT CODE, not stdout content alone — a failed/errored status call (locked
+  // index, transient error) presents as empty stdout and must NOT be treated as "clean".
+  test('git status --porcelain fails (non-zero exit, empty stdout) -> treated as dirty, no heal', async () => {
+    const card = fixtureCard({ branch: 'feat/c1-widget', pr: 12 });
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: card } });
+    const worktreePorcelain = [
+      'worktree /repo/.worktrees/c1',
+      'HEAD abcdef0123456789abcdef0123456789abcdef01',
+      'branch refs/heads/feat/c1-widget',
+    ].join('\n');
+    const { io, calls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'api') return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list') return ok(worktreePorcelain);
+          if (cmd[0] === 'git' && cmd[1] === 'ls-remote') return ok('');
+          // `git status --porcelain` FAILS (locked index) — stdout is empty, exitCode is 1.
+          if (cmd[0] === 'git' && cmd[1] === 'status') return fail('fatal: Unable to read current working directory');
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          return null;
+        },
+      ],
+    });
+
+    const resolved: ResolvedConfig = {
+      ...baseLoopConfig(),
+      baseBranch: 'master',
+      answersContent: '',
+      briefTemplate: '',
+    };
+    const verifyConfig: VerifyConfig = {
+      repoRoot: resolved.repoRoot,
+      remote: resolved.remote,
+      baseBranch: resolved.baseBranch,
+      schemaLockPaths: [],
+      docsOnlyPaths: ['docs/'],
+    };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    const first = await verifyShipped(card, verifyConfig, io);
+    expect(first.shipped).toBe(false);
+
+    await healSafeResidue(ctx, first, verifyConfig);
+
+    // A failed `git status --porcelain` must never be read as "clean" -> no removal attempted.
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'worktree' && c[2] === 'remove')).toBe(false);
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'branch' && c[2] === '-D')).toBe(false);
+  });
+});
+
+// ===========================================================================================
+// P6 (fix-list): shipCard archives a leftover escalation file on ship — "answered/shipped
+// escalations stop haunting re-triggers".
+// ===========================================================================================
+
+describe('shipCard — archives a leftover escalation file on ship (P6)', () => {
+  test('card ships while an escalation file exists -> renameFile is called with the escalation ' +
+    'path and its `.resolved-shipped` twin', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    const { io, renameCalls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+    });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+    const escalationPath = escalationPathOf('/th', 'C1');
+
+    const outcome = await shipCard(ctx, { shipped: true, points: [], failedPoints: [] });
+
+    expect(outcome).toEqual({ kind: 'shipped', cardId: 'C1' });
+    expect(renameCalls).toEqual([{ from: escalationPath, to: `${escalationPath}.resolved-shipped` }]);
+  });
+
+  test('card ships with no escalation file -> renameFile is never called', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    const { io, renameCalls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      // No escalation file for C1 this time.
+    });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    await shipCard(ctx, { shipped: true, points: [], failedPoints: [] });
+
+    expect(renameCalls).toEqual([]);
+  });
+
+  test('escalated/stopped outcomes never rename anything — only shipCard archives', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    const { io, renameCalls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+    });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctx: CardCtx = { cardId: 'C1', state, resolved, io };
+
+    // `escalateCard` runs the OTHER outcome branch — it must never touch `renameFile`
+    // (archiving is exclusively a ship-time action; an escalation WRITES the file, it never
+    // removes/renames one).
+    const outcome = await escalateCard(ctx, 'needs_direction', 'some detail');
+
+    expect(outcome.kind).toBe('escalated');
+    expect(renameCalls).toEqual([]);
+  });
+
+  test('B14 regression (ship-time archiving): an escalated card with an unresolved escalation ' +
+    'file ships under --include-escalated, and shipCard archives the file as part of that run', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      // A pre-assigned branch (not `branch: null`) so a plain fresh ship needs no `gh pr view`
+      // branch-discovery round trip — the same "pre-assigned branch, no PR/worktree trace yet"
+      // convention several other park-and-continue fixtures above already use.
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', status: 'escalated' }) },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+      execHandlers: cleanCommitAndVerifyHandlers('deadb14e'),
+      spawnQueue: [() => messages(shippedMessages(14, 'deadb14e', 'sess-b14'))],
+    });
+    const escalationPath = escalationPathOf('/th', 'C1');
+
+    const firstRun = await runLoop(baseLoopConfig({ includeEscalated: true }), io);
+    expect(firstRun.processed).toEqual([{ kind: 'shipped', cardId: 'C1' }]);
+    // `shipCard` must have archived the leftover escalation file as part of this very run —
+    // directly, mechanically verified (this is the ONE assertion the P6 audit round confirmed
+    // is non-hollow: it fails if the rename call is ever removed from `shipCard`).
+    expect(io.fileExists(escalationPath)).toBe(false);
+
+    // P6 audit fix-round (should-fix, skinnerA + scout): a flag-less second run on this now-
+    // `shipped` card reaching `done` proves NOTHING about the archiving above — `nextCard`
+    // already excludes any `status === 'shipped'` card unconditionally (`core/state.ts`), with
+    // or without the escalation file being archived. That is deliberately NOT asserted here
+    // anymore (a prior version of this test claimed the second run "reaches done ... because
+    // the file was archived", which was never true — see the SKILL-side regression test below
+    // for the actual, previously-unproven claim P6's Decision #2 makes: a flag-less re-trigger
+    // proceeding BECAUSE the file was archived, for a card that never shipped).
+  });
+
+  test('B14 regression (skill-side ritual): a card STAYS `escalated` (never ships) — the ' +
+    'human ruling ritual archives the escalation file directly (the SKILL.md `mv` step, ' +
+    'independent of shipCard) — and a SECOND, flag-less run proceeds to attempt the card ' +
+    'instead of silently skipping it, exactly what P6 Decision #2 promises', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget', status: 'escalated' }) },
+    });
+    const { io, renameCalls } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+      execHandlers: cleanCommitAndVerifyHandlers('deadb14e'),
+      spawnQueue: [() => messages(shippedMessages(14, 'deadb14e', 'sess-b14'))],
+    });
+    const escalationPath = escalationPathOf('/th', 'C1');
+
+    // A flag-less run while the escalation is still UNANSWERED silently skips C1 — it is the
+    // ONLY card in `sequence`, `card.status === 'escalated'`, and `--include-escalated` is
+    // absent, so `nextCard` excludes it before `deriveCardPhase` (or any session) ever runs.
+    // This IS the original B14 incident's own shape: the run reports `done`/`EXIT_OK` with
+    // nothing processed, not a visible escalation — "a wasted cycle", not a loud failure.
+    const parkedRun = await runLoop(baseLoopConfig({ includeEscalated: false }), io);
+    expect(parkedRun.processed).toEqual([]);
+    expect(parkedRun.exitCode).toBe(EXIT_OK);
+    expect(io.spawnSession).not.toHaveBeenCalled();
+
+    // The Shaman rules on it: the SKILL.md ritual appends the ruling to answers.md and
+    // archives the escalation file — `io.renameFile` directly, WITHOUT ever going through
+    // `shipCard` (the card never shipped; only the file moved). `card.status` stays exactly
+    // `'escalated'` — nothing in the skill flow ever touches it.
+    io.renameFile(escalationPath, `${escalationPath}.resolved-R1`);
+    expect(renameCalls).toEqual([{ from: escalationPath, to: `${escalationPath}.resolved-R1` }]);
+
+    // A SECOND, flag-less run must now proceed to actually attempt (and, here, ship) the
+    // card — NOT silently skip it again. Before the P6 audit fix, `nextCard`'s own
+    // `card.status === 'escalated'` gate (independent of `deriveCardPhase`'s file check) kept
+    // excluding this card forever, no matter what the file said — this assertion is the one
+    // that is FALSE without the `nextCard` fix (see `core/state.test.ts`'s companion
+    // unit-level reproduction of the same defect).
+    const secondRun = await runLoop(baseLoopConfig({ includeEscalated: false }), io);
+    expect(secondRun.processed).toEqual([{ kind: 'shipped', cardId: 'C1' }]);
+    expect(secondRun.exitCode).toBe(EXIT_OK);
+  });
+});
+
 describe('runLoop — --dry-run: zero side effects', () => {
   function noMutationIo(base: LoopIO): LoopIO {
     const forbid = (name: string) => () => {
@@ -1060,17 +1740,55 @@ describe('runLoop — --dry-run: zero side effects', () => {
     expect(result.dryRunPlan?.cardId).toBe('B3');
     expect(result.dryRunPlan?.phase).toEqual({ kind: 'fresh' });
   });
+
+  // Audit fix (P11 fix round, skinnerA/skinnerB/scout): `runDryRun`'s own `loadState` call was
+  // the ONE call site left without the `onWarning` callback, so an operator diagnosing a
+  // suspected R3 stale-baseSha incident (the B13 shape) via `--dry-run` got zero warning —
+  // unlike a real run (run-loop.ts's runPass path) or `cli/main.ts`'s report path, both of
+  // which print the warning today. Reproduces the exact B13 combo (`staged` + `sessionId: null`
+  // + a stale `baseSha`) through `--dry-run` and asserts the warning reaches `console.error`.
+  test('surfaces the R3 stale-baseSha warning even on --dry-run (no writes, still a warning)', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: null, baseSha: 'stale-hand-reset-sha' }) },
+    });
+    const { io } = buildMockLoopIo({ stateJson: JSON.stringify(state), answers: '' });
+    const guarded = noMutationIo(io);
+
+    const errors: string[] = [];
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => { errors.push(args.join(' ')); };
+    try {
+      const result = await runLoop(baseLoopConfig({ dryRun: true }), guarded);
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(errors.some((line) => line.includes('C1: cleared stale baseSha on staged card (R3 invariant)'))).toBe(
+        true,
+      );
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
 });
 
 describe('runLoop — session error/timeout without a resume attempt: stops for external retry', () => {
-  test('a fresh session that errors stops this run without escalating', async () => {
+  test('a fresh session that errors exhausts its 2 bounded auto-retries, then stops this run', async () => {
+    // P1 fix-list: a lone `error` outcome is now `retryable`, so this scenario needs the SDK
+    // to keep failing across every attempt (1 original + 2 retries = 3) to still reach
+    // `stopped` — see the "bounded auto-retry" describe block below for the retry-succeeds
+    // and timeout-never-retries counterparts.
     const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
-    const { io } = buildMockLoopIo({
+    const { io, spawnBriefs } = buildMockLoopIo({
       stateJson: JSON.stringify(state),
       answers: '',
       spawnQueue: [
         () => {
           throw new Error('sdk crashed');
+        },
+        () => {
+          throw new Error('sdk crashed again');
+        },
+        () => {
+          throw new Error('sdk crashed a third time');
         },
       ],
     });
@@ -1078,7 +1796,115 @@ describe('runLoop — session error/timeout without a resume attempt: stops for 
     const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
 
     expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
-    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1' });
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: true });
+    expect(spawnBriefs).toHaveLength(3);
+  });
+});
+
+describe('runLoop — bounded auto-retry (P1 fix-list, spec "wait-aware liveness")', () => {
+  test('(a) session ends "error" once then ships on retry: retry takes the D4 RESUME path (not a second blind fresh), outcome shipped, exactly 2 sessions spawned', async () => {
+    // A genuinely fresh card (branch: null) — the P1 incident's own shape: the executor opens
+    // its PR then ends its turn before ever reporting SHIPPED, so `card.pr`/`card.branch` are
+    // never recorded (session.ts's `parseResultMessage` never sets `pr` on an `'error'`
+    // outcome) even though `onSessionStart` DID record `card.sessionId` the instant attempt 1
+    // started. P1 audit fix-round (blocker/should-fix, skinnerB + scout): this is the exact
+    // scenario the earlier version of this test failed to exercise — it pre-set `card.branch`
+    // to satisfy the post-ship verify point, which incidentally made the retry ALSO derive to
+    // a blind `fresh` (the mocked `gh pr view` has no handler here either), so the "retry
+    // succeeds" assertion below passed for the wrong reason. `gh pr view <pr> --json
+    // headRefName` is now mocked so `recordBranchFromPr` can discover the branch AFTER shipping
+    // — the same way it would for real.
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        ...cleanCommitAndVerifyHandlers('aaaaaaa'),
+        (cmd) =>
+          cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view'
+            ? ok(JSON.stringify({ headRefName: 'feat/c1-widget' }))
+            : null,
+      ],
+      spawnQueue: [
+        () => messages(errorMessages('sess-c1-try1')),
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1-try2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(spawnBriefs).toHaveLength(2);
+    // The proof this test exists for (P1 audit fix-round, finding 2): the retry did NOT spawn
+    // a second blind fresh session carrying the plain executor-brief template — it sent the
+    // literal `session_only` resume prompt, with `resume: 'sess-c1-try1'` set on the SDK call
+    // (verified indirectly: only the resume path ever sends this exact literal string; a fresh
+    // spawn always renders through `executorBrief`'s template).
+    expect(spawnBriefs[1]).toBe(CONTINUE_UNKNOWN_STATE_PROMPT);
+    expect(spawnBriefs[1]).not.toContain('{{CARD_ID}}');
+
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
+    expect(finalState.cards.C1.status).toBe('shipped');
+    expect(finalState.cards.C1.branch).toBe('feat/c1-widget');
+  });
+
+  test('(b) session ends "error" every time it is tried: still bounded to exactly 2 retries, exit EXIT_SESSION_INCOMPLETE', async () => {
+    // P1 audit fix-round (blocker/should-fix, skinnerB + scout): now that a genuinely fresh
+    // card (branch: null) whose session recorded a sessionId before erroring takes the D4
+    // RESUME path on retry (`phase.ts`'s `session_only` reason), each of the 2 bounded retries
+    // costs UP TO TWO underlying SDK spawns — the resume attempt itself, and (only when THAT
+    // also surfaces `'error'`) `runCardSession`'s own pre-existing resume-failure fallback to
+    // one fresh-with-digest spawn (card-actions.ts, unchanged by this fix-round). Worst case,
+    // every one of those 5 spawns (1 initial fresh + 2 retries x [resume attempt + fresh
+    // fallback]) errors — this is exactly that worst case, proving the run-loop's own retry
+    // counter (`retries < 2`) still bounds it, independent of how many spawns each retry costs.
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      spawnQueue: [
+        () => messages(errorMessages('sess-c1-try1')), // initial blind fresh
+        () => messages(errorMessages('sess-c1-try2')), // retry 1: resume attempt
+        () => messages(errorMessages('sess-c1-try3')), // retry 1: resume-failure fresh fallback
+        () => messages(errorMessages('sess-c1-try4')), // retry 2: resume attempt
+        () => messages(errorMessages('sess-c1-try5')), // retry 2: resume-failure fresh fallback
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: true });
+    expect(spawnBriefs).toHaveLength(5);
+    // Retries 1 and 2 both actually took the resume path (the literal prompt, not a rendered
+    // executor-brief template) before falling back — the same proof point as test (a) above.
+    expect(spawnBriefs[1]).toBe(CONTINUE_UNKNOWN_STATE_PROMPT);
+    expect(spawnBriefs[3]).toBe(CONTINUE_UNKNOWN_STATE_PROMPT);
+  });
+
+  test('(c) session outcome "timeout": no retry, exactly 1 attempt', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, spawnBriefs } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      spawnQueue: [
+        () =>
+          (async function* () {
+            yield { type: 'system', subtype: 'init', session_id: 'sess-c1-try1' } as SessionMessage;
+            await new Promise(() => {}); // hang forever — only the wall-clock timeout resolves.
+          })(),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1, sessionTimeoutMs: 20 }), io);
+
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: false });
+    expect(spawnBriefs).toHaveLength(1);
   });
 });
 
@@ -1388,6 +2214,489 @@ describe('runLoop — D5′ Warchief audit fix: --max-cards budgets only cards a
   });
 });
 
+// ===========================================================================================
+// P12 follow-up — `--max-concurrent N`: bounded card parallelism
+// ===========================================================================================
+
+/** Polls a synchronous condition by yielding to the microtask queue — used to observe
+ * in-flight pool state (e.g. "both sessions have started") without a real timer. Bounded so a
+ * genuine bug (the condition never becomes true) fails the test instead of hanging it. */
+async function waitForCondition(check: () => boolean, maxTicks = 500): Promise<void> {
+  for (let i = 0; i < maxTicks; i++) {
+    if (check()) return;
+    await Promise.resolve();
+  }
+  throw new Error('condition not met within the microtask budget');
+}
+
+describe('runLoop — --max-concurrent N (P12 follow-up: bounded card parallelism)', () => {
+  test('N=1 (explicit) is byte-identical to the pre-existing default (omitted) serial pass', async () => {
+    const { io: ioDefault } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+    const withoutFlag = await runLoop(baseLoopConfig({ maxCards: 2 }), ioDefault);
+
+    const { io: ioExplicit } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+    const withFlag = await runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 1 }), ioExplicit);
+
+    expect(withFlag.exitCode).toBe(withoutFlag.exitCode);
+    expect(withFlag.processed).toEqual(withoutFlag.processed);
+    expect(withFlag.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(withFlag.processed[1]).toMatchObject({ kind: 'shipped', cardId: 'C2' });
+  });
+
+  test('N=2: two independent cards genuinely overlap in flight — both spawnSession calls fire before either session resolves', async () => {
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const spawnedFor: string[] = [];
+
+    function gatedShippedSession(label: string, pr: number, sha: string, sessionId: string) {
+      return async function* (): AsyncGenerator<SessionMessage> {
+        spawnedFor.push(label);
+        yield { type: 'system', subtype: 'init', session_id: sessionId };
+        // Held open until the test has already proven BOTH sessions started — if the pool
+        // were secretly serial, C2's generator would never even be entered while C1 is
+        // parked here, since C1's `runSession` call wouldn't have returned yet.
+        await gate;
+        yield { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId };
+      };
+    }
+
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => gatedShippedSession('C1', 1, 'aaaaaaa', 'sess-c1')(),
+        () => gatedShippedSession('C2', 2, 'bbbbbbb', 'sess-c2')(),
+      ],
+    });
+
+    const runPromise = runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 2 }), io);
+
+    await waitForCondition(() => spawnedFor.length === 2);
+    expect([...spawnedFor].sort()).toEqual(['C1', 'C2']);
+
+    releaseGate();
+    const result = await runPromise;
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed.map((o) => o.cardId).sort()).toEqual(['C1', 'C2']);
+  });
+
+  test('dependsOn still orders correctly under N=2: the dependent card never starts before its dependency ships', async () => {
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const spawnedFor: string[] = [];
+
+    function gatedShippedSession(label: string, pr: number, sha: string, sessionId: string) {
+      return async function* (): AsyncGenerator<SessionMessage> {
+        spawnedFor.push(label);
+        yield { type: 'system', subtype: 'init', session_id: sessionId };
+        await gate;
+        yield { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId };
+      };
+    }
+
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({
+          branch: 'feat/c2-widget',
+          spec: 'docs/specs/c2.md',
+          plan: 'docs/plans/c2.md',
+          dependsOn: ['C1'],
+        }),
+      },
+    });
+
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => gatedShippedSession('C1', 1, 'aaaaaaa', 'sess-c1')(),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const runPromise = runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 2 }), io);
+
+    // Give the pool every chance it would need to (wrongly) start C2 concurrently with C1 —
+    // several dozen microtask-queue drains, all while C1 (its declared dependency) sits
+    // unshipped behind `gate`.
+    await waitForCondition(() => spawnedFor.length >= 1);
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(spawnedFor).toEqual(['C1']);
+
+    releaseGate();
+    const result = await runPromise;
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    // C2 ships too, via the plain (non-gated) spawn queued for it — `spawnedFor` only ever
+    // records the gated generator's own entries (C1), so the session COUNT is what proves C2
+    // was actually reached after C1 shipped.
+    expect(io.spawnSession).toHaveBeenCalledTimes(2);
+    expect(result.processed.map((o) => o.cardId)).toEqual(['C1', 'C2']);
+  });
+
+  test('never hands the same card to two workers: 5 available slots, 2 independent cards -> exactly 2 sessions spawned', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 5, maxConcurrent: 5 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(io.spawnSession).toHaveBeenCalledTimes(2);
+    expect(result.processed.map((o) => o.cardId).sort()).toEqual(['C1', 'C2']);
+  });
+
+  test('--max-cards budget is never overshot under concurrency: max-concurrent 3, max-cards 1, two independent cards -> only one worked', async () => {
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [() => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1, maxConcurrent: 3 }), io);
+
+    expect(result.processed).toHaveLength(1);
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
+    // C2 was never even claimed this pass — still exactly as staged as before the run.
+    expect(finalState.cards.C2.status).toBe('staged');
+  });
+
+  test('STOP file present at startup: N>1 spawns nothing, same contract as N=1', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '',
+      stopFile: true,
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 2, maxConcurrent: 4 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed).toEqual([]);
+    expect(io.spawnSession).not.toHaveBeenCalled();
+  });
+
+  test('escalation_pending under N>1 parks without consuming a session — independent card still ships', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        // Only the escalation FILE (not `card.status`) marks C1 pending — exactly
+        // `deriveCardPhase`'s `escalation_pending` short-circuit, same fixture shape as the
+        // dedicated N=1 test above.
+        C1: fixtureCard({ branch: null }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      escalationFiles: new Set(['C1']),
+      execHandlers: cleanCommitAndVerifyHandlers('abc0002'),
+      spawnQueue: [() => messages(shippedMessages(2, 'abc0002', 'sess-c2'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 3 }), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toEqual(
+      expect.arrayContaining([
+        { kind: 'escalation_pending', cardId: 'C1', escalationPath: expect.stringContaining('C1.md') },
+        { kind: 'shipped', cardId: 'C2' },
+      ]),
+    );
+    // No session was ever spawned for the parked card C1 — only C2's, same as the N=1 test.
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+
+  test('planning_needed under N>1 is handled without spawning a session for that card — independent card still ships', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [() => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2'))],
+    });
+    // C1's spec/plan (fixtureCard's defaults: docs/specs/c1.md, docs/plans/c1.md) are the only
+    // ones treated as missing — C2's own (docs/specs/c2.md, docs/plans/c2.md) still resolve.
+    const realFileExists = io.fileExists;
+    io.fileExists = ((p: string) =>
+      p.includes('docs/specs/c1.md') || p.includes('docs/plans/c1.md') ? false : realFileExists(p)) as LoopIO['fileExists'];
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 3 }), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'escalated', cardId: 'C1', reason: 'planning_needed' }),
+        expect.objectContaining({ kind: 'shipped', cardId: 'C2' }),
+      ]),
+    );
+    expect(io.spawnSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ===========================================================================================
+// P12 follow-up hardening — panel findings from the --max-concurrent review
+// ===========================================================================================
+
+describe('serializeRepoGitMutation (card-actions.ts) — runner-side git worktree/branch ' +
+  'mutations serialize across concurrent cards (panel finding #1)', () => {
+  test('two concurrent performRevertAndRedo calls (different cards) never interleave their exec calls', async () => {
+    const callOrder: string[] = [];
+    let releaseA!: () => void;
+    const gateA = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+
+    const state = fixtureState({
+      sequence: ['A', 'B'],
+      cards: {
+        A: fixtureCard({ branch: 'feat/a-widget' }),
+        B: fixtureCard({ branch: 'feat/b-widget' }),
+      },
+    });
+    const { io } = buildMockLoopIo({ stateJson: JSON.stringify(state) });
+
+    // Every default-fallback command in buildMockLoopIo resolves near-instantly (no real
+    // delay) — wrap `exec` to (a) record every call's argv, in order, and (b) hold the FIRST
+    // "git worktree list" call open on `gateA` until the test proves the SECOND card's calls
+    // haven't started. Whichever card's `performRevertAndRedo` the mutex lets run first will be
+    // the one that hits this gate (see below: it's launched first, so it's A's).
+    const realExec = io.exec;
+    let gated = false;
+    io.exec = (async (cmd: string[], opts?: { cwd?: string }) => {
+      callOrder.push(cmd.join(' '));
+      const isFirstWorktreeList = !gated && cmd[0] === 'git' && cmd[1] === 'worktree' && cmd[2] === 'list';
+      if (isFirstWorktreeList) {
+        gated = true;
+        await gateA;
+      }
+      return realExec(cmd, opts);
+    }) as LoopIO['exec'];
+
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+    const ctxA: CardCtx = { cardId: 'A', state, resolved, io };
+    const ctxB: CardCtx = { cardId: 'B', state, resolved, io };
+
+    // Fired back-to-back, unawaited — exactly how `runPassPool` would launch two cards'
+    // `runCardTurn`s concurrently.
+    const pA = performRevertAndRedo(ctxA);
+    const pB = performRevertAndRedo(ctxB);
+
+    await waitForCondition(() => callOrder.length >= 1);
+    // Give B's call every chance it would need to (wrongly) start while A is gated mid-call.
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(callOrder).toEqual(['git worktree list --porcelain']); // only A's first call fired.
+
+    releaseA();
+    await Promise.all([pA, pB]);
+
+    // A's entire 3-call sequence completes before B's even begins — no interleaving.
+    expect(callOrder).toEqual([
+      'git worktree list --porcelain',
+      'git branch -D feat/a-widget',
+      'git ls-remote --heads origin feat/a-widget',
+      'git worktree list --porcelain',
+      'git branch -D feat/b-widget',
+      'git ls-remote --heads origin feat/b-widget',
+    ]);
+  });
+
+  test('--max-concurrent 1 (today\'s only caller today) is unaffected: the queue is a permanent no-op with one card in flight', async () => {
+    // Regression guard for the "always-on, no branching on maxConcurrent" design choice — a
+    // single card's own performRevertAndRedo must behave exactly as before this hardening PR:
+    // no extra await, no change to call order or count.
+    const state = fixtureState({ sequence: ['A'], cards: { A: fixtureCard({ branch: 'feat/a-widget' }) } });
+    const { io, calls } = buildMockLoopIo({ stateJson: JSON.stringify(state) });
+    const resolved: ResolvedConfig = { ...baseLoopConfig(), baseBranch: 'master', answersContent: '', briefTemplate: '' };
+
+    await performRevertAndRedo({ cardId: 'A', state, resolved, io });
+
+    expect(calls.map((c) => c.join(' '))).toEqual([
+      'git worktree list --porcelain',
+      'git branch -D feat/a-widget',
+      'git ls-remote --heads origin feat/a-widget',
+    ]);
+  });
+});
+
+describe('runPassPool — panel finding #2: one card\'s thrown exception must not abort the pass or abandon siblings', () => {
+  test('a card whose turn throws mid-pool is reported stopped/non-retryable; the other card still ships; the pass ends cleanly', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: [
+        ...cleanCommitAndVerifyHandlers('deadbee'),
+        (cmd) => {
+          // C1's very first phase-derive call throws — simulating an unexpected exception deep
+          // in a card's turn (e.g. a thrown error the SDK/exec layer doesn't itself convert to
+          // a typed result).
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view' && cmd[3] === 'feat/c1-widget') {
+            throw new Error('simulated unexpected exception mid-turn');
+          }
+          return null;
+        },
+      ],
+      spawnQueue: [() => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2'))],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    // The pass ends cleanly (no uncaught rejection out of runLoop) with BOTH cards accounted
+    // for — C2 was never abandoned mid-flight because of C1's crash.
+    expect(result.processed).toHaveLength(2);
+    const c1 = result.processed.find((o) => o.cardId === 'C1');
+    const c2 = result.processed.find((o) => o.cardId === 'C2');
+    expect(c1).toMatchObject({ kind: 'stopped', cardId: 'C1', retryable: false });
+    expect((c1 as { reason: string }).reason).toContain('simulated unexpected exception mid-turn');
+    expect(c2).toMatchObject({ kind: 'shipped', cardId: 'C2' });
+    expect(result.exitCode).toBe(EXIT_SESSION_INCOMPLETE);
+  });
+});
+
+describe('runPassPool — panel findings #3/#4: rulings gate and mid-pass STOP under N>1', () => {
+  test('genuine done with an unratified ruling -> EXIT_RULINGS_UNRATIFIED through the pool path (N=2)', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '## Some ruling\nBody text, no ratified-as line.\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    expect(result.processed).toHaveLength(2);
+    expect(result.exitCode).toBe(EXIT_RULINGS_UNRATIFIED);
+  });
+
+  test('a card still in flight when nextCard first reports done does NOT wrongly gate on rulings (companion case)', async () => {
+    // maxConcurrent 2 but only ONE card is ever selectable (C2's spec/plan are missing, so it
+    // resolves as PLANNING_NEEDED the very first time it's picked, not a live in-flight worker)
+    // — this test's real point is `reachedDone`'s own two-part condition (`nc.kind === 'done'`
+    // AND `active.size === 0`): it must still end up EXIT_OK/gated exactly like the N=1 path
+    // once every card is genuinely accounted for, never fire the rulings gate a tick early
+    // while something was still active. Covered end-to-end via the single-card overlap case
+    // above; this test pins the OK case (no unratified ruling) so a regression that starts
+    // gating early would flip this from EXIT_OK to EXIT_RULINGS_UNRATIFIED and fail loudly.
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1')),
+        () => messages(shippedMessages(2, 'bbbbbbb', 'sess-c2')),
+      ],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+  });
+
+  test('STOP armed while N=2 workers are mid-flight: both in-flight cards drain to completion, no third card is claimed, reachedDone stays false', async () => {
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const spawnedFor: string[] = [];
+
+    function gatedShippedSession(label: string, pr: number, sha: string, sessionId: string) {
+      return async function* (): AsyncGenerator<SessionMessage> {
+        spawnedFor.push(label);
+        yield { type: 'system', subtype: 'init', session_id: sessionId };
+        await gate;
+        yield { type: 'result', subtype: 'success', result: `All done.\nSHIPPED ${pr} ${sha}`, session_id: sessionId };
+      };
+    }
+
+    // A third, independent card — must NEVER be claimed once STOP is armed, even though the
+    // pool has spare capacity (maxConcurrent 2, only 2 workers active) once C1/C2 drain.
+    const state = fixtureState({
+      sequence: ['C1', 'C2', 'C3'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({ branch: 'feat/c2-widget', spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+        C3: fixtureCard({ branch: 'feat/c3-widget', spec: 'docs/specs/c3.md', plan: 'docs/plans/c3.md' }),
+      },
+    });
+
+    let stopArmed = false;
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '# answers\n(none yet)\n',
+      execHandlers: cleanCommitAndVerifyHandlers('deadbee'),
+      spawnQueue: [
+        () => gatedShippedSession('C1', 1, 'aaaaaaa', 'sess-c1')(),
+        () => gatedShippedSession('C2', 2, 'bbbbbbb', 'sess-c2')(),
+        () => messages(shippedMessages(3, 'ccccccc', 'sess-c3')),
+      ],
+    });
+    const realFileExists = io.fileExists;
+    io.fileExists = ((p: string) => (p.endsWith('STOP') ? stopArmed : realFileExists(p))) as LoopIO['fileExists'];
+
+    const runPromise = runLoop(baseLoopConfig({ maxConcurrent: 2 }), io);
+
+    // Both C1 and C2 start (maxConcurrent 2, both independent, both fit) — THEN arm STOP while
+    // they're still gated mid-session, before releasing them.
+    await waitForCondition(() => spawnedFor.length === 2);
+    stopArmed = true;
+    for (let i = 0; i < 50; i++) await Promise.resolve(); // give the pool every chance to (wrongly) claim C3 anyway.
+    expect(io.spawnSession).toHaveBeenCalledTimes(2); // C3 never claimed.
+
+    releaseGate();
+    const result = await runPromise;
+
+    // Both in-flight cards drained to completion; C3 was never even attempted; the pass did
+    // NOT reach genuine `done` (STOP truncated it), so the rulings gate never fires either.
+    expect(result.processed).toHaveLength(2);
+    expect(result.processed.map((o) => o.cardId).sort()).toEqual(['C1', 'C2']);
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(io.spawnSession).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('runLoop — D5′: exit-code precedence (escalation outranks session-incomplete)', () => {
   test('one card escalates and another stops (session error); exit code is ESCALATED, not SESSION_INCOMPLETE', async () => {
     const state = fixtureState({
@@ -1455,5 +2764,138 @@ describe('runLoop — D5′: STOP file created mid-pass finishes the in-flight c
     expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
     expect(io.spawnSession).toHaveBeenCalledTimes(1);
     expect(result.exitCode).toBe(EXIT_OK);
+  });
+});
+
+// ===========================================================================================
+// runLoop — harness-gap-wiring PR C: the campaign-level rulings gate. Postmortem
+// (outstanding-17): a ruling that captured a durable convention was never ratified into the
+// target repo's governance files because nothing gated on it. This gate fires ONLY on the
+// path that would otherwise conclude `done` (every requested card resolved) — an
+// `escalations_pending`/`session_incomplete`/`stop_requested` exit is unchanged.
+// ===========================================================================================
+
+describe('runLoop — rulings gate (fires only on the would-be-done path)', () => {
+  function fullyShippedState(): CampaignState {
+    return fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ status: 'shipped', pr: 41, mergeSha: 'deadbee' }) },
+    });
+  }
+
+  test('an unratified ruling in answers.md blocks the would-be-done exit', async () => {
+    const answers = ['## R1 — Some convention', '', 'ratified-as: pending', ''].join('\n');
+    const { io } = buildMockLoopIo({ stateJson: JSON.stringify(fullyShippedState()), answers });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_RULINGS_UNRATIFIED);
+    expect(result.unratifiedRulings).toEqual(['R1 — Some convention']);
+    expect(result.message).toBeDefined();
+    expect(result.message as string).toContain('R1 — Some convention');
+  });
+
+  test('every ruling ratified -> normal EXIT_OK/done, no unratifiedRulings field', async () => {
+    const answers = ['## R1 — Some convention', '', 'ratified-as: operational', ''].join('\n');
+    const { io } = buildMockLoopIo({ stateJson: JSON.stringify(fullyShippedState()), answers });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.unratifiedRulings).toBeUndefined();
+  });
+
+  test('answers.md with no rulings at all -> unaffected (regression: existing happy-path shape)', async () => {
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(fullyShippedState()),
+      answers: '# answers\n(none yet)\n',
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.unratifiedRulings).toBeUndefined();
+  });
+
+  test('an escalating pass is NOT gated by an unratified ruling — gate fires only on would-be-done', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    const answers = ['## R1 — Some convention', '', 'ratified-as: pending', ''].join('\n');
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers,
+      spawnQueue: [() => messages(needsDirectionMessages('sess-c1'))],
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1' });
+    expect(result.unratifiedRulings).toBeUndefined();
+  });
+
+  // Regression (3-lens review, contract lens): `computeExitCode` returns `EXIT_OK` whenever
+  // nothing in `processed` escalated or stopped — that is ALSO true when the pass broke out
+  // early (a mid-pass STOP, or the `--max-cards` budget) with cards still genuinely unattempted,
+  // not just when `filteredNextCard` actually returned `{ kind: 'done' }`. The gate must fire
+  // ONLY on the latter (brief: "all requested cards resolved") — these two tests reproduce the
+  // exact scenario the review caught (an unratified ruling present, but the pass never reached
+  // genuine done) and assert the gate stays quiet.
+  test('a mid-pass STOP with a card still unattempted is NOT gated, even with an unratified ruling', async () => {
+    const state = fixtureState({
+      sequence: ['C1', 'C2'],
+      cards: {
+        C1: fixtureCard({ branch: 'feat/c1-widget' }),
+        C2: fixtureCard({ branch: null, spec: 'docs/specs/c2.md', plan: 'docs/plans/c2.md' }),
+      },
+    });
+    const answers = ['## R1 — Some convention', '', 'ratified-as: pending', ''].join('\n');
+    const { io } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers,
+      execHandlers: cleanCommitAndVerifyHandlers('aaaaaaa'),
+      spawnQueue: [() => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1'))],
+    });
+
+    let stopArmed = false;
+    const baseFileExists = io.fileExists as unknown as (p: string) => boolean;
+    io.fileExists = mock((p: string) => {
+      if (p.endsWith('STOP')) return stopArmed;
+      return baseFileExists(p);
+    });
+    const baseSpawnSession = io.spawnSession;
+    io.spawnSession = mock((params) => {
+      // The owner drops STOP while C1's session is in flight — C1 still finishes and ships
+      // (D2's STOP contract), but C2 must never even be attempted this pass.
+      stopArmed = true;
+      return baseSpawnSession(params);
+    });
+
+    const result = await runLoop(baseLoopConfig(), io);
+
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.unratifiedRulings).toBeUndefined();
+  });
+
+  test('a --max-cards budget exhaustion with a card still unattempted is NOT gated, even with an unratified ruling', async () => {
+    const answers = ['## R1 — Some convention', '', 'ratified-as: pending', ''].join('\n');
+    const { io } = buildMockLoopIo({
+      stateJson: stateJsonWithTwoFreshCards(),
+      answers,
+      execHandlers: cleanCommitAndVerifyHandlers('aaaaaaa'),
+      spawnQueue: [() => messages(shippedMessages(1, 'aaaaaaa', 'sess-c1'))],
+    });
+
+    // maxCards: 1 — only C1 (of C1/C2) is ever worked; C2 stays 'staged', genuinely unattempted.
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.processed).toHaveLength(1);
+    expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.unratifiedRulings).toBeUndefined();
   });
 });

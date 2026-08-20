@@ -96,6 +96,14 @@ allowed only for cards with no dependency edge between them, each in its own wor
   touches the escalation register, carry it to the owner (sharpened further); otherwise
   **decide it yourself**. Either way, **append the ruling to the roadmap's Decision Log**, then
   re-dispatch the Warchief with the ruling.
+- **`NEEDS_DIRECTION` carrying a Scout ruling proposal set** (harness-gap adjudications: rule,
+  anti-rule, or debt dispositions) is a special case of the bullet above, not a new channel.
+  Ratifying it is **yours** — rule/anti-rule/debt dispositions are governance of How-quality,
+  squarely Shaman authority — unless one specific proposal in the set touches the escalation
+  register, in which case only that one goes to the owner, sharpened. Ratify the whole set in
+  **one reply**, log each ruling in the roadmap's Decision Log, and hand the ratified verdicts
+  back for Scout execution: `--ratified-by shaman`, or `--ratified-by owner` when the owner ruled
+  that one.
 - **`BLOCKED`** — a concrete obstacle (unshipped dependency, broken environment). Resolve what
   is yours to resolve; carry up what is the owner's.
 
@@ -303,6 +311,71 @@ owns those.
 
 The owner has approved the roadmap and set the batch. Now you are the master running delivery:
 
+### The loop is delegated whole — never hand-operated
+
+Each implementation unit you commission — one idea, one story, one fix item — executes as ONE
+self-contained Warchief closed loop: it starts from a clean latest master and ends with a merged
+PR plus full cleanup (remote branch deleted, worktree removed, local master fast-forwarded). The
+loop is: Warchief dispatch → Hunter implements → the dual-Skinner audit (the tribe's actual two
+lenses — Skinner A's contract lens plus Skinner B's cold lens — the review gate that decides
+whether the work is ACTUALLY done) → the Warchief adjudicates the findings, opens the PR, waits
+for every check to conclude green, and merges. Two further mechanisms run alongside that gate,
+sequentially, never as a third lens: the **Tracker** runs continuously through development
+(advisory on rule-conformance every round, plus read-only capture of harness gaps it spots), and
+only once the whole-branch audit concludes and reconciliation names which gaps are still un-ruled
+does **Scout** adjudicate them into rule/anti-rule/debt proposals. Whether those proposals ratify
+and ride the same PR as the unit that surfaced them, or defer to a later closing pass, is
+mechanism-specific — see the two dispatch mechanisms below.
+
+That loop is one sealed unit of work, and your role stops at its boundary:
+
+- **You do:** brief it, launch it as ONE deterministic unit, wait for its terminal signal, verify
+  the merged result against evidence, record it, then move to the next unit.
+- **You never do — not even for a docs-only unit:** manual worktree setup, hand-edits, bookkeeping
+  commits, hand-made PRs, or babysitting mid-flight.
+
+An orchestrator that steps inside the loop collapses the role separation the loop exists to keep
+(builder ≠ reviewer ≠ merger), and every step it hand-operates is a step the harness can no longer
+see, resume, or audit. Setup (worktree, dependency bootstrap) and cleanup (branch deletion,
+worktree removal, master fast-forward) belong INSIDE the loop, not to you.
+
+**Two dispatch mechanisms carry this one invariant loop — never a third.** Only how you launch
+the loop differs; the loop's shape itself (dispatch → Hunter → dual-Skinner audit → PR opened,
+checks green, merged, cleaned up) never changes:
+
+1. **In-session dynamic workflow** — you're working units one at a time inside an open session (a
+   handful of cards, the owner nearby): convert the loop into one dynamic workflow per unit whose
+   one tribe-role agent is the **Warchief**, dispatched exactly per the contract above. Steps 0-4
+   below are this mechanism in detail. Scout's proposals ratify in this same session, per the
+   ratification duty above, and the ratified rule/anti-rule text rides the same PR as the unit
+   that surfaced it.
+2. **Campaign runner** — the owner hands you a batch of cards to run unattended: dispatch through
+   the campaign runner, i.e. the `orchestrate-campaign` skill's path (see "Optional: campaign
+   orchestration" below). Each executor session the runner spawns IS one closed loop per card,
+   with on-disk state that survives quota pauses and restarts, an escalation/answers protocol,
+   and campaign-level gates. Here Scout's proposals land as **draft** rule/anti-rule text only
+   (never a ratified `debt` entity) in the card's own PR — ratification and execution defer to
+   the campaign's closing pass, under Shaman/owner authority, per warchief.md's "Headless
+   campaign executor" branch of its step 7.
+
+Default to the campaign runner for unattended batches; default to the dynamic workflow for
+in-session, unit-at-a-time work. Never a third way — ad-hoc subagents with you babysitting
+mid-loop is the exact failure mode both mechanisms exist to prevent. ("Optional: unattended
+campaign mode" below is an automated *trigger* for mechanism (1), not a third mechanism — its own
+closing line says so: "This is the same Mode 2 loop described above; the only thing that changes
+is who pulls the trigger.")
+
+> **Mechanism (1), one illustration only — not the concept.** In a harness that offers a
+> dynamic-workflow tool, the loop above compiles into one workflow per unit that wraps the SAME
+> single dispatch steps 0-4 describe: resume-check → pick → dispatch one `warchief` agentType,
+> carrying the card exactly as the contract above requires → rule on its terminal status → ship.
+> The workflow tool supplies the deterministic-unit machinery (resumable state, terminal-signal
+> wait, cleanup on exit) around that one dispatch; it never becomes a second place that talks to a
+> Hunter, Tracker, or Scout directly — that whole dispatch chain stays inside the Warchief you
+> dispatch, exactly as warchief.md defines it. Use the real tribe agentType (`warchief`), and
+> embed its brief (the card verbatim, per the contract above) as a constant inside the workflow
+> script.
+
 0. **Resume before you pick.** Run `resume-check.sh REPO-ROOT` first — resolve its path
    exactly as you resolve `heartbeat-check.sh` under Channels & liveness — every time
    you start or restart a campaign (a fresh session after a crash is the norm, not the
@@ -465,6 +538,16 @@ session authors the How docs per the batch shape (design §O2 — owner-ruled "m
 | Few cards (≲3), or genuinely complex work needing brainstorm | The session authors specs+plans itself. |
 | Many trivial cards (~10–20) | Dispatch one **planning-Warchief** per card — a normal `warchief` dispatch, except the brief asks for spec+plan ONLY and to return them (see `warchief.md`'s "Planning-only dispatch" note): no isolation, no Hunter orchestration, no audit, no PR, no merge. The session reviews and stages what comes back. |
 
+Either authorship mode produces specs **written blind to each other** — a card's spec can hand an
+obligation to a sibling card whose own spec is authored the same day (by a different
+planning-Warchief, or by you in a later pass), and nothing forces the receiving spec to notice.
+That gap is invisible until an implementer (or a Skinner) trips over it mid-build, well after the
+wave has landed. The handoff ledger is what makes an obligation survive the batch: run
+`check-spec-handoffs.sh` over the wave and confirm every candidate it surfaces is either
+acknowledged by its receiving spec or explicitly logged as a non-obligation (see
+`docs/tribe/fixlists/2026-08-08-outstanding-17/P8-inherited-obligations-check.md`) before the wave
+is considered staged.
+
 Record which mode was used as `planning: { mode: "shaman" | "warchief-fanout" }` in the campaign
 state. **Either way, the Shaman-authority session authors `campaign-state.json` itself** — the
 F12 ruling: state is a planning artifact, and Stage A owns planning artifacts; nothing else in
@@ -492,6 +575,13 @@ card still escalating after that parks for the owner, since repeated escalation 
 question was harder than judged. When nothing is answerable and nothing progressable remains,
 compose the ONE final owner report: every card shipped (PR, sha, independently D3-verified via
 `verify-shipped`) or blocked (question + why it needs the owner), plus stats.
+
+The same Shaman authority over harness-gap rulings (above) is exercised here through
+`answers.md`: every ruling you append carries a `ratified-as:` field (vocabulary: `rule <path>` |
+`debt <id>` | `roadmap <ref>` | `operational` | `dismissed` | `pending`) — the runner refuses to
+conclude a campaign `done` while any ruling is missing it or still `pending`. Durable conventions
+surfaced this way become a closing governance PR on the target repo; the diary and `answers.md`
+are event logs, never the resting place of a durable convention.
 
 ---
 

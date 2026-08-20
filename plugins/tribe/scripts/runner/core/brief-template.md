@@ -28,6 +28,13 @@ scope beyond this card.
 - Owner-only items for this campaign (escalate, never decide): {{OWNER_ONLY_ESCALATIONS}}
 - Stay inside this card's plan. No scope creep, no adjacent refactors, no speculative
   generality.
+- Merge gate: every PR check must have CONCLUDED green BEFORE `gh pr merge` — pending is
+  not green. A merge attempt with checks not green is blocked at the permission layer; if
+  a check is red for reasons outside this card's diff, escalate NEEDS_DIRECTION instead of
+  merging.
+- After creating a worktree, run the repo's dependency bootstrap (e.g. `bun install`)
+  before the first commit — repo hooks typically run repo-wide and fail spuriously in a
+  worktree without dependencies.
 
 ## Session liveness (hard wall — this is what kills runs)
 
@@ -41,6 +48,9 @@ notification can reach you. A backgrounded job dies with you. Therefore:
   which will kill you.
 - If a command genuinely cannot fit in 600s, split it by exact spec/test file name and run
   each part in the foreground.
+- To wait for CI: `gh pr checks <pr> --watch` in the foreground (timeout: 600000), re-run it
+  if 10 minutes is not enough. Monitor/ScheduleWakeup are blocked — a notification can never
+  wake you.
 
 A tool call that tries to background is blocked at the permission layer and returns an
 error — that block is this wall enforcing itself, not a bug to work around.
@@ -51,6 +61,25 @@ Every task is test-first: a failing test before the code, gates (formatter/linte
 type-checker/tests) green before commit, and a real commit carrying the code, its test, and
 the plan's ticked checkboxes together. Claims of done are worthless without the gate output
 that proves them — paste gate output verbatim into worker reports.
+
+## Harness gaps and governance (per-card duties)
+
+Your agent Method already carries these; they are walls here because campaigns
+starve them silently:
+
+- Dispatch the Tracker at every audit round (Method step 6.0b) and reconcile any
+  HG-candidates via the gap-reconcile script (Method step 7) — never by hand.
+- The debt burn-down gate and debt-backfill run on EVERY PR, unconditionally.
+- Scout's governance proposals ride THIS card's PR: rule/anti-rule drafts as reviewable
+  text, a debt proposal as its recorded check command + description only — the debt
+  entity itself is created later, by ratified `gap-rule.ts` execution, never here. Do
+  not park the card waiting for ratification, do not
+  self-ratify, and leave the registry's `ruled` events unwritten — the campaign's
+  closing pass rules on the whole batch. Record each proposal and its proposed
+  disposition in your worker report and under a `## Harness gaps` heading in the
+  PR body; that record is what the closing pass reads.
+- Only a gap needing an owner-only decision (see the owner-only list above)
+  escalates NEEDS_DIRECTION.
 
 ## Merge order
 
@@ -77,7 +106,26 @@ Every dispatched worker (Hunter, Skinner) writes its report to:
 Before raising any question, check whether it is already answered here. If it is, follow
 the ruling; do not ask again.
 
+These rulings are a snapshot taken when this session started. A resume never re-sends
+this section — you keep this exact snapshot for the life of this session, resumed or
+not. Only a brand-new session, never this one, can ever see a ruling added after you
+started.
+
 {{ANSWERS_CONTENT}}
+
+## Definition of Done (preconditions for SHIPPED)
+
+"Merged" is not "done". You may print the `SHIPPED` line only after ALL of:
+
+1. The PR is merged (behind the pre-merge check gate).
+2. The remote feature branch is deleted (`git push origin --delete <branch>`).
+3. The card's worktree is removed (`git worktree remove <path>`).
+4. Local master is fast-forwarded to origin/master.
+
+Verify each step with a command, not from memory — the runner independently re-verifies
+all four and a missing one costs a full escalation round-trip.
+
+*done = the next card starts clean on the latest changes.*
 
 ## Terminal contract
 

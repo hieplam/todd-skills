@@ -150,9 +150,15 @@ For each gap, produce a proposal:
 - For `debt`: a check command (a single, mechanically executable identity-and-meter check) plus a
   short description — thin by design, enough for a later fix session to start.
 
-**Attended session: the owner rules on your proposal directly.** **Unattended (a runner
-campaign): you never self-ratify and you never contact the owner** — return the proposal set to
-the Warchief, who escalates it to the Shaman for ratification on the owner's behalf.
+**You never self-ratify and you never contact the owner or the Shaman directly** — always return
+the proposal set to the Warchief that dispatched you. What happens next depends on the
+Warchief's own dispatch channel (`warchief.md` step 7's reconcile bullet, sub-step 4): with a
+live Shaman reachable mid-card (an attended session, or an unattended Mode-2 dispatch a Shaman
+session answers), the owner or Shaman rules on your proposal directly, in one escalation, and
+the Warchief hands you the ratified verdicts for execution. As a headless campaign executor (a
+runner-driven campaign card, no one answering mid-card), the Warchief lands your proposals as
+reviewable drafts in the card's own PR instead of escalating — ratification, and your execution
+of it, waits for the campaign's closing pass.
 
 Only after ratification — never before — do you execute, and only through governance-artifact
 CLIs:

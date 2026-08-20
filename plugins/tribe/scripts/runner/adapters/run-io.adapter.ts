@@ -22,6 +22,19 @@ function realExec(cmd: string[], opts?: { cwd?: string }): Promise<ExecResult> {
   });
 }
 
+/** P10 (fix-list): the tribe never authenticates via ANTHROPIC_API_KEY — executor sessions
+ * authenticate via Claude Code login. Deletes the variable from `process.env` if present,
+ * returning whether it was removed (so the composition root can decide whether to warn).
+ * Lives here, not `core/`, because it is a `process.env` side effect — `structure.test.ts`
+ * bans an ambient `process.env` read anywhere outside `adapters/`. Called directly by
+ * `cli/main.ts` at the very top of `main()`, before `buildRealIo` (and everything else)
+ * runs, so an inherited key never reaches a spawned session. */
+export function unsetAnthropicApiKeyEnv(): boolean {
+  if (process.env.ANTHROPIC_API_KEY === undefined) return false;
+  delete process.env.ANTHROPIC_API_KEY;
+  return true;
+}
+
 function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -31,7 +44,15 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-export function buildRealIo(config: RunLoopConfig): LoopIO {
+/** P11 fix-list follow-up: takes only `{ homeDir }` (a structural `Pick`, not a nominal
+ * narrower type) rather than a full `RunLoopConfig` — `homeDir` is the only field this
+ * function actually reads (for the lock path below); every other member is a fixed closure.
+ * Every existing call site (`main()`'s normal run path) still passes a full `RunLoopConfig`,
+ * which trivially satisfies this narrower shape, so this widening is behavior-preserving.
+ * Widened specifically so the `reset-card` CLI subcommand — which has no `--repo`/`--model`/
+ * `--remote`/... to fabricate — can call this same production adapter with just the one value
+ * it actually has, instead of a second bespoke IO builder duplicating fs/lock wiring. */
+export function buildRealIo(config: Pick<RunLoopConfig, 'homeDir'>): LoopIO {
   const lockPath = join(reportDirOf(config.homeDir), '.runner.lock');
 
   return {
@@ -43,6 +64,9 @@ export function buildRealIo(config: RunLoopConfig): LoopIO {
     writeFile: (p, content) => {
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, content);
+    },
+    renameFile: (from, to) => {
+      renameSync(from, to);
     },
 
     readLock: () => {

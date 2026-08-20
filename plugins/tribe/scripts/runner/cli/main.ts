@@ -9,17 +9,20 @@
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import {
+  liveLockHolder,
   runLoop,
   type LoopIO,
   type LoopResult,
   type RunLoopConfig,
 } from '../core/loop.ts';
-import { loadState } from '../core/state.ts';
-import { campaignStatePathOf, reportDirOf } from '../core/paths.ts';
-import { buildRealIo } from '../adapters/run-io.adapter.ts';
+import { loadState, resetCard, serializeState } from '../core/state.ts';
+import { campaignStatePathOf, escalationPathOf, reportDirOf } from '../core/paths.ts';
+import { buildRealIo, unsetAnthropicApiKeyEnv } from '../adapters/run-io.adapter.ts';
 import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from '../core/report.ts';
 import { EXIT_ERROR } from '../core/types.ts';
+import type { CampaignState } from '../core/types.ts';
 import { finalizeRunRecord, generateRunId, runRecordPathOf, serializeRunRecord } from '../core/run-record.ts';
+import { scrubEnvContent } from '../core/env-guard.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 
@@ -55,6 +58,7 @@ const KNOWN_FLAGS = new Set([
   '--session-timeout',
   '--logs-dir',
   '--max-cards',
+  '--max-concurrent',
   '--cards',
   '--dry-run',
   '--include-escalated',
@@ -124,6 +128,22 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
     maxCards = parsed;
   }
 
+  // P12 follow-up: `--max-concurrent` bounds width (how many cards' sessions may run at
+  // once), never order — `dependsOn` still owns ordering (see run-loop.ts's `runPassPool`).
+  // Default 1 == today's exactly-one-card-at-a-time behavior, set explicitly here (not left
+  // `undefined`) so `result.config.maxConcurrent` always carries a concrete, reasoned value —
+  // unlike `--max-cards`, "no limit" has no integer to fall back to, but "how many at once"
+  // always does.
+  let maxConcurrent = 1;
+  const maxConcurrentRaw = raw.get('--max-concurrent');
+  if (typeof maxConcurrentRaw === 'string') {
+    const parsed = Number(maxConcurrentRaw);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return { error: `--max-concurrent: expected an integer >= 1, got "${maxConcurrentRaw}"` };
+    }
+    maxConcurrent = parsed;
+  }
+
   let cardsFilter: string[] | undefined;
   const cardsRaw = raw.get('--cards');
   if (typeof cardsRaw === 'string') {
@@ -147,6 +167,7 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
       model,
       sessionTimeoutMs,
       maxCards,
+      maxConcurrent,
       cardsFilter,
       includeEscalated,
       dryRun,
@@ -167,7 +188,13 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
  * outermost safety net for "state itself never loaded". */
 async function tryWriteReport(config: RunLoopConfig, io: LoopIO, run: ReportRunInfo): Promise<void> {
   try {
-    const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
+    // P11 fix-list: surfaces `loadState`'s R3-invariant normalization warnings here too —
+    // state.ts stays pure (it only computes the warning strings; it never imports `console`
+    // itself), this is the edge that prints them for the report-writing path.
+    const state = await loadState(
+      () => io.readFile(campaignStatePathOf(config.homeDir)),
+      (warning) => console.error(`[tribe-runner] ${warning}`),
+    );
     await writeReport(
       state,
       run,
@@ -177,6 +204,37 @@ async function tryWriteReport(config: RunLoopConfig, io: LoopIO, run: ReportRunI
     );
   } catch {
     // See the doc comment above: no truthful report to write.
+  }
+}
+
+/** P10 (fix-list): scrub a stray ANTHROPIC_API_KEY line out of the target repo's
+ * `.env.local` — the incident vector (Bun auto-loads `.env.local` from cwd). Real run:
+ * delete without asking (owner ruling). Dry run: warn only — stays zero side effects by
+ * construction. Best-effort, same contract as tryWriteReport/tryFinalizeRunRecord below: a
+ * transient fs error here (EACCES, a mid-flight delete between the exists-check and the
+ * read, a read-only mount) must never crash the run before `runLoop` is even entered — this
+ * is a hygiene step, not part of the campaign's actual progress, so it degrades to a warning
+ * rather than an uncaught exception. Exported for `cli/main.test.ts` (takes only the FsPort
+ * slice of `LoopIO` it actually needs, so a test can inject a throwing mock without building
+ * a full `LoopIO`). */
+export async function scrubTargetEnvLocal(
+  repoRoot: string,
+  dryRun: boolean,
+  io: Pick<LoopIO, 'fileExists' | 'readFile' | 'writeFile'>,
+): Promise<void> {
+  const envLocalPath = join(repoRoot, '.env.local');
+  try {
+    if (!io.fileExists(envLocalPath)) return;
+    const { cleaned, removed } = scrubEnvContent(String(await io.readFile(envLocalPath)));
+    if (removed === 0) return;
+    if (dryRun) {
+      console.error(`campaign runner: ${envLocalPath} has ${removed} ANTHROPIC_API_KEY line(s) — would remove (--dry-run, not written)`);
+      return;
+    }
+    io.writeFile(envLocalPath, cleaned);
+    console.error(`campaign runner: removed ${removed} ANTHROPIC_API_KEY line(s) from ${envLocalPath}`);
+  } catch (err) {
+    console.error(`campaign runner: could not scrub ${envLocalPath} for ANTHROPIC_API_KEY (continuing): ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -197,9 +255,155 @@ function tryFinalizeRunRecord(
   }
 }
 
+// ---------------------------------------------------------------------------------------
+// `reset-card` subcommand (P11 fix-list "out of scope" note): "so humans never hand-edit
+// state.json." A second, tiny mode alongside the main run loop — `main()` below dispatches to
+// it the moment argv[0] is literally `reset-card`, before any of the run-loop-specific setup
+// (the ANTHROPIC_API_KEY hygiene check, runId generation, `parseArgs`) — none of that applies
+// to a subcommand that never spawns a session.
+// ---------------------------------------------------------------------------------------
+
+export interface ParseResetCardArgsResult {
+  homeDir: string;
+  cardId: string;
+}
+export interface ParseResetCardArgsError {
+  error: string;
+}
+
+/** `reset-card`'s own flag set — deliberately separate from `KNOWN_FLAGS` above; this
+ * subcommand's contract has nothing to do with running a campaign pass, so `--repo`/`--model`/
+ * `--remote`/... are all unknown flags here, exactly like `--state`/`--answers` are unknown to
+ * the main parser. */
+const RESET_CARD_KNOWN_FLAGS = new Set(['--home', '--card']);
+
+/** Pure — mirrors `parseArgs`'s own shape (unknown-flag rejection, missing-required-flag
+ * rejection, "next token is the value") at a much smaller scale: exactly `--home` and
+ * `--card`, both required. */
+export function parseResetCardArgs(argv: string[]): ParseResetCardArgsResult | ParseResetCardArgsError {
+  const raw = new Map<string, string>();
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (!token.startsWith('--')) continue;
+    if (!RESET_CARD_KNOWN_FLAGS.has(token)) {
+      return { error: `unknown flag: ${token}` };
+    }
+    const value = argv[i + 1];
+    if (value === undefined) {
+      return { error: `${token} requires a value` };
+    }
+    raw.set(token, value);
+    i += 1;
+  }
+
+  const homeDir = raw.get('--home');
+  if (!homeDir) return { error: 'missing required flag: --home' };
+  const cardId = raw.get('--card');
+  if (!cardId) return { error: 'missing required flag: --card' };
+
+  return { homeDir, cardId };
+}
+
+/** The `reset-card` subcommand's execution. Refuses (returns non-zero, prints a named
+ * diagnostic to stderr prefixed `reset-card:`, writes nothing) when:
+ * - a LIVE process holds `.runner.lock` — checked via `liveLockHolder` (the exact same
+ *   liveness check `acquireLock` refuses on), never claimed: a reset while a pass is
+ *   mid-flight on that very card is exactly the race this guard exists to prevent, since the
+ *   running pass may write this card's state again before it next reads the lock;
+ * - the state file is missing, unreadable, or fails to parse/validate (`loadState` already
+ *   covers "unparseable" — `JSON.parse` and `parseState`'s own typed errors);
+ * - the named card has no entry under `cards` (`resetCard` throws `CardNotFoundError`).
+ *
+ * On success: writes the reset state back, warns (never auto-archives — see `resetCard`'s doc
+ * comment in state.ts for why) if the card's escalation file is still present, then prints the
+ * `resetCard`-produced summary as ONE line of JSON to stdout — the "so sessions can quote it"
+ * contract from the fix-list note.
+ *
+ * Field-by-field reset decisions live on `resetCard` itself (`core/state.ts`) — this function
+ * is the thin IO edge around it: check the lock, load, transform, write, report. `io` is only
+ * the slice of `LoopIO` this subcommand actually touches (same `Pick<LoopIO, ...>` pattern as
+ * `scrubTargetEnvLocal` above), so tests exercise it without a real filesystem. */
+export async function performResetCard(
+  homeDir: string,
+  cardId: string,
+  io: Pick<LoopIO, 'fileExists' | 'readFile' | 'writeFile' | 'readLock' | 'isProcessAlive'>,
+): Promise<number> {
+  const heldBy = liveLockHolder(io);
+  if (heldBy) {
+    console.error(
+      `reset-card: refusing to reset — .runner.lock is held by live pid ${heldBy.pid} ` +
+        `(started ${heldBy.startedAt}); the running pass may still be working this card.`,
+    );
+    return 1;
+  }
+
+  const statePath = campaignStatePathOf(homeDir);
+  let state: CampaignState;
+  try {
+    state = await loadState(() => io.readFile(statePath));
+  } catch (err) {
+    console.error(
+      `reset-card: could not load campaign state at ${statePath}: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    );
+    return 1;
+  }
+
+  let outcome: ReturnType<typeof resetCard>;
+  try {
+    outcome = resetCard(state, cardId);
+  } catch (err) {
+    console.error(`reset-card: ${err instanceof Error ? err.message : String(err)}`);
+    return 1;
+  }
+
+  io.writeFile(statePath, serializeState(outcome.state));
+
+  // Not a Card field (see resetCard's doc comment) — a live escalation file would otherwise
+  // silently re-park this card as escalation_pending on the very next run, contradicting the
+  // state file's own freshly-written `status: 'staged'`. Never auto-archived: that ritual is
+  // coupled to an actual ruling recorded in answers.md, which a plain reset never makes.
+  const escalationPath = escalationPathOf(homeDir, cardId);
+  if (io.fileExists(escalationPath)) {
+    console.error(
+      `reset-card: note — ${escalationPath} still exists; this card re-parks as ` +
+        'escalation_pending until that file is archived (see the ruling ritual in ' +
+        "orchestrate-campaign's SKILL.md) or the next run passes --include-escalated.",
+    );
+  }
+
+  console.log(JSON.stringify(outcome.summary));
+  return 0;
+}
+
 export async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+
+  if (argv[0] === 'reset-card') {
+    const parsed = parseResetCardArgs(argv.slice(1));
+    if ('error' in parsed) {
+      console.error(`reset-card: ${parsed.error}`);
+      process.exit(1);
+      return;
+    }
+    const io = buildRealIo({ homeDir: parsed.homeDir });
+    const exitCode = await performResetCard(parsed.homeDir, parsed.cardId, io);
+    process.exit(exitCode);
+    return;
+  }
+
+  // P10 (fix-list): the tribe never authenticates via ANTHROPIC_API_KEY — executor
+  // sessions authenticate via Claude Code login. Unset it before anything else runs
+  // (before any session spawn), so an inherited key from the launching shell's env
+  // never reaches a spawned session. The env mutation itself lives in the adapter
+  // (`unsetAnthropicApiKeyEnv`) — cli/main.ts never reads `process.env` directly
+  // (structure.test.ts: "no ambient process.env read outside adapters/").
+  if (unsetAnthropicApiKeyEnv()) {
+    console.error('campaign runner: ANTHROPIC_API_KEY was set in the environment — removed (the tribe authenticates via Claude Code login, never this variable)');
+  }
+
   const runId = generateRunId(new Date().toISOString(), randomBytes(2).toString('hex'));
-  const parsed = parseArgs(process.argv.slice(2), runId);
+  const parsed = parseArgs(argv, runId);
   if ('error' in parsed) {
     console.error(`campaign runner: ${parsed.error}`);
     process.exit(1); // argument errors always exit 1 — state was never loadable, no report.
@@ -208,6 +412,12 @@ export async function main(): Promise<void> {
 
   const io = buildRealIo(parsed.config);
   const startedAt = new Date().toISOString();
+
+  // P10: scrub a stray ANTHROPIC_API_KEY line out of the target repo's .env.local. Routed
+  // through `io` (the composition root's own adapter handle), never a direct fs import here
+  // — cli/main.ts only wires adapters, per structure.test.ts. See scrubTargetEnvLocal's doc
+  // comment above for the best-effort contract (never throws).
+  await scrubTargetEnvLocal(parsed.config.repoRoot, parsed.config.dryRun, io);
 
   let result: LoopResult | undefined;
   let thrown: unknown;
@@ -232,6 +442,10 @@ export async function main(): Promise<void> {
       endedAt,
       exitCode,
       reason: deriveExitReason({ threw: Boolean(thrown), exitCode, hasMessage: Boolean(result?.message) }),
+      // Harness-gap-wiring PR C: threads `runLoop`'s rulings-gate ids (see `run-loop.ts`'s
+      // `applyRulingsGate`) onto the ONE artifact an orchestrating session reads — undefined on
+      // every other exit path, exactly like `LoopResult.unratifiedRulings` itself.
+      unratifiedRulings: result?.unratifiedRulings,
     });
     tryFinalizeRunRecord(parsed.config, io, { endedAt, exitCode, reason: deriveExitReason({ threw: Boolean(thrown), exitCode, hasMessage: Boolean(result?.message) }) });
   }

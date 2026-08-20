@@ -254,6 +254,14 @@ async function checkChecksGreen(card: Card, config: VerifyConfig, io: VerifyIO):
   };
 }
 
+// P4 audit fix-round (should-fix, scout): the residue-safety contract between this module and
+// `residue.ts`/`core/loop/card-actions.ts` was three independent string-literal copies of the
+// same two phrases — rewording one silently broke the heal decision with no compile/test
+// failure pointing at the cause. Exported as the single shared source of truth; every producer
+// AND consumer imports these instead of re-typing the literal.
+export const WORKTREE_STILL_PRESENT_DETAIL = 'worktree still present';
+export const REMOTE_BRANCH_STILL_PRESENT_DETAIL = 'remote branch still present';
+
 async function checkWorktreeAndBranchGone(
   card: Card,
   config: VerifyConfig,
@@ -284,8 +292,8 @@ async function checkWorktreeAndBranchGone(
   }
 
   const problems: string[] = [];
-  if (worktreeStillExists) problems.push('worktree still present');
-  if (remoteStillExists) problems.push('remote branch still present');
+  if (worktreeStillExists) problems.push(WORKTREE_STILL_PRESENT_DETAIL);
+  if (remoteStillExists) problems.push(REMOTE_BRANCH_STILL_PRESENT_DETAIL);
   return {
     id: 'worktreeAndBranchGone',
     passed: false,

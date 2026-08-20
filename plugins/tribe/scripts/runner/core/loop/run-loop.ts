@@ -1,11 +1,12 @@
 // The pass + entry: derive-and-act until `done`, honoring STOP and the `--max-cards` budget,
 // tied together with the §D2 lock.
-import type { CampaignState, NextCardResult, ResolvedConfig, RunLoopConfig } from '../types.ts';
-import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_SESSION_INCOMPLETE } from '../types.ts';
+import type { CampaignState, CardResult, NextCardResult, ResolvedConfig, RunLoopConfig } from '../types.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_OK, EXIT_RULINGS_UNRATIFIED, EXIT_SESSION_INCOMPLETE } from '../types.ts';
 import { loadState, nextCard } from '../state.ts';
 import { BRIEF_TEMPLATE_PATH } from '../brief.ts';
 import { campaignStatePathOf, answersPathOf } from '../paths.ts';
 import { buildRunRecord, reportsDirOf, runDirOf, runRecordPathOf, serializeRunRecord } from '../run-record.ts';
+import { unratifiedRulingIds } from '../rulings.ts';
 import type { LoopIO, StateIO } from '../../ports/ports.ts';
 import { acquireLock, isStopRequested, releaseLock, stopFilePathOf } from './lock.ts';
 import { deriveCardPhase, derivePhaseConfigOf, type CardPhase } from './phase.ts';
@@ -24,6 +25,10 @@ export interface LoopResult {
   processed: CardOutcome[];
   message?: string;
   dryRunPlan?: DryRunPlan;
+  /** Harness-gap-wiring PR C: set only when the pass would otherwise have concluded `done` but
+   * `answers.md` still carries ≥1 unratified ruling (`core/rulings.ts`) — see `runLoop`'s
+   * post-`runPass` check, below. */
+  unratifiedRulings?: string[];
 }
 
 /** D5′ park-and-continue (spec §O4/§2 wall reads): a single pass can now end with a MIX of
@@ -92,12 +97,24 @@ function filteredNextCard(
       : state.sequence
   ).filter((id) => !attempted.has(id));
   const view: CampaignState = { ...state, sequence };
-  const stateIO: StateIO = { repoRoot: config.repoRoot, fileExists: (p) => io.fileExists(p) };
+  const stateIO: StateIO = {
+    repoRoot: config.repoRoot,
+    homeDir: config.homeDir,
+    fileExists: (p) => io.fileExists(p),
+  };
   return nextCard(view, stateIO, { includeEscalated: config.includeEscalated });
 }
 
 async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult> {
-  const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
+  // P11 audit fix: `--dry-run` is a diagnostic tool (see this function's zero-side-effects
+  // doc comment on `runLoop`) — exactly what an operator reaches for to inspect a suspected
+  // R3 stale-baseSha incident (the B13 shape) WITHOUT touching state. It must still surface
+  // the warning, same as the two other `loadState` call sites (run-loop.ts's runLoop,
+  // cli/main.ts) — state.ts stays pure; this is still just the edge printing it.
+  const state = await loadState(
+    () => io.readFile(campaignStatePathOf(config.homeDir)),
+    (warning) => console.error(`[tribe-runner] ${warning}`),
+  );
   const nc = filteredNextCard(state, config, io);
 
   if (nc.kind === 'done') {
@@ -139,9 +156,46 @@ async function resolveRunContext(config: RunLoopConfig, io: LoopIO): Promise<Res
   return { ...config, baseBranch, answersContent, briefTemplate };
 }
 
+/** A single card's phase-derive → (park on `escalation_pending`) → `actOnCard`-with-bounded-
+ * retry turn — extracted out of `runPass`'s while-loop body so the N=1 serial pass and the
+ * N>1 concurrent pool (`runPassPool`, below) share EXACTLY one implementation of this logic.
+ * A behavior fixed here is fixed identically for both; there is no second copy that could
+ * silently drift. `worked` mirrors `runPass`'s own attempted/worked split (see that function's
+ * doc comment): `false` only for `escalation_pending` (nothing done this pass, no budget
+ * spent), `true` for every other outcome (`shipped`/`escalated`/`stopped` — real work
+ * happened, even a `stopped` session that ran out of retries). */
+async function runCardTurn(ctx: CardCtx, nc: CardResult): Promise<{ outcome: CardOutcome; worked: boolean }> {
+  const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(ctx.resolved), ctx.io);
+
+  if (phase.kind === 'escalation_pending') {
+    return {
+      outcome: { kind: 'escalation_pending', cardId: nc.cardId, escalationPath: phase.escalationPath },
+      worked: false,
+    };
+  }
+
+  let outcome = await actOnCard(ctx, phase);
+  let retries = 0;
+  while (outcome.kind === 'stopped' && outcome.retryable && retries < 2) {
+    retries += 1;
+    const retryPhase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(ctx.resolved), ctx.io);
+    if (retryPhase.kind === 'escalation_pending') break;
+    outcome = await actOnCard(ctx, retryPhase);
+  }
+  return { outcome, worked: true };
+}
+
 /** One D5′ park-and-continue pass over the campaign: derive-and-act until `done`, STOP, or
- * the --max-cards budget is spent. */
-async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopIO): Promise<LoopResult> {
+ * the --max-cards budget is spent. `reachedDone` records WHICH of the three ended the pass:
+ * true only when `filteredNextCard` itself returned `{ kind: 'done' }` (no progressable card
+ * remains) — a mid-pass STOP and a spent budget both leave it false, because cards may remain
+ * genuinely unattempted on those paths. `computeExitCode` cannot tell these apart (all three
+ * can be `EXIT_OK`), and the rulings gate below must fire only on genuine done. */
+async function runPass(
+  state: CampaignState,
+  resolved: ResolvedConfig,
+  io: LoopIO,
+): Promise<LoopResult & { reachedDone: boolean }> {
   const processed: CardOutcome[] = [];
   // Warchief audit fix (Task 2): `attempted` and the `--max-cards` BUDGET are two different
   // questions, and conflating them was a bug. `attempted` answers ONLY "have I already
@@ -163,13 +217,17 @@ async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopI
   // the loop can tick even when `worked` never reaches `limit` (e.g. every remaining card is
   // `escalation_pending`) — see `filteredNextCard`'s doc comment (Warchief ruling W-F2) for
   // why that must be structural, not incidental.
+  let reachedDone = false;
   while (worked < limit) {
     if (isStopRequested(stopFilePathOf(resolved), io)) {
       break;
     }
 
     const nc = filteredNextCard(state, resolved, io, attempted);
-    if (nc.kind === 'done') break;
+    if (nc.kind === 'done') {
+      reachedDone = true;
+      break;
+    }
 
     const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
 
@@ -181,28 +239,211 @@ async function runPass(state: CampaignState, resolved: ResolvedConfig, io: LoopI
       continue;
     }
 
-    const phase = await deriveCardPhase(nc.cardId, nc.card, derivePhaseConfigOf(resolved), io);
-
-    if (phase.kind === 'escalation_pending') {
-      // D5′: an unanswered escalation from a PRIOR run — nothing to do this pass but park
-      // it (see the `CardOutcome.escalation_pending` doc) and move to the next card. Marks
-      // `attempted` (never re-select it this pass) but NOT `worked` (no budget spent — see
-      // the audit-fix comment above `attempted`'s declaration).
-      attempted.add(nc.cardId);
-      processed.push({ kind: 'escalation_pending', cardId: nc.cardId, escalationPath: phase.escalationPath });
-      continue;
-    }
-
-    const outcome = await actOnCard(ctx, phase);
+    // P1 fix-list "wait-aware liveness" (containment layer): a `stopped` outcome whose
+    // session ended with `error` (never `timeout`) is exactly what a human re-trigger fixed
+    // on 08-08 — the card's sessionId is already recorded locally (written by `onSessionStart`
+    // the instant the SDK assigns it, before the session can even reach a PR/branch), so
+    // re-deriving the phase naturally takes the D4 resume path: `pr_open`/`branch_no_pr` when
+    // a branch was already known, or the P1 audit fix-round's `session_only` reason
+    // (`phase.ts`) when it wasn't — never a blind second `fresh` spawn on top of possibly-
+    // still-open work. Bounded to 2 retries per card per pass so a persistently-erroring card
+    // still surfaces as `stopped` rather than looping forever. (`escalation_pending` — D5′: an
+    // unanswered escalation from a PRIOR run — is also handled inside `runCardTurn`; nothing
+    // to do this pass but park it and move to the next card.)
+    const { outcome, worked: didWork } = await runCardTurn(ctx, nc);
     attempted.add(nc.cardId);
     processed.push(outcome);
-    worked += 1;
+    if (didWork) worked += 1;
     // D5′: `escalated`/`stopped` no longer `break` the pass — the next tick naturally
     // re-derives the next progressable card (excluding this one, now `attempted`) via
     // `filteredNextCard`/`nextCard`'s own blocked-cascade reconciliation (W6).
   }
 
-  return { exitCode: computeExitCode(processed), processed };
+  return { exitCode: computeExitCode(processed), processed, reachedDone };
+}
+
+/** P12 follow-up (`--max-concurrent N`, N > 1): the SAME per-card turn (`runCardTurn`) as the
+ * N=1 serial `runPass` above, but up to `maxConcurrent` cards run their turns concurrently —
+ * cooperatively, via JS's single-threaded event loop (never true parallel execution: every
+ * synchronous span still runs to completion with no other worker's code interleaved inside
+ * it). `runLoop` routes N=1 to `runPass` unconditionally (see that call site) — this function
+ * is never invoked, let alone tested, for the default width, so N=1 cannot regress through it.
+ *
+ * Safety argument (P12 follow-up brief: "either serialize state mutations ... or prove
+ * per-card field disjointness"):
+ *
+ * 1. Selection never double-hands a card. `filteredNextCard`/`nextCard` (`state.ts`) are
+ *    SYNCHRONOUS — and MUTATING (`nextCard` calls `reconcileBlockedStatuses`, which flips
+ *    `card.status` between `'blocked'`/`'staged'` in place on every call — never "pure" in the
+ *    no-side-effects sense, just synchronous and side-effect-free w.r.t. the OUTSIDE world) — no
+ *    `await` sits between reading a freshly-selected `nc.cardId` and `attempted.add(nc.cardId)`
+ *    below, so two fill iterations can never observe the same unclaimed card. Nor can this
+ *    in-place reconciliation itself race: it only ever flips a card TO `blocked` when it
+ *    (transitively) depends on one that's `escalated`/already-blocked, and TO `staged` when it
+ *    no longer does — an in-flight (claimed but unshipped) card is neither, so it is never a
+ *    target these mutations touch while a worker holds it. `attempted` is claimed at SELECTION
+ *    time here — unlike `runPass`'s N=1 loop, which can safely claim after the fact because it
+ *    never selects a second card until the first is fully done — the one deliberate behavioral
+ *    difference from `runPass`, required for concurrency to be safe at all.
+ * 2. `dependsOn` still orders correctly with NO extra bookkeeping. `nextCard` already treats
+ *    any non-`shipped` status — including a claimed-but-still-`staged`/`running` in-flight
+ *    card — as "not shipped", so a dependent card is never selected while its dependency is
+ *    mid-flight, exactly like an ordinary not-yet-selected `staged` dependency behaves today.
+ * 3. Two in-flight cards never touch the same mutable sub-object. `state.cards[cardId]` is a
+ *    distinct object per card id, and point 1 guarantees no two workers ever share a `cardId`
+ *    — so every `card.status = ...`/`card.pr = ...`-style mutation `card-actions.ts` makes is
+ *    disjoint across concurrently-running workers by construction.
+ * 4. `persistLocalState` writes are never torn or regressed. `commit-guard.ts`'s
+ *    `persistLocalState` synchronously serializes and writes the WHOLE `state` object (never a
+ *    per-card patch), and every mutation site in `card-actions.ts` calls it in the SAME
+ *    synchronous span as the mutation (no `await` in between) — JS run-to-completion semantics
+ *    make each mutate-then-flush pair atomic. `state` is one shared object, never copied per
+ *    card, so the strict total order JS's single thread imposes on these atomic spans makes
+ *    the writes that actually reach disk MONOTONIC: whichever flush lands last always includes
+ *    every mutation any worker had applied by that point, in flight or finished — never a lost
+ *    update, regardless of which worker happened to finish first.
+ * 5. (P12 follow-up hardening) The FILESYSTEM/git layer, which points 1-4 above deliberately do
+ *    not cover, is handled separately: `card-actions.ts`'s `serializeRepoGitMutation` queues
+ *    every runner-side `git worktree`/`branch -D` mutation (`performRevertAndRedo`,
+ *    `executeHealActions`, `gatherWorktreeResidueFacts`) behind one promise chain so two cards'
+ *    calls into git's shared, repo-wide bookkeeping never interleave — see that helper's own
+ *    doc comment for why a promise queue is enough (no real OS lock needed) and what it does
+ *    NOT cover (an executor session's own git commands, which this queue cannot reach).
+ * 6. (P12 follow-up hardening) One card's turn throwing an uncaught exception can never abort
+ *    the whole pass or abandon other in-flight cards: `launch`'s `.catch` converts it to a
+ *    `stopped`/non-retryable `CardOutcome` for THAT card only, and `.finally` unconditionally
+ *    clears its `active` slot — see `launch`, below.
+ *
+ * Budget bookkeeping (`--max-cards`, `worked`) is necessarily OPTIMISTIC under concurrency: the
+ * fill loop cannot know whether a freshly-claimed card will turn out to be real work or an
+ * `escalation_pending` park (that only resolves once `runCardTurn` itself runs), so it treats
+ * every in-flight claim as a potential unit of budget (`worked + active.size < limit`) — this
+ * can never OVERSHOOT the limit (a park simply leaves `worked` short of the number of workers
+ * launched, self-correcting on the next fill tick) but a batch can undershoot by up to
+ * `maxConcurrent - 1` cards' worth of parks before the budget is recognized as spent.
+ *
+ * NOT solved here (documented limitations — the runner README and SKILL.md carry the same
+ * notes):
+ * - Two cards that both merge to the SAME base branch can still race at the actual `gh pr
+ *   merge` step — git itself is what serializes (or rejects/re-queues) that, not this pool.
+ * - Each card's OWN executor session runs its own git commands (worktree add, checkout,
+ *   commit, push, ...) with `cwd: resolved.repoRoot` too (`session.ts`'s pinned SDK options) —
+ *   point 5 above serializes only the RUNNER's own git calls; it cannot reach into a session's
+ *   independently-spawned process. Git's own locking mostly prevents outright corruption there,
+ *   but a lock-contention failure can surface as an ordinary non-zero exit from a git command —
+ *   read that as transient contention, not repo corruption, and retry rather than escalate on
+ *   sight. Re-plumbing every session to its own isolated `cwd` is real future hardening, out of
+ *   scope for this pass.
+ * `N > 1` bounds WIDTH only; it is never an ordering promise beyond what `dependsOn` declares. */
+async function runPassPool(
+  state: CampaignState,
+  resolved: ResolvedConfig,
+  io: LoopIO,
+  maxConcurrent: number,
+): Promise<LoopResult & { reachedDone: boolean }> {
+  const processed: CardOutcome[] = [];
+  const attempted = new Set<string>();
+  let worked = 0;
+  let reachedDone = false;
+  const limit = resolved.maxCards ?? Infinity;
+  const active = new Set<Promise<void>>();
+
+  const launch = (nc: CardResult): void => {
+    const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
+    const task: Promise<void> = runCardTurn(ctx, nc)
+      // Panel finding #2 (P12 follow-up hardening): an uncaught exception from ANYWHERE in a
+      // card's turn (deriveCardPhase, actOnCard, or anything either calls) must be contained to
+      // THIS card — never left to reject `task` and blow up the awaited `Promise.race(active)`
+      // below, which would abort the whole pool pass and abandon every OTHER card still
+      // in-flight mid-session. Converted to the same `stopped` shape a session ending with
+      // outcome `'error'` already produces; `retryable: false` because a thrown exception (as
+      // opposed to a typed `SessionResult`) leaves no known-safe state to resume from — treated
+      // as the SAFER, non-retryable case, exactly like `CardOutcome.stopped`'s own doc comment
+      // already distinguishes `'error'`/retryable from `'timeout'`/not.
+      .catch((err: unknown): { outcome: CardOutcome; worked: boolean } => ({
+        outcome: {
+          kind: 'stopped',
+          cardId: nc.cardId,
+          reason: `card turn threw: ${err instanceof Error ? err.message : String(err)}`,
+          retryable: false,
+        },
+        worked: true,
+      }))
+      .then((result) => {
+        processed.push(result.outcome);
+        if (result.worked) worked += 1;
+      })
+      // ALWAYS runs, whether the turn shipped, escalated, parked, or (now) threw — a card can
+      // never wedge a permanent slot in `active` and starve the pool of capacity.
+      .finally(() => {
+        active.delete(task);
+      });
+    active.add(task);
+  };
+
+  for (;;) {
+    if (!isStopRequested(stopFilePathOf(resolved), io)) {
+      // Top up to `maxConcurrent` in-flight workers, never claiming past the (optimistic)
+      // --max-cards budget — see this function's own doc comment.
+      while (active.size < maxConcurrent && worked + active.size < limit) {
+        const nc = filteredNextCard(state, resolved, io, attempted);
+        if (nc.kind === 'done') {
+          // Genuinely done only when nothing is still in flight to possibly unblock a later
+          // card (e.g. by shipping a dependency) — see point 2 of the doc comment above.
+          if (active.size === 0) reachedDone = true;
+          break;
+        }
+        if (nc.kind === 'planning_needed') {
+          attempted.add(nc.cardId);
+          const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
+          const outcome = await escalateCard(ctx, 'planning_needed', `Missing on disk: ${nc.missing.join(', ')}`);
+          processed.push(outcome);
+          worked += 1;
+          continue;
+        }
+        attempted.add(nc.cardId); // Claim BEFORE any await below — see point 1 of the doc comment.
+        launch(nc);
+      }
+    }
+
+    if (active.size === 0) break;
+    await Promise.race(active);
+  }
+
+  return { exitCode: computeExitCode(processed), processed, reachedDone };
+}
+
+/** Harness-gap-wiring PR C (spec: outstanding-17 postmortem — a ruling that captured a durable
+ * convention was never ratified into the target repo's governance files because nothing gated
+ * on it): the mechanical gate. Pure — takes the pass's own result and the `answers.md` content
+ * `resolveRunContext` already read once through the injected `io` seam (`resolved.answersContent`
+ * — no second read here) and decides whether to override an `EXIT_OK` ("done") into
+ * `EXIT_RULINGS_UNRATIFIED`. `reachedDone` (runPass) must be true as well as `EXIT_OK`:
+ * `computeExitCode` returns `EXIT_OK` equally for genuine done, a mid-pass STOP, and a spent
+ * `--max-cards` budget, and gating the latter two would flip "partial progress, come back
+ * later" into a rulings failure while cards remain genuinely unattempted (3-lens review,
+ * contract lens). Every other exit code (an escalation, a stopped session) passes
+ * through UNCHANGED — the brief is explicit that this gate fires only on the path that would
+ * otherwise conclude `done`. Mirrors `debt-count.ts`'s own framing of its diff-mode gate: "exit
+ * code is a gate, not a report." */
+function applyRulingsGate(
+  result: LoopResult,
+  answersContent: string,
+  reachedDone: boolean,
+): LoopResult {
+  if (!reachedDone || result.exitCode !== EXIT_OK) return result;
+
+  const unratified = unratifiedRulingIds(answersContent);
+  if (unratified.length === 0) return result;
+
+  return {
+    ...result,
+    exitCode: EXIT_RULINGS_UNRATIFIED,
+    unratifiedRulings: unratified,
+    message:
+      `${unratified.length} ruling(s) in answers.md are not yet ratified: ${unratified.join(', ')}. ` +
+      'Add a `ratified-as:` line to each block (see the runner README), then re-run.',
+  };
 }
 
 /** The main loop, spec §D2/§D4/§D5′ tied together: acquire the single-instance lock → STOP-file
@@ -248,8 +489,21 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
 
     const resolved = await resolveRunContext(config, io);
 
-    const state = await loadState(() => io.readFile(campaignStatePathOf(config.homeDir)));
-    const result = await runPass(state, resolved, io);
+    // P11 fix-list: surfaces `loadState`'s R3-invariant normalization warnings at the edge —
+    // state.ts stays pure (it only computes the warning strings; it never imports `console`
+    // itself), this is the one place a real run actually prints them.
+    const state = await loadState(
+      () => io.readFile(campaignStatePathOf(config.homeDir)),
+      (warning) => console.error(`[tribe-runner] ${warning}`),
+    );
+    // P12 follow-up: N=1 (omitted or explicit) always takes the ORIGINAL `runPass` code path
+    // — never `runPassPool`, even with maxConcurrent read as `?? 1` — so the default behavior
+    // this whole runner shipped with cannot regress through the new pool path. Only N > 1
+    // routes to `runPassPool`; see that function's own doc comment for the concurrency-safety
+    // argument.
+    const maxConcurrent = resolved.maxConcurrent ?? 1;
+    const result =
+      maxConcurrent > 1 ? await runPassPool(state, resolved, io, maxConcurrent) : await runPass(state, resolved, io);
     // W-F5 (Warchief fix): `nextCard`'s `reconcileBlockedStatuses` (state.ts) can mark a card
     // `blocked` IN MEMORY on the very tick that also discovers `done` (no further progressable
     // card) — that tick never reaches `actOnCard`/`escalateCard`/`shipCard`, so the mutation
@@ -261,7 +515,11 @@ export async function runLoop(config: RunLoopConfig, io: LoopIO): Promise<LoopRe
     // byte-identical round-trip means a pass with no reconciliation to flush just rewrites the
     // same bytes (harmless, no spurious diff).
     persistLocalState(state, resolved, io);
-    return result;
+    // Harness-gap-wiring PR C: gate the genuinely-done exit on `answers.md`'s unratified
+    // rulings — see `applyRulingsGate`'s own doc comment. A no-op for every other exit code
+    // and for EXIT_OK passes that ended on STOP or a spent --max-cards budget.
+    const { reachedDone, ...loopResult } = result;
+    return applyRulingsGate(loopResult, resolved.answersContent, reachedDone);
   } finally {
     releaseLock(io);
   }

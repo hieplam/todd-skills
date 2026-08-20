@@ -19,7 +19,7 @@
 // card that finished before the crash is already durable on disk regardless of what happens to
 // the rest of the pass afterward.
 import { join } from 'node:path';
-import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_SESSION_INCOMPLETE } from './types.ts';
+import { EXIT_ESCALATED, EXIT_LOCKED, EXIT_RULINGS_UNRATIFIED, EXIT_SESSION_INCOMPLETE } from './types.ts';
 import type { Card, CampaignState } from './types.ts';
 import type { ReportIO } from '../ports/ports.ts';
 import { ESCALATIONS_DIRNAME, escalationPathOf } from './paths.ts';
@@ -36,14 +36,26 @@ const REPORT_VERSION = 1;
 /** §O5's `run.reason` vocabulary. `error` is new here (not named in the design doc's JSON
  * example) — it covers the plan's "any error after the state was loadable" exit path, which
  * has no `EXIT_*` code of its own in loop.ts (that constant lives in run.ts, the only place an
- * unhandled exception from `runLoop` is caught). */
-export type ExitReason = 'done' | 'stop_requested' | 'escalations_pending' | 'session_incomplete' | 'error';
+ * unhandled exception from `runLoop` is caught). `rulings_unratified` is harness-gap-wiring PR
+ * C's campaign-level gate (`core/rulings.ts` + `run-loop.ts`'s post-`runPass` check): the pass
+ * would otherwise have concluded `done`, but `answers.md` still carries ≥1 unratified ruling. */
+export type ExitReason =
+  | 'done'
+  | 'stop_requested'
+  | 'escalations_pending'
+  | 'session_incomplete'
+  | 'error'
+  | 'rulings_unratified';
 
 export interface ReportRunInfo {
   startedAt: string;
   endedAt: string;
   exitCode: number;
   reason: ExitReason;
+  /** Only present when `reason === 'rulings_unratified'`: every unratified ruling id
+   * (`core/rulings.ts`'s `RulingBlock.id`), so the orchestrating session can act (ratify each
+   * one in `answers.md`) without re-parsing `answers.md` itself. */
+  unratifiedRulings?: string[];
 }
 
 /** Everything this module needs from campaign config, as inputs (W1: nothing environment
@@ -56,7 +68,16 @@ export interface ReportConfig {
 }
 
 export type CardReportEntry =
-  | { outcome: 'shipped'; pr: number | null; mergeSha: string | null }
+  | {
+      outcome: 'shipped';
+      pr: number | null;
+      mergeSha: string | null;
+      /** P4 fix-list item: the `HealAction.kind`s `healSafeResidue` actually applied while
+       * shipping this card (`card.healedResidue`, set only by `shipCard` — see
+       * `core/loop/card-actions.ts`). OPTIONAL and present ONLY when non-empty, so every
+       * existing shipped-card fixture/assertion that never healed anything is untouched. */
+      healedResidue?: string[];
+    }
   | { outcome: 'escalated'; escalationFile: string; question: string; autoAnswerRounds: number }
   | { outcome: 'blocked'; blockedOn: string }
   | { outcome: 'not_reached' };
@@ -94,6 +115,10 @@ export function deriveExitReason(params: {
   if (params.threw) return 'error';
   if (params.exitCode === EXIT_ESCALATED) return 'escalations_pending';
   if (params.exitCode === EXIT_SESSION_INCOMPLETE) return 'session_incomplete';
+  // Checked ahead of `hasMessage`: the rulings-unratified `LoopResult` carries a human-readable
+  // `message` too (same convention as the startup-STOP path), but its distinct `EXIT_*` code is
+  // unambiguous on its own and must not fall through to the generic `stop_requested` mapping.
+  if (params.exitCode === EXIT_RULINGS_UNRATIFIED) return 'rulings_unratified';
   if (params.hasMessage) return 'stop_requested';
   return 'done';
 }
@@ -191,7 +216,13 @@ export async function buildCampaignReport(
     if (!card) continue; // referential integrity already enforced at load (state.ts); defensive only.
 
     if (card.status === 'shipped') {
-      cards[cardId] = { outcome: 'shipped', pr: card.pr, mergeSha: card.mergeSha };
+      const healedResidue = card.healedResidue ?? [];
+      cards[cardId] = {
+        outcome: 'shipped',
+        pr: card.pr,
+        mergeSha: card.mergeSha,
+        ...(healedResidue.length > 0 ? { healedResidue } : {}),
+      };
       stats.shipped += 1;
       continue;
     }
@@ -223,6 +254,25 @@ export async function buildCampaignReport(
   return { v: REPORT_VERSION, campaign: state.campaign, run, cards, pending, stats };
 }
 
+/** Harness-gap-wiring PR C (maintainer ruling, amending the original brief): the unratified-
+ * rulings outcome is CAMPAIGN-LEVEL state, not a per-card escalation — no single card owns it,
+ * so it is folded into the "## Pending (needs the owner)" section this module already renders,
+ * rather than mimicking `card-actions.ts`'s per-card `# Escalation: <cardId>` markdown (which
+ * stays untouched — do not import from or extend it here). The "answerable" framing (P5
+ * fix-list's vocabulary: a ruling alone clears this, unlike a mechanical verify failure) is
+ * kept as a label, not the per-card Options-block structure. Names every unratified ruling id
+ * verbatim so the orchestrating session can act without re-parsing `answers.md` itself (brief
+ * requirement). */
+function renderRulingsUnratifiedNote(unratifiedRulings: string[]): string[] {
+  return [
+    '',
+    "**Unratified rulings (answerable):** mark each ruling's `ratified-as:` in `answers.md` " +
+      '(vocabulary: `rule <path>` | `debt <id>` | `roadmap <ref>` | `operational` | ' +
+      '`dismissed` — see the runner README) or ratify via the governance path, then re-trigger.',
+    ...unratifiedRulings.map((id) => `- ${id}`),
+  ];
+}
+
 /** Renders the SAME `CampaignReport` structure `writeReport` also serializes to JSON — the
  * human-readable twin the owner reads straight from the target repo, no session required
  * (design §O5). Never independently re-derives anything from `state`/`io`, which is what makes
@@ -248,6 +298,9 @@ export function renderReportMarkdown(report: CampaignReport): string {
     if (entry.outcome === 'shipped') {
       lines.push(`- PR: ${entry.pr ?? '(none)'}`);
       lines.push(`- Merge sha: ${entry.mergeSha ?? '(none)'}`);
+      if (entry.healedResidue && entry.healedResidue.length > 0) {
+        lines.push(`- Healed residue: ${entry.healedResidue.join(', ')}`);
+      }
     } else if (entry.outcome === 'escalated') {
       lines.push(`- Escalation file: ${entry.escalationFile}`);
       lines.push(`- Question: ${entry.question}`);
@@ -266,6 +319,9 @@ export function renderReportMarkdown(report: CampaignReport): string {
     for (const cardId of report.pending) {
       lines.push(`- ${cardId}`);
     }
+  }
+  if (report.run.reason === 'rulings_unratified') {
+    lines.push(...renderRulingsUnratifiedNote(report.run.unratifiedRulings ?? []));
   }
   lines.push('');
 

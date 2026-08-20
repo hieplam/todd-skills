@@ -76,12 +76,23 @@ value belongs in the campaign's own docs, not here.
    markdown file. Only you (or the owner) ever append rulings to this file, in every stage below —
    the runner never writes to it (wall W3: judgment stays in sessions, never migrates into the
    runner).
-5. **Land specs/plans ONLY** — into the host repo's **existing, discovered** convention (e.g.
+5. **Cross-check inherited obligations before landing.** Batch-authored specs are written blind
+   to each other — a spec finished today can hand an obligation to a card whose own spec is
+   authored the same day, and the receiving spec never sees it. Run
+   `plugins/tribe/scripts/check-spec-handoffs.sh <wave's spec dir> <dir of already-shipped
+   specs>` over the wave's own spec dir and the repo's existing (already-shipped) specs dir; for
+   every candidate hit, confirm the receiving spec acknowledges it and produce/refresh a
+   `handoffs.md` ledger (one row per hit, or a listed non-obligation with a reason) committed
+   next to the wave's specs — see
+   `docs/tribe/fixlists/2026-08-08-outstanding-17/P8-inherited-obligations-check.md` for the
+   ledger format. A wave with unacknowledged handoffs does not launch.
+6. **Land specs/plans ONLY** — into the host repo's **existing, discovered** convention (e.g.
    `docs/specs/` + `docs/plans/` where present, or `.c3/adr/`) — as a normal PR to
    `<target-repo>`'s master via `gh pr merge --merge`. Cards are now `staged`. Never invent a
    `docs/tribe/planning/`-style namespace of your own: look for what this repo already uses for
    specs/plans and use that. Campaign state and `answers.md` are never committed — they live only
-   under `--home`, per step 3/4 above.
+   under `--home`, per step 3/4 above. `handoffs.md` DOES land in the repo, alongside the specs
+   it covers.
 
 #### The campaign state file (`campaign-state.json`, under `--home`)
 
@@ -123,8 +134,40 @@ every optional field may simply be omitted rather than written as `null`/`[]` wh
 - `sequence` is the dependency-ordered card order; every id in it (and every id named in a
   `dependsOn`) must have a matching entry under `cards`.
 - Every card you write starts `"status": "staged"`, `"autoAnswerRounds": 0`, and no `dependsOn`
-  unless that card genuinely must not start before another one ships — an undeclared dependency
-  behaves as pure sequential order (today's default), so only declare one you mean.
+  unless that card genuinely must not start before another one ships.
+
+#### The runner's concurrency model (P12 / P12 follow-up)
+
+**By default (`--max-concurrent` never passed, or passed as `1`) the runner never spawns two
+sessions concurrently — it runs exactly one card's session at a time, awaiting it to full
+completion before selecting the next**
+(`docs/superpowers/specs/2026-07-16-campaign-runner-design.md`'s non-goals;
+`docs/superpowers/specs/2026-07-16-campaign-orchestration-design.md` §O7: "never runs two cards
+concurrently" — both describe the DEFAULT, not an absolute ceiling; see below). What an undeclared
+dependency risks under the default is ORDER, not concurrency: absent parking, the runner walks
+`sequence` top to bottom and ships cards in exactly that order — but park-and-continue means a
+card ahead in `sequence` that escalates or gets blocked is skipped rather than halting the run, so
+a later card with no `dependsOn` on it can ship before that earlier, now-parked card does.
+`sequence` position alone does not guarantee card A completes before card B; only `dependsOn`
+does. So only declare one you mean.
+
+**`--max-concurrent N` (N > 1)** is an explicit opt-in that bounds how many cards' sessions may
+run at once — WIDTH only, never ORDER. `dependsOn` is still the only thing that orders cards at
+any `N`: a dependent card is never selected while its dependency is mid-flight, exactly like it's
+never selected while merely `staged` today. Passing this flag does not change how you author
+`dependsOn` — it changes how many *independent*, undeclared-dependency cards the runner is allowed
+to work on at once.
+
+- **Serial campaigns:** when the owner's directive is one-card-at-a-time (or cards merge to the
+  same branch and each should build on the previous card's merged master), author the full
+  sequential chain — every card `dependsOn` its sequence predecessor — REGARDLESS of whether
+  `--max-concurrent` is passed. Default to the chain when in doubt: relying on `sequence` position
+  alone to guarantee ordering is the trap this note exists to close, not a safe shortcut, and
+  `--max-concurrent` does not close it either — it bounds width, it does not order. Only reach for
+  `--max-concurrent N` (N > 1) when the owner's directive genuinely wants bounded parallelism over
+  cards that are actually independent and don't share a base branch (the runner does not add any
+  merge-queue serialization beyond what git/GitHub already do — see the runner README's
+  "Concurrency" section for the full contract and its documented limitations).
 - `ownerOnlyEscalations` is *your* Stage-A authored list — carry over the roadmap's own
   Escalation register verbatim (irreversible data shapes, product-promise changes, new
   permissions, privacy). A trigger name on this list escalates to the owner unconditionally in
@@ -183,6 +226,30 @@ It exits 0 when every prerequisite is present, or exits 1 naming each gap and it
 non-zero exit, relay the gaps to the owner and stop — do not start a campaign on a machine that
 cannot finish it.
 
+**Also validate every card's plan against the campaign's schema-lock paths — once per campaign,
+before the first launch.** This shifts the schema guard left, from verify-time (post-merge) to
+authoring/preflight-time: a plan that schedules a locked-path change without declaring
+`allowsSchemaChange: true` front-matter fails here, before any session spawns, instead of being
+discovered by the runner's `schemaGuard` verify check after the card's PR already merged. Run it
+for EVERY card in the state file's `sequence`, over that card's own `plan` path, passing the state
+file's own `schemaLockPaths` (comma-joined):
+
+```sh
+bash "$(dirname "$(dirname "$runner_dir")")/scripts/validate-plan.sh" \
+  --schema-lock-paths <campaign schemaLockPaths, comma-joined> \
+  <card's plan path>
+```
+
+It exits 0 when the plan either does not touch a locked path or declares
+`allowsSchemaChange: true`, or non-zero naming the plan, the matched task line, and the fix. Run
+this over **every** card before judging anything — same as `doctor.sh` above, this check is
+additive and never fatal-on-first-miss: a non-zero exit on card 2 of 17 is not a reason to skip
+checking cards 3-17, it is one entry to collect and keep going. Only once every card has been
+checked, relay the FULL consolidated list of violating cards (plan, matched task line, and fix
+for each) to the owner in one message and stop — do not launch a campaign that will only fail
+this same guard later, post-merge, one card at a time, after PR #185's incident (08-08 campaign,
+ruling UC-3).
+
 1. **Always `--dry-run` first** — zero side effects (no lock acquired, nothing written, no
    session spawned). Sanity-check the derived next action before committing to a real run:
 
@@ -224,6 +291,7 @@ cannot finish it.
 | `--dry-run` | no | Derive and print the next action with zero side effects. |
 | `--cards` | no | Comma-separated card ids — restrict the loop to only these. |
 | `--max-cards` | no | Stop after processing this many cards this run. |
+| `--max-concurrent` | no | Integer ≥ 1 — how many cards' sessions may run at once this pass. Default `1` (today's one-card-at-a-time behavior); bounds WIDTH only, never ORDER — `dependsOn` still owns ordering (see "The runner's concurrency model" below). Only pass this when the owner's directive genuinely wants bounded parallelism; the default is correct for every other campaign. |
 | `--include-escalated` | no | Reconsider a card whose escalation file already exists. |
 
 The three required flags have **no default** — omitting any of them is a usage error, not a value
@@ -236,6 +304,7 @@ worth guessing. An unrecognized flag (including the deleted `--state`/`--answers
 | `1` | `.runner.lock` is held by a live process, or a CLI argument error. |
 | `2` | The pass finished; **at least one escalation is pending.** This is NOT "aborted at the first question" — the runner parks the escalated card and keeps going, and only exits once nothing else is progressable. |
 | `3` | A spawned session ended incomplete (no further resume path); state was already recorded, so the next run resumes it automatically — this is not a human-decision escalation. |
+| `5` | The pass would otherwise have concluded `done`, but `answers.md` carries ≥1 ruling with no recognized `ratified-as:` disposition (harness-gap-wiring PR C, `core/rulings.ts`). Report `run.reason` is `rulings_unratified`; this is answerable by YOU (Shaman authority) — see the report's "Pending (needs the owner)" section for the unratified ruling ids and how to clear it, never a crash and never a reason to re-trigger unchanged. |
 
 `campaign-report.json` (+ its human-readable `campaign-report.md` twin) is written under the
 campaign home on **every** real exit path above — but **not** on `--dry-run` (zero side effects)
@@ -243,8 +312,10 @@ and **not** on a refused start (exit `1` from a held lock). Its per-card `outcom
 `shipped | escalated | blocked | not_reached`; a `shipped` card carries `pr`/`mergeSha`; an
 `escalated` card carries `escalationFile`, a one-line `question` digest, and `autoAnswerRounds`;
 a `blocked` card carries `blockedOn`. Top-level `pending` lists every card still needing the
-owner, and `stats` totals each outcome. Treat this JSON (never the exit code alone, never your
-own memory of what you dispatched) as the single source of truth for "what happened."
+owner, and `stats` totals each outcome; a `rulings_unratified` exit (code `5`) additionally
+names every unratified ruling id under "Pending (needs the owner)". Treat this JSON (never the
+exit code alone, never your own memory of what you dispatched) as the single source of truth
+for "what happened."
 
 `.runner.lock` (also under the campaign home) makes a double-trigger safe — a second instance
 refuses to start rather than double-spawning sessions. `STOP` (also under the campaign home) is
@@ -256,24 +327,67 @@ or to have an in-flight run finish its current card and stop before starting the
 On every exit notification where the report shows `pending` cards:
 
 1. **For each `escalated` card**, read its `escalationFile`. Two outcomes:
-   - **Within your Shaman authority** (scope clarifications, How tradeoffs, sequencing) — append
-     your ruling to `answers.md` (under the campaign home) yourself (this is the only writer of
-     that file besides the owner; the runner itself never writes there — wall W3). Note the card
-     as answered.
+   - **Within your Shaman authority** (scope clarifications, How tradeoffs, sequencing) — rule on
+     it as ONE atomic ritual, not a bare `answers.md` write: append your ruling to `answers.md`
+     (under the campaign home, tagged `R<n>`) yourself (this is the only writer of that file
+     besides the owner; the runner itself never writes there — wall W3), **then archive the
+     escalation file in the same step** by renaming it to `<card>.md.resolved-R<n>` (never
+     delete it — the ruling trail stays inspectable):
+
+     ```sh
+     mv "<home>/escalations/<card>.md" "<home>/escalations/<card>.md.resolved-R<n>"
+     ```
+     An escalation file left in place is exactly what makes the runner's own `deriveCardPhase`
+     short-circuit any FUTURE flag-less re-trigger of this card straight back to
+     `escalation_pending` (the B14 trap, P6 fix-list) — archiving it the moment you rule is what
+     lets the re-trigger below skip `--include-escalated` for this card. Note the card as
+     answered.
    - **Owner-only** (anything on the state file's own `ownerOnlyEscalations` list — data shapes,
      product promises, new permissions, privacy) **or genuinely too hard to call** — leave it
-     parked. Never rule on an owner-only trigger yourself, no matter how confident you are.
+     parked (escalation file untouched, unanswered). Never rule on an owner-only trigger
+     yourself, no matter how confident you are.
+   - **Every ruling you append to `answers.md` carries a `ratified-as:` field** — this applies
+     whether the ruling answers an `escalated` card's ordinary question or adjudicates a
+     harness-gap proposal, surfaced either by an escalation or by a `shipped` card's
+     `## Harness gaps` PR record. Frozen vocabulary: `rule <path>` | `debt <id>` |
+     `roadmap <ref>` | `operational` | `dismissed` | `pending`. `operational` is for
+     campaign-mechanics rulings that die with the campaign (a sequencing tweak, a scope
+     clarification); anything durable — a rule, an anti-rule, a debt entity — names its
+     governance artifact instead. A single ruling can fan out to MORE than one artifact
+     (the worked example: outstanding-17's R7 became both a ROADMAP Decision Log entry
+     and a new roadmap card) — the field names the PRIMARY artifact, one value only (that
+     is what the runner's gate parses); reference every additional artifact in the ruling
+     body itself.
+
+   `answers.md` is read once, at the START of a runner invocation (`resolveRunContext`,
+   `core/loop/run-loop.ts`) — that single read serves every card the invocation touches, so a
+   card spawned fresh later in the SAME `--cards` batch still sees whatever `answers.md` held
+   when the batch started, not a ruling added mid-batch. And within one card's own session, a
+   ruling reaches the executor ONLY on a freshly-rendered brief (a blind spawn, a digest-
+   carrying spawn, or the fresh-session fallback after a failed resume) — never on a successful
+   `resume`, which sends nothing but a short continuation prompt with no Answers section at all
+   (`core/loop/card-actions.ts`'s `runCardSession`). The card you just ruled on above needs none
+   of this: its prior session already ended (that is what produced the escalation), so step 2's
+   re-trigger below spawns it fresh against today's `answers.md` unconditionally. This matters
+   only for a DIFFERENT card still mid-flight in the same batch, or for the owner editing
+   `answers.md` directly while a multi-card run is active: either let the rule land on that
+   card's own next fresh spawn (the normal case — e.g. a phrasing clarification that is fine to
+   arrive next cycle), or stop the run and re-trigger once the rule is load-bearing for
+   correctness — e.g. a scope or data-shape ruling an in-flight card would otherwise ship
+   without, the same class of stakes as the B14 trap cited above.
 2. **If you answered at least one card**, re-trigger the runner scoped to exactly the cards that
    can now progress — the ones you just answered plus every `not_reached` card from the report
-   (so the rest of the sequence keeps moving, not just the answered card):
+   (so the rest of the sequence keeps moving, not just the answered card). Every card you just
+   archived above needs no flag at all now; `--include-escalated` is needed ONLY when this batch
+   also includes a card whose escalation file you deliberately left in place (still unanswered)
+   and you are choosing to force a retry of it anyway:
 
    ```sh
    bun "$runner_dir/run.ts" \
      --repo <target-repo> \
      --model <model> \
      --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
-     --cards <answered-card-id>,<...>,<not-reached-card-id>,<...> \
-     --include-escalated
+     --cards <answered-card-id>,<...>,<not-reached-card-id>,<...>
    ```
    (`$runner_dir` — resolved once in Stage B; re-use it here rather than re-resolving. `--home`
    resolves to the SAME campaign home every time — it is re-computed rather than cached because
@@ -301,7 +415,18 @@ build the single message the owner reads:
    worktree path. This is the design's no-cascade read: the runner's own claim that a card
    shipped is not evidence on its own. Treat a `verify-shipped` failure as `blocked`, not
    `shipped`, in your final report.
-2. **You can also recover which commits belong to this campaign directly from git.** Every
+2. **The ratification pass.** Collect every convention surfaced across the whole campaign: each
+   `shipped` card's `## Harness gaps` PR record (proposals its Warchief landed as reviewable
+   drafts but did not self-ratify, per its brief) plus every ruling already in `answers.md`.
+   Every one of them must end this pass non-`pending`. Durable dispositions (`rule`, `anti-rule`,
+   `debt`) do not stay as prose in a PR body or a diary line — land them as **ONE closing
+   governance PR** on the target repo (the rule/anti-rule files, the debt entity, the
+   ROADMAP Decision Log entries), then mark each ruling's `ratified-as:` accordingly. The
+   runner's `rulings_unratified` exit is the mechanical backstop for skipping this step — it is
+   not the primary mechanism, do not rely on it to catch what this pass should catch by
+   judgment. A ruling left `pending` means the campaign is **not done**, full stop, no matter how
+   many cards shipped.
+3. **You can also recover which commits belong to this campaign directly from git.** Every
    commit a card's executor session made should carry a `Campaign: <campaign-slug>` git trailer
    — the runner's executor brief instructs it (see the runner README's "Campaign commit
    trailer" section). `git log --grep="Campaign: <campaign-slug>"` in `<target-repo>` lists
@@ -309,10 +434,12 @@ build the single message the owner reads:
    `verify-shipped` confirm the trailer is present, so a missing trailer is a documentation gap
    worth noting, never proof a card didn't ship — `verify-shipped` (item 1) stays the actual
    acceptance gate.
-3. **Compose ONE report** to the owner, covering every card in the campaign:
+4. **Compose ONE report** to the owner, covering every card in the campaign:
    - **Shipped** — PR number, merge sha, and the `verify-shipped` verdict.
    - **Escalated / blocked** — the question (or `blockedOn` dependency), why it needs the owner,
      and how many auto-answer rounds it already used.
+   - **Harness-gap rulings** — every ruling the ratification pass closed, each with where it was
+     ratified to (the rule/debt/roadmap reference, or `operational`/`dismissed`).
    - Overall `stats` (shipped / escalated / blocked / not-reached counts) and pointers to the
      report files and escalation files, so the owner can go deeper without you re-deriving
      anything.
@@ -338,5 +465,10 @@ and its memory never live inside you.
 - **W3 — judgment stays in sessions.** `answers.md` is written only by you (a session) or the
   owner — never by the runner. If you ever see the runner's own commits touching that file,
   something is badly wrong; stop and report it rather than continuing the loop.
+- **The diary and `answers.md` are event logs and operational state, never the resting place of
+  a durable convention.** Durable means a governance surface of the target repo — a rule file,
+  an anti-rule, a debt entity, a ROADMAP Decision Log entry — reached through a PR. A ruling that
+  never leaves `answers.md` is exactly the failure the ratification pass (Stage D) exists to
+  catch.
 - **W7 — bounded auto-answer.** At most 2 auto-answer rounds per card. A card still escalating
   after that parks for the owner, full stop — do not attempt a third ruling.

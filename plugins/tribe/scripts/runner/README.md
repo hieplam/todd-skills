@@ -57,6 +57,7 @@ All paths below that are relative are relative to `--repo` unless noted otherwis
 | `--dry-run` | no | Derive and print the next action with **zero side effects** — no lock, no writes, no session, no report file (see the report contract below). |
 | `--cards` | no | Comma-separated list of card ids — restricts the loop to only these ids, in the state's own `sequence` order. Default: the full sequence. |
 | `--max-cards` | no | Positive integer — stop after WORKING this many cards in this run (a card actually `shipped`/`escalated`/`stopped` this pass — see D5′ below; a card merely parked on a prior run's escalation, or skipped as `blocked`, does not consume this budget). Default: unbounded (run until `done` or the budget is spent — an escalation no longer stops the run, see D5′). |
+| `--max-concurrent` | no | Integer ≥ 1 — how many cards' executor sessions may be IN FLIGHT at once this pass. Bounds WIDTH only, never ORDER: `dependsOn` still owns ordering (see "Concurrency" below). Default: `1`, i.e. **today's exactly-one-card-at-a-time behavior** — this is a strict opt-in; omitting the flag changes nothing. |
 | `--include-escalated` | no | Bypass the escalation-file short-circuit for a card the human has already ruled on, and let `nextCard`/`deriveCardPhase` reconsider it. This is exactly the flag the Stage C round-trip re-triggers with (spec §O6). |
 | `--remote` | no | The git remote this repo's canonical upstream/PR-target actually is — resolved once and threaded everywhere the runner queries or pushes to a remote (base-branch resolution, verify-phase ancestry/diff checks, branch-existence checks). Default: `'origin'`. See [`docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md`](../../../../docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md). |
 
@@ -157,7 +158,7 @@ the safe (fails-closed) default, not a silent free pass for code diffs.
 | `spec` | `string \| null` | yes (nullable) | Path (relative to `--repo`) to the card's spec file. Missing on disk (or `null`) when the card is next up triggers `PLANNING_NEEDED`, which the loop escalates. |
 | `plan` | `string \| null` | yes (nullable) | Same, for the plan file. |
 | `branch` | `string \| null` | yes (nullable) | The card's git branch, once work starts. `null` at authoring time — this is exactly what makes the D4 resume matrix classify a freshly-authored card `fresh`. The loop fills it in from the card's own PR (`gh pr view --json headRefName`) as soon as a PR number is known, because the executor session picks the branch name itself and never reports it back. |
-| `baseSha` | `string \| null` | yes (nullable) | The commit the card's branch is built from; D3's schema-lock diff is taken from this. `null` at authoring time; the loop records `origin/<baseBranch>` into it immediately **before** spawning the card's session, and never overwrites an existing value (a resumed card keeps the base it originally started from). |
+| `baseSha` | `string \| null` | yes (nullable) | The commit the card's branch is built from; D3's schema-lock diff is taken from this. `null` at authoring time; the loop records `origin/<baseBranch>` into it immediately **before** spawning the card's session, and never overwrites an existing value (a resumed card keeps the base it originally started from) — except a blind-fresh spawn (no prior session/PR/digest), which always re-stamps it (P11, ruling R3). To retry a card from scratch, use the `reset-card` subcommand below — never hand-edit this field; a hand-reset card that keeps a stale `baseSha` is the exact incident R3 exists to prevent. |
 | `pr` | `number \| null` | yes (nullable) | The card's PR number, once opened. `null` at authoring time. |
 | `mergeSha` | `string \| null` | yes (nullable) | The merge commit sha, once shipped. `null` until shipped. |
 | `sessionId` | `string \| null` | yes (nullable) | The SDK-assigned executor session id, written the instant a session starts (crash-safe write, before anything else). `null` at authoring time. |
@@ -244,6 +245,70 @@ runs, never discovered card-by-card mid-campaign:
 | `UndefinedSequenceCardError` | `sequence` names a card id with no matching entry under `cards` (e.g. a typo). |
 | `UndefinedDependencyCardError` | A card's `dependsOn` names an id with no matching entry under `cards`. |
 | `CircularDependencyError` | The `dependsOn` graph contains a cycle — a direct self-dependency (`A -> A`) or an indirect one (`A -> B -> A`). The error carries the full cycle path. |
+
+## `reset-card` subcommand (P11 fix-list follow-up)
+
+**Never hand-edit `campaign-state.json` to retry a card — use this subcommand.** It exists
+because hand-editing was the exact incident (P11, ruling R3, "a stale base is worse than no
+base"): a card hand-reset to `status: "staged"` kept its old `baseSha`, and the next verify
+diffed from before a designed change and tripped a false-positive schemaGuard failure on a PR
+that never touched the locked path. `reset-card` is the front door that makes that hand-edit
+unnecessary.
+
+```sh
+bun plugins/tribe/scripts/runner/run.ts reset-card \
+  --home <path-to-campaign-home> \
+  --card <card-id>
+```
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--home` | yes | The same campaign home a normal run uses — `reset-card` operates on `<home>/campaign-state.json`. |
+| `--card` | yes | The id of exactly one card (a key under `cards`) to reset. |
+
+No other flag is recognized (`--repo`/`--model`/`--remote`/... are all `unknown flag` errors
+here — this subcommand's contract has nothing to do with running a campaign pass).
+
+**Refuses (exit `1`, a diagnostic prefixed `reset-card:` on stderr, nothing written) when:**
+
+- a **live** process holds `.runner.lock` — a reset while a pass is mid-flight on that very
+  card is exactly the race this guard exists to prevent (a lock held by a dead process is
+  reclaimed the same way `acquireLock` reclaims it — it never blocks a reset);
+- `<home>/campaign-state.json` is missing, unreadable, or fails to parse/validate (any of the
+  Validation errors above);
+- `--card` names an id with no entry under `cards`.
+
+**On success (exit `0`):** writes the reset state back and prints ONE line of JSON to stdout —
+`{"cardId":...,"previousStatus":...,"status":"staged","clearedFields":[...]}` — so an
+orchestrating session can quote exactly what changed without re-deriving it from a diff.
+
+**What a reset actually changes**, field by field (full rationale — including why `branch`/
+`pr`/`dependsOn` are or aren't treated alike — lives on `resetCard`'s doc comment in
+`core/state.ts`):
+
+| Field | After reset | Why |
+| --- | --- | --- |
+| `status` | `"staged"` | The contract. |
+| `sessionId` | `null` | The contract — also what marks "no world exists yet" for the two fields below. |
+| `baseSha` | `null` | Ruling R3 itself — the incident this subcommand exists to prevent. |
+| `pr` | `null` | A stale `pr` is a silent fallback target (`card.pr = sessionResult.pr ?? card.pr` in `card-actions.ts`) if a future ship ever fails to report a fresh PR number — same "trusted without a reality-check" shape `baseSha` had before P11. |
+| `mergeSha` | `null` | Same stale-fallback shape, one line over; also purely observational once the card isn't `shipped`. |
+| `updatedAt` | `null` | Bookkeeping only, never read to decide anything. |
+| `autoAnswerRounds`, `healedResidue` | **deleted** (become absent, not `0`/`[]`) | Both fields are schema-optional specifically so "never happened" means absent — a stale count/record from the discarded attempt would misreport the new one. |
+| `branch` | **unchanged** | Never trusted blindly — `deriveCardPhase` re-derives the true phase from live `gh`/`git` every time `branch` is non-null. Clearing it would skip that reality-check and the resume matrix's own residue-cleanup path (`revert_and_redo`), reopening the duplicate-PR hazard a blind fresh spawn over a still-open PR creates. |
+| `dependsOn`, `spec`, `plan` | **unchanged** | Structural (this card's declared dependencies and doc paths), not a per-run value — a reset of one card must never rewire the campaign's dependency graph. |
+| any unknown field (top-level or per-card) | **unchanged, byte-faithful** | `state.ts`'s `looseObject` schemas already guarantee this for every load→save cycle; `reset-card` is no exception. |
+
+**Escalation files are not touched.** An escalation lives in a sibling file
+(`<home>/escalations/<card-id>.md`), never a `Card` field, so `reset-card` has nothing to
+clear there — but if that file is still present after a reset, `deriveCardPhase` will keep
+short-circuiting this card straight back to `escalation_pending` on the next run (see "Resume
+semantics" below), even though the state file now says `staged`. `reset-card` warns about this
+(a second stderr line, still exit `0`) rather than silently leaving it inconsistent, and
+deliberately does **not** auto-archive the file: archiving is coupled 1:1 to an actual ruling
+recorded in `answers.md` (see "Escalation / answers workflow" below) — a plain reset makes no
+ruling, so it must not fabricate one. To actually unblock such a card, either rule on it and
+archive the file per that section's ritual, or pass `--include-escalated` on the next run.
 
 ## How this is normally triggered
 
@@ -342,6 +407,71 @@ this field existed.
   to `staged`. A card's parking status is therefore always current, even for a card the
   selection walk itself never reaches this pass.
 
+## Concurrency (`--max-concurrent`, P12 follow-up)
+
+**Default (`--max-concurrent 1`, or the flag omitted): exactly one card's session runs at a
+time, in `sequence` order, awaited to full completion before the next card is even selected.**
+This is the runner's original, unconditional behavior — `--max-concurrent` does not exist yet as
+far as a run that never passes it is concerned.
+
+**`--max-concurrent N` (N > 1)** bounds how many cards' executor sessions may be *in flight at
+once* this pass — a small worker pool over progressable cards, not a rewrite of card selection:
+
+- **Width only, never order.** `dependsOn` (above) is still the ONLY thing that orders cards. A
+  dependent card is never selected while its dependency is mid-flight, for the same reason it's
+  never selected while merely `staged`: `nextCard` treats any non-`shipped` status — including a
+  card another worker currently has claimed — as "not shipped yet". Declaring `dependsOn` is
+  still how you force strict one-by-one ordering (see the previous section and the
+  `orchestrate-campaign` skill's own "Serial campaigns" guidance) — `--max-concurrent` never
+  substitutes for it; it only bounds how many *independent* cards may overlap.
+- **No two workers are ever handed the same card.** Selection (`nextCard`/`filteredNextCard`) is
+  synchronous — and mutating (`nextCard` reconciles derived `blocked`/`staged` statuses in place
+  on every call), but never touches an in-flight card's status, only cards that do/don't
+  transitively depend on an `escalated` one — a card is marked claimed in the SAME synchronous
+  step it's selected, with no `await` in between, so concurrent selection can't race.
+- **State writes stay consistent.** Every card mutation (`card.status`, `card.pr`, ...) is
+  immediately followed, in the same synchronous span, by a full-state write
+  (`persistLocalState`) — JS's single-threaded, run-to-completion semantics make each
+  mutate-then-flush pair atomic, and because `campaign-state.json` is always serialized WHOLE
+  (never a per-card patch) from one shared, in-memory `CampaignState` object, later writes always
+  include every mutation any worker had applied by that point — never a lost update, regardless
+  of which card's session happens to finish first.
+- **Runner-side git worktree/branch mutations are serialized too.** `git worktree add/remove` and
+  `git branch -D` mutate git's shared, repo-wide bookkeeping (`.git/worktrees/`, `.git/refs/`),
+  not per-card state — REVERT_AND_REDO and residue-heal (`performRevertAndRedo`,
+  `executeHealActions`, `gatherWorktreeResidueFacts`, `core/loop/card-actions.ts`) queue behind a
+  single in-process promise chain (`serializeRepoGitMutation`) so two cards' calls into that
+  shared bookkeeping never interleave. A no-op at N=1 by construction (nothing is ever queued
+  ahead of the one caller in flight).
+- **One card's crash never takes down the pass.** An uncaught exception anywhere in a card's turn
+  is caught and reported as that ONE card's own `stopped`/non-retryable outcome — every other
+  in-flight card keeps running to completion; the pass still ends cleanly.
+- **`--max-cards` under concurrency is an optimistic ceiling, not an exact stop.** The pool
+  cannot know a freshly-claimed card will turn out to be a no-op park
+  (`escalation_pending`/answered-and-parked) until it actually checks, so a batch can occasionally
+  claim slightly fewer REAL work-units than `--max-cards` allows before recognizing the budget is
+  spent — it can never exceed it.
+- **Not solved by this flag (two documented limitations):**
+  - *Merge races on a shared base branch.* Two cards that both merge to the SAME base branch can
+    still contend at the actual `gh pr merge` step — this runner does not add any merge-queue/
+    serialization logic beyond what git/GitHub already do (a stale-base merge fails or re-queues
+    on the GitHub side). If your cards merge to the same branch and each should build on the
+    previous one's merged result, use `dependsOn` to force the ordering `--max-concurrent`
+    deliberately does not provide — this was already the prior campaign's own recommendation (see
+    the P12 fixlist note) before this flag existed, and it still applies at any `N`.
+  - *Each card's own executor session runs its own git commands* (worktree add, checkout, commit,
+    push, ...) with the SAME repo root as its `cwd`, independent of the runner-side serialization
+    above — this runner has no seam into a session's own spawned process to queue those calls too.
+    Git's own locking mostly prevents outright corruption, but a lock-contention failure can
+    surface as an ordinary non-zero exit from a git command inside a session — read that as
+    transient contention worth a retry, not repo corruption worth escalating on sight. Giving
+    every session its own isolated `cwd`/worktree is real future hardening, not done here.
+
+Use `--max-concurrent` when a campaign genuinely wants bounded parallelism (independent cards,
+no shared base branch, no ordering requirement) — for anything requiring strict one-by-one
+execution, author the full sequential `dependsOn` chain instead, exactly as before this flag
+existed.
+
 ## Escalation / answers workflow (spec §D5) and D5′ park-and-continue (spec §O4)
 
 The runner escalates instead of deciding whenever: the executor reports
@@ -373,6 +503,64 @@ re-runs the script. A card whose escalation file is still present is skipped
 (`escalation_pending`, parked — see the resume matrix above) unless the re-run passes
 `--include-escalated`.
 
+**Escalation-file lifecycle (P6 fix-list — "answered/shipped escalations stop haunting
+re-triggers"):** the escalation file is never deleted automatically, but it IS archived
+(renamed, never removed — the ruling trail stays inspectable) the moment it stops being
+relevant, two ways: (1) `shipCard` archives it to `<card-id>.md.resolved-shipped` the instant
+a card ships — a shipped card must never re-park; (2) the `orchestrate-campaign` skill's Stage-C
+ruling step archives it to `<card-id>.md.resolved-R<n>` in the same atomic step it appends the
+ruling to `answers.md`. Once archived, a flag-less re-trigger of that card proceeds normally —
+`--include-escalated` is needed only to force a retry of a card whose escalation file is still
+present (i.e. genuinely unanswered).
+
+## Rulings gate (harness-gap-wiring PR C)
+
+**Postmortem (campaign outstanding-17):** a ruling appended to `answers.md` that captured a
+durable convention was never carried into the target repo's own governance files (a rule, a
+debt entry, a roadmap card) — nothing mechanically gated on it, so it was silently dropped.
+Every other step in the campaign runner's loop is mechanically forced (the D3 verify replay,
+the D2 lock, the report contract below); this was the one step that ran 0% of the time because
+nothing checked it. This gate closes that gap.
+
+**When it fires:** only on the pass that would otherwise conclude `EXIT_OK`/`done` — every
+requested card `shipped`/`blocked`/`escalated`, nothing left to do. An
+`escalations_pending`/`session_incomplete`/`stop_requested` exit is completely unaffected; the
+gate never runs on those paths at all (`core/loop/run-loop.ts`'s `applyRulingsGate`, called once,
+right before `runLoop` returns).
+
+**What it checks:** every `## `-headed block in `answers.md` is a "ruling" (the outstanding-17
+convention is `## R<n> — <title>`, but ANY `## ` heading counts). A ruling is **ratified** once
+its block carries a `ratified-as:` line (case-insensitive key; a leading `-`/`*` bullet and
+`**bold**` markers around the key are all tolerated) whose value is one of:
+
+| Value | Meaning |
+| --- | --- |
+| `rule <path>` | Landed as a rule file at `<path>` (e.g. a project rule under `plugins/tribe/rules/` or `.c3/`). |
+| `debt <id>` | Recorded as a harness-gap debt entry with that id (`plugins/tribe/scripts/gaps/`). |
+| `roadmap <ref>` | Carried forward as a roadmap card (`<ref>` names it). |
+| `operational` | A one-off operational decision — deliberately not durable, no governance artifact expected. |
+| `dismissed` | Considered and explicitly rejected — no further action. |
+| `pending` | Explicitly not yet ratified. Valid vocabulary, but **does not** clear the gate. |
+
+Any other value, and a ruling block with **no** `ratified-as:` line at all, both classify as
+unratified — this is strict by design (the gate exists to force the discipline the postmortem
+found missing, not to guess intent). The pure classification lives in `core/rulings.ts`
+(`parseRulings`/`isRulingRatified`/`unratifiedRulingIds`); the gate itself is `core/loop/
+run-loop.ts`'s `applyRulingsGate`, applied to `resolved.answersContent` — the same `answers.md`
+read the loop already performs for every executor brief, not a second file read.
+
+**What happens when it fires:** the exit code becomes `5` (`EXIT_RULINGS_UNRATIFIED`) and the
+report's `run.reason` becomes `'rulings_unratified'`. This is **campaign-level state, not a
+per-card escalation** — no single card owns it, so it is folded into the report's existing
+"## Pending (needs the owner)" section (`renderRulingsUnratifiedNote`, `report.ts`) rather than
+a per-card `escalations/<card>.md` file in the shape "Escalation / answers workflow" above
+describes — `core/loop/card-actions.ts` is untouched by this gate. The note is labeled
+**"answerable"** (the same vocabulary the P5 fix-list uses for reasons a ruling alone clears,
+as opposed to a mechanical verify failure) and names every unratified ruling id verbatim. To
+resolve: add `ratified-as:` to each named block in `answers.md` (or ratify it via the
+governance path it names) and re-trigger; nothing else about the campaign's cards is touched by
+this gate.
+
 ## Report contract (spec §O5)
 
 On **every** exit path except `--dry-run` (zero side effects, by construction — nothing is
@@ -399,9 +587,12 @@ the report is the truth.**
 ```
 
 - **`run.reason`** — one of `done` | `stop_requested` | `escalations_pending` |
-  `session_incomplete` | `error` (`report.ts`'s `deriveExitReason`). `error` covers an unhandled
-  exception thrown after `runLoop` was entered (`run.ts`'s own `EXIT_ERROR = 4` — see Exit codes
-  below; not one of `loop.ts`'s `EXIT_*` constants).
+  `session_incomplete` | `error` | `rulings_unratified` (`report.ts`'s `deriveExitReason`).
+  `error` covers an unhandled exception thrown after `runLoop` was entered (`run.ts`'s own
+  `EXIT_ERROR = 4` — see Exit codes below; not one of `loop.ts`'s `EXIT_*` constants).
+  `rulings_unratified` is the rulings gate (see that section above) — its `run` object also
+  carries `unratifiedRulings: string[]`, and the `.md` twin renders them inside the existing
+  "## Pending (needs the owner)" section (a campaign-level note, not a per-card entry).
 - **Per-card `outcome`** is one of `shipped | escalated | blocked | not_reached`, read entirely
   from the final `CampaignState` on disk (never from `loop.ts`'s own `CardOutcome[]`) —
   `main()` reloads state fresh from disk to build the report rather than reusing `runLoop`'s
@@ -432,6 +623,7 @@ the report is the truth.**
 | `EXIT_OK` (`done`, or startup `STOP`) | Yes — `reason: 'done'` or `'stop_requested'`. |
 | `EXIT_ESCALATED` | Yes — `reason: 'escalations_pending'`. |
 | `EXIT_SESSION_INCOMPLETE` | Yes — `reason: 'session_incomplete'`. |
+| `EXIT_RULINGS_UNRATIFIED` (the rulings gate overrode a would-be `done`) | Yes — `reason: 'rulings_unratified'`. |
 | An unhandled exception after `runLoop` was entered | Yes (best-effort) — `reason: 'error'`, exit code `4`. |
 
 ## STOP file and the lock file (spec §D2)
@@ -450,6 +642,33 @@ Both live directly under `--home`, alongside `campaign-state.json`:
 `--dry-run` touches neither file, and writes no report either: it never acquires the lock and
 never checks `STOP` — zero side effects by construction, not merely by intent.
 
+## ANTHROPIC_API_KEY guard (fix-list P10)
+
+The tribe **never** authenticates via `ANTHROPIC_API_KEY` — executor sessions authenticate via
+Claude Code login only. Two mechanical steps run at the very top of `main()`, before any session
+spawn, on **every** invocation (fresh launch and re-trigger), and both are idempotent:
+
+1. **Unset the runner's own process env.** If `process.env.ANTHROPIC_API_KEY` is set,
+   `adapters/run-io.adapter.ts`'s `unsetAnthropicApiKeyEnv()` deletes it and `main()` prints one
+   warning line to stderr. This is process-local — it happens the same way under `--dry-run`.
+2. **Scrub the target repo's `.env.local`.** If `<repoRoot>/.env.local` exists and contains an
+   `ANTHROPIC_API_KEY=...` line (with or without a leading `export `), the runner removes that
+   line **without asking** (owner ruling) on a real run, and warns-only under `--dry-run`
+   (writing nothing — `--dry-run` stays zero side effects by construction). The pure line-removal
+   logic lives in `core/env-guard.ts`'s `scrubEnvContent` (preserves every other line
+   byte-for-byte, including trailing-newline presence/absence); the edge wiring —
+   `cli/main.ts`'s exported `scrubTargetEnvLocal` — reads/writes the file through `io` and is
+   **best-effort**: any fs error here (a permission error, a mid-flight delete, a read-only
+   mount) is caught and degrades to a console warning rather than crashing the run before
+   `runLoop` is even entered (same contract as `tryWriteReport`/`tryFinalizeRunRecord` below).
+
+Accepted risk (owner-accepted, recorded in the P10 spec): a target repo whose application
+legitimately needs `ANTHROPIC_API_KEY` in its own `.env.local` would have that line silently
+removed on every real run against it. `plugins/tribe/scripts/doctor.sh` reports (never gates on)
+both traps: it never claims "ok" credentials when `ANTHROPIC_API_KEY` is the *only* credential
+source present (that variable is stripped before every spawn, so it is never actually usable),
+and it warns when the target repo's `.env.local` still sets the variable.
+
 ## Exit codes
 
 Read from `EXIT_*` in `loop.ts`, plus `run.ts`'s own `EXIT_ERROR`:
@@ -461,6 +680,7 @@ Read from `EXIT_*` in `loop.ts`, plus `run.ts`'s own `EXIT_ERROR`:
 | `2` | `EXIT_ESCALATED` | D5′: the pass finished and **at least one card is `escalated`** — a fresh escalation this pass, or one still parked, unanswered, from a prior run. Not "aborted at the first question"; other cards in the same pass may have shipped. Read `campaign-report.json`'s `pending` for which card(s) need an answer. |
 | `3` | `EXIT_SESSION_INCOMPLETE` | D5′: at least one card's session ended `error`/`timeout` with no further D4 fallback (no card in this pass escalated); state was already recorded locally, so the next start resumes it — this is not a human-decision escalation. |
 | `4` | `EXIT_ERROR` (`run.ts`, not a `loop.ts` constant) | An unhandled exception surfaced after `runLoop` was entered. The report's `run.reason` is `'error'` — per §O3, treat the report as authoritative over this numeric code. |
+| `5` | `EXIT_RULINGS_UNRATIFIED` | The rulings gate (see "Rulings gate" above): the pass would otherwise have concluded `done`, but `answers.md` carries ≥1 ruling with no recognized `ratified-as:` disposition. `campaign-report.json`'s `run.unratifiedRulings` names them. |
 
 ## Structure
 
@@ -499,8 +719,12 @@ names, no filename convention required — enforced executably by `structure.tes
   "Known limitations" below), `core/loop/card-actions.ts` (per-card escalate/ship/session
   work), and `core/loop/run-loop.ts` (the pass + `runLoop` entry point).
 - **everything else in `core/`** — pure logic: `state.ts`, `verify.ts`, `report.ts`,
-  `brief.ts`, `session.ts`, `paths.ts` (pure campaign-home path helpers, spec §4), and
-  `run-record.ts` (the `run.json` schema). Every world-touching effect is reached through a
+  `brief.ts`, `session.ts`, `paths.ts` (pure campaign-home path helpers, spec §4),
+  `run-record.ts` (the `run.json` schema), `env-guard.ts` (`scrubEnvContent` — the
+  `ANTHROPIC_API_KEY` line-removal logic, fix-list P10; see "ANTHROPIC_API_KEY guard" above),
+  and `rulings.ts` (`answers.md` ruling parsing/classification, harness-gap-wiring PR C; see
+  "Rulings gate" above).
+  Every world-touching effect is reached through a
   `ports/ports.ts` seam, never a direct import; each of these modules re-exports the seam
   type(s) its own tests/importers pull from it (e.g. `verify.ts` re-exports `VerifyIO`).
 - **`adapters/*.adapter.ts`** — the only files allowed to import a world-touching module
@@ -532,10 +756,13 @@ ESLint, which is deferred until typescript-eslint supports TS >= 7.1 (plan Amend
   exhaust must never fail a campaign run (spec §9). A caller relying on `run.json` for liveness
   should treat its absence, or a permanently-unfinalized record with a dead pid, as informative
   rather than assume every invocation always produces one.
-- **`verifyWithRetry` retries with zero delay.** The D3 verify-shipped check is attempted
-  twice back-to-back with no sleep between attempts (`loop.ts`). This catches a transient
-  `gh`/network blip on the *second* call, but it will **not** catch a check that is still
-  settling (e.g. CI still running) — the two attempts happen too close together for that.
+- **The verify retry (`verifyThenHealIfNeeded`/`healSafeResidue`, `core/loop/card-actions.ts`)
+  has zero delay.** The D3 verify-shipped check is attempted twice back-to-back with no sleep
+  between attempts (the second attempt heals whatever residue P4's `decideResidueHeal` proves
+  safe first, per spec `docs/tribe/fixlists/2026-08-08-outstanding-17/P4-self-heal-safe-residue.md`).
+  This catches a transient `gh`/network blip on the *second* call, but it will **not** catch a
+  check that is still settling (e.g. CI still running) — the two attempts happen too close
+  together for that.
 - **`baseBranch` derivation has a silent fallback.** `resolveBaseBranch` runs
   `git symbolic-ref --short refs/remotes/<remote>/HEAD` (`<remote>` is `--remote`, default
   `origin`) and falls back to the literal string `"master"` if that command fails for any
