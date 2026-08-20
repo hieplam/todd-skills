@@ -33,7 +33,8 @@ Two legs on one fixture:
 ## Non-goals (YAGNI)
 
 - No eval of adjudication/ratification/rule-authoring (unit tests + role evals cover those stages).
-- No with/without-agent baseline comparison in v1 (flag may come later).
+- No with/without-agent baseline comparison in v1 (the clean/mem **arms** below compare memory
+  bias, not agent presence).
 - No second-language fixture (C#) in v1; the fixture format must not preclude adding one.
 - No CI wiring of the LLM legs; only the harness's pure core runs in CI-style `bun test`.
 
@@ -116,11 +117,30 @@ prompts, parsing the grader's verdict JSON, computing recall/precision. `run.ts`
 root: filesystem copies, `git init`/`git apply`, and `claude -p` invocations enter core logic only
 through injected ports, so every branch of the scoring pipeline is testable without an API key.
 
-### Run flow (per leg)
+### Arms — memory bias is part of the measurement
+
+Instructions and memory bias a detector: a CLAUDE.md that says "inject the clock" hands it C4 for
+free. Every leg therefore runs in two sandbox **arms**:
+
+- **`clean`** — a completely clean sandbox: no CLAUDE.md, no `.claude/` project memory, no user
+  settings, no MCP. This is the unbiased measurement and the only arm that gates.
+- **`mem`** — the scratch additionally carries a realistic `CLAUDE.md` + `.claude/` project memory
+  (build commands, generic style guidance, fictional project notes) that **never mentions any
+  seeded convention or decoy** — a meta-test enforces zero lexical overlap between the memory
+  fixture and the manifest's convention descriptions. This arm measures how much ambient memory
+  shifts detection; it is reported as a delta, never gated.
+
+The mechanism is the one `run_evals.py` verified empirically: `--setting-sources project
+--strict-mcp-config` loads only the scratch's own files — so the `mem` arm works by materializing
+the memory fixture into scratch, and the `clean` arm by asserting scratch contains no CLAUDE.md and
+no `.claude/` directory (hard check, same as the manifest-absence check).
+
+### Run flow (per leg × arm × repetition)
 
 1. **Assemble scratch**: copy `fixtures/orderly/` into a scratch dir (from `$SCRATCHPAD` or
    `--scratch`), `git init` + initial commit. Leg B: apply `orderly-pr1.patch` as a second commit so
-   a real diff exists. Assert the manifest file is absent from scratch (hard check, not convention).
+   a real diff exists. `mem` arm: add the memory fixture. Hard checks before dispatch: manifest
+   absent; `clean` arm carries no CLAUDE.md / `.claude/`.
 2. **Run detector**: `claude -p` with the real agent definition passed via `--agents`
    (`plugins/tribe/agents/scout.md` / `tracker.md`), using the isolation flags `run_evals.py`
    already verified empirically: `--setting-sources project --strict-mcp-config`, cwd = scratch.
@@ -134,37 +154,61 @@ through injected ports, so every branch of the scoring pipeline is testable with
    then fails the run loudly.
 4. **Score & report**: write `results/<timestamp>/grading.json` — per-convention verdicts with the
    grader's quoted evidence, per-tier breakdown, and:
-   - `recall = caught / seeded` (Leg A: /10; Leg B: /|patch subset|)
-   - `precision = caught / (caught + decoys_flagged + invented)`
+   - `recall = (caught + 0.5·partial) / seeded` (Leg A: seeded = 10; Leg B: seeded = the patch's
+     violated subset, 4)
+   - `precision = caught / (caught + decoys_flagged + invented)` (partials count neither way)
    - token/duration/cost from the stream-json usage block.
-   Exit 0/1 against configurable thresholds (`--min-recall`, `--min-precision`; defaults land in
-   README, not hard-coded folklore).
+
+### Pass definition — numbers, not prose
+
+A benchmark invocation runs **2 legs × 2 arms × 3 repetitions** (12 detector runs, 12 grader
+runs). Gates apply to the `clean` arm only; the `mem` arm reports `Δrecall`/`Δprecision` vs clean.
+
+| Gate | Cell | Threshold |
+|------|------|-----------|
+| G1 | Leg A · clean | recall ≥ **0.70** |
+| G2 | Leg A · clean | precision ≥ **0.70** |
+| G3 | Leg A · clean | easy-tier (C1–C3) recall = **1.00** (all three, every counted rep) |
+| G4 | Leg B · clean | gap-recall ≥ **0.75** (≥3 of C1/C4/C6/C10) |
+| G5 | Leg B · clean | invented-rule violations = **0** — Tracker citing a non-existent rule as a violation hard-fails that repetition |
+
+A **repetition passes** its cell when every gate for that cell holds. A **cell passes** when at
+least **2 of 3** repetitions pass. The **eval PASSES** when both clean cells pass. `benchmark.json`
+rolls up: per-rep grading refs, per-cell pass counts (`n/3`), the two mem-arm deltas, and a single
+top-level `"pass": true|false`. Exit code mirrors it.
+
+Thresholds are CLI-overridable (`--min-recall`, `--min-precision`, `--reps`) with these defaults
+recorded in README; the defaults above are the contract.
 
 ### CLI
 
 ```
-bun run.ts --leg scout|tracker|both [--fixture orderly] [--model <id>]
-           [--dry-run] [--min-recall 0.6] [--min-precision 0.7] [--scratch <dir>]
+bun run.ts --leg scout|tracker|both --arm clean|mem|both [--fixture orderly] [--model <id>]
+           [--reps 3] [--dry-run] [--min-recall 0.70] [--min-precision 0.70] [--scratch <dir>]
 ```
 
-`--dry-run` prints the full plan (files to copy, prompts, commands) with zero API calls — the
-harness's own smoke test.
+`--dry-run` prints the full plan (files to copy per arm, prompts, commands, gate table) with zero
+API calls — the harness's own smoke test.
 
 ## Testing the harness itself
 
-- `core/` is TDD'd with `bun test`: scoring math (recall/precision edge cases, empty sets),
-  manifest schema rejection, scratch-plan excludes the manifest, verdict parsing rejects malformed
-  grader output, Leg B scoring restricted to the patch's subset.
+- `core/` is TDD'd with `bun test`: scoring math (recall/precision edge cases, empty sets, the
+  0.5-partial credit), gate evaluation (each of G1–G5, the 2-of-3 cell rule, the top-level pass),
+  manifest schema rejection, scratch-plan excludes the manifest, clean-arm plan carries no
+  CLAUDE.md/`.claude/`, mem-arm plan carries exactly the memory fixture, verdict parsing rejects
+  malformed grader output, Leg B scoring restricted to the patch's subset.
 - Fixture self-checks (also plain `bun test`, no LLM): fixture's own tests green; a meta-test
   asserts each manifest exemplar/deviation path exists in the fixture and each deviation line
-  matches the manifest's recorded snippet — so fixture edits can't silently rot the answer key.
+  matches the manifest's recorded snippet — so fixture edits can't silently rot the answer key;
+  a meta-test asserts zero lexical overlap between the mem-arm memory fixture and the manifest's
+  convention/decoy descriptions.
 - One `--dry-run` execution and one real run (owner-triggered) validate the edge.
 
 ## Success criteria
 
 - `bun test` over `detection/core` and fixture meta-tests: green, no network.
-- `--dry-run` on both legs prints a correct plan with zero API calls.
-- One real run per leg completes end-to-end and produces `grading.json` with per-convention
-  verdicts, recall, precision, and cost — numbers the owner can compare across future agent-prompt
-  or model changes.
+- `--dry-run` on both legs × both arms prints a correct plan with zero API calls.
+- One real benchmark invocation (2 legs × 2 arms × 3 reps) completes end-to-end and produces
+  `benchmark.json` with per-cell pass counts, mem-arm deltas, and a top-level numeric `pass`
+  verdict per the gate table — never a prose-only claim.
 - The C3 change-unit recording the `ref-evals-fixture` deviation is authored and applied.
