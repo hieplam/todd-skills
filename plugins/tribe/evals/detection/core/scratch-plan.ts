@@ -8,8 +8,9 @@ export function planScratch(input: {
   memoryFixtureFiles?: { path: string; content: string }[];
   patchPath?: string;
 }): ScratchPlan {
-  const excludePaths = input.fixtureFiles.filter((f) => f.includes('manifest'));
-  const copyFiles = input.fixtureFiles.filter((f) => !f.includes('manifest'));
+  const hasManifestSegment = (f: string) => f.split('/').includes('manifest');
+  const excludePaths = input.fixtureFiles.filter(hasManifestSegment);
+  const copyFiles = input.fixtureFiles.filter((f) => !hasManifestSegment(f));
   return {
     copyFrom: 'fixtures/orderly',
     copyFiles,

@@ -33,4 +33,17 @@ describe('planScratch', () => {
     expect(plan.copyFiles.some((f) => f.includes('manifest'))).toBe(false);
     expect(plan.excludePaths).toEqual(['../manifest/orderly.json']);
   });
+
+  test('a fixture file whose path merely contains the substring "manifest" (no manifest path segment) stays in copyFiles', () => {
+    const files = [
+      'src/index.ts',
+      'src/services/manifestValidator.ts',
+      'src/domain/shippingManifest.ts',
+      '../manifest/orderly.json',
+    ];
+    const plan = planScratch({ fixtureFiles: files, leg: 'scout', arm: 'clean' });
+    expect(plan.copyFiles).toContain('src/services/manifestValidator.ts');
+    expect(plan.copyFiles).toContain('src/domain/shippingManifest.ts');
+    expect(plan.excludePaths).toEqual(['../manifest/orderly.json']);
+  });
 });
