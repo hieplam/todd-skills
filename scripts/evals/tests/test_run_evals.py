@@ -11,6 +11,7 @@ import importlib.util
 import json
 import unittest
 from pathlib import Path
+from unittest import mock
 
 EVALS_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = EVALS_DIR.parents[1]
@@ -163,6 +164,65 @@ class RunCaseFixtureSetupGuard(unittest.TestCase):
             self.assertIn("fixture setup failed", result["error"])
 
 
+class RunCaseCheckSetupGuard(unittest.TestCase):
+    """The check machinery (plan_checks/run_checks) and collect_artifacts must not let
+    an exception escape run_case either, exactly like the fixture/memory guards above —
+    the same total-batch-loss failure mode (pool.map with no enclosing handler up to
+    main(), benchmark.json written only after the whole loop finishes), one call
+    further down: a malformed `checks` entry (missing "command", or one that resolves
+    to an empty/blank command, or one with an unbalanced quote) or an absolute
+    `artifacts` glob pattern must degrade into this case's {"error": ...} setup-error
+    signal rather than raise past the already-paid `claude -p` executor call.
+    """
+
+    @staticmethod
+    def _fake_ok_run(*args, **kwargs):
+        return {"ok": True, "events": [], "error": None, "wall_seconds": 0.01}
+
+    def _run_with_case(self, case):
+        """Drive run_case for kind='skill' against a throwaway skill dir (a real
+        SKILL.md is required upstream of the check-setup guard, at
+        `parse_frontmatter(skill_dir / "SKILL.md")`), with run_claude stubbed so no
+        real `claude -p` subprocess is spawned."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_dir = Path(tmp)
+            (skill_dir / "SKILL.md").write_text("---\nname: throwaway\n---\nbody\n")
+            with mock.patch.object(run_evals, "run_claude", side_effect=self._fake_ok_run):
+                return run_evals.run_case(
+                    case, "skill", skill_dir, None, "with_skill", timeout=1,
+                    exec_model=None, grader_model=None,
+                    out_dir=Path("/tmp/unused-run-case-check-guard-test"), verbose=False)
+
+    def test_missing_command_key_becomes_setup_error_not_a_raised_exception(self):
+        case = {"id": 1, "name": "x", "prompt": "p", "expected_output": "e",
+                "checks": [{"name": "c"}]}
+        result = self._run_with_case(case)
+        self.assertIn("error", result)
+        self.assertIn("check setup failed", result["error"])
+
+    def test_empty_resolving_command_becomes_setup_error_not_a_raised_exception(self):
+        case = {"id": 2, "name": "y", "prompt": "p", "expected_output": "e",
+                "checks": [{"name": "c", "command": ""}]}
+        result = self._run_with_case(case)
+        self.assertIn("error", result)
+        self.assertIn("check setup failed", result["error"])
+
+    def test_unbalanced_quote_command_becomes_setup_error_not_a_raised_exception(self):
+        case = {"id": 3, "name": "z", "prompt": "p", "expected_output": "e",
+                "checks": [{"name": "c", "command": "echo it's broken"}]}
+        result = self._run_with_case(case)
+        self.assertIn("error", result)
+        self.assertIn("check setup failed", result["error"])
+
+    def test_absolute_artifact_pattern_becomes_setup_error_not_a_raised_exception(self):
+        case = {"id": 4, "name": "w", "prompt": "p", "expected_output": "e",
+                "artifacts": ["/x.html"]}
+        result = self._run_with_case(case)
+        self.assertIn("error", result)
+        self.assertIn("check setup failed", result["error"])
+
+
 class ArmPlanning(unittest.TestCase):
     def test_mem_arm_runs_with_skill_leg_only(self):
         self.assertEqual(
@@ -307,6 +367,17 @@ class CheckPlanning(unittest.TestCase):
             Path("/s"), Path("/t"))
         self.assertEqual(planned[0]["argv"][-1], "*.html")
 
+    def test_skill_dir_with_a_space_stays_one_argv_token(self):
+        """Plain str.replace before shlex.split (no quoting) tokenizes a space-bearing
+        skill_dir/scratch path into wrong argv, so the check runs the wrong command —
+        likely a FileNotFoundError silently misclassified CHECK_UNGRADED, masking a
+        real pass/fail. The substituted path must stay one argv token."""
+        planned = run_evals.plan_checks(
+            {"checks": [{"name": "c", "command": "bun {skill_dir}/v.ts"}]},
+            Path("/Users/John Doe/skill"), Path("/tmp/scr"))
+        self.assertEqual(planned, [{"name": "c",
+                                     "argv": ["bun", "/Users/John Doe/skill/v.ts"]}])
+
 
 class ArtifactCollection(unittest.TestCase):
     def test_copies_matching_files_and_ignores_the_rest(self):
@@ -328,6 +399,33 @@ class ArtifactCollection(unittest.TestCase):
             scratch.mkdir()
             self.assertEqual(run_evals.collect_artifacts(scratch, [], dest), [])
             self.assertFalse(dest.exists())
+
+    def test_dot_dot_escaping_pattern_never_writes_outside_dest(self):
+        """`target = dest / src.relative_to(scratch)` is lexical (no resolution), so a
+        pattern containing ".." (a case-authoring typo, e.g. "../*.html") yields a
+        src whose relative_to(scratch) is "../"-prefixed and copies SILENTLY outside
+        dest. Mirrors resolve_fixture_source's repo-root confinement: collect_artifacts
+        must never write outside dest."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scratch = root / "run" / "scratch"
+            scratch.mkdir(parents=True)
+            outside_file = root / "run" / "secret.html"
+            outside_file.write_text("LEAKED")
+            dest = scratch / "artifacts"
+
+            collected = run_evals.collect_artifacts(scratch, ["../*.html"], dest)
+
+            self.assertEqual(collected, [])
+            # No file exists anywhere under root, other than the original
+            # pre-existing outside_file itself, that isn't confined to dest.
+            for path in root.rglob("*"):
+                if path.is_file() and path.resolve() != outside_file.resolve():
+                    self.assertTrue(
+                        str(path.resolve()).startswith(str(dest.resolve()) + "/")
+                        or path.resolve() == dest.resolve(),
+                        f"artifact landed outside dest: {path}")
 
 
 if __name__ == "__main__":
