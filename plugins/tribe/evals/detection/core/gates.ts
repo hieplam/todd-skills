@@ -5,7 +5,13 @@ export function evaluateLegAClean(scoreResult: ScoreResult, minRecall: number, m
   return [
     { id: 'G1', cell: 'legA-clean', threshold: minRecall, actual: scoreResult.recall, pass: scoreResult.recall >= minRecall },
     { id: 'G2', cell: 'legA-clean', threshold: minPrecision, actual: scoreResult.precision, pass: scoreResult.precision >= minPrecision },
-    { id: 'G3', cell: 'legA-clean', threshold: 1.0, actual: scoreResult.easyTierRecall ?? 0, pass: (scoreResult.easyTierRecall ?? 0) === 1.0 },
+    {
+      id: 'G3',
+      cell: 'legA-clean',
+      threshold: 1.0,
+      actual: scoreResult.easyTierRecall === null ? 1 : scoreResult.easyTierRecall,
+      pass: scoreResult.easyTierRecall === null ? true : scoreResult.easyTierRecall === 1.0,
+    },
   ];
 }
 
@@ -21,7 +27,7 @@ export function repetitionPasses(gateResults: GateResult[]): boolean {
 }
 
 export function cellPasses(repetitionResults: boolean[]): boolean {
-  return repetitionResults.filter(Boolean).length >= 2;
+  return repetitionResults.filter(Boolean).length > repetitionResults.length / 2;
 }
 
 export function topLevelPass(cells: { legAClean: boolean; legBClean: boolean }): boolean {

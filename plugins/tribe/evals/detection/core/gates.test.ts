@@ -18,6 +18,12 @@ describe('evaluateLegAClean', () => {
     expect(gates.find((g) => g.id === 'G3')!.pass).toBe(false);
   });
 
+  test('G3 passes vacuously when manifest has zero easy-tier conventions (easyTierRecall null)', () => {
+    const score = { ...SCORE, easyTierRecall: null };
+    const gates = evaluateLegAClean(score, 0.7, 0.7);
+    expect(gates.find((g) => g.id === 'G3')!.pass).toBe(true);
+  });
+
   test('below-threshold recall fails G1', () => {
     const score = { ...SCORE, recall: 0.5 };
     const gates = evaluateLegAClean(score, 0.7, 0.7);
@@ -46,6 +52,12 @@ describe('repetitionPasses / cellPasses', () => {
   test('2 of 3 repetitions passing passes the cell', () => {
     expect(cellPasses([true, true, false])).toBe(true);
     expect(cellPasses([true, false, false])).toBe(false);
+  });
+
+  test('cellPasses generalizes to a strict majority for non-default repetition counts', () => {
+    expect(cellPasses([true])).toBe(true);
+    expect(cellPasses([true, true, false, false])).toBe(false);
+    expect(cellPasses([true, true, true, false, false])).toBe(true);
   });
 });
 
