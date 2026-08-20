@@ -1440,7 +1440,7 @@ Steps:
 cd plugins/tribe/evals/detection/fixtures/orderly && bun test && bunx tsc --noEmit
 ```
 Expected: `bun test` → all tests across the fixture so far green (repositories + services +
-foundation, `16 pass, 0 fail`); `bunx tsc --noEmit` clean.
+foundation, `19 pass, 0 fail`); `bunx tsc --noEmit` clean.
 
 ---
 
