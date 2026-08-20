@@ -60,4 +60,28 @@ describe('score', () => {
     });
     expect(result.easyTierRecall).toBeNull();
   });
+
+  test('a single easy-tier partial verdict gives easyTierRecall 0.5, matching the top-level recall weighting', () => {
+    const result = score({
+      verdicts: [{ id: 'C1', verdict: 'partial', evidence: '' }],
+      seeded: [{ id: 'C1', tier: 'easy' }],
+      decoysFlagged: [], invented: [],
+    });
+    expect(result.easyTierRecall).toBe(0.5);
+  });
+
+  test('duplicate verdict ids for the same seeded id do not silently drop a caught result (defense in depth)', () => {
+    // parseGraderVerdict rejects duplicate ids at the parsing boundary; this test only
+    // guards score() itself against silently losing data if it were ever handed duplicates.
+    const result = score({
+      verdicts: [
+        { id: 'C1', verdict: 'caught', evidence: '' },
+        { id: 'C1', verdict: 'missed', evidence: '' },
+      ],
+      seeded: [{ id: 'C1' }],
+      decoysFlagged: [], invented: [],
+    });
+    // caught + partial + missed must always sum to seeded — no verdict is silently lost or double counted.
+    expect(result.caught + result.partial + result.missed).toBe(result.seeded);
+  });
 });

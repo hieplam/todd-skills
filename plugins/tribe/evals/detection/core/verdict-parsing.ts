@@ -8,7 +8,7 @@ export type ParseResult =
 const VERDICTS: Verdict[] = ['caught', 'partial', 'missed'];
 
 export function parseGraderVerdict(raw: string): ParseResult {
-  const stripped = raw.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
+  const stripped = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   let data: unknown;
   try {
     data = JSON.parse(stripped);
@@ -22,6 +22,7 @@ export function parseGraderVerdict(raw: string): ParseResult {
   if (!Array.isArray(rec.conventions)) {
     return { ok: false, error: 'missing conventions array' };
   }
+  const seenIds = new Set<string>();
   for (const c of rec.conventions as unknown[]) {
     if (typeof c !== 'object' || c === null) return { ok: false, error: 'a conventions[] entry is not an object' };
     const cr = c as Record<string, unknown>;
@@ -29,6 +30,10 @@ export function parseGraderVerdict(raw: string): ParseResult {
     if (!VERDICTS.includes(cr.verdict as Verdict)) {
       return { ok: false, error: `conventions[${cr.id}] has invalid verdict '${String(cr.verdict)}'` };
     }
+    if (seenIds.has(cr.id)) {
+      return { ok: false, error: `conventions[] contains a duplicate id '${cr.id}'` };
+    }
+    seenIds.add(cr.id);
   }
   if (!Array.isArray(rec.decoys_flagged) || !rec.decoys_flagged.every((x) => typeof x === 'string')) {
     return { ok: false, error: 'decoys_flagged must be a string[]' };

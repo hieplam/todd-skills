@@ -27,7 +27,8 @@ export function score(input: ScoringInput): ScoreResult {
   let easyTierRecall: number | null = null;
   if (easyIds.length > 0) {
     const easyCaught = easyIds.filter((id) => byId.get(id) === 'caught').length;
-    easyTierRecall = easyCaught / easyIds.length;
+    const easyPartial = easyIds.filter((id) => byId.get(id) === 'partial').length;
+    easyTierRecall = (easyCaught + 0.5 * easyPartial) / easyIds.length;
   }
   return {
     recall, precision, easyTierRecall, caught, partial, missed,
