@@ -967,7 +967,7 @@ consequence is that the illustration must be consumable by a human, not only a f
 
 **Steps**
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -1015,7 +1015,7 @@ describe('renderIllustrationHtml', () => {
 
   Run `bun test`. Expected: the new file fails to resolve `./render-illustration`.
 
-- [ ] **Step 2: Implement `render-illustration.ts`,** dependency-free so it works offline:
+- [x] **Step 2: Implement `render-illustration.ts`,** dependency-free so it works offline:
   - `escapeHtml(text)` escapes `&` first, then `<`, `>`, `"`, `'`.
   - `renderIllustrationHtml({title, diagram, caption})` returns one document containing: a
     `<div class="mermaid">` holding the HTML-escaped diagram; CSS using CSS custom properties with
@@ -1027,7 +1027,7 @@ describe('renderIllustrationHtml', () => {
     pins `@10`; that file is not touched here.)
   - CLI `main()`: `--title`, `--caption`, `--diagram <file>` (or stdin), `--out <path>`; writes the
     file and prints its absolute path.
-- [ ] **Step 3: Prove it green and eyeball a real artifact.**
+- [x] **Step 3: Prove it green and eyeball a real artifact.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-explaining-illustration/plugins/explaining/skills/explaining/scripts
@@ -1040,7 +1040,7 @@ bun validate-mermaid.ts --html-glob /tmp/probe.html; echo "validator exit=$?"
   Expected: `bun test` passes; the renderer prints `/tmp/probe.html`; `validator exit=0` — the
   renderer's output validates through the task-5 validator, which is the round trip that matters.
 
-- [ ] **Step 4: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 6/10`.
+- [x] **Step 4: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 6/10`.
 
 ---
 
