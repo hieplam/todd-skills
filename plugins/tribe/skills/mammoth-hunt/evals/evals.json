@@ -1,0 +1,48 @@
+{
+  "skill_name": "mammoth-hunt",
+  "kind": "skill",
+  "evals": [
+    {
+      "id": 1,
+      "name": "trigger-on-mammoth-hunt-phrase",
+      "prompt": "Run the Mammoth Hunt on this. Task: add a slugify(text) function to src/utils.js (lowercase, spaces to dashes, strip non-alphanumerics) with tests. Before doing any work, reply with ONLY a JSON routing plan: {\"skill_invoked\": \"...\", \"agents_dispatched\": [...]}. Then stop.",
+      "expected_output": "Skill triggers: skill_invoked is mammoth-hunt. agents_dispatched names the full roster — warchief (orchestrator), hunter (implementer), skinner appearing TWICE (two independent audits), scout (unwritten-convention survey), and tracker (rules gate) — not just the warchief/hunter/skinner subset. Claude does not implement the feature itself and does not substitute the Workflow tool or a generic subagent for any of the five roles.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "trigger-on-tribe-workflow-phrase",
+      "prompt": "Implement this by the Tribe workflow. Task: add a slugify(text) function to src/utils.js (lowercase, spaces to dashes, strip non-alphanumerics) with tests. Before doing any work, reply with ONLY a JSON routing plan: {\"skill_invoked\": \"...\", \"agents_dispatched\": [...]}. Then stop.",
+      "expected_output": "Skill triggers on this phrasing even though it does not contain the words 'Mammoth Hunt' — skill_invoked is mammoth-hunt, and agents_dispatched names the full roster: warchief, hunter, skinner x2, scout, tracker. This phrasing collides with the built-in Workflow tool's own opt-in trigger wording ('workflow'), so the key check is that it resolves to the tribe chain, not the Workflow tool.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "trigger-on-role-assignment-phrasing",
+      "prompt": "You are a shaman now, dispatch your tribe to do the Mammoth hunt. Task: add a slugify(text) function to src/utils.js (lowercase, spaces to dashes, strip non-alphanumerics) with tests. Before doing any work, reply with ONLY a JSON routing plan: {\"skill_invoked\": \"...\", \"agents_dispatched\": [...], \"who_implements\": \"...\"}. Then stop.",
+      "expected_output": "Skill triggers even when the invocation is a role assignment rather than a bare command — skill_invoked is mammoth-hunt. Claude takes on the Shaman position (decisions/verification only) but dispatches the REAL warchief agent rather than roleplaying it, and the full downstream roster still appears: warchief, hunter, skinner x2, scout, tracker. who_implements names the hunter, never Claude itself and never the warchief directly.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "no-trigger-on-bare-workflow-tool-phrase",
+      "prompt": "Use a workflow to do this in parallel. Task: add a slugify(text) function to src/utils.js (lowercase, spaces to dashes, strip non-alphanumerics) with tests. Before doing any work, reply with ONLY a JSON routing plan: {\"skill_invoked\": \"...\", \"agents_dispatched\": [...]}. Then stop.",
+      "expected_output": "mammoth-hunt does NOT trigger — skill_invoked is none (or explicitly not mammoth-hunt). 'Use a workflow' is the built-in Workflow tool's own explicit opt-in phrase and carries no tribe/mammoth/hunt reference, so this routes to the Workflow tool (or a similar generic parallel-agent approach) instead of the tribe chain.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "no-trigger-on-bare-task-no-tribe-phrasing",
+      "prompt": "Task: add a slugify(text) function to src/utils.js (lowercase, spaces to dashes, strip non-alphanumerics) with tests. Before doing any work, reply with ONLY a JSON routing plan: {\"skill_invoked\": \"...\", \"agents_dispatched\": [...], \"who_implements\": \"...\"}. Then stop.",
+      "expected_output": "mammoth-hunt does NOT trigger — no tribe/mammoth/workflow phrasing is present. Claude proceeds to implement the small function directly in the main session (who_implements: itself), with no agent dispatch.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "no-trigger-on-orchestration-batch-phrase",
+      "prompt": "Orchestration: run the next 3 roadmap cards unattended and report when all are shipped or blocked. Before doing any work, reply with ONLY a JSON routing plan: {\"skill_invoked\": \"...\", \"approach\": \"...\"}. Then stop.",
+      "expected_output": "mammoth-hunt does NOT trigger for a batch/campaign request — this is orchestrate-campaign's territory (unattended, multiple roadmap cards, one consolidated report), a different skill. skill_invoked should name orchestrate-campaign or otherwise clearly avoid mammoth-hunt; the response must not describe dispatching mammoth-hunt for a single piece of work.",
+      "files": []
+    }
+  ]
+}
