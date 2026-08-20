@@ -8,12 +8,18 @@ export function extractFinalResult(lines: string[]): TranscriptResult {
   for (const [i, line] of lines.entries()) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    let event: Record<string, unknown>;
+    let parsed: unknown;
     try {
-      event = JSON.parse(trimmed);
+      parsed = JSON.parse(trimmed);
     } catch (e) {
+      if (resultEvent) continue;
       return { ok: false, error: `bad JSON on line ${i + 1}: ${(e as Error).message}` };
     }
+    if (typeof parsed !== 'object' || parsed === null) {
+      if (resultEvent) continue;
+      return { ok: false, error: `line ${i + 1} did not parse to an object: ${trimmed}` };
+    }
+    const event = parsed as Record<string, unknown>;
     if (event.type === 'result') resultEvent = event as { result?: string; is_error?: boolean };
   }
   if (!resultEvent) return { ok: false, error: 'no result event found in stream' };

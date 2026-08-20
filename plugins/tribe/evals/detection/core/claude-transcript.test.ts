@@ -33,4 +33,30 @@ describe('extractFinalResult', () => {
     const lines = ['', '{"type":"result","result":"ok","is_error":false}', ''];
     expect(extractFinalResult(lines)).toEqual({ ok: true, text: 'ok' });
   });
+
+  test('tolerates malformed JSON on a line AFTER a result event was already found', () => {
+    const lines = [
+      '{"type":"result","result":"final report text","is_error":false}',
+      'not json (stderr bleed-through)',
+    ];
+    expect(extractFinalResult(lines)).toEqual({ ok: true, text: 'final report text' });
+  });
+
+  test('reports failure (never throws) on a bare "null" line before any result event', () => {
+    const lines = ['null', '{"type":"system"}'];
+    let parsed: ReturnType<typeof extractFinalResult> | undefined;
+    expect(() => {
+      parsed = extractFinalResult(lines);
+    }).not.toThrow();
+    expect(parsed?.ok).toBe(false);
+  });
+
+  test('tolerates a bare "null" line AFTER a result event was already found (no throw)', () => {
+    const lines = ['{"type":"result","result":"ok","is_error":false}', 'null'];
+    let parsed: ReturnType<typeof extractFinalResult> | undefined;
+    expect(() => {
+      parsed = extractFinalResult(lines);
+    }).not.toThrow();
+    expect(parsed).toEqual({ ok: true, text: 'ok' });
+  });
 });
