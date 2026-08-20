@@ -516,7 +516,7 @@ Steps:
 ```bash
 cd plugins/tribe/evals/detection && bun test core/scratch-plan.test.ts core/prompts.test.ts
 ```
-Expected: `7 pass, 0 fail` (5 scratch-plan + 2 prompts cases).
+Expected: `8 pass, 0 fail` (5 scratch-plan + 3 prompts cases).
 
 ---
 
