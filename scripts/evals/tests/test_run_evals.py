@@ -497,6 +497,19 @@ class ExplainingIllustrationCase(unittest.TestCase):
     def test_existing_cases_are_untouched(self):
         self.assertEqual([c["id"] for c in self.data["evals"]], [1, 2, 3])
 
+    def test_expected_output_is_gradeable_from_the_transcript_alone(self):
+        """The grader (run_evals.grade()) only ever sees parsed["transcript"] and
+        parsed["final_result"] — extract_metrics() never captures a tool_result's
+        content, so text read from tribe-README.md via the agent's Read call never
+        reaches the grader (GRADER_INSTRUCTIONS even says "you have no tools —
+        judge only from the text given below"). expected_output must not ask the
+        grader to fact-check claims against a source it is never shown (F22); it
+        must still require the deterministic .html/mermaid artifact."""
+        expected_output = self.case["expected_output"]
+        self.assertNotIn("anchored in what tribe-README.md", expected_output)
+        self.assertIn("self-contained .html file", expected_output)
+        self.assertIn('class="mermaid"', expected_output)
+
 
 if __name__ == "__main__":
     unittest.main()
