@@ -1654,7 +1654,7 @@ Steps:
 ```bash
 cd plugins/tribe/evals/detection/fixtures/orderly && bun test && bunx tsc --noEmit
 ```
-Expected: `bun test` → `21 pass, 0 fail`; `bunx tsc --noEmit` clean.
+Expected: `bun test` → `26 pass, 0 fail`; `bunx tsc --noEmit` clean.
 
 ---
 
