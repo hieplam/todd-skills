@@ -1185,9 +1185,9 @@ describe('productRepository (seeded deviation site)', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/repositories` fails.
-- [ ] **Step 2: GREEN** — add all four files.
-- [ ] **Step 3: Commit** — also record the exact line number of the `findById` DEVIATION comment
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/repositories` fails.
+- [x] **Step 2: GREEN** — add all four files.
+- [x] **Step 3: Commit** — also record the exact line number of the `findById` DEVIATION comment
   in `productRepository.ts` (via `grep -n DEVIATION`) in the task's commit message body; Task 10
   needs it.
 
