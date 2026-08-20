@@ -1176,7 +1176,7 @@ test.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Append:
+- [x] **Step 1: Write the failing test.** Append:
 
 ```python
 EXPLAINING_EVALS = (REPO_ROOT
@@ -1226,7 +1226,7 @@ class ExplainingIllustrationCase(unittest.TestCase):
 
   Expected: every test fails — no case 3, no `memory_fixture` key.
 
-- [ ] **Step 2: Add the case.** Add the top-level `"memory_fixture": "memory-fixture/CLAUDE.md"`
+- [x] **Step 2: Add the case.** Add the top-level `"memory_fixture": "memory-fixture/CLAUDE.md"`
   key and append case id 3, leaving cases 1 and 2 byte-identical:
 
 ```json
@@ -1248,7 +1248,7 @@ class ExplainingIllustrationCase(unittest.TestCase):
     }
 ```
 
-- [ ] **Step 3: Prove it green, including the plan the runner would execute.**
+- [x] **Step 3: Prove it green, including the plan the runner would execute.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-explaining-illustration
@@ -1260,7 +1260,7 @@ scripts/evals/run_evals.py --evals plugins/explaining/skills/explaining/evals/ev
   Expected: unittest `OK`; the dry run exits 0, names eval 3, and prints no mem-skip note (the
   fixture now declares a `memory_fixture`).
 
-- [ ] **Step 4: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 9/10`.
+- [x] **Step 4: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 9/10`.
 
 ---
 
