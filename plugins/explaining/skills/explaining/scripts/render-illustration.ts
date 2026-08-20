@@ -111,6 +111,8 @@ export function renderIllustrationHtml({ title, diagram, caption }: Illustration
  * `main()` and reported as a clean error message, never an uncaught stack trace. */
 class CliArgError extends Error {}
 
+const KNOWN_FLAGS = new Set(['--title', '--caption', '--diagram', '--out']);
+
 function parseArgs(argv: string[]): {
   title: string;
   caption: string;
@@ -126,6 +128,13 @@ function parseArgs(argv: string[]): {
     if (flag === '--title' || flag === '--caption' || flag === '--diagram' || flag === '--out') {
       const value = argv[++i];
       if (value === undefined) throw new CliArgError(`${flag} requires a value`);
+      // A value that is itself a recognized flag name means the actual value was
+      // omitted — e.g. `--title --caption x` must not silently take `--caption` as
+      // the title. A value that merely starts with `-` but isn't a KNOWN flag (a
+      // legitimate title/caption beginning with a hyphen) is still accepted.
+      if (KNOWN_FLAGS.has(value)) {
+        throw new CliArgError(`${flag} requires a value, got the flag ${value} instead`);
+      }
       if (flag === '--title') title = value;
       else if (flag === '--caption') caption = value;
       else if (flag === '--diagram') diagram = value;
@@ -166,7 +175,13 @@ export async function main(argv: string[]): Promise<number> {
 
   const html = renderIllustrationHtml({ title, diagram: diagramText.trim(), caption });
   const outPath = resolve(out);
-  await writeFile(outPath, html, 'utf8');
+  try {
+    await writeFile(outPath, html, 'utf8');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`render-illustration: could not write --out: ${message}`);
+    return 1;
+  }
   console.log(outPath);
   return 0;
 }

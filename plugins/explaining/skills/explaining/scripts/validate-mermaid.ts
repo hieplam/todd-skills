@@ -7,7 +7,7 @@
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Glob } from 'bun';
 
@@ -252,6 +252,28 @@ function parseArgs(argv: string[]): { htmlGlob: string; file: string | null } {
   return { htmlGlob, file };
 }
 
+const GLOB_WILDCARD_CHARS = /[*?[{]/;
+
+/** Split an absolute glob pattern into the longest leading wildcard-free directory
+ * prefix (used as `Glob.scan`'s `cwd`) and the remaining sub-pattern scanned from
+ * there. Handles a wildcard anywhere in the pattern — the final component
+ * (`/abs/dir/*.html`) or a directory component in the middle (`/abs`, then a
+ * wildcard segment, then `out.html`) — not just the basename, which a prior fix
+ * (scanCwd = dirname(htmlGlob)) missed. */
+function splitAbsoluteGlobRoot(pattern: string): { root: string; subPattern: string } {
+  const segments = pattern.split('/');
+  let splitIndex = segments.length - 1; // default: last segment is the sub-pattern
+  for (let i = 0; i < segments.length - 1; i++) {
+    if (GLOB_WILDCARD_CHARS.test(segments[i])) {
+      splitIndex = i;
+      break;
+    }
+  }
+  const root = segments.slice(0, splitIndex).join('/') || '/';
+  const subPattern = segments.slice(splitIndex).join('/');
+  return { root, subPattern };
+}
+
 async function collectSources(htmlGlob: string, file: string | null): Promise<{
   artifacts: number;
   sources: string[];
@@ -272,21 +294,38 @@ async function collectSources(htmlGlob: string, file: string | null): Promise<{
   // Glob.scan() always walks relative to `cwd`. An absolute pattern with NO wildcard
   // characters (e.g. `/tmp/f15/out.html`) never matches under that scheme — Bun does
   // not special-case "the pattern is already an absolute path". Normalize by scanning
-  // from the pattern's own directory when it is absolute, so both a literal absolute
-  // file and an absolute wildcard resolve correctly; a relative pattern (bare filename,
-  // a relative path with a directory component, or a relative wildcard) is untouched.
-  const scanCwd = isAbsolute(htmlGlob) ? dirname(htmlGlob) : process.cwd();
-  const scanPattern = isAbsolute(htmlGlob) ? basename(htmlGlob) : htmlGlob;
-  const glob = new Glob(scanPattern);
+  // from the pattern's longest wildcard-free leading directory prefix; a relative
+  // pattern (bare filename, a relative path with a directory component, or a relative
+  // wildcard) is untouched, scanned from process.cwd() as before.
+  const { root: scanCwd, subPattern: scanPattern } = isAbsolute(htmlGlob)
+    ? splitAbsoluteGlobRoot(htmlGlob)
+    : { root: process.cwd(), subPattern: htmlGlob };
+
+  // A scan root that does not exist on disk can never produce a match — fold into the
+  // ordinary no-artifact/zero-match path instead of letting Glob.scan() throw an
+  // uncaught ENOENT (its normal behavior against a missing directory).
   const matches: string[] = [];
-  for await (const match of glob.scan({ cwd: scanCwd, absolute: true })) {
-    matches.push(match);
+  if (existsSync(scanCwd)) {
+    try {
+      const glob = new Glob(scanPattern);
+      for await (const match of glob.scan({ cwd: scanCwd, absolute: true })) {
+        matches.push(match);
+      }
+    } catch {
+      // No filesystem error scanning the glob may escape as a crash — a permission
+      // error or a path that vanishes mid-scan folds into "no matches found".
+    }
   }
+
   let sources: string[] = [];
   for (const path of matches) {
-    if (!existsSync(path)) continue;
-    const html = await readFile(path, 'utf8');
-    sources = sources.concat(extractMermaidSources(html));
+    try {
+      const html = await readFile(path, 'utf8');
+      sources = sources.concat(extractMermaidSources(html));
+    } catch {
+      // A matched file that vanished (or became unreadable) between scan and read
+      // must not crash the process — just skip it.
+    }
   }
   return { artifacts: matches.length, sources };
 }
