@@ -1,6 +1,6 @@
 ---
 id: c3-301
-c3-seal: ee26155311cdb296204771c248111f7f3f5eb832fd60b8ae029f5e757c018fc4
+c3-seal: f584ea2c39d93c4ee26f826c9e9213036a53e77a70bece15fe005ba1c890f8d4
 title: eval-runner
 type: component
 category: foundation
@@ -33,7 +33,7 @@ Owns the measurement methodology: isolation flags, baseline definition, metric c
 | Aspect | Detail | Reference |
 | --- | --- | --- |
 | Precondition | claude CLI on PATH; fixture files in the shared evals.json shape | N.A - see scripts/evals/README.md |
-| Inputs | --evals <path> or --all; flags --mode, --runs, --timeout, --exec-model, --grader-model, --eval-id, --out-dir, --dry-run | N.A - see scripts/evals/README.md Usage |
+| Inputs | --evals <path> or --all; flags --mode, --arm clean/mem/both, --runs, --timeout, --exec-model, --grader-model, --eval-id, --out-dir, --dry-run | N.A - see scripts/evals/README.md Usage |
 | State | Scratch temp dir per case; output tree scripts/evals/runs/<UTC-timestamp>/ (git-ignored) | N.A - see scripts/evals/.gitignore |
 | Shared dependencies | evals.json fixture shape; claude -p stream-json result events for metrics | ref-evals-fixture |
 
@@ -59,7 +59,7 @@ Owns the measurement methodology: isolation flags, baseline definition, metric c
 | --- | --- | --- | --- | --- |
 | run_evals.py --evals/--all [flags] | IN | CLI documented in README; exit after writing rollup | Python CLI | scripts/evals/README.md Usage |
 | plugins/**/evals/evals.json | IN | Shared fixture shape; kind: agent cases name agents/<name>.md | JSON file | ref-evals-fixture |
-| runs/<ts>/**/benchmark.json, grading.json, metrics.json, transcript.md | OUT | 1-based run-<N> dirs so repeats never overwrite evidence; metrics come from claude's own result events | filesystem | scripts/evals/README.md |
+| runs/<ts>/**/benchmark.json, grading.json, metrics.json, transcript.md | OUT | 1-based run-<N> dirs under an arm segment (<skill_name>/eval-<id>-<name>/<arm>/<configuration>/run-<N>/) so repeats AND arms never overwrite each other's evidence; metrics come from claude's own result events | filesystem | scripts/evals/README.md |
 | claude -p subprocesses | OUT | Never the current session; with_skill = scoped registration, without_skill = --safe-mode | subprocess | scripts/evals/README.md |
 
 ## Change Safety
@@ -69,6 +69,7 @@ Owns the measurement methodology: isolation flags, baseline definition, metric c
 | Baseline contamination (skill fires in without_skill leg) | Weakening --safe-mode / isolation flags | with/without deltas collapse to ~0 across all cases | Run scripts/evals/run_evals.py on a known-good fixture and confirm the legs diverge |
 | Evidence starvation | Switching --output-format away from stream-json | grading.json verdicts lack transcript/tool-call evidence | Inspect a with_skill scripts/evals/runs/<ts>/**/grading.json for evidence fields |
 | Runaway cost | Raising --runs / removing model pins in smoke passes | Wall-clock and total_cost_usd spikes in metrics | Smoke pass first: scripts/evals/run_evals.py --eval-id 1 --exec-model haiku (cost note in scripts/evals/README.md) |
+| Mem-arm honesty (a mem cell silently runs clean) | Requesting --arm mem for a fixture with no declared memory_fixture, or editing plan_jobs() / plan_arm_configurations() | A mem-labeled cell whose scratch dir never received CLAUDE.md, or a mem without_skill leg (impossible under a correct --safe-mode baseline) | Confirm plan_jobs() emits an honest skip note (never a job) when has_memory_fixture is False, and that every mem job's configuration is with_skill only: python3 -m unittest discover -s scripts/evals/tests -t . -v -k ArmPlanning |
 
 ## Derived Materials
 
