@@ -1647,9 +1647,9 @@ describe('productMapper (seeded deviation site)', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/handlers src/mappers` fails (also depends on `src/utils/legacyReceipt.ts`, which Task 9 has not landed yet — stub it minimally in this task as `export function buildLegacyReceiptTimestamp() { return { createdAt: new Date().toString() }; }` with the same module banner comment; Task 9 will own its permanent home and tests, this task only needs the import to resolve).
-- [ ] **Step 2: GREEN** — add all nine files (eight plus the `src/utils/legacyReceipt.ts` stub); re-run.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/handlers src/mappers` fails (also depends on `src/utils/legacyReceipt.ts`, which Task 9 has not landed yet — stub it minimally in this task as `export function buildLegacyReceiptTimestamp() { return { createdAt: new Date().toString() }; }` with the same module banner comment; Task 9 will own its permanent home and tests, this task only needs the import to resolve).
+- [x] **Step 2: GREEN** — add all nine files (eight plus the `src/utils/legacyReceipt.ts` stub); re-run.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection/fixtures/orderly && bun test && bunx tsc --noEmit
