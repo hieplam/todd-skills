@@ -130,7 +130,11 @@ def plan_jobs(cases: list, configurations: tuple, arms: tuple, runs: int,
 
     A mem arm requested for a fixture that declares no memory_fixture is SKIPPED
     with a note — never run as a clean cell labelled `mem`, which would report a
-    number nobody measured.
+    number nobody measured. Likewise, an arm whose runnable legs (per
+    plan_arm_configurations) don't intersect the requested `configurations` at
+    all (e.g. --mode without_skill with --arm mem, since mem only ever runs
+    with_skill) plans zero cells for that arm and gets the same honest note —
+    never a silent zero-job vanish with no note and no setup_error.
     """
     jobs: list = []
     notes: list = []
@@ -138,8 +142,14 @@ def plan_jobs(cases: list, configurations: tuple, arms: tuple, runs: int,
         if arm == "mem" and not has_memory_fixture:
             notes.append("mem arm skipped: fixture declares no memory_fixture")
             continue
+        arm_configurations = plan_arm_configurations(arm, configurations)
+        if not arm_configurations:
+            notes.append(
+                f"{arm} arm skipped: requested configurations {configurations} "
+                f"don't include its required with_skill leg")
+            continue
         for case in cases:
-            for configuration in plan_arm_configurations(arm, configurations):
+            for configuration in arm_configurations:
                 for run_idx in range(runs):
                     jobs.append({"case": case, "configuration": configuration,
                                   "arm": arm, "run_idx": run_idx})
