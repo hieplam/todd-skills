@@ -1,0 +1,9 @@
+{
+  "name": "detection-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test core",
+    "dry-run": "bun run.ts --dry-run"
+  }
+}

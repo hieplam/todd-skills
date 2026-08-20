@@ -1,0 +1,6 @@
+{
+  "name": "orderly",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "bun test", "typecheck": "bunx tsc --noEmit" }
+}

@@ -1,0 +1,81 @@
+{
+  "fixture": "orderly",
+  "conventions": [
+    {
+      "id": "C1", "tier": "easy",
+      "description": "Services return Result objects ({ok:true,value}|{ok:false,reason}), never throw across the service boundary.",
+      "exemplars": ["src/services/orderService.ts", "src/services/customerService.ts", "src/services/productService.ts"],
+      "deviation": { "file": "src/services/notificationService.ts", "line": 9, "note": "sendOrderConfirmation throws instead of returning a Result" },
+      "expected_detection": "Names the Result-returning convention AND the notificationService.ts throw site."
+    },
+    {
+      "id": "C2", "tier": "easy",
+      "description": "Repositories never return null: find* returns an option shape, get* asserts.",
+      "exemplars": ["src/repositories/orderRepository.ts (findById)", "src/repositories/orderRepository.ts (getById)", "src/repositories/customerRepository.ts (findById)"],
+      "deviation": { "file": "src/repositories/productRepository.ts", "line": 8, "note": "findById returns null instead of an Option shape" },
+      "expected_detection": "Names the option-shape convention AND the productRepository.ts null return."
+    },
+    {
+      "id": "C3", "tier": "easy",
+      "description": "Timestamps are UTC ISO strings in fields named *AtUtc.",
+      "exemplars": ["src/services/orderService.ts", "src/services/customerService.ts", "src/services/productService.ts"],
+      "deviation": { "file": "src/utils/legacyReceipt.ts", "line": 5, "note": "uses a local Date and a field named createdAt instead of *AtUtc" },
+      "expected_detection": "Names the *AtUtc/UTC ISO convention AND the legacyReceipt.ts site."
+    },
+    {
+      "id": "C4", "tier": "medium",
+      "description": "The clock is injected; no module calls Date.now() except clock.ts.",
+      "exemplars": ["src/services/orderService.ts", "src/services/productService.ts", "src/services/notificationService.ts"],
+      "deviation": { "file": "src/services/customerService.ts", "line": 15, "note": "calls Date.now()/new Date() inline instead of taking an injected Clock" },
+      "expected_detection": "Names the injected-clock convention AND the customerService.ts inline call."
+    },
+    {
+      "id": "C5", "tier": "medium",
+      "description": "Entity ids carry a type prefix (ord_, cus_, prd_); validators check the prefix.",
+      "exemplars": ["src/ids.ts", "src/services/orderService.ts", "src/services/productService.ts"],
+      "deviation": { "file": "src/services/customerService.ts", "line": 12, "note": "customerService mints a bare id with no type prefix instead of using mintId('customer')" },
+      "expected_detection": "Names the id-prefix convention AND the bare-id site in customerService.ts."
+    },
+    {
+      "id": "C6", "tier": "medium",
+      "description": "Every failure reason is a member of errorCodes.ts.",
+      "exemplars": ["src/services/customerService.ts", "src/services/productService.ts", "src/services/orderService.ts (cancelOrder)"],
+      "deviation": { "file": "src/services/orderService.ts", "line": 20, "note": "createOrder returns the ad-hoc string 'order total must be positive' instead of an errorCodes member" },
+      "expected_detection": "Names the errorCodes convention AND the ad-hoc string in orderService.ts."
+    },
+    {
+      "id": "C7", "tier": "medium",
+      "description": "Handlers never touch the db directly — always via a repository.",
+      "exemplars": ["src/handlers/createOrderHandler.ts", "src/handlers/getOrderHandler.ts", "src/handlers/createCustomerHandler.ts"],
+      "deviation": { "file": "src/handlers/productHandler.ts", "line": 7, "note": "queries db directly instead of going through productRepository" },
+      "expected_detection": "Names the repository-boundary convention AND the productHandler.ts direct db access."
+    },
+    {
+      "id": "C8", "tier": "hard",
+      "description": "Migrations pair NNN_up/NNN_down AND both are listed in migrations/index.ts.",
+      "exemplars": ["src/migrations/001_create_orders.ts", "src/migrations/002_create_customers.ts", "src/migrations/003_create_products.ts"],
+      "deviation": { "file": "src/migrations/index.ts", "line": 14, "note": "004_create_refunds.ts exists with a valid up/down pair but is missing from the registry" },
+      "expected_detection": "Names the pair-and-register cross-file invariant AND that 004 is unregistered."
+    },
+    {
+      "id": "C9", "tier": "hard",
+      "description": "toDto() in every mapper strips internal fields — same name, same meaning.",
+      "exemplars": ["src/mappers/orderMapper.ts (toDto)", "src/mappers/orderMapper.ts (toSummaryDto)", "src/mappers/customerMapper.ts (toDto)"],
+      "deviation": { "file": "src/mappers/productMapper.ts", "line": 14, "note": "toDto leaks internalCostCents, diverging from every sibling toDto's meaning" },
+      "expected_detection": "Names the toDto-strips-internal-fields convention AND the leaked field in productMapper.ts."
+    },
+    {
+      "id": "C10", "tier": "hard",
+      "description": "Money is integer cents everywhere; no float arithmetic.",
+      "exemplars": ["src/types.ts", "src/services/orderService.ts", "src/services/productService.ts"],
+      "deviation": { "file": "src/services/pricingService.ts", "line": 5, "note": "converts to float dollars and multiplies by a float factor" },
+      "expected_detection": "Names the integer-cents convention AND the float arithmetic in pricingService.ts."
+    }
+  ],
+  "decoys": [
+    { "id": "D1", "description": "Imports are ordered alphabetically in every file.", "exemplars": ["src/services/orderService.ts", "src/repositories/orderRepository.ts", "src/mappers/orderMapper.ts"] },
+    { "id": "D2", "description": "Every file opens with a `// module: <name>` banner comment.", "exemplars": ["src/services/orderService.ts", "src/repositories/orderRepository.ts", "src/mappers/orderMapper.ts"] },
+    { "id": "D3", "description": "Strings use single quotes throughout.", "exemplars": ["src/services/orderService.ts", "src/repositories/orderRepository.ts", "src/mappers/orderMapper.ts"] }
+  ],
+  "legB": { "patch": "diffs/orderly-pr1.patch", "violates": ["C1", "C4", "C6", "C10"] }
+}
