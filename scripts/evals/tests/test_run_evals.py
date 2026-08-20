@@ -428,5 +428,30 @@ class ArtifactCollection(unittest.TestCase):
                         f"artifact landed outside dest: {path}")
 
 
+MEMORY_FIXTURE = (REPO_ROOT
+                  / "plugins/explaining/skills/explaining/evals/memory-fixture/CLAUDE.md")
+
+# The mem arm measures whether realistic ambient memory SUPPRESSES the behavior. If the
+# fixture names the vocabulary of the behavior it would seed it instead, and the arm
+# would measure the fixture rather than the skill. Following the zero-lexical-overlap
+# meta-test at plugins/tribe/evals/detection/core/memory-overlap.test.ts.
+BANNED_VOCABULARY = ("mermaid", "diagram", "illustration", "illustrate", "chart",
+                     "graph", "visual", "html", "render", "draw", "picture", "image")
+
+
+class MemoryFixture(unittest.TestCase):
+    def test_exists(self):
+        self.assertTrue(MEMORY_FIXTURE.is_file(), f"missing fixture: {MEMORY_FIXTURE}")
+
+    def test_never_mentions_the_illustration_vocabulary(self):
+        import re as _re
+        text = MEMORY_FIXTURE.read_text().lower()
+        hits = [w for w in BANNED_VOCABULARY if _re.search(rf"\b{w}\w*", text)]
+        self.assertEqual(hits, [], f"memory fixture leaks the answer: {hits}")
+
+    def test_is_substantial_enough_to_be_realistic_ambient_memory(self):
+        self.assertGreater(len(MEMORY_FIXTURE.read_text().split()), 80)
+
+
 if __name__ == "__main__":
     unittest.main()

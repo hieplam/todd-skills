@@ -1114,7 +1114,7 @@ production.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Append:
+- [x] **Step 1: Write the failing test.** Append:
 
 ```python
 MEMORY_FIXTURE = (REPO_ROOT
@@ -1144,12 +1144,12 @@ class MemoryFixture(unittest.TestCase):
 
   Expected: all three fail — the fixture does not exist.
 
-- [ ] **Step 2: Author the fixture.** Realistic project memory for a plausible service, leaning on
+- [x] **Step 2: Author the fixture.** Realistic project memory for a plausible service, leaning on
   terseness and directness, containing none of the banned words nor any word starting with them
   (the test uses a `\bword\w*` prefix match, so `graphs`, `rendering`, `drawing` all count as
   leaks). Cover the shapes the card names: build/test commands, an answer-length preference,
   release notes, and review habits. Keep it over 80 words.
-- [ ] **Step 3: Prove it green.**
+- [x] **Step 3: Prove it green.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-explaining-illustration
@@ -1158,7 +1158,7 @@ python3 -m unittest discover -s scripts/evals/tests -t . -v
 
   Expected: `OK`, with the three `MemoryFixture` tests passing.
 
-- [ ] **Step 4: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 8/10`.
+- [x] **Step 4: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 8/10`.
 
 ---
 
