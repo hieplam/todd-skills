@@ -1054,7 +1054,7 @@ deliverable.
 
 **Steps**
 
-- [ ] **Step 1: Add a `## Rule 4 — Illustrate a flow instead of narrating it` section** after
+- [x] **Step 1: Add a `## Rule 4 — Illustrate a flow instead of narrating it` section** after
   Rule 3 and before `## Self-check before finishing`. It must state, in the existing file's voice
   (imperative, grounded, no persona framing):
   - **When.** A flow with **multiple actors** or **conditional paths** gets a diagram. Linear
@@ -1076,13 +1076,13 @@ deliverable.
     - Wrap a label in double quotes when it contains `(` `)` `[` `]` `{` `}` `|` or `"`, or when
       it starts with `/` or `\`.
     - Write a literal double quote inside a quoted label as `#quot;`.
-- [ ] **Step 2: Add one line to `## Self-check before finishing`:** a third numbered item asking
+- [x] **Step 2: Add one line to `## Self-check before finishing`:** a third numbered item asking
   whether the explanation describes a multi-actor or conditional flow that was narrated instead of
   drawn (Rule 4).
-- [ ] **Step 3: Do not touch Rules 1-3, the Overview, or the Evidence section** beyond the
+- [x] **Step 3: Do not touch Rules 1-3, the Overview, or the Evidence section** beyond the
   `../evals/evals.json` path already fixed in task 1 — the scope fence forbids changing the two
   existing rules.
-- [ ] **Step 4: Verify the skill still parses as a skill.**
+- [x] **Step 4: Verify the skill still parses as a skill.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-explaining-illustration
@@ -1098,7 +1098,7 @@ python3 -m unittest discover -s scripts/evals/tests -t .
 
   Expected: `name = explaining`, a non-zero description length, and unittest `OK`.
 
-- [ ] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 7/10`.
+- [x] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 7/10`.
 
 ---
 
