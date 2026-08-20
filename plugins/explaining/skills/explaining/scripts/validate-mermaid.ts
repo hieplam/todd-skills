@@ -26,18 +26,70 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&amp;/g, '&');
 }
 
+/** Parse an HTML opening tag's attribute text (single- or double-quoted values) and
+ * return the whitespace-split words of its `class` attribute, or `[]` if it has none.
+ * Attribute-aware — a `class="..."`-shaped substring inside a DIFFERENT attribute's
+ * value (e.g. `note='see class="other" here'`) is never mistaken for the real one. */
+function classWordsOf(attrText: string): string[] {
+  const attrPattern = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  let attrMatch: RegExpExecArray | null;
+  while ((attrMatch = attrPattern.exec(attrText)) !== null) {
+    if (attrMatch[1].toLowerCase() === 'class') {
+      const value = attrMatch[2] !== undefined ? attrMatch[2] : attrMatch[3];
+      return value.split(/\s+/).filter((word) => word.length > 0);
+    }
+  }
+  return [];
+}
+
+/** Find the closing tag that matches an already-consumed opening tag of `tagName`,
+ * tracking nesting depth so a nested element of the SAME tag name (e.g. a `<div>`
+ * inside a `.mermaid` `<div>`) does not truncate the match at its own closing tag.
+ * `from` is the index right after the opening tag's `>`. Returns the index of the
+ * matching `</tagName>` and the index right after it, or `null` if unmatched. */
+function findMatchingClose(
+  html: string,
+  from: number,
+  tagName: string,
+): { bodyEnd: number; afterClose: number } | null {
+  const tagPattern = new RegExp(`<(\\/?)${tagName}\\b[^>]*>`, 'gi');
+  tagPattern.lastIndex = from;
+  let depth = 0;
+  let tagMatch: RegExpExecArray | null;
+  while ((tagMatch = tagPattern.exec(html)) !== null) {
+    if (tagMatch[1] === '/') {
+      if (depth === 0) return { bodyEnd: tagMatch.index, afterClose: tagPattern.lastIndex };
+      depth--;
+    } else {
+      depth++;
+    }
+  }
+  return null;
+}
+
 /** Pull mermaid source text out of every `div`/`pre` whose `class` attribute
- * contains the word `mermaid` (extra classes allowed), decoding entities and
- * dropping anything that trims to empty. */
+ * contains the word `mermaid` (extra classes allowed, single- or double-quoted),
+ * decoding entities and dropping anything that trims to empty.
+ *
+ * Nesting guarantee: a nested element of the SAME tag name inside the container
+ * (e.g. `<div class="mermaid">...<div>note</div>...</div>`) is depth-tracked, so for
+ * well-formed HTML (every opening tag has a matching closing tag) the TRUE matching
+ * closing tag is found and nothing after the nested element is dropped. Malformed HTML
+ * (an inner tag left unclosed) may leave the container unmatched, in which case it is
+ * skipped rather than truncated. */
 export function extractMermaidSources(html: string): string[] {
-  const pattern = /<(div|pre)\b[^>]*\bclass\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)<\/\1>/gi;
+  const openTagPattern = /<(div|pre)\b([^>]*)>/gi;
   const sources: string[] = [];
   let match: RegExpExecArray | null;
-  while ((match = pattern.exec(html)) !== null) {
-    const classes = match[2].split(/\s+/);
-    if (!classes.includes('mermaid')) continue;
-    const decoded = decodeHtmlEntities(match[3]).trim();
+  while ((match = openTagPattern.exec(html)) !== null) {
+    const tagName = match[1].toLowerCase();
+    if (!classWordsOf(match[2]).includes('mermaid')) continue;
+    const bodyStart = openTagPattern.lastIndex;
+    const closeInfo = findMatchingClose(html, bodyStart, tagName);
+    if (closeInfo === null) continue;
+    const decoded = decodeHtmlEntities(html.slice(bodyStart, closeInfo.bodyEnd)).trim();
     if (decoded.length > 0) sources.push(decoded);
+    openTagPattern.lastIndex = closeInfo.afterClose;
   }
   return sources;
 }
@@ -72,18 +124,21 @@ export const EXIT_CODE = { VALID: 0, INVALID: 1, COULD_NOT_VALIDATE: 2 } as cons
 
 export type Outcome = 'VALID' | 'INVALID' | 'COULD_NOT_VALIDATE';
 
-/** Decide the overall outcome. Parser availability is checked FIRST — an unavailable
- * parser is COULD_NOT_VALIDATE regardless of anything else. Otherwise, no artifacts,
- * no sources, or any error is INVALID (an absent deliverable is the agent's failure,
- * not the harness's); everything else is VALID. */
+/** Decide the overall outcome. No artifact is checked FIRST and is always INVALID,
+ * even when the parser is unavailable — an absent deliverable is the agent's failure
+ * and must never be excused as COULD_NOT_VALIDATE. Parser availability is checked
+ * next — an unavailable parser (with an artifact present) is COULD_NOT_VALIDATE
+ * regardless of anything else. Otherwise, no sources or any error is INVALID;
+ * everything else is VALID. */
 export function classifyOutcome(input: {
   artifacts: number;
   sources: number;
   parser: 'ready' | 'unavailable';
   errors: unknown[];
 }): Outcome {
+  if (input.artifacts === 0) return 'INVALID';
   if (input.parser === 'unavailable') return 'COULD_NOT_VALIDATE';
-  if (input.artifacts === 0 || input.sources === 0 || input.errors.length > 0) return 'INVALID';
+  if (input.sources === 0 || input.errors.length > 0) return 'INVALID';
   return 'VALID';
 }
 
@@ -175,12 +230,24 @@ export async function validateSources(sources: string[]): Promise<SourceError[]>
 // CLI
 // ---------------------------------------------------------------------------
 
+/** Thrown when a flag that expects a value (`--html-glob`, `--file`) is the last
+ * argument, or is immediately followed by another flag. Caught by `main()` and
+ * reported as a clean error message, never an uncaught stack trace. */
+class CliArgError extends Error {}
+
 function parseArgs(argv: string[]): { htmlGlob: string; file: string | null } {
   let htmlGlob = '*.html';
   let file: string | null = null;
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--html-glob') htmlGlob = argv[++i];
-    else if (argv[i] === '--file') file = argv[++i];
+    if (argv[i] === '--html-glob') {
+      const value = argv[++i];
+      if (value === undefined) throw new CliArgError('--html-glob requires a value');
+      htmlGlob = value;
+    } else if (argv[i] === '--file') {
+      const value = argv[++i];
+      if (value === undefined) throw new CliArgError('--file requires a value');
+      file = value;
+    }
   }
   return { htmlGlob, file };
 }
@@ -190,7 +257,14 @@ async function collectSources(htmlGlob: string, file: string | null): Promise<{
   sources: string[];
 }> {
   if (file !== null) {
-    const text = await readFile(resolve(file), 'utf8');
+    let text: string;
+    try {
+      text = await readFile(resolve(file), 'utf8');
+    } catch {
+      // A missing/unreadable --file folds into the same no-artifact path a
+      // zero-match --html-glob already produces — never a crash.
+      return { artifacts: 0, sources: [] };
+    }
     const trimmed = text.trim();
     return { artifacts: 1, sources: trimmed.length > 0 ? [trimmed] : [] };
   }
@@ -210,7 +284,15 @@ async function collectSources(htmlGlob: string, file: string | null): Promise<{
 }
 
 export async function main(argv: string[]): Promise<number> {
-  const { htmlGlob, file } = parseArgs(argv);
+  let htmlGlob: string;
+  let file: string | null;
+  try {
+    ({ htmlGlob, file } = parseArgs(argv));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`validate-mermaid: ${message}`);
+    return EXIT_CODE.INVALID;
+  }
   const { artifacts, sources } = await collectSources(htmlGlob, file);
 
   const parser = await loadParser();
