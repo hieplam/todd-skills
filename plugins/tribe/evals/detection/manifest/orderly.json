@@ -19,7 +19,7 @@
       "id": "C3", "tier": "easy",
       "description": "Timestamps are UTC ISO strings in fields named *AtUtc.",
       "exemplars": ["src/services/orderService.ts", "src/services/customerService.ts", "src/services/productService.ts"],
-      "deviation": { "file": "src/utils/legacyReceipt.ts", "line": 3, "note": "uses a local Date and a field named createdAt instead of *AtUtc" },
+      "deviation": { "file": "src/utils/legacyReceipt.ts", "line": 5, "note": "uses a local Date and a field named createdAt instead of *AtUtc" },
       "expected_detection": "Names the *AtUtc/UTC ISO convention AND the legacyReceipt.ts site."
     },
     {
@@ -61,14 +61,14 @@
       "id": "C9", "tier": "hard",
       "description": "toDto() in every mapper strips internal fields — same name, same meaning.",
       "exemplars": ["src/mappers/orderMapper.ts (toDto)", "src/mappers/orderMapper.ts (toSummaryDto)", "src/mappers/customerMapper.ts (toDto)"],
-      "deviation": { "file": "src/mappers/productMapper.ts", "line": 12, "note": "toDto leaks internalCostCents, diverging from every sibling toDto's meaning" },
+      "deviation": { "file": "src/mappers/productMapper.ts", "line": 14, "note": "toDto leaks internalCostCents, diverging from every sibling toDto's meaning" },
       "expected_detection": "Names the toDto-strips-internal-fields convention AND the leaked field in productMapper.ts."
     },
     {
       "id": "C10", "tier": "hard",
       "description": "Money is integer cents everywhere; no float arithmetic.",
       "exemplars": ["src/types.ts", "src/services/orderService.ts", "src/services/productService.ts"],
-      "deviation": { "file": "src/services/pricingService.ts", "line": 4, "note": "converts to float dollars and multiplies by a float factor" },
+      "deviation": { "file": "src/services/pricingService.ts", "line": 5, "note": "converts to float dollars and multiplies by a float factor" },
       "expected_detection": "Names the integer-cents convention AND the float arithmetic in pricingService.ts."
     }
   ],

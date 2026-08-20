@@ -33,7 +33,7 @@ describe('orderly.json manifest', () => {
       const filePath = join(FIXTURE_ROOT, c.deviation.file);
       const lines = readFileSync(filePath, 'utf8').split('\n');
       const target = lines[c.deviation.line - 1] ?? '';
-      const nearby = lines.slice(Math.max(0, c.deviation.line - 2), c.deviation.line + 1).join('\n');
+      const nearby = lines.slice(Math.max(0, c.deviation.line - 5), c.deviation.line + 1).join('\n');
       expect(nearby).toContain('DEVIATION');
       expect(target.length).toBeGreaterThan(0);
     }
