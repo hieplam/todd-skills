@@ -556,7 +556,7 @@ scratch dir in its `finally`, so the produced HTML currently cannot be evidence 
 
 **Steps**
 
-- [ ] **Step 1: Write the failing tests.** Append:
+- [x] **Step 1: Write the failing tests.** Append:
 
 ```python
 class CheckOutcomes(unittest.TestCase):
@@ -616,7 +616,7 @@ class ArtifactCollection(unittest.TestCase):
 
   Expected: every test fails with `AttributeError`.
 
-- [ ] **Step 2: Implement.** Add `import shlex` to the imports, then:
+- [x] **Step 2: Implement.** Add `import shlex` to the imports, then:
 
 ```python
 CHECK_PASS, CHECK_FAIL, CHECK_UNGRADED = "pass", "fail", "ungraded"
@@ -688,7 +688,7 @@ def collect_artifacts(scratch: Path, patterns: list, dest: Path) -> list:
     return collected
 ```
 
-- [ ] **Step 3: Wire into `run_case`,** replacing the single `verdict = grade(...)` call:
+- [x] **Step 3: Wire into `run_case`,** replacing the single `verdict = grade(...)` call:
 
 ```python
         check_result = run_checks(plan_checks(case, skill_dir, scratch), scratch, timeout)
@@ -716,13 +716,13 @@ def collect_artifacts(scratch: Path, patterns: list, dest: Path) -> list:
 
   Add `"artifacts": artifacts` and `"check": check_result["name"]` to `grading_json`.
 
-- [ ] **Step 4: Stop copying a 200 MB dependency tree into every scratch dir.** In
+- [x] **Step 4: Stop copying a 200 MB dependency tree into every scratch dir.** In
   `install_skill`, change `shutil.ignore_patterns("evals")` to
   `shutil.ignore_patterns("evals", "node_modules")`. The skill gains a validator in task 5 whose
   `bun install` produces ~207 MB under `scripts/node_modules/`, and `copytree` would otherwise
   duplicate it per case, per leg, per run.
 
-- [ ] **Step 5: Prove it green.**
+- [x] **Step 5: Prove it green.**
 
 ```bash
 python3 -m unittest discover -s scripts/evals/tests -t . -v
@@ -731,7 +731,7 @@ scripts/evals/run_evals.py --all --dry-run
 
   Expected: unittest `OK`; dry run exits 0.
 
-- [ ] **Step 6: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 4/10`.
+- [x] **Step 6: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 4/10`.
 
 ---
 

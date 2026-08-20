@@ -275,5 +275,60 @@ class CompareArmFiltering(unittest.TestCase):
             list(self.compare.index_runs(bench, "with_skill", "clean").values()), [[True]])
 
 
+class CheckOutcomes(unittest.TestCase):
+    def test_zero_is_pass(self):
+        self.assertEqual(run_evals.classify_check_outcome(0), run_evals.CHECK_PASS)
+
+    def test_one_is_a_behavioral_fail(self):
+        self.assertEqual(run_evals.classify_check_outcome(1), run_evals.CHECK_FAIL)
+
+    def test_two_is_could_not_check_not_a_fail(self):
+        self.assertEqual(run_evals.classify_check_outcome(2), run_evals.CHECK_UNGRADED)
+
+    def test_any_other_code_is_could_not_check(self):
+        for rc in (3, 127, -9):
+            self.assertEqual(run_evals.classify_check_outcome(rc), run_evals.CHECK_UNGRADED)
+
+
+class CheckPlanning(unittest.TestCase):
+    def test_substitutes_skill_dir_and_scratch(self):
+        planned = run_evals.plan_checks(
+            {"checks": [{"name": "c", "command": "bun {skill_dir}/v.ts --out {scratch}/x"}]},
+            Path("/s/kill"), Path("/tmp/scr"))
+        self.assertEqual(planned, [{"name": "c",
+                                     "argv": ["bun", "/s/kill/v.ts", "--out", "/tmp/scr/x"]}])
+
+    def test_no_checks_declared_plans_nothing(self):
+        self.assertEqual(run_evals.plan_checks({}, Path("/s"), Path("/t")), [])
+
+    def test_glob_token_is_left_literal_for_the_check_to_expand(self):
+        planned = run_evals.plan_checks(
+            {"checks": [{"name": "c", "command": "bun v.ts --html-glob *.html"}]},
+            Path("/s"), Path("/t"))
+        self.assertEqual(planned[0]["argv"][-1], "*.html")
+
+
+class ArtifactCollection(unittest.TestCase):
+    def test_copies_matching_files_and_ignores_the_rest(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch, dest = Path(tmp) / "s", Path(tmp) / "d"
+            (scratch / "sub").mkdir(parents=True)
+            (scratch / "a.html").write_text("A")
+            (scratch / "b.txt").write_text("B")
+            collected = run_evals.collect_artifacts(scratch, ["*.html"], dest)
+            self.assertEqual(collected, ["a.html"])
+            self.assertEqual((dest / "a.html").read_text(), "A")
+            self.assertFalse((dest / "b.txt").exists())
+
+    def test_no_patterns_collects_nothing_and_creates_nothing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch, dest = Path(tmp) / "s", Path(tmp) / "d"
+            scratch.mkdir()
+            self.assertEqual(run_evals.collect_artifacts(scratch, [], dest), [])
+            self.assertFalse(dest.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
