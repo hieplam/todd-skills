@@ -2574,9 +2574,9 @@ main().then((code) => process.exit(code)).catch((e) => { console.error(e); proce
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun run.ts --dry-run --leg both --arm both` fails (file does not exist).
-- [ ] **Step 2: GREEN** — add `run.ts`; re-run.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun run.ts --dry-run --leg both --arm both` fails (file does not exist).
+- [x] **Step 2: GREEN** — add `run.ts`; re-run.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && bun run.ts --dry-run --leg both --arm both
