@@ -2376,11 +2376,13 @@ File: `plugins/tribe/evals/detection/run.ts`
 
 This is the composition root: argument parsing, filesystem, `git`, and `claude -p` subprocess
 calls all live here and nowhere else. It wires the real `DetectorPort`/`GraderPort` from
-`core/orchestrate.ts` to `Bun.spawn(["claude", "-p", ...])`, using exactly the isolation flags
-`scripts/evals/run_evals.py` already verified empirically (`--setting-sources project
---strict-mcp-config`, `--output-format stream-json --verbose`, `--agents <json>` built from the
-real `plugins/tribe/agents/scout.md` / `tracker.md` frontmatter+body, `--model <frontmatter
-model>` unless `--model` is passed on the CLI, grader calls additionally pass `--tools ""`).
+`core/orchestrate.ts` to `Bun.spawn` running the `claude` CLI, using exactly the isolation flags
+`scripts/evals/run_evals.py` already verified empirically: `--setting-sources project`, plus
+`--strict-mcp-config`, plus `--output-format stream-json --verbose`, plus an `--agents` flag
+whose value is a JSON payload built from the real `plugins/tribe/agents/scout.md` /
+`tracker.md` frontmatter and body, plus a `--model` flag resolved from that same frontmatter's
+`model:` field unless the CLI's own `--model` flag overrides it. Grader calls additionally pass
+an empty `--tools` value.
 
 ```ts
 #!/usr/bin/env bun
@@ -2590,7 +2592,7 @@ exit code 0, zero `claude` subprocess calls.
 
 File: `plugins/tribe/evals/detection/README.md`
 
-```markdown
+````markdown
 # Detection Eval
 
 Answers, with numbers: given a codebase whose conventions are written nowhere, what fraction
@@ -2642,7 +2644,7 @@ This harness is a deliberate, owner-approved deviation from `ref-evals-fixture` 
 one shared eval fixture format via `scripts/evals/run_evals.py`) — see the design spec's
 "Governance note" section. The C3 change-unit recording this deviation is authored separately by
 the Shaman after this harness merges.
-```
+````
 
 Steps:
 - [ ] **Step 1: RED** — `test -f plugins/tribe/evals/detection/README.md` fails.
@@ -2652,7 +2654,7 @@ Steps:
 ```bash
 test -f plugins/tribe/evals/detection/README.md && echo present
 ```
-Expected: `present`.
+Expected: command prints `present`.
 
 ---
 
