@@ -1277,7 +1277,7 @@ appears) and card item 8.
 
 **Steps**
 
-- [ ] **Step 1: Update `scripts/evals/README.md`.** In the `evals.json shape` block add
+- [x] **Step 1: Update `scripts/evals/README.md`.** In the `evals.json shape` block add
   `memory_fixture`, `files[].source`, `checks`, and `artifacts` with one comment line each; in
   `Usage` add `--arm`; and add a short subsection under `What it does` titled
   `### Arms: clean vs mem` stating that the default is `clean`, that the mem arm writes the
@@ -1293,10 +1293,10 @@ appears) and card item 8.
   Finally, correct the stale sentence at lines 45-48 claiming skill cases "register a throwaway
   `.claude/commands/` entry carrying the real `SKILL.md` description" — `install_skill()` copies
   the whole skill directory into the scratch project scope; say that instead.
-- [ ] **Step 2: Document the skill.** In `plugins/explaining/README.md`, describe the skill's four
+- [x] **Step 2: Document the skill.** In `plugins/explaining/README.md`, describe the skill's four
   rules, the two scripts and what each is for, the on-demand dependency install, and where the
   eval fixture now lives.
-- [ ] **Step 3: Verify the installer, and record the verdict either way.** `install.sh` symlinks
+- [x] **Step 3: Verify the installer, and record the verdict either way.** `install.sh` symlinks
   each `skills/<name>/` as a whole directory, so a skill-local `scripts/` ships with the skill and
   no installer change should be needed. Prove it rather than assume it:
 
@@ -1315,7 +1315,7 @@ ls /tmp/claude-install-probe/skills/explaining/evals/ 2>&1
   same situation the other four skills are already in). No `unsupported component type` warning is
   printed. If and only if a warning appears or a component fails to install, change `install.sh`
   and say so in the commit message.
-- [ ] **Step 4: Author the C3 change-unit.** Use `bunx @c3x/cli@11.6.3` for every C3 command — there
+- [x] **Step 4: Author the C3 change-unit.** Use `bunx @c3x/cli@11.6.3` for every C3 command — there
   is no `c3`/`c3x` binary on this machine. Never hand-edit a `.c3/` fact; author an ADR plus
   patches and apply them through the tool, following the shape of
   `.c3/changes/adr-20260820-detection-eval-standalone-harness/`. The unit covers three targets:
@@ -1336,7 +1336,7 @@ C3X_MODE=agent bunx @c3x/cli@11.6.3 check
   "ungrounded derivation in Derived Materials row 1"). Any third error is yours to fix before
   committing.
 
-- [ ] **Step 5: Prove the whole suite green one more time.**
+- [x] **Step 5: Prove the whole suite green one more time.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-explaining-illustration
@@ -1347,7 +1347,7 @@ cd /Users/hip/repo/todd-skills-explaining-illustration && scripts/evals/run_eval
 
   Expected: unittest `OK`; `bun test` all pass; the dry run exits 0.
 
-- [ ] **Step 6: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 10/10`.
+- [x] **Step 6: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 10/10`.
 
 ---
 
