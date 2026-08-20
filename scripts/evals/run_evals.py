@@ -606,9 +606,15 @@ def plan_checks(case: dict, skill_dir: Path | None, scratch: Path) -> list:
     """
     planned = []
     for spec in case.get("checks") or []:
+        # shlex.quote(): a skill_dir/scratch path may contain a space (a real host
+        # path, e.g. /Users/John Doe/...), and plain string substitution before
+        # shlex.split would tokenize it into two argv entries — the check then runs
+        # the wrong command (typically FileNotFoundError, silently misclassified
+        # CHECK_UNGRADED, masking a real pass/fail). A no-op for space-free paths.
+        planned_skill_dir = shlex.quote(str(skill_dir)) if skill_dir else ""
         command = (spec["command"]
-                    .replace("{skill_dir}", str(skill_dir) if skill_dir else "")
-                    .replace("{scratch}", str(scratch)))
+                    .replace("{skill_dir}", planned_skill_dir)
+                    .replace("{scratch}", shlex.quote(str(scratch))))
         planned.append({"name": spec["name"], "argv": shlex.split(command)})
     return planned
 
@@ -637,14 +643,22 @@ def collect_artifacts(scratch: Path, patterns: list, dest: Path) -> list:
     artifact the case is graded on can never be linked as evidence.
     """
     collected = []
+    dest_resolved = dest.resolve()
     for pattern in patterns or []:
         for src in sorted(scratch.glob(pattern)):
             if not src.is_file():
                 continue
-            target = dest / src.relative_to(scratch)
+            rel = src.relative_to(scratch)
+            target = (dest / rel).resolve()
+            # `rel` is lexical (no resolution), so a pattern containing ".."
+            # (fixture-authoring typo, e.g. "../*.html") yields a target OUTSIDE
+            # dest. Mirrors resolve_fixture_source's repo-root confinement: never
+            # write outside dest, no matter what the pattern matched.
+            if target != dest_resolved and not str(target).startswith(str(dest_resolved) + os.sep):
+                continue
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, target)
-            collected.append(str(src.relative_to(scratch)))
+            collected.append(str(rel))
     return collected
 
 
@@ -731,7 +745,18 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         if verbose:
             print(f"    [{configuration}] grading...", file=sys.stderr)
         grader_start = time.time()
-        check_result = run_checks(plan_checks(case, skill_dir, scratch), scratch, timeout)
+        try:
+            check_result = run_checks(plan_checks(case, skill_dir, scratch), scratch, timeout)
+        except Exception as e:  # noqa: BLE001 - mirrors the fixture/memory guards above:
+            # a malformed `checks` spec (missing "command" -> KeyError, a command that
+            # resolves to empty/blank -> argv == [] -> subprocess.run([]) IndexError, an
+            # unbalanced quote -> shlex ValueError) is a harness/authoring failure, not
+            # an agent/grading outcome, and run_checks's own except clause only covers
+            # (TimeoutExpired, FileNotFoundError, OSError) — anything else must become
+            # this case's {"error": ...} setup-error signal rather than escape through
+            # pool.map with no handler up to main(), which would discard every
+            # already-completed, already-paid case in the batch.
+            return {"error": f"check setup failed: {e}", "configuration": configuration}
         if check_result["outcome"] == CHECK_FAIL:
             verdict = {"passed": False,
                         "evidence": f"machine check '{check_result['name']}' failed — "
@@ -754,7 +779,14 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
         # card requires).
         run_dir = out_dir / f"eval-{case['id']}-{case['name']}" / arm / configuration / f"run-{run_idx + 1}"
         run_dir.mkdir(parents=True, exist_ok=True)
-        artifacts = collect_artifacts(scratch, case.get("artifacts"), run_dir / "artifacts")
+        try:
+            artifacts = collect_artifacts(scratch, case.get("artifacts"), run_dir / "artifacts")
+        except Exception as e:  # noqa: BLE001 - same class as the check-setup guard
+            # above: an absolute artifact pattern (e.g. "/x.html") makes
+            # scratch.glob raise NotImplementedError — an authoring failure, not an
+            # agent/grading outcome, and must degrade into {"error": ...} rather
+            # than escape through pool.map and discard the rest of the batch.
+            return {"error": f"check setup failed: {e}", "configuration": configuration}
         (run_dir / "transcript.md").write_text(
             f"# {case['name']} — {configuration}\n\n## Prompt\n{case['prompt']}\n\n"
             f"## Transcript\n{parsed['transcript']}\n\n## Final result\n{parsed['final_result']}\n"
