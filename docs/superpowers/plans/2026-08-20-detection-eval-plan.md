@@ -1814,9 +1814,9 @@ export function buildApp() {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/migrations` fails (migrations don't exist); confirm Task 8's `legacyReceipt.ts` stub is replaced by this file (same content — no functional change, just the permanent location) and `getOrderHandler`'s import still resolves.
-- [ ] **Step 2: GREEN** — add all eight files.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/migrations` fails (migrations don't exist); confirm Task 8's `legacyReceipt.ts` stub is replaced by this file (same content — no functional change, just the permanent location) and `getOrderHandler`'s import still resolves.
+- [x] **Step 2: GREEN** — add all eight files.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection/fixtures/orderly && bun test && bunx tsc --noEmit
