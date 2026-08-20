@@ -7,15 +7,15 @@ export function createCustomerRepository(db: Db) {
   return {
     findById(id: string): Option<Customer> {
       const customer = db.customers.get(id);
-      return customer === undefined ? { some: false } : { some: true, value: customer };
+      return customer === undefined ? { some: false } : { some: true, value: { ...customer } };
     },
     getById(id: string): Customer {
       const customer = db.customers.get(id);
       if (customer === undefined) throw new Error(`customer not found: ${id}`);
-      return customer;
+      return { ...customer };
     },
     save(customer: Customer): void {
-      db.customers.set(customer.id, customer);
+      db.customers.set(customer.id, { ...customer });
     },
   };
 }

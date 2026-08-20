@@ -16,6 +16,37 @@ describe('orderRepository', () => {
     const repo = createOrderRepository(createDb());
     expect(() => repo.getById('missing')).toThrow();
   });
+
+  test('mutating the local object after save() does not affect what is read back', () => {
+    const repo = createOrderRepository(createDb());
+    const order = {
+      id: 'o1',
+      customerId: 'c1',
+      productId: 'p1',
+      quantity: 1,
+      totalCents: 100,
+      createdAtUtc: '2026-01-01T00:00:00.000Z',
+    };
+    repo.save(order);
+    order.quantity = 999;
+    expect(repo.getById('o1').quantity).toBe(1);
+  });
+
+  test('mutating an object returned by getById does not affect what is read back later', () => {
+    const repo = createOrderRepository(createDb());
+    const order = {
+      id: 'o1',
+      customerId: 'c1',
+      productId: 'p1',
+      quantity: 1,
+      totalCents: 100,
+      createdAtUtc: '2026-01-01T00:00:00.000Z',
+    };
+    repo.save(order);
+    const fetched = repo.getById('o1');
+    fetched.quantity = 999;
+    expect(repo.getById('o1').quantity).toBe(1);
+  });
 });
 
 describe('customerRepository', () => {
