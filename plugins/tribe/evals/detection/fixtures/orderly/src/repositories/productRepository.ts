@@ -19,3 +19,5 @@ export function createProductRepository(db: Db) {
     },
   };
 }
+
+export type ProductRepository = ReturnType<typeof createProductRepository>;

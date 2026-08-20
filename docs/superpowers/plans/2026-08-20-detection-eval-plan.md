@@ -1432,9 +1432,9 @@ describe('notificationService (seeded deviation site)', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/services` fails (modules missing; also add the `OrderRepository`/`CustomerRepository`/`ProductRepository` type exports to the Task 6 files as part of this RED step).
-- [ ] **Step 2: GREEN** — add all six files (plus the repository type-export amendment); re-run.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection/fixtures/orderly && bun test src/services` fails (modules missing; also add the `OrderRepository`/`CustomerRepository`/`ProductRepository` type exports to the Task 6 files as part of this RED step).
+- [x] **Step 2: GREEN** — add all six files (plus the repository type-export amendment); re-run.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection/fixtures/orderly && bun test && bunx tsc --noEmit

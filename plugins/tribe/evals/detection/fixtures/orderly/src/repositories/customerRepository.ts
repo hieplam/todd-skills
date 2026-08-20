@@ -19,3 +19,5 @@ export function createCustomerRepository(db: Db) {
     },
   };
 }
+
+export type CustomerRepository = ReturnType<typeof createCustomerRepository>;

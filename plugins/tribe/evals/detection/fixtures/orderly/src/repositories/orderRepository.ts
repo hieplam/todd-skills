@@ -20,3 +20,5 @@ export function createOrderRepository(db: Db) {
     },
   };
 }
+
+export type OrderRepository = ReturnType<typeof createOrderRepository>;
