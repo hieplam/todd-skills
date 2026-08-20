@@ -29,7 +29,7 @@ function validateConvention(c: unknown, idx: number, errors: string[]): c is Con
   }
   const dev = rec.deviation as Record<string, unknown> | undefined;
   if (typeof dev !== 'object' || dev === null || !isNonEmptyString(dev.file) ||
-      typeof dev.line !== 'number' || !isNonEmptyString(dev.note)) {
+      !Number.isInteger(dev.line) || (dev.line as number) <= 0 || !isNonEmptyString(dev.note)) {
     errors.push(`conventions[${idx}] (${rec.id}): deviation must be {file, line, note}`);
   }
   if (!isNonEmptyString(rec.expected_detection)) errors.push(`conventions[${idx}] (${rec.id}): missing expected_detection`);
@@ -69,7 +69,10 @@ export function validateManifest(data: unknown): ValidationResult {
   }
   const legB = rec.legB as Record<string, unknown> | undefined;
   const conventionIds = Array.isArray(rec.conventions)
-    ? (rec.conventions as Record<string, unknown>[]).map((c) => c.id).filter(isNonEmptyString)
+    ? rec.conventions
+        .filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
+        .map((c) => c.id)
+        .filter(isNonEmptyString)
     : [];
   if (typeof legB !== 'object' || legB === null || !isNonEmptyString(legB.patch) || !isStringArray(legB.violates)) {
     errors.push('manifest: legB must be {patch: string, violates: string[]}');

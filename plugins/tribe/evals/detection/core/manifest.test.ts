@@ -60,4 +60,31 @@ describe('validateManifest', () => {
     const result = validateManifest(m);
     expect(result.ok).toBe(true);
   });
+
+  test('returns {ok: false} instead of throwing when a convention entry is null', () => {
+    const m = validManifest();
+    // @ts-expect-error deliberately malformed for the test
+    m.conventions = [null];
+    let result: ReturnType<typeof validateManifest> | undefined;
+    expect(() => {
+      result = validateManifest(m);
+    }).not.toThrow();
+    expect(result?.ok).toBe(false);
+  });
+
+  test('rejects a convention with a NaN deviation.line', () => {
+    const m = validManifest();
+    m.conventions[0].deviation.line = NaN;
+    const result = validateManifest(m);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.some((e) => e.includes('deviation'))).toBe(true);
+  });
+
+  test('rejects a convention with a negative deviation.line', () => {
+    const m = validManifest();
+    m.conventions[0].deviation.line = -5;
+    const result = validateManifest(m);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.some((e) => e.includes('deviation'))).toBe(true);
+  });
 });
