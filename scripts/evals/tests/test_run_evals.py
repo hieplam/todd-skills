@@ -453,5 +453,50 @@ class MemoryFixture(unittest.TestCase):
         self.assertGreater(len(MEMORY_FIXTURE.read_text().split()), 80)
 
 
+EXPLAINING_EVALS = (REPO_ROOT
+                    / "plugins/explaining/skills/explaining/evals/evals.json")
+
+
+class ExplainingIllustrationCase(unittest.TestCase):
+    def setUp(self):
+        self.data = json.loads(EXPLAINING_EVALS.read_text())
+        self.case = next(c for c in self.data["evals"]
+                          if c["name"] == "tribe-overall-flow-illustrated")
+
+    def test_fixture_declares_its_memory_fixture(self):
+        self.assertEqual(self.data["memory_fixture"], "memory-fixture/CLAUDE.md")
+        self.assertTrue(
+            (EXPLAINING_EVALS.parent / self.data["memory_fixture"]).is_file())
+
+    def test_uses_the_real_tribe_readme_by_source_not_an_inlined_copy(self):
+        self.assertEqual(self.case["files"],
+                          [{"path": "tribe-README.md",
+                            "source": "plugins/tribe/README.md"}])
+
+    def test_prompt_never_asks_for_the_artifact(self):
+        prompt = self.case["prompt"].lower()
+        for word in ("diagram", "mermaid", "html", "chart", "picture", "image",
+                      "illustrate", "illustration", "draw", "visual", "render"):
+            self.assertNotIn(word, prompt,
+                              f"prompt leaks the behavior under test: {word!r}")
+
+    def test_declares_a_machine_check_and_collects_the_artifact(self):
+        self.assertEqual(len(self.case["checks"]), 1)
+        command = self.case["checks"][0]["command"]
+        self.assertIn("{skill_dir}", command)
+        self.assertIn("validate-mermaid.ts", command)
+        self.assertEqual(self.case["artifacts"], ["*.html"])
+
+    def test_the_planned_check_argv_points_at_a_real_script(self):
+        _, skill_dir, _ = run_evals.derive_kind_and_dirs(
+            EXPLAINING_EVALS, self.data.get("kind"))
+        planned = run_evals.plan_checks(self.case, skill_dir, Path("/tmp/scratch"))
+        self.assertTrue(Path(planned[0]["argv"][1]).is_file(),
+                         f"check points at a missing script: {planned[0]['argv']}")
+
+    def test_existing_cases_are_untouched(self):
+        self.assertEqual([c["id"] for c in self.data["evals"]], [1, 2, 3])
+
+
 if __name__ == "__main__":
     unittest.main()
