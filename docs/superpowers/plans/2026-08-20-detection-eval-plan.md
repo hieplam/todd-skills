@@ -314,10 +314,10 @@ describe('validateManifest', () => {
 ```
 
 Steps:
-- [ ] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/manifest.test.ts` fails
+- [x] **Step 1: RED** — `cd plugins/tribe/evals/detection && bun test core/manifest.test.ts` fails
   (module `./manifest` does not exist yet).
-- [ ] **Step 2: GREEN** — add all files above; re-run the same command.
-- [ ] **Step 3: Commit**
+- [x] **Step 2: GREEN** — add all files above; re-run the same command.
+- [x] **Step 3: Commit**
 
 ```bash
 cd plugins/tribe/evals/detection && bun test core/manifest.test.ts
