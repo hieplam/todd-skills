@@ -232,6 +232,41 @@ describe('--html-glob finds artifacts regardless of pattern form (F15)', () => {
       expect(exitCode).toBe(EXIT_CODE.INVALID);
     });
   });
+
+  // F16: form 3 above (join(dir, '*.html')) only exercises a wildcard in the FINAL path
+  // component. A wildcard in a DIRECTORY component (e.g. /abs/*/out.html) must also
+  // resolve — a prior fix (scanCwd = dirname(htmlGlob)) only stripped the basename, so
+  // this form crashed with an uncaught ENOENT rather than matching.
+  test('form 6: wildcard in a directory component of an absolute pattern (F16)', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, ['--html-glob', join(dir, '*', 'out.html')]);
+      expect(exitCode).toBe(EXIT_CODE.VALID);
+    });
+  });
+
+  // F16: an absolute pattern whose DIRECTORY does not exist must fold into the ordinary
+  // no-artifact INVALID path (clean exit 1), never an uncaught ENOENT crash. This is the
+  // normal shape of a first-run --out path that has not been created yet.
+  test('an absolute pattern whose directory does not exist is a clean INVALID, not a crash (F16)', async () => {
+    await withArtifact(async (dir) => {
+      const exitCode = await runMain(dir, [
+        '--html-glob',
+        join(dir, 'nonexistent-dir-xyz', 'out.html'),
+      ]);
+      expect(exitCode).toBe(EXIT_CODE.INVALID);
+    });
+  });
+
+  // F16: the same missing-directory shape but with a wildcard in the missing directory
+  // component (/abs/*/out.html where /abs itself does not exist) — the OTHER crash
+  // trigger the prior fix introduced.
+  test('a wildcard pattern whose root directory does not exist is a clean INVALID, not a crash (F16)', async () => {
+    const exitCode = await runMain(process.cwd(), [
+      '--html-glob',
+      join('/tmp', `validate-mermaid-f16-missing-root-${Date.now()}`, '*', 'out.html'),
+    ]);
+    expect(exitCode).toBe(EXIT_CODE.INVALID);
+  });
 });
 
 describe('validateSources against the real parser', () => {
