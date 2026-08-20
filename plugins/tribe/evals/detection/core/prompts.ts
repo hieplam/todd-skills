@@ -1,4 +1,5 @@
 // module: core/prompts
+import { selectSeededConventions } from './seeded-conventions';
 import type { Leg, Manifest } from './types';
 
 export function buildDetectorPrompt(leg: Leg): string {
@@ -19,10 +20,9 @@ export function buildDetectorPrompt(leg: Leg): string {
 }
 
 export function buildGraderPrompt(input: { leg: Leg; manifest: Manifest; detectorReport: string }): string {
-  const seeded = input.leg === 'scout'
-    ? input.manifest.conventions
-    : input.manifest.conventions.filter((c) => input.manifest.legB.violates.includes(c.id));
+  const seeded = selectSeededConventions(input.manifest, input.leg);
   const conventionLines = seeded
+    .map((s) => input.manifest.conventions.find((c) => c.id === s.id)!)
     .map((c) => `- ${c.id} (${c.tier}): ${c.description}\n  Expected detection: ${c.expected_detection}`)
     .join('\n');
   return [

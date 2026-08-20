@@ -7,6 +7,7 @@ import { runCell, type DetectorPort, type GraderPort } from './core/orchestrate'
 import { buildDetectorPrompt } from './core/prompts';
 import { planScratch } from './core/scratch-plan';
 import { score } from './core/scoring';
+import { selectSeededConventions } from './core/seeded-conventions';
 import type { Arm, Leg, Manifest, ScoreResult, ScratchPlan } from './core/types';
 
 const DETECTION_ROOT = import.meta.dir;
@@ -297,11 +298,16 @@ async function main() {
   const outDir = join(DETECTION_ROOT, 'results', new Date().toISOString().replace(/[:.]/g, '-'));
   mkdirSync(outDir, { recursive: true });
 
-  const cellResults: Record<string, { pass: boolean; passCount: number; totalReps: number; scores: ReturnType<typeof score>[] }> = {};
+  const cellResults: Record<string, { pass: boolean | null; passCount: number | null; totalReps: number; scores: ReturnType<typeof score>[] }> = {};
   for (const leg of legs) {
     for (const arm of arms) {
       const repPasses: boolean[] = [];
       const scores: ReturnType<typeof score>[] = [];
+      // Whether this cell has any defined gates at all (scout-clean/tracker-clean do;
+      // every mem-arm cell doesn't — the mem arm reports Δrecall/Δprecision vs clean, never a
+      // pass/fail, per spec). Tracked across reps rather than assumed from leg/arm alone so an
+      // ungated cell can never be conflated with a vacuously-passing gated one.
+      let cellHasGates = false;
       for (let rep = 0; rep < reps; rep++) {
         const scratchDir = join(outDir, `${leg}-${arm}-rep${rep}`);
         mkdirSync(scratchDir, { recursive: true });
@@ -320,9 +326,7 @@ async function main() {
           // from the detector genuinely finding nothing.
           console.error(`WARNING: leg=${leg} arm=${arm} rep=${rep} — grading pipeline failed (ungraded): ${cell.error}`);
         }
-        const seeded = leg === 'scout'
-          ? manifest.conventions.map((c) => ({ id: c.id, tier: c.tier }))
-          : manifest.conventions.filter((c) => manifest.legB.violates.includes(c.id)).map((c) => ({ id: c.id, tier: c.tier }));
+        const seeded = selectSeededConventions(manifest, leg);
         const s = score({
           verdicts: cell.verdict?.conventions ?? [], seeded,
           decoysFlagged: cell.verdict?.decoys_flagged ?? [], invented: cell.verdict?.invented ?? [],
@@ -331,11 +335,12 @@ async function main() {
         writeFileSync(join(scratchDir, 'grading.json'), JSON.stringify({ cell: cell, score: s }, null, 2));
         const gates = leg === 'scout' && arm === 'clean' ? evaluateLegAClean(s, minRecall, minPrecision)
           : leg === 'tracker' && arm === 'clean' ? evaluateLegBClean(s.recall, s.invented) : [];
+        if (gates.length > 0) cellHasGates = true;
         repPasses.push(gates.length === 0 ? true : repetitionPasses(gates));
       }
       cellResults[`${leg}-${arm}`] = {
-        pass: cellPasses(repPasses),
-        passCount: repPasses.filter(Boolean).length,
+        pass: cellHasGates ? cellPasses(repPasses) : null,
+        passCount: cellHasGates ? repPasses.filter(Boolean).length : null,
         totalReps: repPasses.length,
         scores,
       };
