@@ -764,7 +764,7 @@ label), `Lexical error on line N. Unrecognized text.` (label starting with a sla
 
 **Steps**
 
-- [ ] **Step 1: Set up the package.** `package.json`:
+- [x] **Step 1: Set up the package.** `package.json`:
 
 ```json
 {
@@ -787,7 +787,7 @@ node_modules/
   Then `cd plugins/explaining/skills/explaining/scripts && bun install` and **commit
   `bun.lock`** alongside `package.json`.
 
-- [ ] **Step 2: Write the failing tests** in `validate-mermaid.test.ts`, covering the pure core
+- [x] **Step 2: Write the failing tests** in `validate-mermaid.test.ts`, covering the pure core
   and — separately — the real parser:
 
 ```ts
@@ -903,7 +903,7 @@ describe('validateSources against the real parser', () => {
   Run `bun test` in that directory. Expected: the file fails to resolve
   `./validate-mermaid` — nothing implemented yet.
 
-- [ ] **Step 3: Implement `validate-mermaid.ts`.** Pure core exported for tests; the impure edge
+- [x] **Step 3: Implement `validate-mermaid.ts`.** Pure core exported for tests; the impure edge
   behind `loadParser()`. Required behaviors:
   - `decodeHtmlEntities(text)` decodes `&lt; &gt; &quot; &#39;` and decodes `&amp;` **last**.
   - `extractMermaidSources(html)` matches any `div` or `pre` whose `class` attribute contains the
@@ -937,7 +937,7 @@ cd plugins/explaining/skills/explaining/scripts && bun test
 
   Expected: all tests pass, including both `validateSources` tests against the real parser.
 
-- [ ] **Step 4: Prove the CLI's three outcomes by hand.**
+- [x] **Step 4: Prove the CLI's three outcomes by hand.**
 
 ```bash
 cd /tmp && rm -rf vm-check && mkdir vm-check && cd vm-check
@@ -953,7 +953,7 @@ bun "$S/validate-mermaid.ts" --html-glob '*.html'; echo "bad exit=$?"
   Expected: `no-artifact exit=1`, `good exit=0`, `bad exit=1` with a printed hint about wrapping
   the label in double quotes.
 
-- [ ] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 5/10`.
+- [x] **Step 5: Commit** with `Tribe-Card: explaining-illustration` and `Tribe-Task: 5/10`.
 
 ---
 
