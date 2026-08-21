@@ -9,6 +9,7 @@ import {
   extractMermaidSources,
   hintFor,
   main,
+  raceExitAgainstTimeout,
   validateSources,
 } from './validate-mermaid';
 
@@ -53,6 +54,18 @@ describe('extractMermaidSources', () => {
     const html = '<div class="mermaid">flowchart TD\n A --> B\n <div>note</div>\n C --> D</div>';
     expect(extractMermaidSources(html))
       .toEqual(['flowchart TD\n A --> B\n <div>note</div>\n C --> D']);
+  });
+
+  // FB2: a `>` inside a quoted attribute value on the SAME container element must not
+  // truncate the open-tag scan early — the scan must be attribute-value-aware.
+  test('a ">" inside a double-quoted attribute does not truncate the open tag (FB2)', () => {
+    const html = '<div class="mermaid" title="a>b">graph TD; A-->B;</div>';
+    expect(extractMermaidSources(html)).toEqual(['graph TD; A-->B;']);
+  });
+
+  test('a ">" inside a single-quoted attribute does not truncate the open tag (FB2)', () => {
+    const html = "<div class=\"mermaid\" title='a>b'>graph TD; A-->B;</div>";
+    expect(extractMermaidSources(html)).toEqual(['graph TD; A-->B;']);
   });
 });
 
@@ -266,6 +279,24 @@ describe('--html-glob finds artifacts regardless of pattern form (F15)', () => {
       join('/tmp', `validate-mermaid-f16-missing-root-${Date.now()}`, '*', 'out.html'),
     ]);
     expect(exitCode).toBe(EXIT_CODE.INVALID);
+  });
+});
+
+// FB3: an on-demand `bun install` that stalls (a dead/slow network) must degrade to the
+// documented could-not-validate path instead of hanging the process forever. The bound
+// is expressed as a pure race between the spawned process's `exited` promise and a
+// timeout, so a test can inject a never-resolving promise and a tiny timeout to prove
+// the timeout branch deterministically, without waiting out a real multi-minute stall.
+describe('raceExitAgainstTimeout (FB3)', () => {
+  test('resolves with the real exit code when the process finishes before the timeout', async () => {
+    const result = await raceExitAgainstTimeout(Promise.resolve(0), 5_000);
+    expect(result).toEqual({ kind: 'exited', code: 0 });
+  });
+
+  test('resolves timeout when the process never finishes within the bound (FB3)', async () => {
+    const neverResolves = new Promise<number>(() => {}); // simulates a stalled install
+    const result = await raceExitAgainstTimeout(neverResolves, 10);
+    expect(result).toEqual({ kind: 'timeout' });
   });
 });
 

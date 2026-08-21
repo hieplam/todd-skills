@@ -78,7 +78,12 @@ function findMatchingClose(
  * (an inner tag left unclosed) may leave the container unmatched, in which case it is
  * skipped rather than truncated. */
 export function extractMermaidSources(html: string): string[] {
-  const openTagPattern = /<(div|pre)\b([^>]*)>/gi;
+  // Attribute-value-aware: the attribute-text group alternates quoted runs
+  // (`"[^"]*"` / `'[^']*'`, which may legally contain a `>`, e.g. `title="a>b"`) with
+  // unquoted characters that are not a quote or the tag-closing `>` itself. A naive
+  // `[^>]*` (FB2) stops at the FIRST `>`, even one embedded inside a quoted value,
+  // corrupting the extracted body with the tag's own tail.
+  const openTagPattern = /<(div|pre)\b((?:"[^"]*"|'[^']*'|[^'">])*)>/gi;
   const sources: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = openTagPattern.exec(html)) !== null) {
@@ -174,18 +179,48 @@ async function buildJsdomShimAndImportMermaid(): Promise<MermaidModule> {
   return mermaid;
 }
 
+/** How long an on-demand `bun install` may run before it is treated as stalled (a dead
+ * or very slow network) rather than awaited forever. 120s is generous for a small
+ * dependency set on a healthy connection while still bounding the worst case. */
+const BUN_INSTALL_TIMEOUT_MS = 120_000;
+
+/** Race a spawned process's `exited` promise against a timeout. Takes both as plain
+ * arguments (no direct `Bun.spawn`/`setTimeout` reach-in from the caller's decision
+ * logic) so a test can inject a promise that never resolves alongside a tiny
+ * `timeoutMs` and observe the timeout branch deterministically, without waiting out a
+ * real multi-minute stall. Never rejects — a process that exits abnormally is reported
+ * via its exit code, not a thrown error. */
+export async function raceExitAgainstTimeout(
+  exited: Promise<number>,
+  timeoutMs: number,
+): Promise<{ kind: 'exited'; code: number } | { kind: 'timeout' }> {
+  return Promise.race([
+    exited.then((code) => ({ kind: 'exited' as const, code })),
+    new Promise<{ kind: 'timeout' }>((resolve) => {
+      setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs);
+    }),
+  ]);
+}
+
 async function loadParserUncached(): Promise<ParserHandle> {
   try {
     return { mermaid: await buildJsdomShimAndImportMermaid() };
   } catch {
-    // On-demand install, once, then retry.
+    // On-demand install, once, then retry. Bounded by BUN_INSTALL_TIMEOUT_MS: a
+    // stalled network must degrade to 'unavailable' (COULD_NOT_VALIDATE, exit 2)
+    // rather than hang the process — "a validator that cannot run is not a failing
+    // diagram" (SKILL.md Rule 4).
     try {
       const proc = Bun.spawn(['bun', 'install', '--cwd', SCRIPT_DIR], {
         stdout: 'ignore',
         stderr: 'ignore',
       });
-      const exitCode = await proc.exited;
-      if (exitCode !== 0) return 'unavailable';
+      const result = await raceExitAgainstTimeout(proc.exited, BUN_INSTALL_TIMEOUT_MS);
+      if (result.kind === 'timeout') {
+        proc.kill();
+        return 'unavailable';
+      }
+      if (result.code !== 0) return 'unavailable';
       return { mermaid: await buildJsdomShimAndImportMermaid() };
     } catch {
       return 'unavailable';
