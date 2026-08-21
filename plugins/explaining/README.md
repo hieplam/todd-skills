@@ -42,6 +42,14 @@ by the two scripts below plus a machine check in this skill's own eval case.
 Both are `bun` CLIs, run from the directory where the diagram/output files live (their
 path flags — `--diagram`, `--out`, `--html-glob`, `--file` — are relative to `cwd`).
 
+This `scripts/` directory is **skill-local** (`plugins/explaining/skills/explaining/scripts/`),
+which matters for installability: `install.sh` symlinks a skill's whole directory into
+`~/.claude/skills/<name>/` (`scripts/` included), so these two scripts install
+automatically with no installer change. A *plugin-level* `scripts/` — directly under
+`plugins/explaining/`, not under a `skills/<name>/` — is a different case: `install.sh`'s
+whitelist recognizes that name too, but only to skip it ("repo-invoked, NOT installed"),
+never to link it. See `ref-plugin-layout`'s How section for the golden plugin layout.
+
 ## On-demand dependency install
 
 `validate-mermaid.ts` depends on `mermaid` and `jsdom` (`package.json` +

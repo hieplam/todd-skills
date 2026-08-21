@@ -1,6 +1,6 @@
 ---
 id: ref-plugin-layout
-c3-seal: bdcdb32600e6f94bfe8eed542ebf6d0849346442bd6f460b344232126c960c16
+c3-seal: f7ba47d483824f0c9216b53bc7e2cb5824993d05c15af430be4989d7e1972b98
 title: plugin-layout
 type: ref
 goal: 'Standardize the directory shape of every plugin so the installer, the marketplace manifest, and the eval harness can walk any plugin without per-plugin logic. The recurring need: 8 plugins, one install code path.'
@@ -16,13 +16,14 @@ A plugin is a directory under `plugins/<name>/` containing `.claude-plugin/plugi
 
 ## Why
 
-`install.sh`'s `install_plugin()` is written against exactly these names — its case statement whitelists `agents|skills|claude-md|hooks|.claude-plugin|scripts|evals` and warns on anything else ("unsupported component type — not installed", `install.sh:107-117`). A predictable per-directory contract is what lets install be symlink-based and idempotent: the unit of linking is a whole file (agent) or whole directory (skill), never merged content. The alternative — per-plugin install logic — would grow linearly with plugins and break the "add a plugin = add a manifest entry" simplicity. A **skill-local** `skills/<name>/scripts/` (e.g. `plugins/explaining/skills/explaining/scripts/`) IS installed, because the installer symlinks the whole skill directory (`scripts/` included) — unlike a *plugin-level* `scripts/` (directly under `plugins/<name>/`), which the case statement above whitelists but never links.
+`install.sh`'s `install_plugin()` is written against exactly these names — its case statement whitelists `agents|skills|claude-md|hooks|.claude-plugin|scripts|evals` and warns on anything else ("unsupported component type — not installed", `install.sh:107-117`). A predictable per-directory contract is what lets install be symlink-based and idempotent: the unit of linking is a whole file (agent) or whole directory (skill), never merged content. The alternative — per-plugin install logic — would grow linearly with plugins and break the "add a plugin = add a manifest entry" simplicity.
 
 ## How
 
 Golden layout, from the richest real plugin (`plugins/tribe/`):
 
-`````plugins/tribe/
+`````
+plugins/tribe/
 ├── .claude-plugin/plugin.json   # REQUIRED — name matches directory basename
 ├── README.md                    # OPTIONAL
 ├── install.sh                   # OPTIONAL post-install hook (CLAUDE_DIR passed through)
