@@ -1,0 +1,24 @@
+== explaining (skill) — 1 case(s) from plugins/explaining/skills/explaining/evals/evals.json ==
+
+Running 9 execution(s) with 3 concurrent job(s)...
+
+  [1/9] eval 3: tribe-overall-flow-illustrated
+    [with_skill] FAIL  69.6s  399308 tokens
+  [2/9] eval 3: tribe-overall-flow-illustrated
+    [with_skill] PASS  52.8s  310234 tokens
+  [3/9] eval 3: tribe-overall-flow-illustrated
+    [with_skill] PASS  52.8s  341255 tokens
+  [4/9] eval 3: tribe-overall-flow-illustrated
+    [without_skill] FAIL  23.0s  68714 tokens
+  [5/9] eval 3: tribe-overall-flow-illustrated
+    [without_skill] FAIL  19.8s  97789 tokens
+  [6/9] eval 3: tribe-overall-flow-illustrated
+    [without_skill] FAIL  29.2s  98670 tokens
+  [7/9] eval 3: tribe-overall-flow-illustrated
+    [with_skill] PASS  51.9s  303847 tokens
+  [8/9] eval 3: tribe-overall-flow-illustrated
+    [with_skill] FAIL  50.8s  267433 tokens
+  [9/9] eval 3: tribe-overall-flow-illustrated
+    [with_skill] PASS  48.9s  311808 tokens
+
+Wrote 9 run(s) -> /tmp/explaining-illustration-eval/benchmark.json

@@ -1,0 +1,386 @@
+{
+  "metadata": {
+    "timestamp": "20260821T102545Z",
+    "label": "(unlabeled)",
+    "runs_per_configuration": 3,
+    "jobs": 3,
+    "exec_model": "sonnet",
+    "grader_model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "agents_dir": "(default)",
+    "arms": [
+      "clean",
+      "mem"
+    ],
+    "evals_run": [
+      {
+        "skill_name": "explaining",
+        "kind": "skill",
+        "evals_json": "plugins/explaining/skills/explaining/evals/evals.json",
+        "subjects": {
+          "explaining": {
+            "sha256": "e960cfadb6bae5c2",
+            "chars": 5827,
+            "lines": 66
+          }
+        },
+        "case_ids": [
+          3
+        ]
+      }
+    ]
+  },
+  "runs": [
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 69.6,
+        "tokens": 399308,
+        "cost_usd": 0.35464280000000004,
+        "tool_calls": 8,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'html-mermaid-parses' failed \u2014 exit 1: INVALID: 0 diagram(s) found, 0 error(s)"
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 52.8,
+        "tokens": 310234,
+        "cost_usd": 0.2912225,
+        "tool_calls": 6,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent wrote tribe-flow.mmd, then ran render-illustration.ts and validate-mermaid.ts producing 'tribe-flow.html' and confirming 'Diagram validated and written to tribe-flow.html', satisfying the requirement for a rendered, parseable mermaid HTML file. The prose defines every role at first use (Shaman, Warchief, Hunter, Tracker, Skinner, Scout with emoji and one-line job descriptions), gives a specific numbered handoff chain with concrete returns (e.g. Hunter 'implements under TDD, commits, and reports the diff back'), covers conditional paths (Tracker BLOCK loop, Skinner adjudication dispositions, debt gate, optional Scout branch), and explicitly delineates the Tracker/Skinner boundary as required."
+        }
+      ],
+      "run_number": 2,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 52.8,
+        "tokens": 341255,
+        "cost_usd": 0.29127700000000006,
+        "tool_calls": 7,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent used the explaining skill to write a mermaid sequence diagram (tribe-flow.mmd), rendered it via render-illustration.ts into tribe-flow.html, validated it with validate-mermaid.ts, then moved the .html file into the working directory (mv ... tribe-flow.html to the task's root dir), leaving a self-contained artifact on disk. The prose defines every role and jargon term at first use (e.g., 'Hunter \u2014 the implementer... under TDD (test-driven development...)', 'diff (the set of changed lines)', 'harness gap'), specifies exact handoffs and returns (Shaman\u2192Warchief idea card, Warchief\u2192Hunter spec/plan, Hunter\u2192Warchief report, Warchief\u2192Shaman outcome), covers conditional paths (Tracker BLOCK loop, Skinner disposition branches, Scout's conditional dispatch, debt gate), and clearly delineates the Tracker/Skinner boundary by reference and cadence rather than vaguely by severity."
+        }
+      ],
+      "run_number": 3,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "without_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 23.0,
+        "tokens": 68714,
+        "cost_usd": 0.12321159999999999,
+        "tool_calls": 2,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'html-mermaid-parses' failed \u2014 exit 1: INVALID: 0 diagram(s) found, 0 error(s)"
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "without_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 19.8,
+        "tokens": 97789,
+        "cost_usd": 0.127291,
+        "tool_calls": 2,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'html-mermaid-parses' failed \u2014 exit 1: INVALID: 0 diagram(s) found, 0 error(s)"
+        }
+      ],
+      "run_number": 2,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "without_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 29.2,
+        "tokens": 98670,
+        "cost_usd": 0.13924989999999998,
+        "tool_calls": 2,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'html-mermaid-parses' failed \u2014 exit 1: INVALID: 0 diagram(s) found, 0 error(s)"
+        }
+      ],
+      "run_number": 3,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "with_skill",
+      "arm": "mem",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 51.9,
+        "tokens": 303847,
+        "cost_usd": 0.2877585,
+        "tool_calls": 6,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent wrote tribe-flow.mmd with mermaid flowchart source, ran a render-illustration.ts script to produce tribe-flow.html, then ran validate-mermaid.ts against it which confirmed the diagram validated \u2014 establishing a rendered .html file on disk (not just a fenced code block). The prose covers the full dispatch chain (Shaman\u2192Warchief\u2192Hunter, the Tracker loop, the Skinner done-check, the conditional Scout path, and close-out to merge), defines jargon at first use (e.g. TDD, BLOCK/APPROVE verdicts, CONTRACT-LENS/COLD-LENS), and ends with a specific comparison table delineating the Tracker vs Skinner boundary, satisfying the task's requirements for both an on-disk rendered diagram and an internally consistent, jargon-defined explanation of the flow."
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "with_skill",
+      "arm": "mem",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 50.8,
+        "tokens": 267433,
+        "cost_usd": 0.27355779999999996,
+        "tool_calls": 5,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'html-mermaid-parses' failed \u2014 exit 1: INVALID: 0 diagram(s) found, 0 error(s)"
+        }
+      ],
+      "run_number": 2,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "tribe-overall-flow-illustrated",
+      "configuration": "with_skill",
+      "arm": "mem",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 48.9,
+        "tokens": 311808,
+        "cost_usd": 0.2767423,
+        "tool_calls": 6,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "The response makes the multi-actor flow understandable AND leaves behind a rendered illustration the reader can open: a self-contained .html file written into the working directory whose mermaid source sits in an element with class=\"mermaid\" and parses. The diagram covers the dispatch chain across the roles and at least one conditional path. The accompanying prose obeys the skill's existing rules \u2014 every role name and piece of jargon is defined or contextualized at first use, and the explanation of who hands work to whom and what each role returns is specific and internally consistent rather than vague or hand-wavy. Producing only a fenced code block, or only prose with no file on disk, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent wrote a .mmd file, ran render-illustration.ts to produce tribe-flow.html, then ran validate-mermaid.ts to confirm the diagram parses ('Diagram validated and saved to tribe-flow.html'), satisfying the requirement for a rendered, validated illustration on disk. The prose covers the full dispatch chain (Shaman\u2192Warchief\u2192Hunter\u2192Tracker/Skinner\u2192Warchief), defines jargon at first use (e.g. 'TDD (test-driven development...)', 'diff (the set of code changes)'), explicitly delineates the Tracker/Skinner boundary in a comparison table, and details at least two conditional paths (Tracker BLOCK routing and Skinner CONFIRMED/REFUTED/DEBT adjudication) with specific, internally consistent hand-off/return semantics."
+        }
+      ],
+      "run_number": 3,
+      "skill_name": "explaining",
+      "agent": null
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "time_seconds": {
+        "mean": 54.5,
+        "stddev": 7.6,
+        "min": 48.9,
+        "max": 69.6
+      },
+      "tokens": {
+        "mean": 322314,
+        "stddev": 44488,
+        "min": 267433,
+        "max": 399308
+      },
+      "ungraded": 0,
+      "pass_rate": {
+        "mean": 0.667,
+        "stddev": 0.516,
+        "min": 0.0,
+        "max": 1.0
+      }
+    },
+    "without_skill": {
+      "time_seconds": {
+        "mean": 24.0,
+        "stddev": 4.8,
+        "min": 19.8,
+        "max": 29.2
+      },
+      "tokens": {
+        "mean": 88391,
+        "stddev": 17046,
+        "min": 68714,
+        "max": 98670
+      },
+      "ungraded": 0,
+      "pass_rate": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.67",
+      "time_seconds": "+30.5",
+      "tokens": "+233923.0"
+    },
+    "by_arm": {
+      "clean": {
+        "time_seconds": {
+          "mean": 58.4,
+          "stddev": 9.7,
+          "min": 52.8,
+          "max": 69.6
+        },
+        "tokens": {
+          "mean": 350266,
+          "stddev": 45215,
+          "min": 310234,
+          "max": 399308
+        },
+        "ungraded": 0,
+        "pass_rate": {
+          "mean": 0.667,
+          "stddev": 0.577,
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      "mem": {
+        "time_seconds": {
+          "mean": 50.5,
+          "stddev": 1.5,
+          "min": 48.9,
+          "max": 51.9
+        },
+        "tokens": {
+          "mean": 294363,
+          "stddev": 23659,
+          "min": 267433,
+          "max": 311808
+        },
+        "ungraded": 0,
+        "pass_rate": {
+          "mean": 0.667,
+          "stddev": 0.577,
+          "min": 0.0,
+          "max": 1.0
+        }
+      }
+    },
+    "arm_delta": {
+      "pass_rate": "+0.00",
+      "note": "mem minus clean, with_skill leg; reported, never gated"
+    }
+  },
+  "setup_errors": [],
+  "notes": []
+}
