@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tribe end-to-end flow</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --caption-fg: #555555;
+    --border: #dddddd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --fg: #f0f0f0;
+      --caption-fg: #aaaaaa;
+      --border: #444444;
+    }
+  }
+  body {
+    margin: 0;
+    padding: 2rem;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, sans-serif;
+  }
+  h1 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+  }
+  .diagram-wrap {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow: auto;
+  }
+  figcaption {
+    margin-top: 0.75rem;
+    color: var(--caption-fg);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<h1>Tribe end-to-end flow</h1>
+<figure class="diagram-wrap">
+<div class="mermaid">flowchart TD
+    Shaman[&quot;🔮 Shaman&lt;br/&gt;picks one idea card&lt;br/&gt;(what / why)&quot;]
+    Warchief[&quot;🪓 Warchief&lt;br/&gt;writes spec, dispatches,&lt;br/&gt;adjudicates, merges&quot;]
+    Hunter[&quot;🏹 Hunter&lt;br/&gt;implements + commits&lt;br/&gt;(TDD)&quot;]
+    Diff([&quot;diff / PR branch&quot;])
+    Tracker[&quot;👣 Tracker&lt;br/&gt;rule-conformance gate&lt;br/&gt;(runs many times during dev)&quot;]
+    Skinner[&quot;🔪 Skinner&lt;br/&gt;done-ness gate&lt;br/&gt;(runs once, at the end)&quot;]
+    FixerHunter[&quot;🏹 Hunter (fixer mode)&lt;br/&gt;reproduces + fixes&quot;]
+    Merge([&quot;PR opened + merged&quot;])
+
+    Shaman --&gt;|&quot;vision: what / why&quot;| Warchief
+    Warchief --&gt;|&quot;spec + how, dispatch&quot;| Hunter
+    Hunter --&gt;|&quot;implement, commit&quot;| Diff
+
+    Diff --&gt;|&quot;every commit/PR&quot;| Tracker
+    Tracker --&gt;|&quot;BLOCK verdict&quot;| FixerHunter
+    Tracker --&gt;|&quot;APPROVE /&lt;br/&gt;APPROVE-WITH-COMMENTS&quot;| Warchief
+
+    Diff --&gt;|&quot;once, before merge&quot;| Skinner
+    Skinner --&gt;|&quot;CONTRACT-LENS + COLD-LENS&lt;br/&gt;findings&quot;| Warchief
+
+    Warchief --&gt;|&quot;adjudicate:&lt;br/&gt;CONFIRMED&quot;| FixerHunter
+    Warchief -.-&gt;|&quot;adjudicate:&lt;br/&gt;REFUTED or DEBT&quot;| Merge
+    FixerHunter --&gt;|&quot;NOT_REPRODUCED or fixed&quot;| Warchief
+
+    Tracker --&gt;|&quot;approved diff&quot;| Merge
+    Warchief --&gt;|&quot;swings the hammer&quot;| Merge
+    Merge --&gt;|&quot;reports result&quot;| Shaman</div>
+<figcaption></figcaption>
+</figure>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+  });
+</script>
+</body>
+</html>

@@ -19,6 +19,7 @@ with/without comparison) instead of inventing a new one.
 {
   "skill_name": "example-skill",
   "kind": "skill",                    // "skill" (default, omit-able) | "agent"
+  "memory_fixture": "memory-fixture/CLAUDE.md", // OPTIONAL, top-level — CLAUDE.md the --arm mem axis writes to scratch/
   "evals": [
     {
       "id": 1,
@@ -26,7 +27,13 @@ with/without comparison) instead of inventing a new one.
       "agent": "hunter",              // only for kind: "agent" — which agents/<name>.md to test
       "prompt": "the task given to the model",
       "expected_output": "prose description of correct behavior — the grading rubric",
-      "files": []
+      "files": [
+        { "path": "a.md", "source": "plugins/tribe/README.md" } // OPTIONAL per-entry — a repo-relative file read verbatim, instead of an inlined "content"
+      ],
+      "checks": [                     // OPTIONAL — machine commands whose exit code decides pass/fail/ungraded before any LLM grader runs
+        { "name": "html-mermaid-parses", "command": "bun {skill_dir}/scripts/validate-mermaid.ts --html-glob *.html" }
+      ],
+      "artifacts": ["*.html"]         // OPTIONAL — glob patterns preserved from the scratch dir as evidence before it is deleted
     }
   ]
 }
@@ -43,11 +50,14 @@ For each case, up to two isolated `claude -p` subprocesses run (never the curren
 session — a genuinely clean context per skill-creator's own `run_eval.py` pattern):
 
 - **with_skill** — the skill/agent under test is made available for that one process
-  only: skill cases register a throwaway `.claude/commands/` entry carrying the real
-  `SKILL.md` description (exactly the technique `skill-creator/scripts/run_eval.py`
-  uses, so triggering is genuine, not forced); agent cases pass the named agent's real
-  frontmatter + body straight through `--agents`/`--agent`, independent of whether it
-  happens to be symlink-installed locally.
+  only: skill cases have `install_skill()` copy the ENTIRE real skill directory
+  (`SKILL.md` + `references/`, `scripts/`, assets — not just the frontmatter
+  `description:`) into the scratch cwd's project scope under
+  `.claude/skills/<name>/`, exactly like `skill-creator`'s own eval loop installs the
+  skill under test, so the skill can genuinely trigger (or fail to) via the normal
+  Skill tool and exercise its real body, not dead-end at a one-line stub; agent cases
+  pass the named agent's real frontmatter + body straight through `--agents`/`--agent`,
+  independent of whether it happens to be symlink-installed locally.
 - **without_skill** — a `claude -p --safe-mode` call: nothing registered *and* every
   user/project-scope customization (CLAUDE.md, skills, plugins, hooks, MCP servers,
   custom commands/agents) disabled. Plain `claude -p` alone isn't a clean baseline when
@@ -93,6 +103,34 @@ An ungraded run is excluded from the pass/total denominator wherever results rol
 This only reads skill/agent files and shells out to `claude -p` in a scratch temp
 directory per case — it never edits a skill's or agent's runtime files.
 
+### Arms: clean vs mem
+
+The default arm is `clean`: the scratch cwd carries no `CLAUDE.md`, and the harness
+asserts none is present rather than merely skipping the write. The `mem` arm writes the
+fixture's declared top-level `memory_fixture` to `scratch/CLAUDE.md`, which
+`--setting-sources project` loads for the `with_skill` leg. **The `mem` arm runs the
+`with_skill` leg only** — the `without_skill` baseline is `claude -p --safe-mode`, and
+`--safe-mode` disables `CLAUDE.md` entirely, so a "mem baseline" leg would silently be a
+clean baseline wearing a mem label. A fixture that declares no `memory_fixture` gets an
+honest skip note in `benchmark.json`'s `notes` (never a clean cell run and mislabelled
+`mem`). The mem-vs-clean pass-rate delta is recorded as `run_summary.arm_delta`; it is
+**reported, never gated** — a negative delta (ambient memory suppressing a behavior) is
+a real finding to publish, not a failure to hide.
+
+### Machine checks
+
+A case's optional `checks` list runs after the executor and before any LLM grader call,
+and its exit code decides the outcome directly: `0` is a pass (the LLM grader still
+runs, scoring the transcript against `expected_output` as usual); `1` is a behavioral
+FAIL owned by the agent, and the grader is skipped entirely (the machine already has the
+verdict); any other exit code — a missing dependency, no network, a crash — is
+UNGRADED, routed through the exact same harness-failure machinery as an ungraded LLM
+grader call (excluded from the pass/total denominator, never scored as an agent
+failure). A case's optional `artifacts` glob patterns are copied out of the scratch dir
+before it is deleted, so a check's target file (or a human reviewer) has something to
+inspect after the run. The per-run output path now carries an arm segment:
+`<skill_name>/eval-<id>-<name>/<arm>/<configuration>/run-<N>/`.
+
 ## Usage
 
 ```bash
@@ -107,12 +145,22 @@ scripts/evals/run_evals.py --all --mode with_skill --eval-id 1 --exec-model haik
 
 # See what would run without spending anything
 scripts/evals/run_evals.py --all --dry-run
+
+# Include the mem arm too (only fixtures with a memory_fixture actually run it)
+scripts/evals/run_evals.py --all --arm both --dry-run
 ```
 
-Key flags: `--mode {both,with_skill,without_skill}`, `--runs N` (repeats per
-configuration, for variance), `--timeout SECONDS` (per `claude -p` call), `--exec-model`
+Key flags: `--mode {both,with_skill,without_skill}`, `--arm {clean,mem,both}` (default
+`clean` — see Arms: clean vs mem above), `--runs N` (repeats per configuration, for
+variance), `--timeout SECONDS` (per `claude -p` call), `--exec-model`
 / `--grader-model` (default: your configured model — pin to something cheap for a smoke
 pass), `--eval-id 1,3` (restrict to specific case ids).
+
+Run the harness's own unit tests (no `claude -p` calls, no cost) with:
+
+```bash
+python3 -m unittest discover -s scripts/evals/tests -t .
+```
 
 **Executor model resolution (`kind: "agent"` cases only).** An explicit `--exec-model`
 used to be the *only* way to pick the executor's model, so every agent-kind case ran on
@@ -139,9 +187,9 @@ Output lands in `scripts/evals/runs/<UTC-timestamp>/` by default (git-ignored �
 reproducible from `evals.json` + this script, not checked in), or under `--out-dir PATH`
 (any path, including outside the repo, e.g. a CI artifacts dir): per-case, per-run
 `transcript.md` / `metrics.json` / `grading.json` under
-`<skill_name>/eval-<id>-<name>/<configuration>/run-<N>/` (1-based `run-<N>`, always
-present even for the default `--runs 1`, so repeats never overwrite each other's
-evidence), plus one rolled-up `benchmark.json` at the run root.
+`<skill_name>/eval-<id>-<name>/<arm>/<configuration>/run-<N>/` (1-based `run-<N>`,
+always present even for the default `--runs 1`, so repeats and arms never overwrite
+each other's evidence), plus one rolled-up `benchmark.json` at the run root.
 
 ## Cost note
 
