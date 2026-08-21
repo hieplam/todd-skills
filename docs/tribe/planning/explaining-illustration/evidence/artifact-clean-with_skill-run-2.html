@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tribe work flow</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --caption-fg: #555555;
+    --border: #dddddd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --fg: #f0f0f0;
+      --caption-fg: #aaaaaa;
+      --border: #444444;
+    }
+  }
+  body {
+    margin: 0;
+    padding: 2rem;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, sans-serif;
+  }
+  h1 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+  }
+  .diagram-wrap {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow: auto;
+  }
+  figcaption {
+    margin-top: 0.75rem;
+    color: var(--caption-fg);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<h1>Tribe work flow</h1>
+<figure class="diagram-wrap">
+<div class="mermaid">flowchart TD
+  Shaman[&quot;🔮 Shaman picks ONE idea card&quot;] --&gt;|vision: what/why| Warchief1[&quot;🪓 Warchief writes spec + plan&quot;]
+  Warchief1 --&gt;|spec, dispatch| Hunter1[&quot;🏹 Hunter implements #40;TDD#41;, commits&quot;]
+  Hunter1 --&gt;|diff + report| TrackerGate{&quot;Warchief: run Tracker&lt;br/&gt;#40;every commit/PR#41;&quot;}
+  TrackerGate --&gt; Tracker[&quot;👣 Tracker checks diff vs written rules&quot;]
+  Tracker --&gt;|verdict: BLOCK| FixHunterA[&quot;🏹 Hunter #40;fixer#41;&quot;]
+  FixHunterA --&gt; TrackerGate
+  Tracker --&gt;|verdict: APPROVE or&lt;br/&gt;APPROVE-WITH-COMMENTS| SkinnerGate{&quot;Warchief: run Skinner&lt;br/&gt;#40;once, at the end#41;&quot;}
+  SkinnerGate --&gt; Skinner[&quot;🔪 Skinner: contract-lens + cold-lens&lt;br/&gt;RUNS proof against requirement contract&quot;]
+  Skinner --&gt;|findings, no verdict| Adjudicate{&quot;Warchief adjudicates&lt;br/&gt;each finding&quot;}
+  Adjudicate --&gt;|CONFIRMED| FixHunterB[&quot;🏹 Hunter #40;fixer mode#41;&lt;br/&gt;reproduces, or reports NOT_REPRODUCED&quot;]
+  FixHunterB --&gt; SkinnerGate
+  Adjudicate --&gt;|REFUTED with evidence,&lt;br/&gt;or DEBT| DebtGate{&quot;Warchief: debt burn-down gate&lt;br/&gt;debt-count.ts --diff&quot;}
+  DebtGate --&gt;|positive delta| FixHunterA
+  DebtGate --&gt;|clean| OpenPR[&quot;Warchief opens PR and merges&quot;]
+  OpenPR --&gt; ReportUp[&quot;Warchief reports result&quot;]
+  ReportUp --&gt; Shaman
+
+  Warchief1 -.dispatched conditionally,&lt;br/&gt;with harness gaps.-&gt; Scout[&quot;🧭 Scout surveys standing code,&lt;br/&gt;proposes rule/anti-rule/debt/dismissed&quot;]
+  Scout -.new rule candidates feed.-&gt; Tracker</div>
+<figcaption></figcaption>
+</figure>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+  });
+</script>
+</body>
+</html>

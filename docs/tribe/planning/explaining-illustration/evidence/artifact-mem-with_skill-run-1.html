@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tribe: end-to-end work flow</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --caption-fg: #555555;
+    --border: #dddddd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --fg: #f0f0f0;
+      --caption-fg: #aaaaaa;
+      --border: #444444;
+    }
+  }
+  body {
+    margin: 0;
+    padding: 2rem;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, sans-serif;
+  }
+  h1 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+  }
+  .diagram-wrap {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow: auto;
+  }
+  figcaption {
+    margin-top: 0.75rem;
+    color: var(--caption-fg);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<h1>Tribe: end-to-end work flow</h1>
+<figure class="diagram-wrap">
+<div class="mermaid">flowchart TD
+    Shaman[&quot;🔮 Shaman&lt;br/&gt;What? / Why?&quot;] --&gt;|&quot;one idea card, vision&quot;| Warchief
+    Warchief[&quot;🪓 Warchief&lt;br/&gt;How? spec + dispatch + merge authority&quot;] --&gt;|&quot;spec, TDD brief&quot;| Hunter[&quot;🏹 Hunter&lt;br/&gt;implements, commits&quot;]
+    Hunter --&gt;|&quot;diff, report done&quot;| Warchief
+
+    Warchief --&gt;|&quot;dispatch, during dev, repeatable&quot;| Tracker[&quot;👣 Tracker&lt;br/&gt;rules gate, advisory&quot;]
+    Tracker --&gt;|&quot;BLOCK&quot;| FixHunter1[&quot;🏹 Hunter, fixer mode&quot;]
+    FixHunter1 --&gt;|&quot;revised diff&quot;| Warchief
+    Tracker --&gt;|&quot;APPROVE or APPROVE-WITH-COMMENTS&quot;| ReadyCheck{&quot;more dev needed?&quot;}
+    ReadyCheck --&gt;|&quot;yes&quot;| Warchief
+    ReadyCheck --&gt;|&quot;no&quot;| Skinner
+
+    Warchief -.-&gt;|&quot;conditional: harness gaps to adjudicate&quot;| Scout[&quot;🧭 Scout&lt;br/&gt;terrain analysis, read-only&quot;]
+    Scout -.-&gt;|&quot;rule / anti-rule / debt / dismissed&quot;| Warchief
+
+    Skinner[&quot;🔪 Skinner&lt;br/&gt;done-ness gate, once&quot;] --&gt;|&quot;CONTRACT-LENS findings + COLD-LENS hypotheses&quot;| Warchief
+    Warchief --&gt;|&quot;adjudicates each finding&quot;| Disposition{&quot;disposition&quot;}
+    Disposition --&gt;|&quot;CONFIRMED&quot;| FixHunter2[&quot;🏹 Hunter, fixer mode&quot;]
+    FixHunter2 --&gt;|&quot;fixed+verified, or NOT_REPRODUCED with evidence&quot;| Warchief
+    Disposition --&gt;|&quot;REFUTED or DEBT&quot;| Warchief
+
+    Warchief --&gt;|&quot;debt burn-down gate, open PR, merge&quot;| Merge([&quot;merge&quot;])
+    Merge --&gt;|&quot;report result&quot;| Shaman</div>
+<figcaption></figcaption>
+</figure>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tribe flow: idea to merge</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --caption-fg: #555555;
+    --border: #dddddd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --fg: #f0f0f0;
+      --caption-fg: #aaaaaa;
+      --border: #444444;
+    }
+  }
+  body {
+    margin: 0;
+    padding: 2rem;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, sans-serif;
+  }
+  h1 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+  }
+  .diagram-wrap {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow: auto;
+  }
+  figcaption {
+    margin-top: 0.75rem;
+    color: var(--caption-fg);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<h1>Tribe flow: idea to merge</h1>
+<figure class="diagram-wrap">
+<div class="mermaid">sequenceDiagram
+    participant Shaman
+    participant Warchief
+    participant Hunter
+    participant Tracker
+    participant Skinner
+    participant Scout
+
+    Shaman-&gt;&gt;Warchief: one idea card (what + why)
+    Warchief-&gt;&gt;Hunter: spec + plan (how), dispatch
+
+    loop many times during dev
+        Hunter-&gt;&gt;Hunter: implement, commit (diff grows)
+        Warchief-&gt;&gt;Tracker: same diff range
+        Tracker--&gt;&gt;Warchief: BLOCK / APPROVE-WITH-COMMENTS / APPROVE
+        alt verdict is BLOCK
+            Warchief-&gt;&gt;Hunter: fix, no Skinner dispatched
+        end
+    end
+
+    Hunter--&gt;&gt;Warchief: reports done
+
+    Warchief-&gt;&gt;Skinner: final diff (once, before merge)
+    Skinner--&gt;&gt;Warchief: CONTRACT-LENS findings + COLD-LENS hypotheses
+
+    opt harness gaps surfaced
+        Warchief-&gt;&gt;Scout: adjudicate gaps
+        Scout--&gt;&gt;Warchief: rule / anti-rule / debt / dismissed
+    end
+
+    Warchief-&gt;&gt;Warchief: adjudicate each finding
+    alt CONFIRMED
+        Warchief-&gt;&gt;Hunter: route to fixer Hunter
+        Hunter--&gt;&gt;Warchief: reproduced fix, or NOT_REPRODUCED + evidence
+    else REFUTED
+        Warchief-&gt;&gt;Warchief: drop, evidence recorded
+    else DEBT
+        Warchief-&gt;&gt;Warchief: record follow-up (never for Critical)
+    end
+
+    Warchief-&gt;&gt;Warchief: debt burn-down gate (debt-count.ts --diff)
+    alt positive delta
+        Warchief-&gt;&gt;Hunter: fix new debt hits
+    end
+    Warchief-&gt;&gt;Warchief: debt-backfill.ts + close closable entries
+
+    Warchief-&gt;&gt;Warchief: open PR, merge
+    Warchief--&gt;&gt;Shaman: report outcome</div>
+<figcaption></figcaption>
+</figure>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+  });
+</script>
+</body>
+</html>
