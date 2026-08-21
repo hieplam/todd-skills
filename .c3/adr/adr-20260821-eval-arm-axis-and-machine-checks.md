@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-eval-arm-axis-and-machine-checks
-c3-seal: ac8b270a03d0525a758eed0f4a7551994d9ef111a0d3edc4588ca02bb1f0a761
+c3-seal: fc68e1eb68e8566e66b99dbac8163fffb2defcea8f953cde0a72c4452ea56ece
 title: eval-arm-axis-and-machine-checks
 type: adr
 goal: |-
@@ -11,10 +11,10 @@ goal: |-
     instead of an LLM grader opinion), and per-case `artifacts` (glob patterns preserved
     before the scratch dir is deleted); `run_evals.py` gains the global `--arm
     clean|mem|both` ambient-memory axis, whose output path carries an arm segment and whose
-    `mem` result is reported as `arm_delta` but never gates. `ref-evals-fixture`,
-    `c3-301-eval-runner`, and `ref-plugin-layout` currently describe none of this — this
-    unit brings the facts back in sync with the code so the next `c3x check` / audit reads
-    shipped behavior instead of stale documentation.
+    `mem` result is reported as `arm_delta` but never gates. `ref-evals-fixture` and
+    `c3-301-eval-runner` currently describe none of this — this unit brings the facts back
+    in sync with the code so the next `c3x check` / audit reads shipped behavior instead of
+    stale documentation.
 status: accepted
 date: "2026-08-21"
 ---
@@ -28,10 +28,10 @@ instead of an inlined copy), per-case `checks` (a machine command that decides p
 instead of an LLM grader opinion), and per-case `artifacts` (glob patterns preserved
 before the scratch dir is deleted); `run_evals.py` gains the global `--arm
 clean|mem|both` ambient-memory axis, whose output path carries an arm segment and whose
-`mem` result is reported as `arm_delta` but never gates. `ref-evals-fixture`,
-`c3-301-eval-runner`, and `ref-plugin-layout` currently describe none of this — this
-unit brings the facts back in sync with the code so the next `c3x check` / audit reads
-shipped behavior instead of stale documentation.
+`mem` result is reported as `arm_delta` but never gates. `ref-evals-fixture` and
+`c3-301-eval-runner` currently describe none of this — this unit brings the facts back
+in sync with the code so the next `c3x check` / audit reads shipped behavior instead of
+stale documentation.
 
 ## Context
 
@@ -65,13 +65,18 @@ skill-local `scripts/` directory
 `render-illustration.ts` plus a `bun install`-managed `node_modules/` — `install.sh`
 already symlinks a skill's directory whole (`ln -s "$src" "$CLAUDE_DIR/skills/$name"`),
 so this scripts directory installs automatically with no installer change, unlike a
-*plugin-level* `scripts/` (documented in `ref-plugin-layout` as "repo-invoked, NOT
-installed"), which is a materially different case `ref-plugin-layout` does not yet
-distinguish.
+*plugin-level* `scripts/` (a materially different, non-installed case). That
+distinction is documented in `plugins/explaining/README.md` rather than in
+`ref-plugin-layout`: c3x 11.6.3's block-patch serializer welds an `insert`/`block`
+patch's first content line onto the code-fence marker that opens `ref-plugin-layout`'s
+How-section tree diagram, so CommonMark reads the welded text as the fence's info
+string and it silently vanishes from every render — an upstream c3x defect (filed as a
+follow-up) that makes it unsafe to land this note inside that fact's fenced block via
+the sanctioned patch mechanism.
 
 ## Decision
 
-Three block patches, one per affected fact, landing atomically as one change-unit:
+Two block patches, one per affected fact, landing atomically as one change-unit:
 
 1. `ref-evals-fixture` Choice — the fixture shape gains `memory_fixture` (optional,
 top-level), `files[].source` (optional, mutually exclusive with `content`),
@@ -84,11 +89,11 @@ both gain `--arm clean|mem|both` and the output path's new arm segment
 gains an inserted row for the mem-arm honesty risk (a mem cell that silently runs
 clean — mitigated by `plan_jobs()`'s explicit skip-note path, never a silent
 relabel).
-3. `ref-plugin-layout` How — an inserted note that a *skill-local*
-`skills/<name>/scripts/` IS installed (the whole skill directory is symlinked,
-`scripts/` included), unlike a *plugin-level* `scripts/`, which is not — the two
-look identical in name but differ in installability because of which directory the
-symlink targets.
+
+The skill-local-vs-plugin-level `scripts/` installability distinction was documented in
+`plugins/explaining/README.md` instead of `ref-plugin-layout`, because c3x 11.6.3's
+block-patch serializer welds a code-fence marker onto that fact's tree-diagram block's
+first content line and cannot safely edit it (filed as a c3x follow-up).
 
 This wins over leaving the facts stale because `c3x check`, `c3x lookup`, and any
 future audit read `.c3/` as the source of truth for "what does this component actually
@@ -96,10 +101,9 @@ do" — a `ref`/`component` that describes a `--mode` flag but not the `--arm` f
 to it, or a fixture shape missing four of its eight top-level keys, silently
 mis-teaches the next reader (human or agent) that the newer behavior does not exist.
 Extending the existing facts (rather than a new component/ref) is correct here because
-none of the three targets' Goal or ownership boundary changed — `ref-evals-fixture`
+neither of the two targets' Goal or ownership boundary changed — `ref-evals-fixture`
 still governs the fixture *shape*, `c3-301-eval-runner` still governs the *runner*'s
-methodology, `ref-plugin-layout` still governs *installability* — only their internal
-detail grew.
+methodology — only their internal detail grew.
 
 ## Affected Topology
 
@@ -107,7 +111,6 @@ detail grew.
 | --- | --- | --- | --- | --- |
 | ref-evals-fixture | N.A - ref (governance doc, not topology; the fact this unit amends) | Its Choice section names the fixture's full field list; four new optional fields (memory_fixture, files[].source, checks, artifacts) are undocumented there | ref-evals-fixture#n1632@v1:sha256:fb8e9cf86e0bd6e6c4a7a8ad5dac6401d24087de7026be640a2f54a0d73c2683 "evals/evals.json next to the skill (or at plugins/tribe/evals/evals.json for agents)" | This unit's Choice patch is the review |
 | c3-301 | component | Its Foundational Flow (Inputs) and Contract (output path) rows describe only --mode, not the sibling --arm axis or the arm-segmented output path run_case now writes, and Change Safety has no row for the mem-arm honesty risk | c3-301#n1586@v1:sha256:1394e2e7281d09e086db76e4f443b477f9a561f813154593369562932ccaeedd "--evals <path> or --all; flags --mode, --runs, --timeout, --exec-model, --grader-model, --eval-id, --out-dir, --dry-run" | This unit's Foundational Flow, Contract, and Change Safety patches are the review |
-| ref-plugin-layout | N.A - ref (governance doc, not topology; the fact this unit amends) | Its How section's golden layout lists scripts/ as plugin-level "repo-invoked, NOT installed"; the new skill-local plugins/explaining/skills/explaining/scripts/ is installed, and the ref does not yet distinguish the two cases | ref-plugin-layout#n1646@v1:sha256:2c8167e4166c7f6ec55c64a44665ca722696501fc93bf0c24f7ebb5e172c650c "plugins/tribe/" | This unit's How patch is the review |
 
 ## Verification
 
@@ -117,4 +120,3 @@ detail grew.
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 check | Exactly the 2 pre-existing errors (c3-213, c3-216), no new error |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 read ref-evals-fixture | Choice section names memory_fixture, files[].source, checks, artifacts |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 read c3-301 | Foundational Flow/Contract show --arm clean |
-| C3X_MODE=agent bunx @c3x/cli@11.6.3 read ref-plugin-layout | How section distinguishes skill-local scripts/ (installed) from plugin-level scripts/ (not installed) |
