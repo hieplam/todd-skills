@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-fix-ref-plugin-layout-note-fence
-c3-seal: e10b5065096aaade073f1482b61f60a8aaf94997b74fa79fd378f6900cd6cb1c
+c3-seal: 431929ccacbd7cd3220f9db253bfeb374737f8d1cbba34041a90e520a328f7e8
 title: fix-ref-plugin-layout-note-fence
 type: adr
 goal: |-
@@ -14,7 +14,7 @@ goal: |-
     viewer. Move the same note text into the pre-existing, unfenced tree-diagram block
     instead (a `block`-scope replace, not another `insert`), and blank the erroneous
     fenced sibling block the first patch left behind.
-status: proposed
+status: accepted
 date: "2026-08-21"
 ---
 

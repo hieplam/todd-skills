@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-relocate-skill-local-scripts-note
-c3-seal: 9a26378273c0bf865af4cf69f85134e1c130786ab6bbb1030669af9f19708d65
+c3-seal: d3b14e7d5930094ae5a330868d2389f4780829f0fa2c9e4eb7f1ec26b5926d73
 title: relocate-skill-local-scripts-note
 type: adr
 goal: |-
@@ -17,7 +17,7 @@ goal: |-
     subsequent line in the block reaches 11). Relocate the note into the Why section's
     single, fence-free prose paragraph instead, and restore the How-section tree-diagram
     block to its pre-existing, byte-for-byte original content.
-status: proposed
+status: accepted
 date: "2026-08-21"
 ---
 
