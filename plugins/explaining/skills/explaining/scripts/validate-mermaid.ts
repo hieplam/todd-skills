@@ -42,6 +42,17 @@ function classWordsOf(attrText: string): string[] {
   return [];
 }
 
+/** Matches ANY HTML tag (open or close, any tag name), attribute-value-aware: the
+ * alternation group consumes quoted attribute runs (which may legally contain a `>` or
+ * even a `</tag>`-shaped substring, e.g. `title="fake </div> inside"`) as part of the
+ * SAME tag, so a delimiter-looking character sequence embedded inside another tag's
+ * quoted attribute value is never split out as its own match. `findMatchingClose` scans
+ * with this generic pattern (rather than one hard-coded to `tagName`) specifically so an
+ * unrelated tag's quoted attribute is fully consumed — and thus never independently
+ * inspected — instead of only being protected when it happens to belong to `tagName`
+ * itself. (F28) */
+const ANY_TAG_PATTERN = /<(\/?)([a-zA-Z][-a-zA-Z0-9]*)\b(?:"[^"]*"|'[^']*'|[^'">])*>/g;
+
 /** Find the closing tag that matches an already-consumed opening tag of `tagName`,
  * tracking nesting depth so a nested element of the SAME tag name (e.g. a `<div>`
  * inside a `.mermaid` `<div>`) does not truncate the match at its own closing tag.
@@ -52,11 +63,12 @@ function findMatchingClose(
   from: number,
   tagName: string,
 ): { bodyEnd: number; afterClose: number } | null {
-  const tagPattern = new RegExp(`<(\\/?)${tagName}\\b[^>]*>`, 'gi');
+  const tagPattern = new RegExp(ANY_TAG_PATTERN.source, 'gi');
   tagPattern.lastIndex = from;
   let depth = 0;
   let tagMatch: RegExpExecArray | null;
   while ((tagMatch = tagPattern.exec(html)) !== null) {
+    if (tagMatch[2].toLowerCase() !== tagName) continue;
     if (tagMatch[1] === '/') {
       if (depth === 0) return { bodyEnd: tagMatch.index, afterClose: tagPattern.lastIndex };
       depth--;
@@ -194,12 +206,43 @@ export async function raceExitAgainstTimeout(
   exited: Promise<number>,
   timeoutMs: number,
 ): Promise<{ kind: 'exited'; code: number } | { kind: 'timeout' }> {
-  return Promise.race([
-    exited.then((code) => ({ kind: 'exited' as const, code })),
-    new Promise<{ kind: 'timeout' }>((resolve) => {
-      setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs);
-    }),
-  ]);
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<{ kind: 'timeout' }>((resolve) => {
+    timer = setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      exited.then((code) => ({ kind: 'exited' as const, code })),
+      timeout,
+    ]);
+  } finally {
+    // Clear the timer on EVERY exit from the race — including the exited-wins path —
+    // so a winning exit never leaks a pending timer for the rest of timeoutMs (F30).
+    // Harmless (a no-op) when the timeout itself won, since it has already fired.
+    clearTimeout(timer!);
+  }
+}
+
+/** How long to wait, after an initial SIGTERM, before escalating to SIGKILL if the
+ * process still has not exited. Short relative to BUN_INSTALL_TIMEOUT_MS — this only
+ * runs on the already-slow/stalled timeout path, so it must not add a second
+ * multi-minute wait on top of it. */
+const KILL_GRACE_MS = 5_000;
+
+/** After an initial SIGTERM has already been sent, ensure the process is actually
+ * reaped: escalate to SIGKILL if `exited` has not resolved within `graceMs`. A bare
+ * `proc.kill()` only REQUESTS termination — a SIGTERM-ignoring or blocked stalled child
+ * would otherwise stay alive/orphaned forever (F31). Takes `exited` and `kill` as plain
+ * arguments (no direct `proc`/timer reach-in), the same seam `raceExitAgainstTimeout`
+ * uses, so a test can inject a promise that never resolves alongside a tiny `graceMs`
+ * and observe the escalation deterministically. Never throws. */
+export async function ensureTerminated(
+  exited: Promise<number>,
+  kill: (signal: 'SIGKILL') => void,
+  graceMs: number,
+): Promise<void> {
+  const result = await raceExitAgainstTimeout(exited, graceMs);
+  if (result.kind === 'timeout') kill('SIGKILL');
 }
 
 async function loadParserUncached(): Promise<ParserHandle> {
@@ -218,6 +261,12 @@ async function loadParserUncached(): Promise<ParserHandle> {
       const result = await raceExitAgainstTimeout(proc.exited, BUN_INSTALL_TIMEOUT_MS);
       if (result.kind === 'timeout') {
         proc.kill();
+        // SIGTERM only REQUESTS termination — fire-and-forget escalation to SIGKILL if
+        // the child is still alive after KILL_GRACE_MS, so a SIGTERM-ignoring stalled
+        // process is actually reaped rather than left orphaned (F31). Not awaited: the
+        // outer timeout branch must still resolve to 'unavailable' immediately, exactly
+        // as before.
+        void ensureTerminated(proc.exited, (signal) => proc.kill(signal), KILL_GRACE_MS);
         return 'unavailable';
       }
       if (result.code !== 0) return 'unavailable';

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   classifyOutcome,
   decodeHtmlEntities,
+  ensureTerminated,
   EXIT_CODE,
   extractMermaidSources,
   hintFor,
@@ -66,6 +67,16 @@ describe('extractMermaidSources', () => {
   test('a ">" inside a single-quoted attribute does not truncate the open tag (FB2)', () => {
     const html = "<div class=\"mermaid\" title='a>b'>graph TD; A-->B;</div>";
     expect(extractMermaidSources(html)).toEqual(['graph TD; A-->B;']);
+  });
+
+  // F28: a nested tag's quoted attribute value containing a `</div>`-shaped substring
+  // must not be mistaken by findMatchingClose's tag scan for a real closing tag — the
+  // scan must be attribute-value-aware, the same way the open-tag scan already is (FB2).
+  test('a nested tag carrying a `</div>`-shaped quoted attribute value does not truncate the close scan (F28)', () => {
+    const html = '<div class="mermaid">graph TD; A-->B;' +
+      '<span title="fake </div> inside">x</span></div>';
+    expect(extractMermaidSources(html))
+      .toEqual(['graph TD; A-->B;<span title="fake </div> inside">x</span>']);
   });
 });
 
@@ -297,6 +308,39 @@ describe('raceExitAgainstTimeout (FB3)', () => {
     const neverResolves = new Promise<number>(() => {}); // simulates a stalled install
     const result = await raceExitAgainstTimeout(neverResolves, 10);
     expect(result).toEqual({ kind: 'timeout' });
+  });
+
+  // F30: when `exited` wins the race, the timeout's setTimeout handle must be cleared —
+  // otherwise it leaks a pending timer for the full `timeoutMs` duration on every winning
+  // exit (masked today only because the real CLI calls process.exit() immediately after).
+  test('clears the timeout timer when the process exits before the timeout (F30)', async () => {
+    const clearSpy = spyOn(globalThis, 'clearTimeout');
+    try {
+      const result = await raceExitAgainstTimeout(Promise.resolve(0), 5_000);
+      expect(result).toEqual({ kind: 'exited', code: 0 });
+      expect(clearSpy).toHaveBeenCalled();
+    } finally {
+      clearSpy.mockRestore();
+    }
+  });
+});
+
+// F31: a bare proc.kill() only REQUESTS termination (SIGTERM) — a SIGTERM-ignoring
+// stalled child stays alive/orphaned forever unless escalated. ensureTerminated must
+// escalate to SIGKILL after a grace period when `exited` has not resolved by then, and
+// must do nothing when the process already exited within the grace period.
+describe('ensureTerminated escalation after SIGTERM (F31)', () => {
+  test('escalates to SIGKILL when the process has not exited within the grace period', async () => {
+    const neverExits = new Promise<number>(() => {}); // simulates a SIGTERM-ignoring child
+    const signalsSent: string[] = [];
+    await ensureTerminated(neverExits, (signal) => signalsSent.push(signal), 10);
+    expect(signalsSent).toEqual(['SIGKILL']);
+  });
+
+  test('does not escalate when the process exits within the grace period', async () => {
+    const signalsSent: string[] = [];
+    await ensureTerminated(Promise.resolve(0), (signal) => signalsSent.push(signal), 5_000);
+    expect(signalsSent).toEqual([]);
   });
 });
 
