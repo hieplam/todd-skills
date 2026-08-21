@@ -1,6 +1,6 @@
 ---
 id: c3-201
-c3-seal: e7e3703ddf7d97875573467802185c2ecd274b5e782ae4e67a7aec3464b781d5
+c3-seal: 3e75953234b141fb7e42859e65dc89c6007a96c7de670fb15d31068ffe693f0e
 title: explaining
 type: component
 category: feature
@@ -24,7 +24,7 @@ Ship the `explaining` skill: two explanation-writing rules (term discipline + gr
 | Parent container | c3-2 (plugins) |
 | Membership | 9th plugin; skill-only member like splitting-plans/verify-shipped |
 | Goal contribution | Adds a quality-of-output capability: explanation prose style, evidence-gated |
-| Boundary | Runtime content only; no scripts, no hooks, no agents |
+| Boundary | Runtime content, plus an embedded illustration validator/renderer under `skills/explaining/scripts/` (bun + mermaid/jsdom, installed on demand, node_modules/ gitignored); still no hooks, no agents |
 
 ## Purpose
 
@@ -62,7 +62,7 @@ Owns the `explaining` skill definition (`skills/explaining/SKILL.md`) and its re
 
 | Surface | Direction | Contract | Boundary | Evidence |
 | --- | --- | --- | --- | --- |
-| skills/explaining/SKILL.md | OUT | Frontmatter description triggers only on explanation-shaped tasks; body carries exactly the eval-backed rule pair + self-check + evidence note | Claude Code skill loader | SKILL.md content |
+| skills/explaining/SKILL.md | OUT | Frontmatter description triggers only on explanation-shaped tasks; body carries the eval-backed rule set — term discipline + grounding, plus Rule 4 (illustrate a flow instead of narrating it), added on the evidence of eval case tribe-overall-flow-illustrated — + self-check + evidence note | Claude Code skill loader | SKILL.md content; eval case tribe-overall-flow-illustrated in skills/explaining/evals/evals.json |
 | evals/evals.json | OUT | Shared fixture shape (skill_name/kind/evals[].prompt/expected_output) executable by the harness unmodified | c3-3 eval harness | python3 scripts/evals/run_evals.py --evals plugins/explaining/evals/evals.json |
 
 ## Change Safety
@@ -79,3 +79,4 @@ Owns the `explaining` skill definition (`skills/explaining/SKILL.md`) and its re
 | --- | --- | --- | --- |
 | plugins/explaining/skills/explaining/SKILL.md | This component's Purpose section (A3 rule pair only) and Governance row adr-20260718-explaining-skill | Wording/formatting; never rule additions without new eval evidence | Evidence section inside plugins/explaining/skills/explaining/SKILL.md cites the eval numbers |
 | plugins/explaining/evals/evals.json | This component's Contract row evals/evals.json and Change Safety row 1 (evidence-gated rule edits) | Additional cases may be added; existing two stay | python3 scripts/evals/run_evals.py --evals plugins/explaining/evals/evals.json |
+| plugins/explaining/skills/explaining/scripts/{validate-mermaid.ts,render-illustration.ts} | This component's Contract row skills/explaining/SKILL.md (Rule 4's How paragraph: build with render-illustration.ts, validate with validate-mermaid.ts) | Implementation details; validate-mermaid.ts's exit codes (0 valid, 1 invalid, 2 could-not-validate) and render-illustration.ts's class="mermaid" output contract must hold | bun test in plugins/explaining/skills/explaining/scripts; runtime dependency (bun + mermaid/jsdom) installed on demand via bun install, node_modules/ gitignored |
