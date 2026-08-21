@@ -5,10 +5,10 @@ import { join } from 'node:path';
 import {
   classifyOutcome,
   decodeHtmlEntities,
-  ensureTerminated,
   EXIT_CODE,
   extractMermaidSources,
   hintFor,
+  killStalledInstall,
   main,
   raceExitAgainstTimeout,
   validateSources,
@@ -188,6 +188,58 @@ describe('main() CLI — clean verdicts on bad input (F14)', () => {
   });
 });
 
+// S1: --help/-h previously fell through to the default `*.html` glob and silently
+// scanned the current working directory instead of printing usage. Proven here by
+// running from a temp cwd that DOES contain a valid mermaid artifact and asserting the
+// output is usage text, not a "VALID: N diagram(s) found" verdict line — a verdict line
+// would mean the filesystem was scanned despite --help.
+describe('main() --help/-h prints usage without touching the filesystem (S1)', () => {
+  const HTML = '<!DOCTYPE html><html><body><div class="mermaid">flowchart TD\n' +
+    '  A --> B</div></body></html>';
+
+  function withArtifactCwd<T>(run: (dir: string) => Promise<T>): Promise<T> {
+    const dir = mkdtempSync(join(tmpdir(), 'validate-mermaid-s1-'));
+    writeFileSync(join(dir, 'out.html'), HTML);
+    return run(dir).finally(() => rmSync(dir, { recursive: true, force: true }));
+  }
+
+  test('--help prints usage and exits VALID, not a scan verdict', async () => {
+    await withArtifactCwd(async (dir) => {
+      const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+      const originalCwd = process.cwd();
+      process.chdir(dir);
+      try {
+        const exitCode = await main(['--help']);
+        expect(exitCode).toBe(EXIT_CODE.VALID);
+        const loggedText = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+        expect(loggedText).toMatch(/Usage:/);
+        expect(loggedText).not.toMatch(/diagram\(s\) found/);
+      } finally {
+        process.chdir(originalCwd);
+        logSpy.mockRestore();
+      }
+    });
+  });
+
+  test('-h prints usage and exits VALID, not a scan verdict', async () => {
+    await withArtifactCwd(async (dir) => {
+      const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+      const originalCwd = process.cwd();
+      process.chdir(dir);
+      try {
+        const exitCode = await main(['-h']);
+        expect(exitCode).toBe(EXIT_CODE.VALID);
+        const loggedText = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+        expect(loggedText).toMatch(/Usage:/);
+        expect(loggedText).not.toMatch(/diagram\(s\) found/);
+      } finally {
+        process.chdir(originalCwd);
+        logSpy.mockRestore();
+      }
+    });
+  });
+});
+
 // F15: --html-glob is fed straight into Bun's Glob.scan(), which walks the filesystem
 // relative to cwd — so an absolute-path pattern never matches and the CLI falsely
 // reports "0 diagrams found" (INVALID) for a real, valid artifact.
@@ -325,22 +377,23 @@ describe('raceExitAgainstTimeout (FB3)', () => {
   });
 });
 
-// F31: a bare proc.kill() only REQUESTS termination (SIGTERM) — a SIGTERM-ignoring
-// stalled child stays alive/orphaned forever unless escalated. ensureTerminated must
-// escalate to SIGKILL after a grace period when `exited` has not resolved by then, and
-// must do nothing when the process already exited within the grace period.
-describe('ensureTerminated escalation after SIGTERM (F31)', () => {
-  test('escalates to SIGKILL when the process has not exited within the grace period', async () => {
-    const neverExits = new Promise<number>(() => {}); // simulates a SIGTERM-ignoring child
+// FA1: the F31 "fix" above was a fire-and-forget async grace-period escalation, awaited
+// nowhere, immediately followed by `loadParserUncached` returning and the CLI's
+// top-level `process.exit()` running milliseconds later — which tears down the event
+// loop and cancels the pending grace-period timer before SIGKILL could ever be sent,
+// leaving a SIGTERM-ignoring stalled child orphaned exactly as before. killStalledInstall
+// replaces it with a direct, synchronous, unignorable SIGKILL that cannot be raced
+// against process.exit — proven here by asserting the signal is sent with no `await` in
+// between call and assertion (a promise-returning escalation could not make that
+// assertion pass).
+describe('killStalledInstall sends SIGKILL directly and synchronously (FA1)', () => {
+  test('SIGKILL is sent synchronously, before any further event-loop turn', () => {
     const signalsSent: string[] = [];
-    await ensureTerminated(neverExits, (signal) => signalsSent.push(signal), 10);
+    killStalledInstall((signal) => signalsSent.push(signal));
+    // No `await` above: if this assertion passes, the signal was already sent by the
+    // time killStalledInstall() returned — there is no pending timer or promise for a
+    // subsequent process.exit() to race against and cancel.
     expect(signalsSent).toEqual(['SIGKILL']);
-  });
-
-  test('does not escalate when the process exits within the grace period', async () => {
-    const signalsSent: string[] = [];
-    await ensureTerminated(Promise.resolve(0), (signal) => signalsSent.push(signal), 5_000);
-    expect(signalsSent).toEqual([]);
   });
 });
 
