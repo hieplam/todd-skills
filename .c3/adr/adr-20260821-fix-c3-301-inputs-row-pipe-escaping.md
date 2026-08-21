@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-fix-c3-301-inputs-row-pipe-escaping
-c3-seal: d8d8d961b0f0b369e4261fe37686e544c68f33841c67266421f6b3a24851c7f3
+c3-seal: c87c325907a0d7dba819243fb376c4fc47eb3146f1283744349bbb26a052a6eb
 title: fix-c3-301-inputs-row-pipe-escaping
 type: adr
 goal: |-
@@ -12,7 +12,7 @@ goal: |-
     has a literal, un-escaped `|` character inside the Inputs row's Detail cell
     (`--arm clean\ | mem\ | both`), which any standard GFM table renderer parses as two
     extra column separators, breaking the row from 3 cells (matching the header) into 5.
-status: proposed
+status: accepted
 date: "2026-08-21"
 ---
 

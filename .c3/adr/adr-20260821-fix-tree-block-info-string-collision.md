@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-fix-tree-block-info-string-collision
-c3-seal: d04c06598137780846cad7a0e160b072399eff7cce6a445e27b4ccfca2abc47c
+c3-seal: 6dee2204e2ef478bdeb4f0ab892525ec368a8fbf28a224103f6b407585380679
 title: fix-tree-block-info-string-collision
 type: adr
 goal: |-
@@ -13,7 +13,7 @@ goal: |-
     semantic content (confirmed: `c3x read ref-plugin-layout --section How --cite` now
     quotes n1646 as starting at `├── .claude-plugin/plugin.json...`, not
     `plugins/tribe/`).
-status: proposed
+status: accepted
 date: "2026-08-21"
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-eval-arm-axis-and-machine-checks
-c3-seal: 59939356e75da39d3688fcb96919b6ca3ebf1039d995821b6bff09334a19e183
+c3-seal: ac8b270a03d0525a758eed0f4a7551994d9ef111a0d3edc4588ca02bb1f0a761
 title: eval-arm-axis-and-machine-checks
 type: adr
 goal: |-
@@ -15,7 +15,7 @@ goal: |-
     `c3-301-eval-runner`, and `ref-plugin-layout` currently describe none of this — this
     unit brings the facts back in sync with the code so the next `c3x check` / audit reads
     shipped behavior instead of stale documentation.
-status: proposed
+status: accepted
 date: "2026-08-21"
 ---
 
@@ -116,5 +116,5 @@ detail grew.
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 change apply adr-20260820-eval-arm-axis-and-machine-checks | Reports all patches applied |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 check | Exactly the 2 pre-existing errors (c3-213, c3-216), no new error |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 read ref-evals-fixture | Choice section names memory_fixture, files[].source, checks, artifacts |
-| C3X_MODE=agent bunx @c3x/cli@11.6.3 read c3-301 | Foundational Flow/Contract show --arm clean|mem|both and the arm-segmented output path; Change Safety lists the mem-arm honesty risk |
+| C3X_MODE=agent bunx @c3x/cli@11.6.3 read c3-301 | Foundational Flow/Contract show --arm clean |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 read ref-plugin-layout | How section distinguishes skill-local scripts/ (installed) from plugin-level scripts/ (not installed) |
