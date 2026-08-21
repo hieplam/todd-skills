@@ -223,26 +223,18 @@ export async function raceExitAgainstTimeout(
   }
 }
 
-/** How long to wait, after an initial SIGTERM, before escalating to SIGKILL if the
- * process still has not exited. Short relative to BUN_INSTALL_TIMEOUT_MS — this only
- * runs on the already-slow/stalled timeout path, so it must not add a second
- * multi-minute wait on top of it. */
-const KILL_GRACE_MS = 5_000;
-
-/** After an initial SIGTERM has already been sent, ensure the process is actually
- * reaped: escalate to SIGKILL if `exited` has not resolved within `graceMs`. A bare
- * `proc.kill()` only REQUESTS termination — a SIGTERM-ignoring or blocked stalled child
- * would otherwise stay alive/orphaned forever (F31). Takes `exited` and `kill` as plain
- * arguments (no direct `proc`/timer reach-in), the same seam `raceExitAgainstTimeout`
- * uses, so a test can inject a promise that never resolves alongside a tiny `graceMs`
- * and observe the escalation deterministically. Never throws. */
-export async function ensureTerminated(
-  exited: Promise<number>,
-  kill: (signal: 'SIGKILL') => void,
-  graceMs: number,
-): Promise<void> {
-  const result = await raceExitAgainstTimeout(exited, graceMs);
-  if (result.kind === 'timeout') kill('SIGKILL');
+/** Terminate a stalled `bun install` child with an unignorable SIGKILL, sent directly
+ * and synchronously — never a SIGTERM followed by a later, awaited escalation. The CLI's
+ * imminent `process.exit()` (see the bottom of this file) tears down the event loop
+ * within milliseconds of `loadParserUncached` returning, which cancels any pending timer
+ * or unresolved promise — including a grace-period escalation — before it can run. An
+ * async escalation therefore never survives to fire (FA1: this replaces the F31 fix,
+ * which was fire-and-forget dead code for exactly that reason). SIGKILL has no such
+ * race: it is unignorable and takes effect immediately, with no grace period to lose.
+ * Takes `kill` as a plain argument (no direct `proc` reach-in) so a test can verify the
+ * signal sent without spawning a real process. */
+export function killStalledInstall(kill: (signal: 'SIGKILL') => void): void {
+  kill('SIGKILL');
 }
 
 async function loadParserUncached(): Promise<ParserHandle> {
@@ -260,13 +252,11 @@ async function loadParserUncached(): Promise<ParserHandle> {
       });
       const result = await raceExitAgainstTimeout(proc.exited, BUN_INSTALL_TIMEOUT_MS);
       if (result.kind === 'timeout') {
-        proc.kill();
-        // SIGTERM only REQUESTS termination — fire-and-forget escalation to SIGKILL if
-        // the child is still alive after KILL_GRACE_MS, so a SIGTERM-ignoring stalled
-        // process is actually reaped rather than left orphaned (F31). Not awaited: the
-        // outer timeout branch must still resolve to 'unavailable' immediately, exactly
-        // as before.
-        void ensureTerminated(proc.exited, (signal) => proc.kill(signal), KILL_GRACE_MS);
+        // Direct, synchronous SIGKILL — not SIGTERM plus an async escalation (FA1): the
+        // CLI's process.exit() runs milliseconds after this branch returns 'unavailable'
+        // and would cancel any pending grace-period timer before it could fire, leaving
+        // a SIGTERM-ignoring stalled child orphaned exactly as before the F31 "fix".
+        killStalledInstall((signal) => proc.kill(signal));
         return 'unavailable';
       }
       if (result.code !== 0) return 'unavailable';
@@ -414,7 +404,26 @@ async function collectSources(htmlGlob: string, file: string | null): Promise<{
   return { artifacts: matches.length, sources };
 }
 
+/** Usage text for `--help`/`-h`. Printed BEFORE any filesystem work (S1): without this,
+ * both flags fell through to the default `*.html` glob and silently scanned the current
+ * working directory instead of describing the CLI. */
+const USAGE = `validate-mermaid — extract and parse every mermaid diagram in HTML artifacts.
+
+Usage: validate-mermaid.ts [--html-glob <pattern>] [--file <path>]
+
+  --html-glob <pattern>  Glob to scan for HTML artifacts (default: *.html).
+  --file <path>          Validate a single file's raw mermaid source instead of scanning.
+
+Exit codes:
+  ${EXIT_CODE.VALID}  VALID              every extracted diagram parsed cleanly.
+  ${EXIT_CODE.INVALID}  INVALID            no artifact found, or a diagram failed to parse.
+  ${EXIT_CODE.COULD_NOT_VALIDATE}  COULD_NOT_VALIDATE the mermaid parser is unavailable (ship unvalidated).`;
+
 export async function main(argv: string[]): Promise<number> {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log(USAGE);
+    return EXIT_CODE.VALID;
+  }
   let htmlGlob: string;
   let file: string | null;
   try {
