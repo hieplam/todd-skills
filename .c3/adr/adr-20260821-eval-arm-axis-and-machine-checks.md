@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-eval-arm-axis-and-machine-checks
-c3-seal: fc68e1eb68e8566e66b99dbac8163fffb2defcea8f953cde0a72c4452ea56ece
+c3-seal: 3c2fccb3a7c41f33998143483bc6491d18aa617ab48c4fdbf6d91a511523e97d
 title: eval-arm-axis-and-machine-checks
 type: adr
 goal: |-
@@ -76,7 +76,8 @@ the sanctioned patch mechanism.
 
 ## Decision
 
-Two block patches, one per affected fact, landing atomically as one change-unit:
+Four patches across two facts: one block patch on ref-evals-fixture and three on
+c3-301-eval-runner (two block, one insert), landing atomically as one change-unit:
 
 1. `ref-evals-fixture` Choice — the fixture shape gains `memory_fixture` (optional,
 top-level), `files[].source` (optional, mutually exclusive with `content`),
@@ -116,7 +117,7 @@ methodology — only their internal detail grew.
 
 | Check | Result |
 | --- | --- |
-| C3X_MODE=agent bunx @c3x/cli@11.6.3 change apply adr-20260820-eval-arm-axis-and-machine-checks | Reports all patches applied |
+| C3X_MODE=agent bunx @c3x/cli@11.6.3 change apply adr-20260821-eval-arm-axis-and-machine-checks | Reports all patches applied |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 check | Exactly the 2 pre-existing errors (c3-213, c3-216), no new error |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 read ref-evals-fixture | Choice section names memory_fixture, files[].source, checks, artifacts |
 | C3X_MODE=agent bunx @c3x/cli@11.6.3 read c3-301 | Foundational Flow/Contract show --arm clean |
