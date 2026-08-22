@@ -1,6 +1,6 @@
 ---
 id: ref-plugin-layout
-c3-seal: f7ba47d483824f0c9216b53bc7e2cb5824993d05c15af430be4989d7e1972b98
+c3-seal: fc82ade4c80ddd83845592cc094e78f40e3e5dd871c14ab6ca62744c28c6061f
 title: plugin-layout
 type: ref
 goal: 'Standardize the directory shape of every plugin so the installer, the marketplace manifest, and the eval harness can walk any plugin without per-plugin logic. The recurring need: 8 plugins, one install code path.'
@@ -12,11 +12,11 @@ Standardize the directory shape of every plugin so the installer, the marketplac
 
 ## Choice
 
-A plugin is a directory under `plugins/<name>/` containing `.claude-plugin/plugin.json` (name, description, version) plus any of exactly these component directories: `agents/*.md` (symlinked file-by-file into `~/.claude/agents/`), `skills/<skill-name>/` with a `SKILL.md` (symlinked as a directory into `~/.claude/skills/`), `install.sh` (post-install hook, receives `CLAUDE_DIR`), `claude-md/` (snippets consumed by such hooks), `hooks/` (hook config), `scripts/` (repo-invoked validators, not installed), and `evals/` (dev fixtures, not installed).
+A plugin is a directory under `plugins/<name>/` containing `.claude-plugin/plugin.json` (name, description, version) plus any of exactly these component directories: `agents/*.md` (symlinked file-by-file into `~/.claude/agents/`), `skills/<skill-name>/` with a `SKILL.md` (symlinked as a directory into `~/.claude/skills/`), `install.sh` (post-install hook, receives `CLAUDE_DIR`), `claude-md/` (snippets consumed by such hooks), `rules/*.md` (machine-global rule files a hook symlinks into `~/.claude/rules/`), `canvases/*.md` (shipped canvas definitions a hook symlinks into `~/.claude/canvases/`), `hooks/` (hook config), `scripts/` (repo-invoked validators, not installed), and `evals/` (dev fixtures, not installed).
 
 ## Why
 
-`install.sh`'s `install_plugin()` is written against exactly these names — its case statement whitelists `agents|skills|claude-md|hooks|.claude-plugin|scripts|evals` and warns on anything else ("unsupported component type — not installed", `install.sh:107-117`). A predictable per-directory contract is what lets install be symlink-based and idempotent: the unit of linking is a whole file (agent) or whole directory (skill), never merged content. The alternative — per-plugin install logic — would grow linearly with plugins and break the "add a plugin = add a manifest entry" simplicity.
+`install.sh`'s `install_plugin()` is written against exactly these names — its case statement whitelists `agents|skills|claude-md|hooks|rules|canvases|.claude-plugin` plus separate `scripts` and `evals` arms, and warns on anything else ("unsupported component type — not installed", `install.sh:110-124`). `rules/` and `canvases/` are whitelisted but skipped *silently* by the root installer: the owning plugin's own `install.sh` hook links them, so a warning from the root would be a false alarm. A predictable per-directory contract is what lets install be symlink-based and idempotent: the unit of linking is a whole file (agent, rule, canvas) or whole directory (skill), never merged content. The alternative — per-plugin install logic — would grow linearly with plugins and break the "add a plugin = add a manifest entry" simplicity.
 
 ## How
 

@@ -132,7 +132,22 @@ This split is **encoded right into the metaphor**: *a tracker naturally walks th
 
 ---
 
-## Design golden standard: pure core, impure edges
+## Machine-global rules — `rules/`
+
+The tribe ships **standing standards as files**, symlinked into `~/.claude/rules/`, where
+Claude Code loads them by their frontmatter contract:
+
+| Rule | `paths:` glob | Loaded |
+|---|---|---|
+| [`rules/pure-core.md`](rules/pure-core.md) | none | **Every turn** — it governs all production source, so it is never scoped away |
+| [`rules/html-illustration.md`](rules/html-illustration.md) | `**/*.html`, `**/*.htm` | Only when an HTML file is in play — zero cost on every other turn |
+
+A rule with **no** `paths:` glob applies generally; a rule **with** one applies only when
+its glob matches a file in play. That is the whole progressive-disclosure mechanism: a
+standard that must always hold pays the context cost always, and a standard that only
+governs one file type pays nothing until that file type appears.
+
+### `pure-core.md` — the design golden standard
 
 The tribe carries **one cross-stack design philosophy** into every codebase it works in:
 core logic (calculation, decisions, flow control) stays **pure** — deterministic,
@@ -140,6 +155,23 @@ side-effect-free — and every outside-world dependency (database, network, file
 clock, random) enters only through an abstraction injected from the edge. The canonical
 text, with the golden pattern and the reviewer severity guide, is
 [`rules/pure-core.md`](rules/pure-core.md).
+
+### `html-illustration.md` — the visual output house style
+
+Whenever HTML is authored **because a wall of text cannot carry the point** — an Artifact,
+a standalone `.html` written to disk, a rendered mermaid illustration, a report or
+dashboard — this rule fixes the structure so it is not re-decided ad hoc each time:
+container width, root type scale, reading measure, panel caps, the mermaid SVG scaling
+override, theming across both delivery modes, and the mobile reset, all calibrated for a
+2560×1440 desktop. It deliberately does **not** fix palette or typeface — those stay
+derived per subject, with a latte + green lean when nothing else pulls.
+
+The glob is only the outer filter. The rule opens with a **semantic gate** — apply it when
+the page *is* the explanation a human reads, skip it for production application markup,
+templates, and test fixtures, which follow the repo's own design system. That second layer
+needs model judgment, which is why it lives in the rule body rather than in the glob.
+
+### How each role picks the rules up
 
 Delivery is deliberately **file-based, not prompt-based**, so it works in any repo on the
 machine regardless of tech stack:
