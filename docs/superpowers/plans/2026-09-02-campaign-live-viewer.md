@@ -276,7 +276,7 @@ past `state.offset`; this function turns those bytes into complete lines and car
 final line to the next tick. A `fileSize` smaller than `state.offset` means truncation or
 rotation: reset to a fresh state and re-read from zero.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/tail.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/tail.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -319,15 +319,15 @@ test('a shrinking file resets the tail and re-reads from zero', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/tail.test.ts`.
   Expected: fails to resolve `./tail.ts`.
 
-- [ ] **Step 2: Implement** `core/live/tail.ts`. Append `chunk` to `state.carry`, split on `\n`,
+- [x] **Step 2: Implement** `core/live/tail.ts`. Append `chunk` to `state.carry`, split on `\n`,
   pop the last element back into `carry`, trim a trailing `\r` from each emitted line, drop empty
   lines, and set `offset` to `fileSize`. When `fileSize < state.offset`, start from
   `initialTailState()` before processing the chunk.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, four new tests passing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/tail.ts plugins/tribe/scripts/viewer/core/live/tail.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
