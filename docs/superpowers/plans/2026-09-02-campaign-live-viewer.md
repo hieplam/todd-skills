@@ -745,7 +745,7 @@ arrives over SSE. Follow the `html-illustration.md` structural numbers (containe
 scale, reading measure, panel caps, spacing rhythm) while keeping the existing status page's
 palette for continuity (spec §7).
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/page.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/page.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -781,13 +781,13 @@ test('it contains no form, button or input — there is no control surface', () 
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/page.test.ts`.
   Expected: fails to resolve `./page.ts`.
 
-- [ ] **Step 2: Implement** `core/live/page.ts`, reusing the `escapeHtml` already exported by
+- [x] **Step 2: Implement** `core/live/page.ts`, reusing the `escapeHtml` already exported by
   `core/render.ts` rather than writing a second escaper.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and the four assertions above hold.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/page.ts plugins/tribe/scripts/viewer/core/live/page.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
