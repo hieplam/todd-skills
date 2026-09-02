@@ -124,7 +124,7 @@ docs + C3 + skill (Task 14): runner README, plugins/tribe/README.md,
 This task is types plus constants only — no logic, no imports of anything else in the repo. It
 exists so wave 1's two Hunters compile against one frozen contract (spec §4.1).
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/model.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/model.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -149,7 +149,7 @@ test('bounds are explicit values, not magic numbers at call sites', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/model.test.ts`.
   Expected: the run fails because `core/live/model.ts` does not resolve.
 
-- [ ] **Step 2: Implement.** Create `core/live/model.ts` with the interfaces exactly as spec
+- [x] **Step 2: Implement.** Create `core/live/model.ts` with the interfaces exactly as spec
   §4.1 lists them (`ProcessNode`, `TranscriptEvent`, `EventKind`) plus:
 
 ```ts
@@ -171,10 +171,10 @@ export type LiveRoute =
 export interface SseFrame { event: SseEventName; data: unknown }
 ```
 
-- [ ] **Step 3: Verify.** Run `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** Run `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: `tsc --noEmit` clean and all tests pass, including the 27 pre-existing ones.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/model.ts \
