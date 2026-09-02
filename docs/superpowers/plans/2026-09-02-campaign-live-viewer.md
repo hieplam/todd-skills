@@ -814,7 +814,7 @@ event nodes, applies `patches` to the matching call card by `seq`, keeps the vie
 bottom unless the reader scrolled up, and reopens the stream when the selection changes. It
 never parses markdown (the server already did, spec D6) and never sends anything.
 
-- [ ] **Step 1: Write the failing test.** Create `client/app.test.ts` driving the module with
+- [x] **Step 1: Write the failing test.** Create `client/app.test.ts` driving the module with
   fakes:
 
 ```ts
@@ -867,15 +867,15 @@ test('selecting another process closes the old stream and opens one for the new 
   Run `cd plugins/tribe/scripts/viewer && bun test client/app.test.ts`.
   Expected: fails to resolve `./app.js`.
 
-- [ ] **Step 2: Implement** `client/app.js` (a plain ES module, no imports, no build step) and
+- [x] **Step 2: Implement** `client/app.js` (a plain ES module, no imports, no build step) and
   `client/app.css` (the structural numbers from `html-illustration.md`; the existing status
   page's palette). Thinking blocks render inside `<details>` so they are collapsed by default.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green; the module imports nothing and references `document` only through its
   injected dependency.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/client docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
