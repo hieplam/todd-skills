@@ -1199,7 +1199,7 @@ check command as a single-quoted argument that the harness splits with `shlex`.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Create
+- [x] **Step 1: Write the failing test.** Create
   `plugins/explaining/skills/explaining/scripts/evals-case4.test.ts`:
 
 ```ts
@@ -1266,7 +1266,7 @@ bun test evals-case4.test.ts
 
   Expected: every test fails — there is no case with id 4.
 
-- [ ] **Step 2: Add the case.** Append to the `evals` array in
+- [x] **Step 2: Add the case.** Append to the `evals` array in
   `plugins/explaining/skills/explaining/evals/evals.json`, leaving cases 1, 2 and 3 byte-identical:
 
 ```json
@@ -1286,7 +1286,7 @@ bun test evals-case4.test.ts
     }
 ```
 
-- [ ] **Step 3: Prove it green, and prove the harness would really run it.**
+- [x] **Step 3: Prove it green, and prove the harness would really run it.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -1304,7 +1304,7 @@ python3 -m unittest discover -s scripts/evals/tests -t .
   the repo resolves to a real subject and that planned check argv point at files that exist, which
   now includes `check-review-log.ts`).
 
-- [ ] **Step 4: Commit** — stage the fixture, the new test and this plan; message
+- [x] **Step 4: Commit** — stage the fixture, the new test and this plan; message
   `explaining: eval case 4 for the blind-reader review`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 6/10`.
 
