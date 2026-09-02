@@ -347,7 +347,7 @@ the template, decide. No file touches this task at all.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Create
+- [x] **Step 1: Write the failing test.** Create
   `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts`:
 
 ```ts
@@ -367,7 +367,7 @@ import {
 } from './check-review-log';
 
 const INVARIANTS = ['You are a first-time reader.', 'SEVERITY: BLOCK or NIT'];
-const PROMPT = 'Explain how a write-ahead log keeps a database durable and crash consistent across a restart of the process';
+const PROMPT = 'Explain how a journaling log keeps a database durable and crash consistent across a restart of the process';
 
 function brief(extra = ''): string {
   return `Read the file at draft.md. It was written for a backend developer, in English.\nYou are a first-time reader.\nSEVERITY: BLOCK or NIT\n${extra}`;
@@ -565,7 +565,7 @@ bun test check-review-log.test.ts
 
   Expected: the run errors out on a missing module — `check-review-log.ts` does not exist.
 
-- [ ] **Step 2: Write the pure core.** Create
+- [x] **Step 2: Write the pure core.** Create
   `plugins/explaining/skills/explaining/scripts/check-review-log.ts` with exactly this content
   (the impure edge arrives in task 4; this file is complete and importable as it stands):
 
@@ -791,7 +791,7 @@ export function formatSummary(file: string, rounds: RoundRecord[]): string {
 }
 ```
 
-- [ ] **Step 3: Prove it green, and prove nothing else moved.**
+- [x] **Step 3: Prove it green, and prove nothing else moved.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -802,7 +802,7 @@ bun test
   Expected: the new file passes every one of its tests, and the full suite (the two existing
   script suites plus the template suite from task 2) is green with 0 failures.
 
-- [ ] **Step 4: Commit** — stage the two new script files and this plan; message
+- [x] **Step 4: Commit** — stage the two new script files and this plan; message
   `explaining: review-log check, pure core`, with `Tribe-Card: i106-blind-reader-review` and
   `Tribe-Task: 3/10`.
 
