@@ -201,7 +201,7 @@ checkable claim rather than an intention.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Create
+- [x] **Step 1: Write the failing test.** Create
   `plugins/explaining/skills/explaining/scripts/blind-reader-brief.test.ts`:
 
 ```ts
@@ -267,7 +267,7 @@ bun test blind-reader-brief.test.ts
 
   Expected: every test fails — the template file does not exist yet.
 
-- [ ] **Step 2: Write the template.** Create
+- [x] **Step 2: Write the template.** Create
   `plugins/explaining/skills/explaining/references/blind-reader-brief.md` with exactly this
   content:
 
@@ -283,7 +283,7 @@ the review log records.
 Read the file at {{artifact_path}}. It was written for {{audience}}, in {{language}}.
 
 You are a first-time reader. You have no other context, and you must not go looking for any:
-do not read other files, do not search anywhere, do not guess at what the author meant. Judge
+do not read other files, do not search anywhere, do not guess at what was intended. Judge
 only what is on the page.
 
 Report every place you could not follow, in the order they appear. Give each one as three
@@ -305,8 +305,8 @@ found zero BLOCK findings, or READER: FAIL n BLOCK when you found n of them.
 
 ## Rendering notes (never send these to the reader)
 
-- The three slots are the only values that may cross into the brief: `{{artifact_path}}` is the
-  path of the file on disk, `{{audience}}` is one short phrase, `{{language}}` is the language
+- The three slots are the only values that may cross into the brief: `artifact_path` is the
+  path of the file on disk, `audience` is one short phrase, `language` is the language
   the file is written in. Nothing else crosses — not the user's request, not your sources, not
   your reasoning, not the draft text pasted inline, and not any earlier round's findings. A
   reader that has been told what the draft was supposed to say can no longer tell you what it
@@ -319,7 +319,7 @@ found zero BLOCK findings, or READER: FAIL n BLOCK when you found n of them.
   current session itself: the whole value is a context that has never seen the draft before.
 ```
 
-- [ ] **Step 3: Prove it green.**
+- [x] **Step 3: Prove it green.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -328,7 +328,7 @@ bun test blind-reader-brief.test.ts
 
   Expected: 7 pass, 0 fail.
 
-- [ ] **Step 4: Commit** — stage
+- [x] **Step 4: Commit** — stage
   `plugins/explaining/skills/explaining/references/blind-reader-brief.md`,
   `plugins/explaining/skills/explaining/scripts/blind-reader-brief.test.ts` and this plan;
   message `explaining: add the blind-reader brief template`, with
