@@ -128,7 +128,7 @@ result here.
 
 **Steps**
 
-- [ ] **Step 1: Run the probe.** From a throwaway directory, replicate the harness's `with_skill`
+- [x] **Step 1: Run the probe.** From a throwaway directory, replicate the harness's `with_skill`
   invocation exactly — the flags come from `scripts/evals/run_evals.py` `run_claude()`
   (`--output-format stream-json --verbose --no-session-persistence`,
   `--permission-mode bypassPermissions`, `--setting-sources project --strict-mcp-config`) and the
@@ -146,7 +146,7 @@ env -u CLAUDECODE claude -p 'Dispatch one fresh subagent using your Agent or Tas
 echo "exit=$?"
 ```
 
-- [ ] **Step 2: Read the three answers out of the stream.** Each is a separate question and each
+- [x] **Step 2: Read the three answers out of the stream.** Each is a separate question and each
   goes in the transcript:
 
 ```bash
@@ -167,13 +167,13 @@ grep -c 'SUBAGENT-OK 7919' probe.stream.json
   only the executor model appears, it is not, and Rule 5 records `reader_model` as the model
   actually used.
 
-- [ ] **Step 3: Write the transcript.** Create
+- [x] **Step 3: Write the transcript.** Create
   `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review-derisk.md` containing: the
   exact command, the exit code, the three greps above with their real output, the file content of
   `reader-result.txt`, and a one-line verdict — `DISPATCH AVAILABLE` or `DISPATCH UNAVAILABLE` —
   plus one line stating whether a reader-model override was accepted.
 
-- [ ] **Step 4: Commit** — stage only the new evidence file and this plan, message
+- [x] **Step 4: Commit** — stage only the new evidence file and this plan, message
   `de-risk: prove subagent dispatch inside the harness with_skill leg`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 1/10` as the final paragraph.
 
