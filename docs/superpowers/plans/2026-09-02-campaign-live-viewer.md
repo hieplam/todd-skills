@@ -358,7 +358,7 @@ Reads both `sessionId` and `session_id` (card D7). Never throws: an unparseable 
 `isMessageRecord`. The fixtures are hand-authored to the shapes verified in spec §1.1 — copy the
 shapes, never real session content.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/records.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/records.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -395,15 +395,15 @@ test('assistant, user and system rows are messages', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/records.test.ts`.
   Expected: fails to resolve `./records.ts`.
 
-- [ ] **Step 2: Implement** `core/live/records.ts` and author the three fixture files (a valid
+- [x] **Step 2: Implement** `core/live/records.ts` and author the three fixture files (a valid
   parent transcript with a user prompt, a thinking block, a text block, a `tool_use` and its
   paired `tool_result`; a malformed file with two broken lines; a subagent transcript whose rows
   carry `isSidechain: true`).
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green; the malformed fixture parses with a non-zero `skipped` and no exception.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/records.ts plugins/tribe/scripts/viewer/core/live/records.test.ts plugins/tribe/scripts/viewer/fixtures docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
