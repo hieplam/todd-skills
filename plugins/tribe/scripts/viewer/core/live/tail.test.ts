@@ -33,3 +33,37 @@ test('a shrinking file resets the tail and re-reads from zero', () => {
   expect(truncated.state.offset).toBe(6);
   expect(truncated.lines).toEqual(['fresh']);
 });
+
+test('a shrink to a smaller non-zero size with an empty chunk never marks the rewritten bytes as consumed (F6)', () => {
+  // Warchief's exact three-tick reproduction.
+  const tick1 = advanceTail(initialTailState(), 'line-one\nline-two\n', 18);
+  expect(tick1.lines).toEqual(['line-one', 'line-two']);
+  expect(tick1.state).toEqual({ offset: 18, carry: '' });
+
+  // File truncated-and-rewritten to 10 bytes; adapter cannot know the new
+  // content yet, so it can only pass an empty chunk on the discovery tick.
+  const tick2 = advanceTail(tick1.state, '', 10);
+  expect(tick2.lines).toEqual([]);
+  // The 10 rewritten bytes must stay reachable: offset must NOT jump to 10
+  // (that would mark bytes nobody ever read as "consumed"), and the caller
+  // must be told to re-read from zero immediately via `reset`.
+  expect(tick2.state).toEqual({ offset: 0, carry: '' });
+  expect(tick2.reset).toBe(true);
+
+  // Told via `reset`, the adapter re-reads immediately from zero (the whole
+  // 10-byte rewritten file) rather than waiting a tick — the previously
+  // "lost" content is fully recoverable.
+  const recovered = advanceTail(tick2.state, 'abcdefghi\n', 10);
+  expect(recovered.lines).toEqual(['abcdefghi']);
+  expect(recovered.state).toEqual({ offset: 10, carry: '' });
+  expect(recovered.reset).toBe(false);
+});
+
+test('reset is false on steady ticks and true exactly when the shrink branch fires, chunk non-empty or not', () => {
+  const first = advanceTail(initialTailState(), 'old\n', 4);
+  expect(first.reset).toBe(false);
+  const reset = advanceTail(first.state, 'new\n', 8);
+  expect(reset.reset).toBe(false);
+  const truncated = advanceTail(reset.state, 'fresh\n', 6);
+  expect(truncated.reset).toBe(true);
+});
