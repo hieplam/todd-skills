@@ -6,9 +6,11 @@ import {
   evaluateLog,
   findLeakedNgram,
   formatSummary,
+  main,
   missingInvariants,
   ngrams,
   normalizeWords,
+  parseArgs,
   parseReviewLog,
   templateInvariants,
 } from './check-review-log';
@@ -199,5 +201,111 @@ describe('formatSummary', () => {
 
   test('the exit codes are the harness three-outcome vocabulary', () => {
     expect(EXIT_CODE).toEqual({ PASS: 0, FAIL: 1, CANNOT_RUN: 2 });
+  });
+});
+
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const TEMPLATE_TEXT = [
+  '# not part of the brief',
+  '<!-- BRIEF-START -->',
+  'Read the file at {{artifact_path}}. It was written for {{audience}}, in {{language}}.',
+  'You are a first-time reader.',
+  'SEVERITY: BLOCK or NIT',
+  '<!-- BRIEF-END -->',
+  'notes',
+].join('\n');
+
+function scratch(): string {
+  return mkdtempSync(join(tmpdir(), 'check-review-log-'));
+}
+
+describe('parseArgs', () => {
+  test('defaults the glob and the directory', () => {
+    const args = parseArgs(['--prompt', 'p']);
+    expect(args.logGlob).toBe('*.review.jsonl');
+    expect(args.dir).toBe('.');
+    expect(args.requireCatch).toBe(false);
+    expect(args.error).toBeNull();
+  });
+
+  test('a missing --prompt is a setup error, not a verdict', () => {
+    expect(parseArgs([]).error).toContain('--prompt');
+  });
+
+  test('an unknown flag is a setup error', () => {
+    expect(parseArgs(['--prompt', 'p', '--nope']).error).toContain('unknown argument');
+  });
+});
+
+describe('main() exit codes', () => {
+  test('exits 2 when the arguments cannot be understood', async () => {
+    expect(await main([])).toBe(EXIT_CODE.CANNOT_RUN);
+  });
+
+  test('exits 2 when the brief template cannot be read', async () => {
+    const dir = scratch();
+    try {
+      expect(await main(['--prompt', PROMPT, '--dir', dir, '--template', join(dir, 'absent.md')]))
+        .toBe(EXIT_CODE.CANNOT_RUN);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('exits 1 when no review log exists — the review did not happen', async () => {
+    const dir = scratch();
+    const template = join(dir, 'template.md');
+    writeFileSync(template, TEMPLATE_TEXT);
+    try {
+      expect(await main(['--prompt', PROMPT, '--dir', dir, '--template', template]))
+        .toBe(EXIT_CODE.FAIL);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('exits 0 on a well-formed two-round log', async () => {
+    const dir = scratch();
+    const template = join(dir, 'template.md');
+    writeFileSync(template, TEMPLATE_TEXT);
+    writeFileSync(join(dir, 'draft.md.review.jsonl'), `${round(1, 2)}\n${round(2, 0)}\n`);
+    try {
+      expect(await main(['--prompt', PROMPT, '--dir', dir, '--template', template]))
+        .toBe(EXIT_CODE.PASS);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('exits 1 on a fourth round', async () => {
+    const dir = scratch();
+    const template = join(dir, 'template.md');
+    writeFileSync(template, TEMPLATE_TEXT);
+    writeFileSync(join(dir, 'draft.md.review.jsonl'),
+      `${round(1, 3)}\n${round(2, 2)}\n${round(3, 1)}\n${round(4, 0)}\n`);
+    try {
+      expect(await main(['--prompt', PROMPT, '--dir', dir, '--template', template]))
+        .toBe(EXIT_CODE.FAIL);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('--require-catch turns a clean first read into a fail, for post-hoc tallying', async () => {
+    const dir = scratch();
+    const template = join(dir, 'template.md');
+    writeFileSync(template, TEMPLATE_TEXT);
+    writeFileSync(join(dir, 'draft.md.review.jsonl'), `${round(1, 0)}\n`);
+    try {
+      expect(await main(['--prompt', PROMPT, '--dir', dir, '--template', template]))
+        .toBe(EXIT_CODE.PASS);
+      expect(await main(['--prompt', PROMPT, '--dir', dir, '--template', template, '--require-catch']))
+        .toBe(EXIT_CODE.FAIL);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

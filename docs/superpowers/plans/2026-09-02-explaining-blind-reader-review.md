@@ -820,7 +820,7 @@ contract, and nothing else.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Append to
+- [x] **Step 1: Write the failing test.** Append to
   `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts` (and extend its import
   list with `main` and `parseArgs`):
 
@@ -941,7 +941,7 @@ bun test check-review-log.test.ts
 
   Expected: the import of `main` and `parseArgs` fails — neither is exported yet.
 
-- [ ] **Step 2: Write the edge.** Append to
+- [x] **Step 2: Write the edge.** Append to
   `plugins/explaining/skills/explaining/scripts/check-review-log.ts`:
 
 ```ts
@@ -1062,7 +1062,7 @@ if (import.meta.main) {
 }
 ```
 
-- [ ] **Step 3: Prove it green, including as a real CLI.**
+- [x] **Step 3: Prove it green, including as a real CLI.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -1076,7 +1076,7 @@ bun check-review-log.ts --dir "$WORK"; echo "no-prompt exit=$?"
   the no-prompt invocation prints a `CANNOT-RUN:` line and exits 2. Those two exit codes are the
   behavioral-fail and harness-failure legs of the harness contract.
 
-- [ ] **Step 4: Commit** — stage the two script files and this plan; message
+- [x] **Step 4: Commit** — stage the two script files and this plan; message
   `explaining: review-log check CLI and exit-code contract`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 4/10`.
 

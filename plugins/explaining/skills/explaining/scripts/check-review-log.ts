@@ -217,3 +217,119 @@ export function formatSummary(file: string, rounds: RoundRecord[]): string {
   const verdict = rounds.length > 0 ? rounds[rounds.length - 1].verdict : 'NONE';
   return `REVIEW-LOG: file=${file} rounds=${rounds.length} blocks=${blocks === '' ? 'none' : blocks} verdict=${verdict}`;
 }
+
+import { Glob } from 'bun';
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+
+export interface CliArgs {
+  dir: string;
+  logGlob: string;
+  prompt: string | null;
+  template: string | null;
+  requireCatch: boolean;
+  error: string | null;
+}
+
+/** Pure: argv to options. A malformed invocation is a SETUP error (exit 2), never a
+ * verdict on the artifact — the harness routes exit 2 to ungraded for exactly this. */
+export function parseArgs(argv: string[]): CliArgs {
+  const args: CliArgs = {
+    dir: '.', logGlob: '*.review.jsonl', prompt: null, template: null,
+    requireCatch: false, error: null,
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const flag = argv[i];
+    if (flag === '--require-catch') {
+      args.requireCatch = true;
+      continue;
+    }
+    const value = argv[i + 1];
+    if (flag === '--log-glob' || flag === '--prompt' || flag === '--template' || flag === '--dir') {
+      if (value === undefined) {
+        args.error = `${flag} needs a value`;
+        return args;
+      }
+      i++;
+      if (flag === '--log-glob') args.logGlob = value;
+      else if (flag === '--prompt') args.prompt = value;
+      else if (flag === '--template') args.template = value;
+      else args.dir = value;
+      continue;
+    }
+    args.error = `unknown argument: ${flag}`;
+    return args;
+  }
+  if (args.prompt === null) args.error = 'missing required --prompt';
+  return args;
+}
+
+/** Impure edge: read the template and every matching log, run the pure decision, print,
+ * and return the exit code the harness reads. */
+export async function main(argv: string[]): Promise<number> {
+  const args = parseArgs(argv);
+  if (args.error !== null) {
+    console.error(`CANNOT-RUN: ${args.error}`);
+    return EXIT_CODE.CANNOT_RUN;
+  }
+  const templatePath = args.template
+    ?? resolve(SCRIPT_DIR, '..', 'references', 'blind-reader-brief.md');
+  let invariants: string[];
+  try {
+    invariants = templateInvariants(await readFile(templatePath, 'utf8'));
+  } catch (error) {
+    console.error(`CANNOT-RUN: cannot read the brief template at ${templatePath}: ${String(error)}`);
+    return EXIT_CODE.CANNOT_RUN;
+  }
+  if (invariants.length === 0) {
+    console.error(`CANNOT-RUN: the brief template at ${templatePath} carries no invariant lines between its markers`);
+    return EXIT_CODE.CANNOT_RUN;
+  }
+
+  const files: string[] = [];
+  try {
+    for await (const file of new Glob(args.logGlob).scan({ cwd: args.dir, onlyFiles: true })) {
+      files.push(file);
+    }
+  } catch (error) {
+    console.error(`CANNOT-RUN: cannot scan ${args.dir} for ${args.logGlob}: ${String(error)}`);
+    return EXIT_CODE.CANNOT_RUN;
+  }
+  files.sort();
+  if (files.length === 0) {
+    console.log(`INVALID: no review log matched ${args.logGlob} in ${args.dir} — the blind-reader review left no record`);
+    return EXIT_CODE.FAIL;
+  }
+
+  let failed = false;
+  for (const file of files) {
+    let text: string;
+    try {
+      text = await readFile(resolve(args.dir, file), 'utf8');
+    } catch (error) {
+      console.error(`CANNOT-RUN: cannot read ${file}: ${String(error)}`);
+      return EXIT_CODE.CANNOT_RUN;
+    }
+    const { rounds, errors } = parseReviewLog(text);
+    const evaluation = evaluateLog(rounds, {
+      invariants,
+      prompt: args.prompt as string,
+      requireCatch: args.requireCatch,
+    });
+    console.log(formatSummary(file, rounds));
+    for (const problem of [...errors, ...evaluation.reasons]) {
+      failed = true;
+      console.log(`INVALID: ${file}: ${problem}`);
+    }
+  }
+  if (failed) return EXIT_CODE.FAIL;
+  console.log(`VALID: ${files.length} review log(s) checked, 0 error(s)`);
+  return EXIT_CODE.PASS;
+}
+
+if (import.meta.main) {
+  process.exit(await main(Bun.argv.slice(2)));
+}
