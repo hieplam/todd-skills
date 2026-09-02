@@ -205,7 +205,7 @@ NFC-normalize, replace every `[^a-zA-Z0-9]` with `-`, and when the result exceed
 truncate to 200 and append `-` plus the base36 hash suffix (`Bun.hash` when available, else the
 djb2 fallback Kanna documents).
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/paths.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/paths.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -242,15 +242,15 @@ test('recovers an agent id from its transcript file name, and its sidecar name',
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/paths.test.ts`.
   Expected: fails to resolve `./paths.ts`.
 
-- [ ] **Step 2: Implement** `core/live/paths.ts` using only `join` from `node:path` (permitted in
+- [x] **Step 2: Implement** `core/live/paths.ts` using only `join` from `node:path` (permitted in
   core — `node:path` is not a world module) and the Kanna algorithm above. `agentIdFromFileName`
   must match `^agent-(.+)\.jsonl$` only, so a `.meta.json` sidecar never yields an id.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and the two encoded names in the first test match the directories that exist
   under `~/.claude/projects` on this machine.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/paths.ts plugins/tribe/scripts/viewer/core/live/paths.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
