@@ -675,7 +675,7 @@ Spec §4.2. `repo` and `slug` are separate query parameters, each validated agai
 `^[A-Za-z0-9._-]+$`; anything else yields `bad_request` before any path is built. Assets resolve
 from a fixed two-name allowlist, never from the request path.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/routes.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/routes.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -712,14 +712,14 @@ test('an SSE frame is name plus one JSON data line, terminated by a blank line',
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/routes.test.ts`.
   Expected: fails to resolve `./routes.ts`.
 
-- [ ] **Step 2: Implement** `core/live/routes.ts` using the `URL` global (no imports beyond
+- [x] **Step 2: Implement** `core/live/routes.ts` using the `URL` global (no imports beyond
   `./model.ts`). `encodeSseFrame` must strip newlines from the serialized data so a single frame
   can never be split into two by transcript content.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, traversal cases rejected.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/routes.ts plugins/tribe/scripts/viewer/core/live/routes.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
