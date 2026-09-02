@@ -27,3 +27,19 @@ test('an SSE frame is name plus one JSON data line, terminated by a blank line',
   expect(encodeSseFrame({ event: 'append', data: { processId: 'card:T20', events: [] } }))
     .toBe('event: append\ndata: {"processId":"card:T20","events":[]}\n\n');
 });
+
+test('a dot-only identifier is rejected even though it matches the character class (F3)', () => {
+  expect(parseLiveRoute('http://127.0.0.1:4321/live?repo=..&slug=..').kind).toBe('bad_request');
+  expect(parseLiveRoute('http://127.0.0.1:4321/live?repo=.&slug=b').kind).toBe('bad_request');
+  expect(parseLiveRoute('http://127.0.0.1:4321/live?repo=...&slug=b').kind).toBe('bad_request');
+});
+
+test('a bodiless keep-alive frame encodes rather than throwing (F4)', () => {
+  expect(encodeSseFrame({ event: 'ping', data: undefined }))
+    .toBe('event: ping\ndata: null\n\n');
+});
+
+test('the processes route parses to the processes variant (Warchief ruling)', () => {
+  expect(parseLiveRoute('http://127.0.0.1:4321/api/processes?repo=r&slug=s'))
+    .toEqual({ kind: 'processes', repoKey: 'r', slug: 's' });
+});

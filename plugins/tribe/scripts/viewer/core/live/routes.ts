@@ -4,12 +4,13 @@
 import type { LiveRoute, SseFrame } from './model.ts';
 
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9._-]+$/;
+const DOTS_ONLY_PATTERN = /^\.+$/;
 
 // Fixed allowlist — assets are never resolved by joining the request path.
 const ASSET_NAMES = new Set(['app.js', 'app.css'] as const);
 
 function isValidIdentifier(value: string | null): value is string {
-  return value !== null && IDENTIFIER_PATTERN.test(value);
+  return value !== null && IDENTIFIER_PATTERN.test(value) && !DOTS_ONLY_PATTERN.test(value);
 }
 
 export function parseLiveRoute(url: string): LiveRoute {
@@ -52,6 +53,6 @@ export function parseLiveRoute(url: string): LiveRoute {
 }
 
 export function encodeSseFrame(frame: SseFrame): string {
-  const data = JSON.stringify(frame.data).replace(/\r?\n/g, '');
+  const data = JSON.stringify(frame.data === undefined ? null : frame.data).replace(/\r?\n/g, '');
   return `event: ${frame.event}\ndata: ${data}\n\n`;
 }
