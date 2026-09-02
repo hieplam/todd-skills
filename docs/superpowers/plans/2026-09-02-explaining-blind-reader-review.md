@@ -1321,7 +1321,7 @@ this task proves that claim rather than asserting it.
 
 **Steps**
 
-- [ ] **Step 1: Rewrite the two affected sections.** In `plugins/explaining/README.md`:
+- [x] **Step 1: Rewrite the two affected sections.** In `plugins/explaining/README.md`:
   rename the heading `## The four rules (skills/explaining/SKILL.md)` to `## The five rules
   (skills/explaining/SKILL.md)`, append item 5, rename `## The two scripts` to `## The three
   scripts` and add the checker, and add one short paragraph on the brief template. The added
@@ -1354,7 +1354,7 @@ this task proves that claim rather than asserting it.
   except `evals/` and `node_modules/`), that its three slots are the only values allowed to reach
   the reader, and that the reader model is a documented knob defaulting to `sonnet`.
 
-- [ ] **Step 2: Prove the installer needs no change.**
+- [x] **Step 2: Prove the installer needs no change.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1369,7 +1369,7 @@ ls ~/.claude/skills/explaining/references/ ~/.claude/skills/explaining/scripts/c
   the new script are already visible through it with no installer edit. If any of those listings
   fail, STOP and report — an installer change is outside this card's fence and needs the Shaman.
 
-- [ ] **Step 3: Verify the README claims against the files.**
+- [x] **Step 3: Verify the README claims against the files.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1381,7 +1381,7 @@ grep -c "blind-reader-brief.md" plugins/explaining/README.md
 
   Expected: each count is at least 1, and no stale "four rules" or "two scripts" phrase survives.
 
-- [ ] **Step 4: Commit** — stage `plugins/explaining/README.md` and this plan; message
+- [x] **Step 4: Commit** — stage `plugins/explaining/README.md` and this plan; message
   `explaining: document Rule 5, the brief template and the review-log checker`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 7/10`.
 
