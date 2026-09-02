@@ -1092,7 +1092,7 @@ self-check line, and touches nothing else in the file.
 
 **Steps**
 
-- [ ] **Step 1: Capture the guard.** Record what must not move, so step 3 can prove it did not:
+- [x] **Step 1: Capture the guard.** Record what must not move, so step 3 can prove it did not:
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1103,7 +1103,7 @@ wc -l /tmp/rules-1-to-4-before.txt
 
   Expected: the extract is non-empty and covers Rules 1 through 4.
 
-- [ ] **Step 2: Insert Rule 5 between Rule 4 and the self-check.** Add this section verbatim,
+- [x] **Step 2: Insert Rule 5 between Rule 4 and the self-check.** Add this section verbatim,
   immediately before the `## Self-check before finishing` heading:
 
 ```markdown
@@ -1162,7 +1162,7 @@ self-check, and say so in one line:
 4. Did the blind-reader review run to a verdict, and did the answer say how it ended? (Rule 5)
 ```
 
-- [ ] **Step 3: Prove the rule landed and Rules 1 through 4 did not move.**
+- [x] **Step 3: Prove the rule landed and Rules 1 through 4 did not move.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1178,7 +1178,7 @@ sed -n '/^## Self-check/,/^## Evidence/p' plugins/explaining/skills/explaining/S
   Expected: the `Rule 5` count is at least 1; the `diff` of the Rules 1 through 4 region is empty
   (nothing but the appended Rule 5 differs); the self-check now lists exactly 4 numbered items.
 
-- [ ] **Step 4: Commit** — stage `plugins/explaining/skills/explaining/SKILL.md` and this plan;
+- [x] **Step 4: Commit** — stage `plugins/explaining/skills/explaining/SKILL.md` and this plan;
   message `explaining: add Rule 5, blind-reader review before delivery`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 5/10`.
 
