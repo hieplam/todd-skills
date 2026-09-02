@@ -43,3 +43,21 @@ test('the processes route parses to the processes variant (Warchief ruling)', ()
   expect(parseLiveRoute('http://127.0.0.1:4321/api/processes?repo=r&slug=s'))
     .toEqual({ kind: 'processes', repoKey: 'r', slug: 's' });
 });
+
+test('encodeSseFrame is total: unserializable payloads never throw and still yield a well-formed frame (F8)', () => {
+  const isWellFormed = (out: string) => /^event: ping\ndata: .+\n\n$/.test(out);
+
+  const fnOut = encodeSseFrame({ event: 'ping', data: (() => {}) as unknown });
+  expect(isWellFormed(fnOut)).toBe(true);
+
+  const symOut = encodeSseFrame({ event: 'ping', data: Symbol('x') as unknown });
+  expect(isWellFormed(symOut)).toBe(true);
+
+  const bigintOut = encodeSseFrame({ event: 'ping', data: 10n as unknown });
+  expect(isWellFormed(bigintOut)).toBe(true);
+
+  const cyclic: Record<string, unknown> = {};
+  cyclic.self = cyclic;
+  const cyclicOut = encodeSseFrame({ event: 'ping', data: cyclic });
+  expect(isWellFormed(cyclicOut)).toBe(true);
+});

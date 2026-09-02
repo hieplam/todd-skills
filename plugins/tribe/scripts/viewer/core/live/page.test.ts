@@ -26,3 +26,10 @@ test('it contains no form, button or input — there is no control surface', () 
   const html = renderLivePage({ repoKey: 'a', slug: 'b', processId: null });
   for (const tag of ['<form', '<input', '<textarea', '<button']) expect(html).not.toContain(tag);
 });
+
+test('the page title (h1) uses the page-title type-scale row, not the section-heading row (F7)', () => {
+  const html = renderLivePage({ repoKey: 'a', slug: 'b', processId: null });
+  const match = html.match(/header h1\s*\{[^}]*font-size:\s*([^;]+);/);
+  expect(match).not.toBeNull();
+  expect(match![1]!.trim()).toBe('clamp(2.6rem, 3.4vw, 3.8rem)');
+});

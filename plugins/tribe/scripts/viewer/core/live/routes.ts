@@ -52,7 +52,22 @@ export function parseLiveRoute(url: string): LiveRoute {
   return { kind: 'not_found' };
 }
 
+// JSON.stringify returns `undefined` (not a throw) for a bare function or symbol, and throws
+// outright for a BigInt or a cyclic object. `data` is typed `unknown`, so any of those can reach
+// here — this boundary must be total: it always returns a well-formed frame, never propagates.
+function serializeFrameData(value: unknown): string {
+  try {
+    const serialized = JSON.stringify(value === undefined ? null : value);
+    if (serialized === undefined) {
+      return JSON.stringify({ error: 'unserializable payload' });
+    }
+    return serialized;
+  } catch {
+    return JSON.stringify({ error: 'unserializable payload' });
+  }
+}
+
 export function encodeSseFrame(frame: SseFrame): string {
-  const data = JSON.stringify(frame.data === undefined ? null : frame.data).replace(/\r?\n/g, '');
+  const data = serializeFrameData(frame.data).replace(/\r?\n/g, '');
   return `event: ${frame.event}\ndata: ${data}\n\n`;
 }

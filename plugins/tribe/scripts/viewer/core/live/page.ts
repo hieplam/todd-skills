@@ -13,7 +13,7 @@ const STYLE = `
   body { font-size: 21.85px; line-height: 1.65; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; color: #1a1a1a; background: #fafafa; }
   .wrap { max-width: min(1780px, 94vw); margin: 0 auto; padding: 40px 40px 120px; }
   header p.disclaimer { color: #555; font-size: 0.9rem; }
-  header h1 { font-size: clamp(1.9rem, 2.1vw, 2.5rem); margin: 0 0 8px; }
+  header h1 { font-size: clamp(2.6rem, 3.4vw, 3.8rem); margin: 0 0 8px; }
   header nav a { color: #1a7f37; }
   main.layout { display: flex; gap: 32px; align-items: flex-start; margin-top: 40px; }
   aside.processes { max-width: 420px; flex: 0 0 320px; border: 1px solid #ddd; border-radius: 6px; padding: 22px 26px; background: #fff; }
