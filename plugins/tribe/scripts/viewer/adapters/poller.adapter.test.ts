@@ -245,3 +245,43 @@ test('a read failure becomes an error frame, the connection is never thrown', ()
 
   expect(frames.some((f) => f.event === 'error')).toBe(true);
 });
+
+test('a short readRange (fewer bytes than statFileOrNull reported) never loses content — the next tick re-reads the missed bytes (F56)', () => {
+  const fake = makeFakeIo();
+  const record = `${JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'hello' }] } })}\n`;
+  fake.writeFile(CAMPAIGN.transcriptPath, record);
+  fake.setDir(CAMPAIGN.subagentsDir, []);
+
+  // `statFileOrNull` reports the true, full size, but `readRange` — simulating a single
+  // `readSync` that didn't fill its buffer — hands back only the first 2 bytes on its very
+  // first call. `advanceTail` must not trust the stale stat size as the new offset (F56): if it
+  // did, this content would be permanently skipped, since the file never grows again.
+  const originalReadRange = fake.io.readRange;
+  let calls = 0;
+  fake.io.readRange = (p, start, end) => {
+    calls += 1;
+    return calls === 1 ? originalReadRange(p, start, start + 2) : originalReadRange(p, start, end);
+  };
+
+  const frames: SseFrame[] = [];
+  const { schedule, tick } = makeControllableSchedule();
+  createLivePoller({
+    io: fake.io,
+    intervalMs: 400,
+    campaign: CAMPAIGN,
+    processId: null,
+    emit: (f) => frames.push(f),
+    schedule,
+  });
+
+  // The file never grows again — a buggy poller that already marked the whole file "consumed"
+  // on the short read would never see this content on any later tick.
+  tick();
+  tick();
+
+  const sawHello = frames.some((f) => {
+    const data = f.data as { events?: { html: string }[] } | undefined;
+    return data?.events?.some((e) => e.html.includes('hello')) ?? false;
+  });
+  expect(sawHello).toBe(true);
+});

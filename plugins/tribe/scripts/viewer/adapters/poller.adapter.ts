@@ -91,7 +91,13 @@ function readNewLines(io: TranscriptIo, track: TrackedTranscript): string[] {
   if (stat.sizeBytes < track.tail.offset) track.decoder = new TextDecoder('utf-8');
   const bytes = stat.sizeBytes > track.tail.offset ? io.readRange(track.path, track.tail.offset, stat.sizeBytes) : new Uint8Array(0);
   const chunk = track.decoder.decode(bytes, { stream: true });
-  const advanced = advanceTail(track.tail, chunk, stat.sizeBytes);
+  // `bytes.length` (F56) — the RAW byte count actually returned by `readRange`, which can be
+  // LESS than `stat.sizeBytes - track.tail.offset` asked for (a single `readSync` is not
+  // guaranteed to fill its buffer, and the file can shrink between the `stat` and the `read`).
+  // `advanceTail` advances the offset by exactly this many bytes, never by `stat.sizeBytes` —
+  // trusting the stale stat size instead would silently and permanently skip whatever the read
+  // actually missed.
+  const advanced = advanceTail(track.tail, chunk, bytes.length, stat.sizeBytes);
   track.tail = advanced.state;
   return advanced.lines;
 }

@@ -137,8 +137,14 @@ Bun.serve({
         if (activeStreams >= MAX_LIVE_STREAMS) {
           return new Response('too many live streams', { status: 503 });
         }
-        activeStreams += 1;
 
+        // F57: `activeStreams` is incremented ONLY once `createLivePoller` has actually
+        // returned (never before, and never inside a `try` that could still leave it
+        // half-done) — so a synchronous throw during construction can never leave the slot
+        // counted with nothing able to release it. `cancel()` mirrors that: it only ever
+        // decrements a slot THIS connection itself incremented, and only once (`poller` is
+        // nulled out immediately after), so the increment and decrement can never drift apart
+        // no matter how many times the platform calls `cancel()`.
         let poller: { stop: () => void } | null = null;
         const stream = new ReadableStream({
           start(controller) {
@@ -157,9 +163,12 @@ Bun.serve({
                 }
               },
             });
+            activeStreams += 1;
           },
           cancel() {
-            poller?.stop();
+            if (poller === null) return;
+            poller.stop();
+            poller = null;
             activeStreams -= 1;
           },
         });
