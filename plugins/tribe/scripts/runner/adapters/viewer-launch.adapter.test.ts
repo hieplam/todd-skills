@@ -1,8 +1,9 @@
 // adapters/viewer-launch.adapter.test.ts — the production ViewerPort's two world-touching
 // facts, tested against real (but local, bounded) I/O: a real detached spawn of a
 // nonexistent binary (F38 regression: an unlistened spawn 'error' must never take down the
-// parent), and a real local Bun.serve fake for the reuse probe (F39 regression: the probe
-// must require the viewer's own identity marker, not accept any 2xx from any process).
+// parent; F49 regression: that same spawn error must now be REPORTED, not swallowed), and a
+// real local Bun.serve fake for the reuse probe (F39 regression: the probe must require the
+// viewer's own identity marker, not accept any 2xx from any process).
 import { expect, test } from 'bun:test';
 import { buildViewerPort } from './viewer-launch.adapter.ts';
 
@@ -26,6 +27,35 @@ test('spawnDetached against a nonexistent binary does not kill the parent proces
   // Reaching this line at all is the proof: an unhandled 'error' event would have thrown
   // an uncaught exception and torn down the whole bun test process before this point.
   expect(true).toBe(true);
+});
+
+// F49 — before the fix, the spawn 'error' handler was `() => {}`: a silent no-op. A viewer
+// start failure (bun unresolvable, ENOENT, EACCES, fd exhaustion) was therefore never
+// reported anywhere, contradicting the README/C3 docs' own claim that it "is logged to
+// stderr". This proves the handler now emits exactly one stderr line for a real spawn
+// error, and still never throws (the F38 guarantee must hold together with the new report).
+test('spawnDetached against a nonexistent binary reports exactly one stderr line and does not throw (F49)', async () => {
+  const port = buildViewerPort();
+  const calls: unknown[][] = [];
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    calls.push(args);
+  };
+
+  try {
+    expect(() => {
+      port.spawnDetached(['/definitely-not-a-real-binary-xyz', '--port', '4321']);
+    }).not.toThrow();
+
+    // The spawn 'error' (ENOENT) fires asynchronously — give it room to fire before
+    // asserting on what it produced.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  expect(calls.length).toBe(1);
+  expect(String(calls[0]?.[0])).toMatch(/^campaign viewer: failed to start/);
 });
 
 test('probeViewer against a fake serving the correct identity marker returns true (F39)', async () => {

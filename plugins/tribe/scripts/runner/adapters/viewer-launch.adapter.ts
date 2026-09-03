@@ -54,17 +54,22 @@ export function buildViewerPort(): ViewerPort {
         detached: true,
         stdio: 'ignore',
       });
-      // F38: an unlistened spawn 'error' (e.g. ENOENT — `bun` not resolvable on the child's
-      // PATH under cron/launchd/CI, EACCES, fd exhaustion) fires asynchronously and is an
-      // uncaught exception that kills the whole campaign runner — the enclosing try/catch in
-      // `cli/main.ts` has already exited its scope by the time it fires, so it cannot help.
-      // Same convention as `run-io.adapter.ts`'s `realExec`: degrade to a no-op, never throw
-      // — a failed spawn must read exactly like a failed probe (D12: "observability exhaust
-      // never kills a run"). Nothing to relay it to here (`spawnDetached` returns void by
-      // design — the caller has already returned the 'spawn' decision and printed its URL);
-      // production diagnosis of a failed detached spawn is out of band (the viewer never
-      // answers `/healthz` on a later run).
-      child.on('error', () => {});
+      // F38/F49: an unlistened spawn 'error' (e.g. ENOENT — `bun` not resolvable on the
+      // child's PATH under cron/launchd/CI, EACCES, fd exhaustion) fires asynchronously and
+      // is an uncaught exception that kills the whole campaign runner — the enclosing
+      // try/catch in `cli/main.ts` has already exited its scope by the time it fires, so it
+      // cannot help. Same convention as `run-io.adapter.ts`'s `realExec`: degrade, never
+      // throw — a failed spawn must never gate the run (D12: "observability exhaust never
+      // kills a run"). Unlike F38's original fix, the event is now REPORTED on stderr rather
+      // than swallowed (F49: the docs promise a stderr line for this case, and this is the
+      // only failure shape the adapter can actually observe — `spawnDetached` returns void
+      // by design, so `console.error` here is the sole channel; the caller has already
+      // returned the 'spawn' decision and printed its URL on stdout).
+      child.on('error', (err) => {
+        console.error(
+          `campaign viewer: failed to start (continuing): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
       child.unref();
     },
   };

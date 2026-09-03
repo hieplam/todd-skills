@@ -140,12 +140,19 @@ campaign viewer: http://127.0.0.1:4321/live?repo=<repo-key>&slug=<campaign-slug>
 - **It may outlive the run.** The viewer is spawned detached, so it keeps serving the
   transcripts of a card whose session already finished (or the whole campaign, once it's
   `done`) until something else stops it — the runner never kills it on exit.
-- **`--no-viewer` disables it entirely** for that run — no probe, no spawn, no printed line.
-  `--viewer-port <n>` picks a different port than the default `4321` (1-65535).
-- **Never affects the campaign run.** A failure to start (port unavailable, spawn error) is
-  logged to stderr and the run proceeds exactly as if `--no-viewer` had been passed — this is
-  observability exhaust, never a gate. `--dry-run` skips this step entirely (zero side effects
-  stays a hard contract).
+- **`--no-viewer` disables it entirely** for that run — no probe, no spawn, no printed URL
+  (one `campaign viewer: skipped: --no-viewer` note still goes to stderr). `--viewer-port <n>`
+  picks a different port than the default `4321` (1-65535).
+- **Never affects the campaign run**, but not every failure is visible the same way. A
+  failure the runner can SEE — the viewer entry file missing, the `--no-viewer`/`--dry-run`
+  skip, a thrown error in the launch path, or a spawn `error` event (e.g. `bun` unresolvable)
+  — prints one `campaign viewer: …` line to stderr and the run proceeds. A failure the runner
+  **cannot** see: the target port is already held by some other, non-viewer process, so the
+  probe reports "nothing here" and the runner spawns anyway; the detached, `stdio: 'ignore'`
+  child then dies to `EADDRINUSE` after the URL has already been printed on stdout, and that
+  crash is invisible to the parent. If the printed URL doesn't answer, open it or re-run with
+  a different `--viewer-port`. Either way this is observability exhaust, never a gate.
+  `--dry-run` skips this step entirely (zero side effects stays a hard contract).
 
 See [`scripts/viewer/README.md`](../viewer/README.md) for what the live page actually shows
 (the process tree, tailed transcripts) and its full route/route-contract.
