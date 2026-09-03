@@ -494,7 +494,7 @@ never rendered), and tool calls paired with their results. Because the stream is
 call card (Kanna's pending-map idea, adapted to an append-only wire). Rows failing
 `isMessageRecord` produce nothing. `model: "<synthetic>"` is not an error (card D7).
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/normalize.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/normalize.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -550,14 +550,14 @@ test('bookkeeping rows and a synthetic model produce no events and no throw (car
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/normalize.test.ts`.
   Expected: fails to resolve `./normalize.ts`.
 
-- [ ] **Step 2: Implement** `core/live/normalize.ts` over `records.ts` and `markdown.ts`, keeping
+- [x] **Step 2: Implement** `core/live/normalize.ts` over `records.ts` and `markdown.ts`, keeping
   `seq` monotonic across calls and `pending` mapping a `tool_use` id to the `seq` of its call
   event.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green; no code path renders a raw JSON line as output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/normalize.ts plugins/tribe/scripts/viewer/core/live/normalize.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
