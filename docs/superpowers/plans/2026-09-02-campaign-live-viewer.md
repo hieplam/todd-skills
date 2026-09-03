@@ -675,7 +675,7 @@ Spec §4.2. `repo` and `slug` are separate query parameters, each validated agai
 `^[A-Za-z0-9._-]+$`; anything else yields `bad_request` before any path is built. Assets resolve
 from a fixed two-name allowlist, never from the request path.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/routes.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/routes.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -712,14 +712,14 @@ test('an SSE frame is name plus one JSON data line, terminated by a blank line',
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/routes.test.ts`.
   Expected: fails to resolve `./routes.ts`.
 
-- [ ] **Step 2: Implement** `core/live/routes.ts` using the `URL` global (no imports beyond
+- [x] **Step 2: Implement** `core/live/routes.ts` using the `URL` global (no imports beyond
   `./model.ts`). `encodeSseFrame` must strip newlines from the serialized data so a single frame
   can never be split into two by transcript content.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, traversal cases rejected.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/routes.ts plugins/tribe/scripts/viewer/core/live/routes.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -745,7 +745,7 @@ arrives over SSE. Follow the `html-illustration.md` structural numbers (containe
 scale, reading measure, panel caps, spacing rhythm) while keeping the existing status page's
 palette for continuity (spec §7).
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/page.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/page.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -781,13 +781,13 @@ test('it contains no form, button or input — there is no control surface', () 
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/page.test.ts`.
   Expected: fails to resolve `./page.ts`.
 
-- [ ] **Step 2: Implement** `core/live/page.ts`, reusing the `escapeHtml` already exported by
+- [x] **Step 2: Implement** `core/live/page.ts`, reusing the `escapeHtml` already exported by
   `core/render.ts` rather than writing a second escaper.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and the four assertions above hold.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/page.ts plugins/tribe/scripts/viewer/core/live/page.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -814,7 +814,7 @@ event nodes, applies `patches` to the matching call card by `seq`, keeps the vie
 bottom unless the reader scrolled up, and reopens the stream when the selection changes. It
 never parses markdown (the server already did, spec D6) and never sends anything.
 
-- [ ] **Step 1: Write the failing test.** Create `client/app.test.ts` driving the module with
+- [x] **Step 1: Write the failing test.** Create `client/app.test.ts` driving the module with
   fakes:
 
 ```ts
@@ -867,15 +867,15 @@ test('selecting another process closes the old stream and opens one for the new 
   Run `cd plugins/tribe/scripts/viewer && bun test client/app.test.ts`.
   Expected: fails to resolve `./app.js`.
 
-- [ ] **Step 2: Implement** `client/app.js` (a plain ES module, no imports, no build step) and
+- [x] **Step 2: Implement** `client/app.js` (a plain ES module, no imports, no build step) and
   `client/app.css` (the structural numbers from `html-illustration.md`; the existing status
   page's palette). Thinking blocks render inside `<details>` so they are collapsed by default.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green; the module imports nothing and references `document` only through its
   injected dependency.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/client docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -898,7 +898,7 @@ directory roles to the viewer: `core/` is pure, `adapters/*.adapter.ts` own ever
 `serve.ts` is the composition root, `client/` is browser code and is exempt from the Node-module
 ban but must import nothing.
 
-- [ ] **Step 1: Write the failing test.** Create `structure.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `structure.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -953,13 +953,13 @@ describe('viewer structural contract', () => {
   Expected: it fails on the last test until `client/app.js` exists in this worktree (Task 10
   precedes it in the same worktree, so run Task 10 first and expect only genuine violations).
 
-- [ ] **Step 2: Implement.** Fix any violation the wall reports in this worktree's own files;
+- [x] **Step 2: Implement.** Fix any violation the wall reports in this worktree's own files;
   never weaken an assertion to make it pass.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, with the four structural tests passing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/structure.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
