@@ -1817,7 +1817,7 @@ substitute for reading it.
 
 **Steps**
 
-- [ ] **Step 1: Run the mandatory file-context gate and read the schema.**
+- [x] **Step 1: Run the mandatory file-context gate and read the schema.**
 
 ```bash
 export C3X=/Users/hip/.claude/plugins/marketplaces/c3-skill-marketplace/skills/c3/bin/c3x.sh
@@ -1832,7 +1832,7 @@ C3X_MODE=agent bash "$C3X" read c3-201 --full
   `lookup` names `c3-201` as the owner plus its governing refs and rules; `schema adr` leads with
   its REJECT-IF list, which the ADR body must honor.
 
-- [ ] **Step 2: Author the ADR and create the change-unit.** Write the body to a scratch file
+- [x] **Step 2: Author the ADR and create the change-unit.** Write the body to a scratch file
   **outside** `.c3/`, then register it:
 
 ```bash
@@ -1854,7 +1854,7 @@ C3X_MODE=agent bash "$C3X" change new adr-20260902-explaining-blind-reader-revie
   `adr-20260902-explaining-blind-reader-review`, and `change new` creates the matching folder
   under `.c3/changes/`.
 
-- [ ] **Step 3: Cite the blocks, author the patches, preview, accept and apply.**
+- [x] **Step 3: Cite the blocks, author the patches, preview, accept and apply.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1903,7 +1903,7 @@ C3X_MODE=agent bash "$C3X" check
   If `apply` rejects, fix the patch body and re-apply — never hand-edit
   `.c3/c3-2-plugins/c3-201-explaining.md`, which is a frozen fact.
 
-- [ ] **Step 4: Prove the sync landed.**
+- [x] **Step 4: Prove the sync landed.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1916,7 +1916,7 @@ git status --porcelain .c3 | head -20
   `blind-reader-brief.md`; `git status` lists the ADR, the change folder, the updated `c3-201`
   and `.c3/c3.db`, and nothing outside `.c3/`.
 
-- [ ] **Step 5: Commit** — stage `.c3/` and this plan only; message
+- [x] **Step 5: Commit** — stage `.c3/` and this plan only; message
   `c3: change-unit and ADR for the explaining blind-reader review`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 10/10`.
 
