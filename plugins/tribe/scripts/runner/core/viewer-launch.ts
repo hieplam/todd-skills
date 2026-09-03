@@ -21,10 +21,15 @@ export function campaignKeyOf(homeDir: string): CampaignKey {
   return { repoKey, slug };
 }
 
-/** The URL the runner prints (G3) and the adapter probes/reuses (D12). */
+/** The URL the runner prints (G3) and the adapter probes/reuses (D12). `--home` is
+ * free-form input (spec §2), so `repoKey`/`slug` are percent-encoded before interpolation:
+ * an unencoded `&`, space, or unicode character in a slug would otherwise either split into
+ * extra query params or reach the owner's terminal/browser un-escaped. Ordinary kebab-case
+ * slugs (the expected shape) encode to themselves, so this is behavior-preserving for the
+ * common case. */
 export function viewerUrlFor(homeDir: string, port: number): string {
   const { repoKey, slug } = campaignKeyOf(homeDir);
-  return `http://127.0.0.1:${port}/live?repo=${repoKey}&slug=${slug}`;
+  return `http://127.0.0.1:${port}/live?repo=${encodeURIComponent(repoKey)}&slug=${encodeURIComponent(slug)}`;
 }
 
 export interface ViewerLaunchInput {

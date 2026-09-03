@@ -19,10 +19,18 @@ export const VIEWER_ENTRY_PATH = join(import.meta.dir, '../../viewer/serve.ts');
 
 const PROBE_TIMEOUT_MS = 500;
 
+/** The `/healthz` identity marker THIS viewer answers with (`serve.ts`'s route, added by a
+ * concurrently-built task). A bare 2xx is not enough to prove reuse-safety (F39): any
+ * unrelated process holding the target port would otherwise pass the probe and get silently
+ * "reused". Requiring this exact field makes the probe an identity check, not a liveness
+ * check. */
+const VIEWER_IDENTITY_MARKER = 'tribe-live-viewer';
+
 /** Production `ViewerPort`: a plain read-only `fetch` probe (card D6) and a detached spawn
  * that cannot hold the runner open (D12: `detached: true`, `stdio: 'ignore'`, then
- * `unref()`). A probe failure (connection refused, timeout, any thrown error) degrades to
- * `false` — never thrown — so an unreachable port reads exactly like "nothing is listening". */
+ * `unref()`). A probe failure (connection refused, timeout, non-JSON body, wrong/absent
+ * identity marker, any thrown error) degrades to `false` — never thrown — so anything other
+ * than THIS viewer reads exactly like "nothing is listening" (F39). */
 export function buildViewerPort(): ViewerPort {
   return {
     async probeViewer(port) {
@@ -30,7 +38,13 @@ export function buildViewerPort(): ViewerPort {
         const res = await fetch(`http://127.0.0.1:${port}/healthz`, {
           signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
         });
-        return res.ok;
+        if (!res.ok) return false;
+        const body = (await res.json()) as unknown;
+        return (
+          typeof body === 'object' &&
+          body !== null &&
+          (body as { viewer?: unknown }).viewer === VIEWER_IDENTITY_MARKER
+        );
       } catch {
         return false;
       }
@@ -40,6 +54,17 @@ export function buildViewerPort(): ViewerPort {
         detached: true,
         stdio: 'ignore',
       });
+      // F38: an unlistened spawn 'error' (e.g. ENOENT — `bun` not resolvable on the child's
+      // PATH under cron/launchd/CI, EACCES, fd exhaustion) fires asynchronously and is an
+      // uncaught exception that kills the whole campaign runner — the enclosing try/catch in
+      // `cli/main.ts` has already exited its scope by the time it fires, so it cannot help.
+      // Same convention as `run-io.adapter.ts`'s `realExec`: degrade to a no-op, never throw
+      // — a failed spawn must read exactly like a failed probe (D12: "observability exhaust
+      // never kills a run"). Nothing to relay it to here (`spawnDetached` returns void by
+      // design — the caller has already returned the 'spawn' decision and printed its URL);
+      // production diagnosis of a failed detached spawn is out of band (the viewer never
+      // answers `/healthz` on a later run).
+      child.on('error', () => {});
       child.unref();
     },
   };

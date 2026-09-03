@@ -112,6 +112,24 @@ describe('parseArgs — --viewer-port / --no-viewer (Task 13, spec D11)', () => 
     }
   });
 
+  // F41: an oversized port fails deep inside the detached child (stdio: 'ignore' makes it
+  // invisible there) instead of loudly and early in the parser.
+  test('--viewer-port rejects a value above 65535 (F41)', () => {
+    const result = parseArgs([...validArgv(), '--viewer-port', '70000'], RUN_ID);
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('--viewer-port');
+    }
+  });
+
+  test('--viewer-port accepts the upper bound 65535 (F41)', () => {
+    const result = parseArgs([...validArgv(), '--viewer-port', '65535'], RUN_ID);
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.viewerPort).toBe(65535);
+    }
+  });
+
   test('--no-viewer defaults to false, and disables the viewer when passed', () => {
     const withoutFlag = parseArgs(validArgv(), RUN_ID);
     expect('error' in withoutFlag).toBe(false);

@@ -31,3 +31,20 @@ test('--no-viewer and a missing entry both degrade to skip with a reason', () =>
   expect(missing.kind).toBe('skip');
   expect(missing.note).toContain('serve.ts');
 });
+
+// F40: `--home` is free-form input — an unencoded `&`/space in the slug must not be able to
+// inject extra query params or reach the printed URL un-escaped.
+test('a slug containing "&" is percent-encoded, not split into an extra query param (F40)', () => {
+  const evilHome = '/Users/hip/.tribe/-Users-hip-repo-x/campaigns/feat&evil=1';
+  const url = viewerUrlFor(evilHome, 4321);
+  expect(url).toBe('http://127.0.0.1:4321/live?repo=-Users-hip-repo-x&slug=feat%26evil%3D1');
+  expect(new URL(url).searchParams.get('slug')).toBe('feat&evil=1');
+  expect(new URL(url).searchParams.get('evil')).toBe(null);
+});
+
+test('a slug containing a space is percent-encoded (F40)', () => {
+  const spacedHome = '/Users/hip/.tribe/-Users-hip-repo-x/campaigns/my campaign';
+  const url = viewerUrlFor(spacedHome, 4321);
+  expect(url).toBe('http://127.0.0.1:4321/live?repo=-Users-hip-repo-x&slug=my%20campaign');
+  expect(new URL(url).searchParams.get('slug')).toBe('my campaign');
+});

@@ -173,8 +173,11 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
   const viewerPortRaw = raw.get('--viewer-port');
   if (typeof viewerPortRaw === 'string') {
     const parsed = Number(viewerPortRaw);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      return { error: `--viewer-port: expected a positive integer, got "${viewerPortRaw}"` };
+    // F41: bounded to the valid TCP port range (1-65535) so an oversized value fails loudly
+    // and early here, instead of failing deep inside the detached child where `stdio:
+    // 'ignore'` makes it invisible.
+    if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
+      return { error: `--viewer-port: expected an integer between 1 and 65535, got "${viewerPortRaw}"` };
     }
     viewerPort = parsed;
   }
