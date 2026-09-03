@@ -1089,7 +1089,7 @@ note }`. The adapter performs the `/healthz` probe and the detached spawn
 calls the adapter inside a `try`/`catch` before `runLoop`, and prints one line. The runner's
 `structure.test.ts` is **not modified** and must stay green.
 
-- [ ] **Step 1: Write the failing test.** Create `core/viewer-launch.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/viewer-launch.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -1132,10 +1132,10 @@ test('--no-viewer and a missing entry both degrade to skip with a reason', () =>
   Run `cd plugins/tribe/scripts/runner && bun test viewer-launch`.
   Expected: fails to resolve `./viewer-launch.ts`.
 
-- [ ] **Step 2: Implement** the pure module, the `ViewerPort` interface in `ports/ports.ts`, the
+- [x] **Step 2: Implement** the pure module, the `ViewerPort` interface in `ports/ports.ts`, the
   adapter, and the four-line wiring in `cli/main.ts`.
 
-- [ ] **Step 3: Verify.** Run the runner's own check plus a real dry run and a real launch:
+- [x] **Step 3: Verify.** Run the runner's own check plus a real dry run and a real launch:
 
 ```sh
 cd plugins/tribe/scripts/runner && bun run check
@@ -1146,7 +1146,7 @@ bun run.ts --repo /Users/hip/repo/todd-skills --model claude-haiku-4-5-20251001 
   Expected: `bun run check` green **including the untouched `structure.test.ts`**; the dry run
   prints its plan or its state error and prints no viewer line and spawns no process.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/runner docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
