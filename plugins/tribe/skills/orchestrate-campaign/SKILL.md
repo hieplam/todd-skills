@@ -275,6 +275,10 @@ ruling UC-3).
    The harness notifies you when a background command exits — treat that notification itself as
    the "report is ready" signal. Do not poll or guess; wait for it.
 
+   Before the first card's session spawns, the runner also prints a read-only live-viewer URL
+   on its own stdout (`campaign viewer: http://127.0.0.1:4321/live?...`) so the owner can watch
+   the running card's transcript; pass `--no-viewer` above to skip starting it.
+
 3. **On the exit notification, read `campaign-report.json`** under the campaign home. **The exit
    code is a hint, the report is the truth** — always read the report before deciding what to do
    next, even if the exit code alone looks final.

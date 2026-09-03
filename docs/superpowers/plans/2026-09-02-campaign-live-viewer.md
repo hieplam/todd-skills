@@ -1188,7 +1188,7 @@ fails with two unrelated component errors (`c3-213` and `c3-216`, ungrounded Der
 derivations) and `c3x check --only c3-215` already reports canonical markdown drift. Repair
 `c3-215` only. Never touch `c3-213` or `c3-216`; record both, before and after, in the PR body.
 
-- [ ] **Step 1: Write the failing check.** Capture the inherited baseline first, then the two
+- [x] **Step 1: Write the failing check.** Capture the inherited baseline first, then the two
   documentation gaps this task closes:
 
 ```sh
@@ -1201,12 +1201,12 @@ grep -c 'app.js' plugins/tribe/scripts/viewer/README.md || true
   Expected before the edits: the baseline file records exactly the two inherited errors,
   `--only c3-215` reports canonical markdown drift, and both `grep -c` calls report `0`.
 
-- [ ] **Step 2: Implement** the five documentation edits, then bring `c3-215` back into sync with
+- [x] **Step 2: Implement** the five documentation edits, then bring `c3-215` back into sync with
   `c3x repair` (never by hand-editing a seal). Confirm `install.sh` needs no change: `scripts/`
   is deliberately skipped (`install.sh:119-121`) and this branch adds no new agent, skill, rule
   or canvas — record that finding in the PR body rather than silently doing nothing.
 
-- [ ] **Step 3: Verify.**
+- [x] **Step 3: Verify.**
 
 ```sh
 c3x check --only c3-215
@@ -1220,7 +1220,7 @@ grep -c 'viewer-port' plugins/tribe/scripts/runner/README.md
   the two inherited `c3-213`/`c3-216` errors unchanged; the fresh-machine harness passes; and the
   flag is documented at least once.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/README.md plugins/tribe/scripts/runner/README.md plugins/tribe/scripts/viewer/README.md plugins/tribe/skills/orchestrate-campaign/SKILL.md .c3 docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
