@@ -43,3 +43,9 @@ found zero BLOCK findings, or READER: FAIL n BLOCK when you found n of them.
   the model actually used in the review log.
 - Dispatch a fresh subagent every round. Never a fork of the current session, and never the
   current session itself: the whole value is a context that has never seen the draft before.
+- Dispatch the reader with `run_in_background: false`, and wait for its reply. This skill runs
+  in headless sessions, where a backgrounded reader never returns a verdict and the round's log
+  record can never be completed.
+- Open the round's log record before you dispatch: the round number and this rendered brief,
+  verbatim. Complete it with the findings, block count, verdict and your action when the reader
+  returns. A round with no opened record is a round whose reader was never dispatched.

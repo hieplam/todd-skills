@@ -65,17 +65,23 @@ reader blind.
 **Dispatch one blind reader per round.** A fresh subagent — never a fork of this session, never
 this session itself — briefed with `references/blind-reader-brief.md` from this skill directory,
 its three slots filled in: the file path, the audience in one short phrase, and the language.
-Reader model: `sonnet` by default. Nothing else crosses into that brief: not the user's request,
-not your sources, not your reasoning, not the draft text inline, not an earlier round's findings.
-A reader that has been told what the draft was supposed to say can no longer tell you what it
-actually says.
+Reader model: `sonnet` by default. Dispatch it with `run_in_background: false` and wait for its
+reply: this skill runs in headless sessions, where a backgrounded reader never returns a verdict.
+Nothing else crosses into that brief: not the user's request, not your sources, not your
+reasoning, not the draft text inline, not an earlier round's findings. A reader that has been
+told what the draft was supposed to say can no longer tell you what it actually says.
 
-**Fix and loop, three rounds at the most.** Fix every `BLOCK` finding, rewrite the file, and
-dispatch a NEW reader — fresh context again. Stop at `READER: PASS`, or after round 3. Never a
-fourth round. A `NIT` may be dismissed; record the one-clause reason in the log.
+**Log every round, and open the record before you dispatch.** The log is a file named after the
+draft with `.review.jsonl` appended (a draft at `explanation.md` logs to
+`explanation.md.review.jsonl`). Each round is two writes, in this order:
 
-**Log every round.** Append one JSON object per round to a file named after the draft with
-`.review.jsonl` appended (a draft at `explanation.md` logs to `explanation.md.review.jsonl`):
+1. **Open** — before dispatching the reader, append one JSON object carrying `round` and `brief`
+   (the rendered brief, verbatim).
+2. **Complete** — when the reader returns, rewrite that same line with `findings`, `block_count`,
+   `verdict` and `author_action` filled in.
+
+Opening first is not bookkeeping taste. It is what makes a missing log impossible: if the log has
+no record for a round, no reader was dispatched for it.
 
 ```json
 {"round": 1, "reader_model": "sonnet", "brief": "the rendered brief, verbatim", "findings": [{"severity": "BLOCK", "location": "the quoted phrase", "issue": "what broke, in the reader's words"}], "block_count": 1, "verdict": "FAIL", "author_action": "what you changed before the next round"}
@@ -87,14 +93,28 @@ is zero. Check the log with
 holding the draft: exit `0` means the review is well-formed, exit `1` names what is wrong, exit
 `2` means the checker itself could not run.
 
+**Fix and loop. Round 3 is the last round. After its verdict, stop — even on FAIL.** Fix every
+`BLOCK` finding, rewrite the file, and dispatch a NEW reader — fresh context again. Stop at
+`READER: PASS`, or when round 3 returns its verdict, whichever comes first. There is no fourth
+round; the checker fails a log that records one. A `NIT` may be dismissed; record the one-clause
+reason in the log.
+
 **Say how it ended.** The final answer carries exactly one line about the review, never silence:
 
 - `Blind-reader review: PASS after 2 round(s)`
 - `Blind-reader review: ended at cap with 1 open BLOCK finding(s)` followed by the list
 
-**Degrade, never block.** If this session has no subagent dispatch tool, skip the review, keep the
-self-check, and say so in one line:
-`Blind-reader review: skipped (no subagent dispatch available in this session).`
+**Degrade only after a dispatch has actually failed.** Skipping the review is permitted only
+after you attempted to dispatch a reader and that attempt itself failed. Believing that no
+dispatch tool exists is not a permitted reason — attempt the dispatch and let the failure be the
+evidence. When it fails, write the round 0 record to the log first:
+
+```json
+{"round": 0, "brief": "the rendered brief, verbatim", "findings": [], "block_count": 0, "verdict": "FAIL", "author_action": "dispatch failed: the failure text, verbatim"}
+```
+
+then keep the self-check and say so in one line:
+`Blind-reader review: skipped (dispatch failed, round 0 in the review log carries the error).`
 
 ## Self-check before finishing
 

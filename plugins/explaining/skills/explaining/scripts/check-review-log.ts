@@ -57,6 +57,10 @@ export function parseReviewLog(text: string): { rounds: RoundRecord[]; errors: s
       return;
     }
     const record = value as Record<string, unknown>;
+    if (record.round === 0) {
+      errors.push(`${where}: round 0 is the degrade record (the reader dispatch failed) — a review that never dispatched a reader is not a completed review`);
+      return;
+    }
     if (!Number.isInteger(record.round) || (record.round as number) < 1) {
       errors.push(`${where}: round must be an integer of at least 1`);
       return;
@@ -176,7 +180,7 @@ export function evaluateLog(rounds: RoundRecord[], options: EvaluateOptions): Ev
 
   if (rounds.length === 0) reasons.push('no review round recorded');
   if (rounds.length > maxRounds) {
-    reasons.push(`${rounds.length} rounds recorded, cap is ${maxRounds}`);
+    reasons.push(`${rounds.length} rounds recorded, cap is ${maxRounds} — Round 3 is the last round. After its verdict, stop — even on FAIL.`);
   }
 
   rounds.forEach((record, index) => {

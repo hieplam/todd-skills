@@ -1184,6 +1184,255 @@ sed -n '/^## Self-check/,/^## Evidence/p' plugins/explaining/skills/explaining/S
 
 ---
 
+### Task 5b: Harden Rule 5 so a cheap executor cannot skip, mis-log or over-run it
+
+**Why:** Shaman ruling R1 (2026-09-03, `answers.md`). The first Task 8 evidence attempt found
+three conformance defects in Rule 5's *text*, not in the executor: the executor (a) took the
+degrade path while claiming "no subagent dispatch available" without ever attempting a dispatch,
+(b) ran a **fourth** review round, and (c) wrote **no** `*.review.jsonl` at all across four
+rounds. R1's ruling: harden the rule so each step is mechanical and non-optional. Rules 1
+through 4, the Overview and the Evidence section stay frozen — Task 5 step 3's guard is re-run
+here to prove it.
+
+This task also carries, in the same commit, the Shaman's own amendment of the spec (R1 item 2)
+and this plan's Task 8 bookkeeping (R1 item 4). Both document edits are authored by the
+Warchief and are already present in the worktree when this task starts; the Hunter stages them,
+it does not write them.
+
+- Modify: `plugins/explaining/skills/explaining/SKILL.md` (the Rule 5 section only)
+- Modify: `plugins/explaining/skills/explaining/references/blind-reader-brief.md` (the
+  "Rendering notes" section only — the region between `BRIEF-START` and `BRIEF-END` is frozen)
+- Modify: `plugins/explaining/skills/explaining/scripts/check-review-log.ts` (two messages only)
+- Modify: `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts` (new tests)
+
+**Steps**
+
+- [x] **Step 1: Capture the guard, then write the two failing tests.** First record what must
+  not move:
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review
+sed -n '/^## Rule 1/,/^## Rule 5/p' plugins/explaining/skills/explaining/SKILL.md \
+  | sed '/^## Rule 5/,$d' > /tmp/i106-rules-1-to-4-before.txt
+wc -l /tmp/i106-rules-1-to-4-before.txt
+```
+
+  Expected: a non-empty extract covering Rules 1 through 4.
+
+  Then append these two tests to
+  `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts`, inside the existing
+  top-level `describe` that already covers `evaluateLog` and `parseReviewLog` (match the file's
+  existing helper names and import list — add `parseReviewLog` to the import if it is not
+  already there):
+
+```ts
+describe('ruling R1 message hardening', () => {
+  test('the over-cap reason quotes the stop sentence from Rule 5', () => {
+    const rounds = [1, 2, 3, 4].map((round) => ({
+      round,
+      brief: 'x',
+      findings: [],
+      block_count: 0,
+      verdict: 'PASS' as const,
+    }));
+    const reasons = evaluateLog(rounds, { invariants: [], prompt: '' }).reasons.join(' ');
+    expect(reasons).toContain(`cap is ${MAX_ROUNDS}`);
+    expect(reasons).toContain('Round 3 is the last round. After its verdict, stop — even on FAIL.');
+  });
+
+  test('a round 0 record is named as the degrade record, not a type complaint', () => {
+    const line = JSON.stringify({
+      round: 0,
+      brief: 'x',
+      findings: [],
+      block_count: 0,
+      verdict: 'FAIL',
+      author_action: 'dispatch failed: no such tool',
+    });
+    const { rounds, errors } = parseReviewLog(line);
+    expect(rounds).toHaveLength(0);
+    expect(errors.join(' ')).toContain('round 0');
+    expect(errors.join(' ')).toContain('degrade');
+  });
+});
+```
+
+  Run them and watch them FAIL:
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review/plugins/explaining/skills/explaining/scripts
+bun test check-review-log.test.ts
+```
+
+  Expected: RED — the two new tests fail (the cap reason does not yet carry the stop sentence;
+  the round 0 error still reads "round must be an integer of at least 1"). Every other test in
+  the file still passes. Paste the failing output into the report file verbatim.
+
+- [x] **Step 2: Change exactly two messages in `check-review-log.ts`.** Nothing else in that
+  file moves — no exit code, no field, no accepted shape. The two edits:
+
+  In `parseReviewLog`, replace the single round-validity branch with a branch that names round 0
+  specifically and leaves every other invalid value on the existing message:
+
+```ts
+    if (record.round === 0) {
+      errors.push(`${where}: round 0 is the degrade record (the reader dispatch failed) — a review that never dispatched a reader is not a completed review`);
+      continue;
+    }
+    if (!Number.isInteger(record.round) || (record.round as number) < 1) {
+      errors.push(`${where}: round must be an integer of at least 1`);
+      continue;
+    }
+```
+
+  (Keep whatever control-flow keyword the surrounding loop already uses to drop an invalid
+  record — if the existing branch does not `continue`, mirror exactly what it does instead.)
+
+  In `evaluateLog`, extend the over-cap reason so it quotes Rule 5's stop sentence:
+
+```ts
+    reasons.push(`${rounds.length} rounds recorded, cap is ${maxRounds} — Round 3 is the last round. After its verdict, stop — even on FAIL.`);
+```
+
+- [x] **Step 3: Replace the Rule 5 section in `SKILL.md`.** Replace everything from the line
+  `## Rule 5 — Blind-reader review before delivery` up to (but NOT including) the line
+  `## Self-check before finishing` with exactly this text:
+
+````markdown
+## Rule 5 — Blind-reader review before delivery
+
+You cannot see what a reader lacks, because you have the context that makes every jump feel
+smooth. The self-check below is you grading your own homework; this rule is the part a reader
+does.
+
+**When.** The deliverable is a file on disk (HTML or markdown), or the explanatory prose runs to
+600 words or more. Shorter answers keep the self-check alone.
+
+**Draft to disk first.** Write the complete draft to a file — the artifact itself, or
+`explanation.md` in the working directory when the deliverable is prose. The review runs on the
+file, never on pasted text: the path is the reader's entire input, and that is what keeps the
+reader blind.
+
+**Dispatch one blind reader per round.** A fresh subagent — never a fork of this session, never
+this session itself — briefed with `references/blind-reader-brief.md` from this skill directory,
+its three slots filled in: the file path, the audience in one short phrase, and the language.
+Reader model: `sonnet` by default. Dispatch it with `run_in_background: false` and wait for its
+reply: this skill runs in headless sessions, where a backgrounded reader never returns a verdict.
+Nothing else crosses into that brief: not the user's request, not your sources, not your
+reasoning, not the draft text inline, not an earlier round's findings. A reader that has been
+told what the draft was supposed to say can no longer tell you what it actually says.
+
+**Log every round, and open the record before you dispatch.** The log is a file named after the
+draft with `.review.jsonl` appended (a draft at `explanation.md` logs to
+`explanation.md.review.jsonl`). Each round is two writes, in this order:
+
+1. **Open** — before dispatching the reader, append one JSON object carrying `round` and `brief`
+   (the rendered brief, verbatim).
+2. **Complete** — when the reader returns, rewrite that same line with `findings`, `block_count`,
+   `verdict` and `author_action` filled in.
+
+Opening first is not bookkeeping taste. It is what makes a missing log impossible: if the log has
+no record for a round, no reader was dispatched for it.
+
+```json
+{"round": 1, "reader_model": "sonnet", "brief": "the rendered brief, verbatim", "findings": [{"severity": "BLOCK", "location": "the quoted phrase", "issue": "what broke, in the reader's words"}], "block_count": 1, "verdict": "FAIL", "author_action": "what you changed before the next round"}
+```
+
+`block_count` is the number of `BLOCK` findings and `verdict` is `PASS` exactly when that count
+is zero. Check the log with
+`bun scripts/check-review-log.ts --prompt "the request you were given"` from the directory
+holding the draft: exit `0` means the review is well-formed, exit `1` names what is wrong, exit
+`2` means the checker itself could not run.
+
+**Fix and loop. Round 3 is the last round. After its verdict, stop — even on FAIL.** Fix every
+`BLOCK` finding, rewrite the file, and dispatch a NEW reader — fresh context again. Stop at
+`READER: PASS`, or when round 3 returns its verdict, whichever comes first. There is no fourth
+round; the checker fails a log that records one. A `NIT` may be dismissed; record the one-clause
+reason in the log.
+
+**Say how it ended.** The final answer carries exactly one line about the review, never silence:
+
+- `Blind-reader review: PASS after 2 round(s)`
+- `Blind-reader review: ended at cap with 1 open BLOCK finding(s)` followed by the list
+
+**Degrade only after a dispatch has actually failed.** Skipping the review is permitted only
+after you attempted to dispatch a reader and that attempt itself failed. Believing that no
+dispatch tool exists is not a permitted reason — attempt the dispatch and let the failure be the
+evidence. When it fails, write the round 0 record to the log first:
+
+```json
+{"round": 0, "brief": "the rendered brief, verbatim", "findings": [], "block_count": 0, "verdict": "FAIL", "author_action": "dispatch failed: the failure text, verbatim"}
+```
+
+then keep the self-check and say so in one line:
+`Blind-reader review: skipped (dispatch failed, round 0 in the review log carries the error).`
+
+````
+
+- [x] **Step 4: Add two rendering notes to the brief template.** In
+  `plugins/explaining/skills/explaining/references/blind-reader-brief.md`, append these two
+  bullets to the end of the `## Rendering notes (never send these to the reader)` list. Do not
+  touch anything between `BRIEF-START` and `BRIEF-END`, and never introduce a `{{` slot outside
+  that region — two shipped tests assert both:
+
+```markdown
+- Dispatch the reader with `run_in_background: false`, and wait for its reply. This skill runs
+  in headless sessions, where a backgrounded reader never returns a verdict and the round's log
+  record can never be completed.
+- Open the round's log record before you dispatch: the round number and this rendered brief,
+  verbatim. Complete it with the findings, block count, verdict and your action when the reader
+  returns. A round with no opened record is a round whose reader was never dispatched.
+```
+
+- [x] **Step 5: Prove it green, and prove the frozen regions did not move.**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review/plugins/explaining/skills/explaining/scripts
+bun test
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review
+diff <(grep -v '^$' /tmp/i106-rules-1-to-4-before.txt) \
+     <(sed -n '/^## Rule 1/,/^## Rule 5/p' plugins/explaining/skills/explaining/SKILL.md \
+       | sed '/^## Rule 5/,$d' | grep -v '^$')
+sed -n '/^## Self-check/,/^## Evidence/p' plugins/explaining/skills/explaining/SKILL.md | grep -c '^[0-9]\.'
+grep -c "run_in_background: false" plugins/explaining/skills/explaining/SKILL.md
+grep -c "run_in_background: false" plugins/explaining/skills/explaining/references/blind-reader-brief.md
+grep -c "Round 3 is the last round. After its verdict, stop" plugins/explaining/skills/explaining/SKILL.md
+grep -c "Round 3 is the last round. After its verdict, stop" plugins/explaining/skills/explaining/scripts/check-review-log.ts
+python3 -c "import json;json.load(open('plugins/explaining/skills/explaining/evals/evals.json'))" && echo "json ok"
+python3 -m unittest discover -s scripts/evals/tests -t .
+```
+
+  Expected: `bun test` is fully green with two more tests than before (105 pass / 0 fail, up from
+  103); the `diff` of the Rules 1 through 4 region prints nothing; the self-check still lists
+  exactly 4 numbered items; each `grep -c` is at least 1; the evals JSON parses; the harness
+  unittest run reports `OK` (48 tests). Paste every command's output into the report file
+  verbatim.
+
+- [x] **Step 6: Commit.** Stage exactly these six paths and nothing else (`git add` each path
+  explicitly — never `git add -A`, never `git commit -a`; three unrelated dirty files exist in
+  this repo and are not yours):
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review
+git add plugins/explaining/skills/explaining/SKILL.md \
+        plugins/explaining/skills/explaining/references/blind-reader-brief.md \
+        plugins/explaining/skills/explaining/scripts/check-review-log.ts \
+        plugins/explaining/skills/explaining/scripts/check-review-log.test.ts \
+        docs/superpowers/specs/2026-09-02-explaining-blind-reader-review-design.md \
+        docs/superpowers/plans/2026-09-02-explaining-blind-reader-review.md
+git status --short
+```
+
+  Expected: exactly those six paths staged, nothing else. The spec and plan files are already
+  modified in the worktree by the Warchief (the R1 spec amendment and this task's own section) —
+  stage them as they are; do not edit them beyond ticking this task's six step checkboxes.
+
+  Commit message: `explaining: harden Rule 5 against a cheap reader (ruling R1)`, with a single
+  final paragraph carrying, on three lines, `Tribe-Card: i106-blind-reader-review`,
+  `Tribe-Task: 5b/10` and `Campaign: gh-issues-2026-09`. Never add an agent name as a co-author.
+
+---
+
 ### Task 6: Eval case 4 and its consistency test
 
 **Why:** spec §2.3 and `c3-201`'s frozen fact — no rule addition without new eval evidence. This
@@ -1390,8 +1639,20 @@ grep -c "blind-reader-brief.md" plugins/explaining/README.md
 ### Task 8: Evidence run — case 4 (G1, G2, G3, G4)
 
 **Why:** spec §6 item 2 and §2.3. This is the paid measurement that decides whether Rule 5 ships.
-**Run by the Warchief**, not a Hunter: capturing evidence through the repo harness is the
-Warchief's own delivery duty, and the eval budget is not a Hunter's to spend.
+Never a Hunter's task: the eval budget is not a Hunter's to spend.
+
+**Amended by ruling R1 (2026-09-03).** Three things changed after the first attempt at this task
+escalated. (a) **Who runs it:** the harness commands below are run by the **Shaman** in its own
+session, because a conformant case-4 run over-runs the 600-second foreground command cap the
+Warchief session is bound by. The commands stay here verbatim as the record of what is run. The
+Warchief's job in this task becomes *incorporating* the Shaman's results: it is handed the path
+of the results directory and writes the evidence document, the benchmark copy and the preserved
+artifacts from it. (b) **Two executor cells, 3 runs each:** `claude-haiku-4-5-20251001` (step 1)
+and `sonnet` (step 1b), plus the pre-change cost cell (step 3). (c) **Which cell gates:** G1's
+≥2/3 gate applies to the **`sonnet`** cell. The Haiku cell is reported in full — pass rate and
+the failure shapes — as the model-transfer measurement, the same way the skill's own Evidence
+section reports its Opus→Fable transfer grid; it does not gate. If the `sonnet` cell also misses
+≥2/3, the rule does not ship: return NEEDS_DIRECTION with the numbers (spec §7 risk 1 stands).
 
 - Create: `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review.md`
 - Create: `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review-benchmark.json`
@@ -1415,6 +1676,21 @@ python3 scripts/evals/run_evals.py \
   Expected: 3 executor runs and up to 3 grader runs complete; `benchmark.json` reports
   `with_skill` pass rate over graded runs; each run directory carries an `artifacts/` folder
   holding a draft and a `*.review.jsonl`. The G1 gate is at least 2 of 3 passing.
+
+- [ ] **Step 1b: Run the same case on the gating executor model (`sonnet`).** Identical to step
+  1 except for the executor model and the output directory. This is the cell G1 is measured on:
+
+```bash
+cd /Users/hip/repo/todd-skills
+python3 scripts/evals/run_evals.py \
+  --evals plugins/explaining/skills/explaining/evals/evals.json \
+  --eval-id 4 --mode with_skill --runs 3 --jobs 3 \
+  --exec-model sonnet --grader-model sonnet \
+  --out-dir /tmp/i106-case4-sonnet 2>&1 | tee /tmp/i106-case4-sonnet/run.log
+```
+
+  Expected: 3 executor runs complete and at least 2 of 3 pass `checks[]` — that is G1. Each run
+  directory carries an `artifacts/` folder holding a draft and a `*.review.jsonl`.
 
 - [ ] **Step 2: Re-verify one preserved log by hand, and tally G2, G3 and G4.** The check's own
   stdout is only captured by the harness on a non-pass, so re-run it over the preserved artifacts

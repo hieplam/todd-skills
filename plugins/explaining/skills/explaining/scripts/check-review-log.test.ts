@@ -309,3 +309,33 @@ describe('main() exit codes', () => {
     }
   });
 });
+
+describe('ruling R1 message hardening', () => {
+  test('the over-cap reason quotes the stop sentence from Rule 5', () => {
+    const rounds = [1, 2, 3, 4].map((round) => ({
+      round,
+      brief: 'x',
+      findings: [],
+      block_count: 0,
+      verdict: 'PASS' as const,
+    }));
+    const reasons = evaluateLog(rounds, { invariants: [], prompt: '' }).reasons.join(' ');
+    expect(reasons).toContain(`cap is ${MAX_ROUNDS}`);
+    expect(reasons).toContain('Round 3 is the last round. After its verdict, stop — even on FAIL.');
+  });
+
+  test('a round 0 record is named as the degrade record, not a type complaint', () => {
+    const line = JSON.stringify({
+      round: 0,
+      brief: 'x',
+      findings: [],
+      block_count: 0,
+      verdict: 'FAIL',
+      author_action: 'dispatch failed: no such tool',
+    });
+    const { rounds, errors } = parseReviewLog(line);
+    expect(rounds).toHaveLength(0);
+    expect(errors.join(' ')).toContain('round 0');
+    expect(errors.join(' ')).toContain('degrade');
+  });
+});
