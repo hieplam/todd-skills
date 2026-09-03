@@ -584,7 +584,7 @@ Spec D3: the tree comes from the `.meta.json` sidecars — `spawnDepth: 1` entri
 session node, deeper ones off `parentAgentId`. Status order: `missing`, then `done`, then
 `active` (mtime within `ACTIVE_WINDOW_MS`), else `idle`. A null meta never drops an entry.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/processes.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/processes.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -645,14 +645,14 @@ test('an unreadable sidecar still yields a visible entry', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/processes.test.ts`.
   Expected: fails to resolve `./processes.ts`.
 
-- [ ] **Step 2: Implement** `core/live/processes.ts`. The session node is always first, with
+- [x] **Step 2: Implement** `core/live/processes.ts`. The session node is always first, with
   `agentId: null` and `kind: 'session'`; children are sorted by `firstSeenIso` then `agentId` so
   the order is stable between ticks.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and the derivation reproduces the shapes verified on disk in spec §1.1.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/processes.ts plugins/tribe/scripts/viewer/core/live/processes.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
