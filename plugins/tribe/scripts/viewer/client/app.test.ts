@@ -8,7 +8,14 @@ import { createLiveClient } from './app.js';
 // `childElementCount`/`firstElementChild`/`removeChild` for eviction (F14). A `querySelector`
 // call built from a malformed `seq` throws, exactly like a real browser rejecting an invalid
 // attribute-selector string (F15's reproduction vehicle).
-function fakeDoc(opts: { liveRootProcess?: string } = {}) {
+//
+// `#transcript` and `#process-list` are two SEPARATE nodes in a real document (Skinner audit,
+// 2026-09-02, F28) — routing both to one shared object here would let a `renderProcessList`
+// `.innerHTML =` write silently clobber a `replaceTranscript` write (or vice versa) without any
+// test ever noticing, since neither call site reads the other's element back. `makeFakeEl()` is
+// the one node shape both `#transcript` and `#process-list` get their own independent instance
+// of.
+function makeFakeEl() {
   const nodes: string[] = [];
   const cards = new Map<string, { innerHTML: string; className: string }>();
   const children: { seq: string; innerHTML: string; className: string }[] = [];
@@ -49,15 +56,27 @@ function fakeDoc(opts: { liveRootProcess?: string } = {}) {
     dataset: {} as Record<string, string>,
   };
 
+  return { el, nodes, cards };
+}
+
+function fakeDoc(opts: { liveRootProcess?: string } = {}) {
+  const { el: transcriptEl, nodes, cards } = makeFakeEl();
+  const { el: processListEl } = makeFakeEl();
+
   const liveRootEl = { dataset: (opts.liveRootProcess ? { process: opts.liveRootProcess } : {}) as Record<string, string> };
 
   return {
     nodes,
     cards,
     doc: {
-      getElementById: (id: string) => (id === 'live-root' ? liveRootEl : el),
-      querySelector: () => el,
-      body: el,
+      getElementById: (id: string) => {
+        if (id === 'live-root') return liveRootEl;
+        if (id === 'transcript') return transcriptEl;
+        if (id === 'process-list') return processListEl;
+        return null;
+      },
+      querySelector: () => transcriptEl,
+      body: transcriptEl,
     },
   };
 }
@@ -186,4 +205,18 @@ test('calling start() twice does not leak a second EventSource (F17)', () => {
   client.start();
   expect(FakeEventSource.instances.length - before).toBe(1);
   expect(FakeEventSource.last!.closed).toBe(false);
+});
+
+test('the process list and the transcript are distinct DOM nodes (F28)', () => {
+  const { doc } = fakeDoc();
+  const client = createLiveClient({ EventSource: FakeEventSource as never, document: doc as never, location: { search: '?repo=a&slug=b' } as never });
+  client.start();
+  FakeEventSource.last!.emit('processes', { processes: [{ id: 'card:T20', label: 'Root', status: 'running', depth: 0 }] });
+  FakeEventSource.last!.emit('snapshot', { events: [{ seq: 1, kind: 'assistant_text', html: '<p>hi</p>', timestamp: null }] });
+  const processListHtml = (doc.getElementById('process-list') as unknown as { innerHTML: string }).innerHTML;
+  const transcriptHtml = (doc.getElementById('transcript') as unknown as { innerHTML: string }).innerHTML;
+  expect(processListHtml).toContain('Root');
+  expect(processListHtml).not.toContain('<p>hi</p>');
+  expect(transcriptHtml).toContain('<p>hi</p>');
+  expect(transcriptHtml).not.toContain('Root');
 });
