@@ -1769,7 +1769,7 @@ can quietly cost the older behavior. This re-measures case 3 against its recorde
 
 **Steps**
 
-- [ ] **Step 1: Re-run case 3, both modes, three runs.**
+- [x] **Step 1: Re-run case 3, both modes, three runs.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1786,13 +1786,13 @@ python3 scripts/evals/run_evals.py \
   `sonnet` here to match the recorded baseline it is being compared against, not the cheap model
   used for the new case.
 
-- [ ] **Step 2: Append the regression section to the evidence document.** Add a `## G5 — no
+- [x] **Step 2: Append the regression section to the evidence document.** Add a `## G5 — no
   regression on case 3` section quoting: the command, both pass rates, the pre-change rates from
   the prior card's evidence file, ungraded counts, and a one-line verdict. If `with_skill` comes
   in below 2 of 3, record it and STOP — that is a regression, not a rounding error, and it goes to
   the Shaman with the numbers rather than being explained away.
 
-- [ ] **Step 3: Commit** — stage the evidence document and this plan; message
+- [x] **Step 3: Commit** — stage the evidence document and this plan; message
   `evidence: case 3 regression check after Rule 5`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 9/10`.
 

@@ -351,3 +351,46 @@ The complete results tree — every transcript, `grading.json`, `metrics.json` a
 directory, plus `lane.sh`, `lane-C.log` and the invalid `quota-killed-0049Z/` attempt — lives
 outside the repo at
 `~/.tribe/-Users-hip-repo-todd-skills/campaigns/gh-issues-2026-09/evidence/i106/`.
+
+## G5 — no regression on case 3
+
+Rule 5 lengthened the same prompt that carries Rule 4, so the older illustrated-flow behaviour was
+re-measured against its recorded baseline. Command as run (cell 4 above):
+
+```bash
+python3 scripts/evals/run_evals.py \
+  --evals plugins/explaining/skills/explaining/evals/evals.json \
+  --eval-id 3 --mode both --runs 3 --jobs 3 \
+  --exec-model sonnet --grader-model sonnet --timeout 1500 \
+  --out-dir <results>/case3
+```
+
+| Cell | Before Rule 5 (recorded) | After Rule 5 (this run) | Verdict |
+| --- | --- | --- | --- |
+| `clean` · `with_skill` | **2/3** | **3/3** (pass_rate mean 1.0, stddev 0.0) | no regression — improved |
+| `clean` · `without_skill` | **0/3** | **0/3** (no HTML artifact produced) | unchanged |
+
+The "before" column is the rate recorded for the same case in
+`docs/tribe/planning/explaining-illustration/evidence/EVIDENCE.md` (the prior card's evidence,
+`clean · with_skill` 2/3 against gate ≥2 of 3, baseline 0/3). `ungraded` = 0 in both modes and
+`setup_errors` = 0, so the comparison is like-for-like: same case, same executor tier (`sonnet`),
+same `clean` arm.
+
+Per-run detail, `with_skill`: 521.0 s / 2 711 092 tok, 815.7 s / 3 066 547 tok, 793.5 s /
+3 460 390 tok — all three passed. `without_skill`: 22.3 s, 19.7 s, 17.5 s, none of which produced
+a valid HTML artifact, exactly as before.
+
+**Verdict: G5 met.** Adding Rule 5 did not cost Rule 4's behaviour; on this run it went up by one
+run out of three, which at n=3 is within noise and is reported as "no regression", not as a gain.
+
+## Limits of this evidence
+
+1. **n = 3 per cell.** Directional, not statistical. The gate cell's stddev is 0.0 only because
+   all three runs passed; a single run's variance is not measurable at this sample size.
+2. **G1 is measured on `sonnet`.** Ruling R1 put the gate there deliberately after the cheap model
+   proved non-conformant. The `claude-haiku-4-5-20251001` cell is the transfer measurement and it
+   passes only 1 of 3 — Rule 5 should be expected to work reliably at the `sonnet` tier and to
+   degrade on cheaper executors, mostly through log-fidelity failures rather than skipped reviews.
+3. **The pre-change cost cell cannot speak to quality**, only to cost — see the caveat in G4.
+4. **The cost is real.** ~16× the tokens of the pre-change skill on this prompt. Rule 5's `When`
+   clause (an on-disk artifact, or ≥600 words) is what keeps that cost off short answers.
