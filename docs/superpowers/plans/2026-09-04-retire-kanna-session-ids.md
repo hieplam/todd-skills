@@ -43,17 +43,28 @@ a="$(git ls-files plugins/tribe/scripts/kanna)"
 [ -z "$a" ] && echo "ok: git ls-files plugins/tribe/scripts/kanna is empty" || { echo "FAIL: still tracked: $a"; fail=1; }
 [ ! -e plugins/tribe/scripts/tests/test-list-session-ids.sh ] \
   && echo "ok: test-list-session-ids.sh is gone" || { echo "FAIL: test file still present"; fail=1; }
-b="$(grep -rn list-session-ids plugins .c3 README.md install.sh || true)"
-[ -z "$b" ] && echo "ok: grep -rn list-session-ids plugins .c3 README.md install.sh is empty" \
-  || { echo "FAIL: remaining hits:"; echo "$b"; fail=1; }
+b="$(grep -rnI list-session-ids plugins .c3 README.md install.sh || true)"
+[ -z "$b" ] && echo "ok: grep -rnI list-session-ids plugins .c3 README.md install.sh is empty" \
+  || { echo "FAIL: remaining text hits:"; echo "$b"; fail=1; }
+c="$(git grep -n list-session-ids -- plugins .c3 README.md install.sh || true)"
+[ -z "$c" ] && echo "ok: git grep list-session-ids over tracked plugins/.c3/README/install.sh is empty" \
+  || { echo "FAIL: remaining tracked hits:"; echo "$c"; fail=1; }
 exit "$fail"
 SH
 chmod +x /tmp/g1-assert.sh
 bash /tmp/g1-assert.sh; echo "exit=$?"
 ```
 
-Expected at base (RED, before Task 1): three `FAIL:` lines and `exit=1`.
-Expected after Task 2 (GREEN): three `ok:` lines and `exit=0`.
+**Why `-I` (skip binary files).** A plain `grep -r` over `.c3` also matches
+`.c3/c3.db`, the C3 local sqlite cache. That file is **gitignored**
+(`.gitignore:2`), untracked, and rebuilt from the canonical `.c3/*.md` by `c3x` on demand — it
+is a build artifact, not a repo reference, and a stale string sitting in a sqlite free page is
+not a surviving mention of the script. `-I` skips it; the added `git grep` line then asserts the
+same thing over exactly the set that *is* the repo (tracked files), so the goal is proven twice
+rather than weakened once.
+
+Expected at base (RED, before Task 1): four `FAIL:` lines and `exit=1`.
+Expected after Task 2 (GREEN): four `ok:` lines and `exit=0`.
 
 ---
 
@@ -71,7 +82,8 @@ bash /tmp/g1-assert.sh; echo "exit=$?"
 ```
 
 Expected: `FAIL: still tracked: plugins/tribe/scripts/kanna/list-session-ids.sh`,
-`FAIL: test file still present`, `FAIL: remaining hits:` listing four paths
+`FAIL: test file still present`, and two `FAIL: remaining ... hits:` blocks listing the same
+six lines across four paths
 (`.c3/c3-2-plugins/c3-215-tribe.md:78`, `plugins/tribe/scripts/kanna/list-session-ids.sh:2`,
 `plugins/tribe/scripts/kanna/list-session-ids.sh:7`,
 `plugins/tribe/scripts/runner/README.md:215`,
@@ -324,7 +336,7 @@ Expected, matching the base capture in the spec: `check --only c3-215` prints
 `Checked 46 docs — all clear` with `only-215 exit=0`; the full `check` prints
 `Checked 46 docs — 2 errors` naming `c3-213` and `c3-216` and nothing else, with `full exit=1`
 (identical to base — those two are inherited and out of scope, so do **not** fix them); the ADR
-check exits 0; `/tmp/g1-assert.sh` prints three `ok:` lines with `g1 exit=0`. `git status --short`
+check exits 0; `/tmp/g1-assert.sh` prints four `ok:` lines with `g1 exit=0`. `git status --short`
 must show no stray `.c3/c3.db-shm` or `.c3/c3.db-wal`; delete them with
 `rm -f .c3/c3.db-shm .c3/c3.db-wal` if they appear.
 
