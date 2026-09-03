@@ -428,7 +428,7 @@ italic, ATX headings, bullet and numbered lists, links, paragraphs, hard line br
 else renders as escaped text. Escaping happens **before** markup is added, so no input can ever
 inject an element or an attribute.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/markdown.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/markdown.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -458,14 +458,14 @@ test('a javascript: link is rendered as plain text, never as an anchor', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/markdown.test.ts`.
   Expected: fails to resolve `./markdown.ts`.
 
-- [ ] **Step 2: Implement** `core/live/markdown.ts`. Split fenced blocks out first, escape every
+- [x] **Step 2: Implement** `core/live/markdown.ts`. Split fenced blocks out first, escape every
   segment, then apply inline rules to the non-fenced segments only. Anchor `href` values are
   allowed only when they start with `http://`, `https://`, or `/`.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and no test input escapes as live markup.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/markdown.ts plugins/tribe/scripts/viewer/core/live/markdown.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
