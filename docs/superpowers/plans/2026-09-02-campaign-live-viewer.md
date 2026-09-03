@@ -992,7 +992,7 @@ existing `scanTribeRoot`/`deriveStatus`/`renderPage` chain unchanged; `core/rend
 `MAX_LIVE_STREAMS`; the 8-th plus connection gets `503`. Every read failure becomes an `error`
 frame, never a thrown request.
 
-- [ ] **Step 1: Write the failing tests.** Create both adapter tests; the transcript adapter test
+- [x] **Step 1: Write the failing tests.** Create both adapter tests; the transcript adapter test
   writes real files under a temp dir and asserts incremental reads:
 
 ```ts
@@ -1037,11 +1037,11 @@ test('a subagent appearing mid-run is listed on the very next poll', async () =>
   Run `cd plugins/tribe/scripts/viewer && bun test adapters`.
   Expected: both files fail to resolve their modules.
 
-- [ ] **Step 2: Implement** the two adapters, the `README.md`, the `serve.ts` routes, and the one
+- [x] **Step 2: Implement** the two adapters, the `README.md`, the `serve.ts` routes, and the one
   link in `core/render.ts`. `serve.ts` reads the two client assets once at startup and serves
   them from memory with correct content types.
 
-- [ ] **Step 3: Verify.** Run the check, then drive the real server against the campaign home
+- [x] **Step 3: Verify.** Run the check, then drive the real server against the campaign home
   that already exists on this machine:
 
 ```sh
@@ -1057,7 +1057,7 @@ kill %1
   Expected: `bun run check` green; `/healthz` returns the health JSON; `/api/processes` lists the
   card session nodes with their subagents; the status page contains at least one live link.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer docs/superpowers/plans/2026-09-02-campaign-live-viewer.md

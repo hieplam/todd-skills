@@ -1,0 +1,87 @@
+# Campaign viewer
+
+A **stateless, read-only** local HTTP server for a machine's `~/.tribe/` tree, with two surfaces:
+
+- **Status page** (`GET /`) — a refresh-based snapshot of every campaign found under
+  `--tribe-root`: liveness, cards, escalations, worker reports, the session log tail. Every GET
+  re-scans from scratch; the refresh IS the poll, nothing is cached (unchanged from before this
+  package grew a second surface).
+- **Live view** (`GET /live`) — while a campaign's session is running, one page listing every
+  process the runner spawned for the currently running card (the executor session and every
+  subagent) and tailing each transcript live, over Server-Sent Events, within ~2s of a new
+  message. See
+  [`docs/superpowers/specs/2026-09-02-campaign-live-viewer-design.md`](../../../../docs/superpowers/specs/2026-09-02-campaign-live-viewer-design.md)
+  for the full design.
+
+This file documents what the code in this directory **actually does** — verified against the
+code, not asserted from memory.
+
+## Read-only, by construction
+
+Nothing in this package ever writes, renames, deletes, locks, or executes anything, anywhere; it
+never calls `git`, `gh`, or any network endpoint; it binds `127.0.0.1` only. Every filesystem
+access — for both surfaces — goes through `adapters/scan.adapter.ts` (status page) or
+`adapters/transcript.adapter.ts` (live view); the poller
+(`adapters/poller.adapter.ts`) is the only clock owner. Nothing under `core/` touches the
+filesystem, the clock, or the network directly — `structure.test.ts` enforces this mechanically
+on every `bun test` run.
+
+## Run it
+
+```sh
+bun serve.ts --tribe-root ~/.tribe --port 4321
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--tribe-root` | `$HOME/.tribe` | Root directory to scan for `<repoKey>/campaigns/<slug>/` trees. |
+| `--port` | `4321` | HTTP port, bound to `127.0.0.1` only. |
+
+## Routes
+
+| Route | Response |
+| --- | --- |
+| `GET /` | The status page (unchanged renderer), plus one "watch live" link per campaign section. |
+| `GET /live?repo=<repoKey>&slug=<slug>[&process=<id>]` | The live page shell — content arrives over `/events`. |
+| `GET /events?repo=…&slug=…[&process=…]` | SSE stream: `processes`, `snapshot`, `append`, `ping`, `error`. Capped at 8 concurrent streams; the 9th connection gets `503`. |
+| `GET /api/processes?repo=…&slug=…` | `{ processes }` JSON — the machine-readable process list (also the e2e's assertion surface). |
+| `GET /app.js`, `GET /app.css` | The two static browser client files, served from memory from a fixed allowlist — never resolved from the request path. |
+| `GET /healthz` | `{ ok: true, viewer: "tribe-live-viewer", v: 1 }` — the runner's "is a viewer already serving this port" reuse probe. |
+| anything else | `404` |
+
+`repo` and `slug` are separate query parameters (never one slash-joined value) and must each
+match `^[A-Za-z0-9._-]+$`; anything else is `400` before a single path is built.
+
+## How the live view finds a campaign's transcripts
+
+Given `repo` + `slug` alone (no new persisted field — nothing under `~/.tribe` gained a new
+field for this feature):
+
+1. Read the campaign's newest `runs/<id>/run.json` for the target repo's `cwd` and the
+   `campaign-state.json` path.
+2. Read that state file's `sequence`/`cards`; pick the newest-in-sequence card whose status is
+   `running` (falling back to the last card in `sequence` if none is currently running, e.g. the
+   run already ended) — that card's `sessionId` names the session to watch.
+3. Encode the repo `cwd` the same way Claude Code does
+   (`core/live/paths.ts:sanitizeProjectDirName`, ported from Kanna) to find
+   `~/.claude/projects/<encoded>/<sessionId>.jsonl` (the parent transcript) and
+   `~/.claude/projects/<encoded>/<sessionId>/subagents/agent-*.jsonl` (+ `.meta.json` sidecars,
+   for every subagent).
+
+## Package layout
+
+```
+core/                    pure: parsing, normalizing, process-tree derivation, HTML rendering
+core/live/                pure: the live-view wire contract, path math, tail state machine,
+                           transcript reader, markdown, normalize, process derivation, routes,
+                           page shell
+client/                  browser ES module + stylesheet — no build step, no imports
+adapters/scan.adapter.ts        status-page filesystem/process reads
+adapters/transcript.adapter.ts  live-view filesystem reads (transcripts, sidecars, assets)
+adapters/poller.adapter.ts      the live view's clock — one 400ms poll loop per SSE connection
+serve.ts                 composition root: routes + wiring
+structure.test.ts         executable purity wall for this package
+fixtures/                hand-authored transcript shapes used by the live-view unit tests
+```
+
+Check command: `bun run check` (`tsc --noEmit && bun test`).
