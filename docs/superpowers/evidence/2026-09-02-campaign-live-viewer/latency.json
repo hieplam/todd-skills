@@ -1,13 +1,20 @@
 {
-  "measuredAt": "2026-09-03T14:03:47.705Z",
+  "measuredAt": "2026-09-03T16:02:51.441Z",
   "budgetMs": 2000,
   "latenciesMs": [
-    186.1005859375,
-    343.911376953125,
-    268.54296875,
-    109.28173828125,
-    35.310546875
+    1414,
+    783,
+    247,
+    1140,
+    145
   ],
-  "worstMs": 343.911376953125,
-  "sampleCount": 5
+  "worstMs": 1414,
+  "sampleCount": 5,
+  "sampleMethods": [
+    "timestamp",
+    "timestamp",
+    "timestamp",
+    "timestamp",
+    "timestamp"
+  ]
 }
