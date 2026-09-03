@@ -79,6 +79,23 @@ describe('parseSessionSignals — against real captured logs', () => {
     expect(got.quota).toBe(null);
   });
 
+  test('a truncated FINAL line is caught even at a very short prefix, not just past the ' +
+    'first ~25 bytes of the type token (F3b)', () => {
+    const lines = read('quota-real-429.log').trim().split('\n');
+    const rejectedIdx = lines.findIndex((l) => l.includes('"type":"rate_limit_event"'));
+    const rejectedLine = lines[rejectedIdx] as string;
+    for (const n of [1, 5, 10, 15, 25, 26, 30]) {
+      const truncated = rejectedLine.slice(0, n);
+      const tail = [...lines.slice(0, rejectedIdx), truncated].join('\n');
+      expect(parseSessionSignals(tail).finalLineUnparseable).toBe(true);
+    }
+  });
+
+  test('pure noise as the final line is still never flagged, however short (F3b guard)', () => {
+    const lines = ['{"type":"result","is_error":false}', '{"unclosed":'];
+    expect(parseSessionSignals(lines.join('\n')).finalLineUnparseable).toBeUndefined();
+  });
+
   test('every 5xx overload status is recognized, 429 excluded', () => {
     for (const status of [500, 502, 503, 504, 529]) {
       const line = JSON.stringify({ type: 'result', is_error: true, api_error_status: status });
