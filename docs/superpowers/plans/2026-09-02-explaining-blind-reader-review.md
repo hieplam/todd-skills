@@ -1661,7 +1661,7 @@ section reports its Opus→Fable transfer grid; it does not gate. If the `sonnet
 
 **Steps**
 
-- [ ] **Step 1: Run case 4, with the skill, three runs, on the cheap executor model.** Model ids
+- [x] **Step 1: Run case 4, with the skill, three runs, on the cheap executor model.** Model ids
   verbatim from spec §6 item 2:
 
 ```bash
@@ -1677,7 +1677,7 @@ python3 scripts/evals/run_evals.py \
   `with_skill` pass rate over graded runs; each run directory carries an `artifacts/` folder
   holding a draft and a `*.review.jsonl`. The G1 gate is at least 2 of 3 passing.
 
-- [ ] **Step 1b: Run the same case on the gating executor model (`sonnet`).** Identical to step
+- [x] **Step 1b: Run the same case on the gating executor model (`sonnet`).** Identical to step
   1 except for the executor model and the output directory. This is the cell G1 is measured on:
 
 ```bash
@@ -1692,7 +1692,7 @@ python3 scripts/evals/run_evals.py \
   Expected: 3 executor runs complete and at least 2 of 3 pass `checks[]` — that is G1. Each run
   directory carries an `artifacts/` folder holding a draft and a `*.review.jsonl`.
 
-- [ ] **Step 2: Re-verify one preserved log by hand, and tally G2, G3 and G4.** The check's own
+- [x] **Step 2: Re-verify one preserved log by hand, and tally G2, G3 and G4.** The check's own
   stdout is only captured by the harness on a non-pass, so re-run it over the preserved artifacts
   where it is readable:
 
@@ -1717,7 +1717,7 @@ done
   exiting 0 is G3 for that run; the card's G3 gate is at least 2 of 3. Rounds never exceeding 3
   in any summary line is G4's hard half.
 
-- [ ] **Step 3: Measure the cost delta against the pre-change skill (G4, report only).** Export
+- [x] **Step 3: Measure the cost delta against the pre-change skill (G4, report only).** Export
   the base-commit skill directory and point the harness at it with `--skill-dir`:
 
 ```bash
@@ -1738,7 +1738,7 @@ python3 scripts/evals/run_evals.py \
   `check-review-log.ts` does not exist, and the harness routes a check that cannot run to ungraded
   by design. The evidence document must say so plainly — this cell measures cost, never quality.
 
-- [ ] **Step 4: Write the evidence document.** Create
+- [x] **Step 4: Write the evidence document.** Create
   `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review.md` in the shape of
   `docs/tribe/planning/explaining-illustration/evidence/EVIDENCE.md`: the exact command lines, the
   model ids verbatim, total cost, ungraded and setup-error counts, a per-cell result table, a
@@ -1748,7 +1748,7 @@ python3 scripts/evals/run_evals.py \
   `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review-benchmark.json` and copy at
   least one draft plus its log into the artifacts directory.
 
-- [ ] **Step 5: Commit** — stage only the evidence files and this plan; message
+- [x] **Step 5: Commit** — stage only the evidence files and this plan; message
   `evidence: blind-reader review, eval case 4 on haiku`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 8/10`.
 
