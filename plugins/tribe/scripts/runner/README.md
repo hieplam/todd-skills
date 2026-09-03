@@ -60,6 +60,8 @@ All paths below that are relative are relative to `--repo` unless noted otherwis
 | `--max-concurrent` | no | Integer ≥ 1 — how many cards' executor sessions may be IN FLIGHT at once this pass. Bounds WIDTH only, never ORDER: `dependsOn` still owns ordering (see "Concurrency" below). Default: `1`, i.e. **today's exactly-one-card-at-a-time behavior** — this is a strict opt-in; omitting the flag changes nothing. |
 | `--include-escalated` | no | Bypass the escalation-file short-circuit for a card the human has already ruled on, and let `nextCard`/`deriveCardPhase` reconsider it. This is exactly the flag the Stage C round-trip re-triggers with (spec §O6). |
 | `--remote` | no | The git remote this repo's canonical upstream/PR-target actually is — resolved once and threaded everywhere the runner queries or pushes to a remote (base-branch resolution, verify-phase ancestry/diff checks, branch-existence checks). Default: `'origin'`. See [`docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md`](../../../../docs/superpowers/specs/2026-07-31-runner-remote-resolution-design.md). |
+| `--viewer-port` | no | Port the auto-started read-only [live viewer](#live-viewer) binds on `127.0.0.1`. Must be an integer between 1 and 65535. Default: `4321`. |
+| `--no-viewer` | no | Skip starting the live viewer entirely for this run — no probe, no spawn, no printed URL. See [Live viewer](#live-viewer) below. |
 
 `--repo`, `--model`, and `--home` — the three required flags — have **no default** — this is
 deliberate (the stateless-capability wall): omitting any of them is a usage error, not a value
@@ -119,6 +121,41 @@ writes nothing (it returns before the lock is ever acquired).
 `statePath`/`answersPath`/`escalationsDir` are recorded **absolute** (resolved against
 `--home`, via `core/paths.ts`) — a reader of `run.json` never has to re-derive them relative to
 anything. `argv` is the raw `process.argv.slice(2)` this invocation was started with.
+
+## Live viewer
+
+On every real (non-`--dry-run`) invocation, before the first card's executor session spawns,
+the runner starts (or reuses) a **read-only** local web page for watching this campaign's
+sessions live — the same package as the [status viewer](../viewer/README.md), grown a second
+surface (`GET /live`). It prints its URL on this process's own stdout:
+
+```
+campaign viewer: http://127.0.0.1:4321/live?repo=<repo-key>&slug=<campaign-slug> (read-only)
+```
+
+- **Auto-started, not owned.** The URL is derived from `--home` alone (repo key + campaign
+  slug) — nothing new is written to disk or to `campaign-state.json` for this. If a viewer is
+  already answering `/healthz` on the target port, the runner reuses it instead of spawning a
+  second one.
+- **It may outlive the run.** The viewer is spawned detached, so it keeps serving the
+  transcripts of a card whose session already finished (or the whole campaign, once it's
+  `done`) until something else stops it — the runner never kills it on exit.
+- **`--no-viewer` disables it entirely** for that run — no probe, no spawn, no printed URL
+  (one `campaign viewer: skipped: --no-viewer` note still goes to stderr). `--viewer-port <n>`
+  picks a different port than the default `4321` (1-65535).
+- **Never affects the campaign run**, but not every failure is visible the same way. A
+  failure the runner can SEE — the viewer entry file missing, the `--no-viewer`/`--dry-run`
+  skip, a thrown error in the launch path, or a spawn `error` event (e.g. `bun` unresolvable)
+  — prints one `campaign viewer: …` line to stderr and the run proceeds. A failure the runner
+  **cannot** see: the target port is already held by some other, non-viewer process, so the
+  probe reports "nothing here" and the runner spawns anyway; the detached, `stdio: 'ignore'`
+  child then dies to `EADDRINUSE` after the URL has already been printed on stdout, and that
+  crash is invisible to the parent. If the printed URL doesn't answer, open it or re-run with
+  a different `--viewer-port`. Either way this is observability exhaust, never a gate.
+  `--dry-run` skips this step entirely (zero side effects stays a hard contract).
+
+See [`scripts/viewer/README.md`](../viewer/README.md) for what the live page actually shows
+(the process tree, tailed transcripts) and its full route/route-contract.
 
 ## State file schema
 

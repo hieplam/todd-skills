@@ -123,6 +123,17 @@ describe('renderPage', () => {
     expect(html).toContain('blocked');
   });
 
+  test('renders one "watch live" link per campaign, pointed at the live route with escaped identifiers', () => {
+    const html = renderPage(
+      [statusWith({ repoKey: '"><script>x</script>', campaignSlug: 'camp' })],
+      META,
+    );
+
+    expect(html).toContain('watch live');
+    expect(html).toContain('/live?repo=');
+    expect(html).not.toContain('<script>x</script>');
+  });
+
   test('renders pending escalation reason text inline', () => {
     const html = renderPage(
       [

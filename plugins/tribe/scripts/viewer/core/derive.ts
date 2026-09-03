@@ -7,13 +7,22 @@
 // `cards: { error }` while everything else on the status still derives (spec §7 rule 2).
 import type { CampaignSnapshot, CampaignStatus, CardRow, Liveness } from './model.ts';
 
-/** Picks the run with the latest `startedAt` (ISO8601 strings sort lexicographically in the
- * same timezone representation the runner always writes — `Date.toISOString()`). */
-function latestRunOf(snapshot: CampaignSnapshot) {
-  return snapshot.runs.reduce<CampaignSnapshot['runs'][number] | null>((best, run) => {
-    if (best === null || run.startedAt > best.startedAt) return run;
+/** Picks the item with the latest `startedAt` (ISO8601 strings sort lexicographically in the
+ * same timezone representation the runner always writes — `Date.toISOString()`). Generic so
+ * this one "latest by startedAt" decision has a single identity shared by every caller that
+ * needs it — `latestRunOf` below, and `core/live/campaign.ts`'s live-view campaign resolution
+ * (F46) — rather than each re-deriving the same reduce independently. */
+export function pickLatestByStartedAt<T extends { startedAt: string }>(items: readonly T[]): T | null {
+  return items.reduce<T | null>((best, item) => {
+    if (best === null || item.startedAt > best.startedAt) return item;
     return best;
   }, null);
+}
+
+/** Picks the run with the latest `startedAt` — the identity `core/live/campaign.ts` (F46)
+ * reuses via `pickLatestByStartedAt` for the live view's own "which run is latest" decision. */
+function latestRunOf(snapshot: CampaignSnapshot) {
+  return pickLatestByStartedAt(snapshot.runs);
 }
 
 function deriveLiveness(snapshot: CampaignSnapshot): Liveness {

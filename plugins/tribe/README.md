@@ -228,19 +228,28 @@ README's "Run record" section) — this is what the status viewer below reads.
 
 ## Status viewer
 
-[`scripts/viewer/`](scripts/viewer/) is a read-only, refresh-based web page — a sibling
-capability to the runner, same stack (bun + TS), zero client JS — that scans `~/.tribe` and
-answers at a glance: which campaigns exist, is each runner's process actually alive right now,
-per-card status, pending escalations, and the current session's log tail. It never writes
-anything (no lock, no state, no `gh`/`git`); every "refresh" in a browser is simply a fresh scan.
-Start it with:
+[`scripts/viewer/`](scripts/viewer/) is a read-only local web page — a sibling capability to the
+runner, same stack (bun + TS) — that scans `~/.tribe` and answers at a glance: which campaigns
+exist, is each runner's process actually alive right now, per-card status, pending escalations,
+and the current session's log tail. It never writes anything (no lock, no state, no `gh`/`git`);
+it binds `127.0.0.1` only. It has two surfaces:
+
+- **Status page** (`GET /`) — refresh-based, zero client JS: every "refresh" in a browser is
+  simply a fresh scan.
+- **Live view** (`GET /live`) — while a campaign's session is running, tails the executor's and
+  every subagent's transcript over Server-Sent Events, rendered by a small browser client
+  (`client/app.js`). The campaign runner starts this surface automatically alongside a real run
+  and prints its URL — see [`scripts/runner/README.md`](scripts/runner/README.md#live-viewer).
+
+Start the server by hand with:
 
 ```sh
 bun plugins/tribe/scripts/viewer/serve.ts [--tribe-root <dir>] [--port <n>]
 ```
 
-`--tribe-root` defaults to `$HOME/.tribe`; `--port` defaults to `4321`. It binds `127.0.0.1`
-only. Then open `http://127.0.0.1:<port>` (or `curl` it) and refresh to re-poll.
+`--tribe-root` defaults to `$HOME/.tribe`; `--port` defaults to `4321`. Then open
+`http://127.0.0.1:<port>` (or `curl` it). See [`scripts/viewer/README.md`](scripts/viewer/README.md)
+for the full route contract.
 
 ## Migrating pre-existing worker reports
 

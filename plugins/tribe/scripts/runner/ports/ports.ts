@@ -56,6 +56,19 @@ export interface RunHomePort {
   writeFileAtomic(resolvedPath: string, content: string): void;
 }
 
+/** Task 13 (spec D11/D12): the runner's live-viewer auto-start seam. Production wires this
+ * to a `GET /healthz` fetch and a detached `node:child_process` spawn
+ * (`adapters/viewer-launch.adapter.ts`, the only file naming `node:child_process` for this
+ * feature); `core/viewer-launch.ts`'s `decideViewerLaunch` only ever sees the booleans this
+ * port produces — it never touches the network or a process itself. */
+export interface ViewerPort {
+  /** Read-only reuse probe against `http://127.0.0.1:<port>/healthz` (card D6). */
+  probeViewer(port: number): Promise<boolean>;
+  /** Detached, `stdio: 'ignore'`, `unref()`ed — cannot hold the runner open, cannot pollute
+   * its stdout, cannot fail it (D12: "observability exhaust never kills a run"). */
+  spawnDetached(argv: string[]): void;
+}
+
 // ---------------------------------------------------------------------------------------
 // ExecResult — unified. Previously defined TWICE, identically, in core/verify.ts and
 // core/github.ts (core/loop.ts re-exported the verify.ts one) — one definition now.
