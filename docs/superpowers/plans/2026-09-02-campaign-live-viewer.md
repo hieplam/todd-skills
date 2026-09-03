@@ -205,7 +205,7 @@ NFC-normalize, replace every `[^a-zA-Z0-9]` with `-`, and when the result exceed
 truncate to 200 and append `-` plus the base36 hash suffix (`Bun.hash` when available, else the
 djb2 fallback Kanna documents).
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/paths.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/paths.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -242,15 +242,15 @@ test('recovers an agent id from its transcript file name, and its sidecar name',
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/paths.test.ts`.
   Expected: fails to resolve `./paths.ts`.
 
-- [ ] **Step 2: Implement** `core/live/paths.ts` using only `join` from `node:path` (permitted in
+- [x] **Step 2: Implement** `core/live/paths.ts` using only `join` from `node:path` (permitted in
   core — `node:path` is not a world module) and the Kanna algorithm above. `agentIdFromFileName`
   must match `^agent-(.+)\.jsonl$` only, so a `.meta.json` sidecar never yields an id.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and the two encoded names in the first test match the directories that exist
   under `~/.claude/projects` on this machine.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/paths.ts plugins/tribe/scripts/viewer/core/live/paths.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -276,7 +276,7 @@ past `state.offset`; this function turns those bytes into complete lines and car
 final line to the next tick. A `fileSize` smaller than `state.offset` means truncation or
 rotation: reset to a fresh state and re-read from zero.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/tail.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/tail.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -319,15 +319,15 @@ test('a shrinking file resets the tail and re-reads from zero', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/tail.test.ts`.
   Expected: fails to resolve `./tail.ts`.
 
-- [ ] **Step 2: Implement** `core/live/tail.ts`. Append `chunk` to `state.carry`, split on `\n`,
+- [x] **Step 2: Implement** `core/live/tail.ts`. Append `chunk` to `state.carry`, split on `\n`,
   pop the last element back into `carry`, trim a trailing `\r` from each emitted line, drop empty
   lines, and set `offset` to `fileSize`. When `fileSize < state.offset`, start from
   `initialTailState()` before processing the chunk.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, four new tests passing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/tail.ts plugins/tribe/scripts/viewer/core/live/tail.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -358,7 +358,7 @@ Reads both `sessionId` and `session_id` (card D7). Never throws: an unparseable 
 `isMessageRecord`. The fixtures are hand-authored to the shapes verified in spec §1.1 — copy the
 shapes, never real session content.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/records.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/records.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -395,15 +395,15 @@ test('assistant, user and system rows are messages', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/records.test.ts`.
   Expected: fails to resolve `./records.ts`.
 
-- [ ] **Step 2: Implement** `core/live/records.ts` and author the three fixture files (a valid
+- [x] **Step 2: Implement** `core/live/records.ts` and author the three fixture files (a valid
   parent transcript with a user prompt, a thinking block, a text block, a `tool_use` and its
   paired `tool_result`; a malformed file with two broken lines; a subagent transcript whose rows
   carry `isSidechain: true`).
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green; the malformed fixture parses with a non-zero `skipped` and no exception.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/records.ts plugins/tribe/scripts/viewer/core/live/records.test.ts plugins/tribe/scripts/viewer/fixtures docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -428,7 +428,7 @@ italic, ATX headings, bullet and numbered lists, links, paragraphs, hard line br
 else renders as escaped text. Escaping happens **before** markup is added, so no input can ever
 inject an element or an attribute.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/markdown.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/markdown.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -458,14 +458,14 @@ test('a javascript: link is rendered as plain text, never as an anchor', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/markdown.test.ts`.
   Expected: fails to resolve `./markdown.ts`.
 
-- [ ] **Step 2: Implement** `core/live/markdown.ts`. Split fenced blocks out first, escape every
+- [x] **Step 2: Implement** `core/live/markdown.ts`. Split fenced blocks out first, escape every
   segment, then apply inline rules to the non-fenced segments only. Anchor `href` values are
   allowed only when they start with `http://`, `https://`, or `/`.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and no test input escapes as live markup.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/markdown.ts plugins/tribe/scripts/viewer/core/live/markdown.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -494,7 +494,7 @@ never rendered), and tool calls paired with their results. Because the stream is
 call card (Kanna's pending-map idea, adapted to an append-only wire). Rows failing
 `isMessageRecord` produce nothing. `model: "<synthetic>"` is not an error (card D7).
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/normalize.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/normalize.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -550,14 +550,14 @@ test('bookkeeping rows and a synthetic model produce no events and no throw (car
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/normalize.test.ts`.
   Expected: fails to resolve `./normalize.ts`.
 
-- [ ] **Step 2: Implement** `core/live/normalize.ts` over `records.ts` and `markdown.ts`, keeping
+- [x] **Step 2: Implement** `core/live/normalize.ts` over `records.ts` and `markdown.ts`, keeping
   `seq` monotonic across calls and `pending` mapping a `tool_use` id to the `seq` of its call
   event.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green; no code path renders a raw JSON line as output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/normalize.ts plugins/tribe/scripts/viewer/core/live/normalize.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
@@ -584,7 +584,7 @@ Spec D3: the tree comes from the `.meta.json` sidecars — `spawnDepth: 1` entri
 session node, deeper ones off `parentAgentId`. Status order: `missing`, then `done`, then
 `active` (mtime within `ACTIVE_WINDOW_MS`), else `idle`. A null meta never drops an entry.
 
-- [ ] **Step 1: Write the failing test.** Create `core/live/processes.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `core/live/processes.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -645,14 +645,14 @@ test('an unreadable sidecar still yields a visible entry', () => {
   Run `cd plugins/tribe/scripts/viewer && bun test core/live/processes.test.ts`.
   Expected: fails to resolve `./processes.ts`.
 
-- [ ] **Step 2: Implement** `core/live/processes.ts`. The session node is always first, with
+- [x] **Step 2: Implement** `core/live/processes.ts`. The session node is always first, with
   `agentId: null` and `kind: 'session'`; children are sorted by `firstSeenIso` then `agentId` so
   the order is stable between ticks.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, and the derivation reproduces the shapes verified on disk in spec §1.1.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/core/live/processes.ts plugins/tribe/scripts/viewer/core/live/processes.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
