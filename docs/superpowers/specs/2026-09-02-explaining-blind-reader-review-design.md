@@ -123,11 +123,12 @@ the contract is not):
 > cap); the Warchief incorporates the results into the evidence document.
 
 > **Amended by ruling R2 (2026-09-03):** the prompt-leak check's contract is **word-based** — a
-> shared run of 12 whitespace-normalized words — so scripts with no whitespace word boundaries
-> (Japanese, Chinese) are **out of contract** for this card: the detector cannot fire on them, and
-> `check-review-log.ts` therefore prints `WARN: prompt-leak detection not applicable (prompt has
-> <12 word tokens)` and continues, so the gap is announced rather than passing silently.
-> Character-n-gram leak detection for those scripts is a follow-up (FU-1), not part of this card.
+> shared run of 12 whitespace-normalized words — so any prompt that normalizes to fewer than 12
+> word tokens is **out of contract** (scripts with no whitespace word boundaries, such as Japanese
+> or Chinese, are the motivating case, but a short prompt in any language hits the same condition):
+> `check-review-log.ts` prints `WARN: prompt-leak detection not applicable (prompt has <12 word
+> tokens)` and continues, announcing the gap rather than passing silently, and character-n-gram
+> leak detection for those scripts is a separate follow-up, not part of this card.
 
 ### 2.4 Governance
 

@@ -1,6 +1,6 @@
 ---
 id: adr-20260903-explaining-blind-reader-review
-c3-seal: 9cb051d1374bc66417dffc1e37aaa810c415ee646d838527d24653dd1e22c205
+c3-seal: 39e24c2571077421ba810fd08e20b2eb82be1cb3665ae093c68ee55eadce2ec5
 title: explaining-blind-reader-review
 type: adr
 goal: |-
@@ -59,7 +59,7 @@ review log plus eval case `write-ahead-log-explained-and-blind-read` as its evid
 2. `02-derived-skillmd-row.patch.md` — `scope: block` on Derived Materials row 1: the Evidence
 cell additionally cites `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review.md`.
 3. `03-derived-scripts-row.patch.md` — `scope: block` on the Derived Materials scripts row: add
-`check-review-log.ts` and its exit-code contract (`0` sound, `1` unsound, `2` could not run). Ruling R2 (2026-09-03) notes the leak-detection sub-check is word-based, so scripts with no whitespace word boundaries (e.g. Japanese, Chinese) are out of contract and the checker prints a `WARN: prompt-leak detection not applicable` line rather than passing silently.
+`check-review-log.ts` and its exit-code contract (`0` sound, `1` unsound, `2` could not run). Ruling R2 (2026-09-03) notes the leak-detection sub-check is word-based, so any prompt normalizing to fewer than 12 word tokens is out of contract (scripts with no whitespace word boundaries, e.g. Japanese, Chinese, are the motivating case, but a short prompt in any language hits the same condition), and the checker prints a `WARN: prompt-leak detection not applicable` line rather than passing silently.
 4. `04-derived-brief-template-row.patch.md` — `scope: insert`, based on the row it follows: a new
 Derived Materials row for `plugins/explaining/skills/explaining/references/blind-reader-brief.md`,
 deriving from the Contract row for `SKILL.md` (Rule 5's dispatch paragraph), allowed variance
