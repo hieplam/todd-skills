@@ -1,0 +1,78 @@
+import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseSessionSignals } from './signals.ts';
+
+const FIXTURES = join(import.meta.dir, '..', '..', 'fixtures', 'watchdog');
+const read = (name: string) => readFileSync(join(FIXTURES, name), 'utf8');
+
+describe('parseSessionSignals — against real captured logs', () => {
+  test('the real killed log yields the quota signal with its epoch resetsAt', () => {
+    const got = parseSessionSignals(read('quota-real-429.log'));
+    expect(got.quota).toEqual({ resetsAtEpochS: 1788392400 });
+    expect(got.overload).toBe(null);
+    expect(got.lastResultIsError).toBe(true);
+  });
+
+  test('allowed and allowed_warning are not quota deaths', () => {
+    const got = parseSessionSignals(read('allowed-and-warning.log'));
+    expect(got.quota).toBe(null);
+    expect(got.overload).toBe(null);
+  });
+
+  test('the 529 result line is an overload signal, and not a quota signal', () => {
+    const got = parseSessionSignals(read('overload-529.log'));
+    expect(got.overload).toEqual({ apiErrorStatus: 529 });
+    expect(got.quota).toBe(null);
+  });
+
+  test('a 429 is never an overload signal (W-P3)', () => {
+    const got = parseSessionSignals(read('quota-real-429.log'));
+    expect(got.overload).toBe(null);
+  });
+
+  test('last line wins: rejected then allowed means the session recovered', () => {
+    const tail = `${read('quota-real-429.log').trim()}\n${read('allowed-and-warning.log').trim()}\n`;
+    expect(parseSessionSignals(tail).quota).toBe(null);
+  });
+
+  test('a rejected event with no 429 result is still a quota signal (W-P3)', () => {
+    const rejected = read('quota-real-429.log')
+      .split('\n')
+      .filter((l) => l.includes('"type":"rate_limit_event"'))
+      .join('\n');
+    expect(parseSessionSignals(rejected).quota).toEqual({ resetsAtEpochS: 1788392400 });
+  });
+
+  test('a truncated first line (byte-bounded tail) is skipped, never thrown', () => {
+    const full = read('quota-real-429.log');
+    const tail = full.slice(200); // mid-JSON cut, exactly what a byte tail produces
+    expect(() => parseSessionSignals(tail)).not.toThrow();
+    expect(parseSessionSignals(tail).quota).toEqual({ resetsAtEpochS: 1788392400 });
+  });
+
+  test('a rejected event with a non-numeric resetsAt is no signal', () => {
+    const line = JSON.stringify({
+      type: 'rate_limit_event',
+      rate_limit_info: { status: 'rejected', resetsAt: null },
+    });
+    expect(parseSessionSignals(line).quota).toBe(null);
+  });
+
+  test('empty input and pure noise are no signal, and never throw', () => {
+    for (const input of ['', '\n\n', 'not json at all\n{"unclosed":\n']) {
+      expect(parseSessionSignals(input)).toEqual({
+        quota: null, overload: null, lastResultIsError: false,
+      });
+    }
+  });
+
+  test('every 5xx overload status is recognized, 429 excluded', () => {
+    for (const status of [500, 502, 503, 504, 529]) {
+      const line = JSON.stringify({ type: 'result', is_error: true, api_error_status: status });
+      expect(parseSessionSignals(line).overload).toEqual({ apiErrorStatus: status });
+    }
+    const line429 = JSON.stringify({ type: 'result', is_error: true, api_error_status: 429 });
+    expect(parseSessionSignals(line429).overload).toBe(null);
+  });
+});

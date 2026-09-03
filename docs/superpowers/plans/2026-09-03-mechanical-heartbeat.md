@@ -767,7 +767,7 @@ and spec §8, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Build the fixtures** (commands, run from the worktree root; the source campaign
+- [x] **Step 1: Build the fixtures** (commands, run from the worktree root; the source campaign
   home is machine-local and is never committed — only these copies are):
 
 ```sh
@@ -812,7 +812,7 @@ no `"rejected"`; `overload-529.log` is 1 line containing exactly one `529` and n
 | `overload-529.log` | DERIVED, not captured: the real `result` line above with `"api_error_status":429` replaced by `529`, and no `rate_limit_event`. No HTTP 529 session log exists on this machine (`grep -rl 'api_error_status":529' ~/.tribe` finds none); spec §8 records the shape from the live 2026-09-03 incident and instructs exactly this derivation. |
 ```
 
-- [ ] **Step 2: Failing test** — `core/watchdog/signals.test.ts`:
+- [x] **Step 2: Failing test** — `core/watchdog/signals.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -897,7 +897,7 @@ describe('parseSessionSignals — against real captured logs', () => {
 
 Run `bun test core/watchdog/signals.test.ts`. Expected: red (module missing).
 
-- [ ] **Step 3: Implement** `core/watchdog/signals.ts`:
+- [x] **Step 3: Implement** `core/watchdog/signals.ts`:
 
 ```ts
 /**
@@ -965,7 +965,7 @@ export function parseSessionSignals(tail: string): SessionSignals {
 }
 ```
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -975,7 +975,7 @@ git status --short   # only the intended new files; no campaign-home path staged
 Expected: `423 pass, 0 fail` (413 + 10 new); `tsc` silent; `git status` lists only
 `core/watchdog/signals.*` and `fixtures/watchdog/*`.
 
-- [ ] **Step 5: Commit** — `feat(runner): parse quota and overload signals from real session logs (task 3/15)`,
+- [x] **Step 5: Commit** — `feat(runner): parse quota and overload signals from real session logs (task 3/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
