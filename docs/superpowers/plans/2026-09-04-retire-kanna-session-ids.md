@@ -74,7 +74,7 @@ Expected after Task 2 (GREEN): four `ok:` lines and `exit=0`.
 - Delete: `plugins/tribe/scripts/tests/test-list-session-ids.sh`
 - Modify: `plugins/tribe/scripts/runner/README.md:212-219` (retitle and rewrite the section)
 
-- [ ] **Step 1: Watch it fail.**
+- [x] **Step 1: Watch it fail.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -90,7 +90,7 @@ six lines across four paths
 `plugins/tribe/scripts/tests/test-list-session-ids.sh:2`,
 `plugins/tribe/scripts/tests/test-list-session-ids.sh:5`), and `exit=1`.
 
-- [ ] **Step 2: Remove the two files.**
+- [x] **Step 2: Remove the two files.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -103,7 +103,7 @@ ls -d plugins/tribe/scripts/kanna 2>&1 || echo "kanna directory gone"
 Expected: the last line prints `kanna directory gone` (the `ls` fails because the directory no
 longer exists). No shim, no stub, no redirect script is created in its place.
 
-- [ ] **Step 3: Rewrite the README section.**
+- [x] **Step 3: Rewrite the README section.**
 
 Replace `plugins/tribe/scripts/runner/README.md` lines 212 through 219 — that is exactly this
 block, verbatim as it stands today:
@@ -146,7 +146,7 @@ paragraph, line 217 is blank, and line 218 begins `### Worked example`. The `gre
 **unchanged** from base (run the same `grep -c` on `git show HEAD:plugins/tribe/scripts/runner/README.md`
 to compare) — proving a section was rewritten, not added.
 
-- [ ] **Step 4: Prove the shell suite is delta-zero.**
+- [x] **Step 4: Prove the shell suite is delta-zero.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -160,7 +160,7 @@ Exactly two are red and they are the inherited pair — `test-fresh-machine.sh` 
 (`25 passed, 1 failed`) and `test-input-asymmetry.sh` at `exit 2`. Every other suite reports
 `exit 0`. If any *other* suite turns red, stop and report `BLOCKED` rather than editing it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -367,7 +367,7 @@ tree).
 
 ## Task checkboxes
 
-- [ ] Task 1 — script, test and README (tick in Task 1's commit)
+- [x] Task 1 — script, test and README (tick in Task 1's commit)
 - [ ] Task 2 — c3-215 Contract row via ADR change-unit (tick in Task 2's commit)
 
 ## Report back
