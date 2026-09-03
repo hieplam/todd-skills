@@ -1604,7 +1604,7 @@ arguments), no fs, no `process`.
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `core/watchdog/select.test.ts`:
+- [x] **Step 1: Failing test** — `core/watchdog/select.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -1753,7 +1753,7 @@ describe('actionLine — one human stdout line per action', () => {
 Run `bun test core/watchdog/select.test.ts core/watchdog/status.test.ts`. Expected: red (both
 modules missing).
 
-- [ ] **Step 2: Implement** `core/watchdog/select.ts`:
+- [x] **Step 2: Implement** `core/watchdog/select.ts`:
 
 ```ts
 /** Pure selection and path math for the watchdog. No fs: the edge lists directories and hands
@@ -1897,7 +1897,7 @@ export function actionLine(action: WatchdogAction): string {
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -1905,7 +1905,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 
 Expected: `521 pass, 0 fail` (509 + 12 new); `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(runner): watchdog selectors, status/event shaping and exit codes (task 6/15)`,
+- [x] **Step 4: Commit** — `feat(runner): watchdog selectors, status/event shaping and exit codes (task 6/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
