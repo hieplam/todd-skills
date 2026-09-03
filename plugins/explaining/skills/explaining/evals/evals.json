@@ -32,6 +32,20 @@
         }
       ],
       "artifacts": ["*.html"]
+    },
+    {
+      "id": 4,
+      "name": "write-ahead-log-explained-and-blind-read",
+      "prompt": "Explain how a write-ahead log keeps a database durable and crash consistent: what gets written and in what order, how a checkpoint interacts with log truncation, what an fsync actually guarantees, and how recovery replays the log after a crash. Write it for a backend developer who has never implemented one.",
+      "expected_output": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+      "files": [],
+      "checks": [
+        {
+          "name": "blind-reader-review-log",
+          "command": "bun {skill_dir}/scripts/check-review-log.ts --log-glob *.review.jsonl --prompt 'Explain how a write-ahead log keeps a database durable and crash consistent: what gets written and in what order, how a checkpoint interacts with log truncation, what an fsync actually guarantees, and how recovery replays the log after a crash. Write it for a backend developer who has never implemented one.'"
+        }
+      ],
+      "artifacts": ["*.md", "*.review.jsonl", "*.html"]
     }
   ]
 }

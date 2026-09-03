@@ -128,7 +128,7 @@ result here.
 
 **Steps**
 
-- [ ] **Step 1: Run the probe.** From a throwaway directory, replicate the harness's `with_skill`
+- [x] **Step 1: Run the probe.** From a throwaway directory, replicate the harness's `with_skill`
   invocation exactly — the flags come from `scripts/evals/run_evals.py` `run_claude()`
   (`--output-format stream-json --verbose --no-session-persistence`,
   `--permission-mode bypassPermissions`, `--setting-sources project --strict-mcp-config`) and the
@@ -146,7 +146,7 @@ env -u CLAUDECODE claude -p 'Dispatch one fresh subagent using your Agent or Tas
 echo "exit=$?"
 ```
 
-- [ ] **Step 2: Read the three answers out of the stream.** Each is a separate question and each
+- [x] **Step 2: Read the three answers out of the stream.** Each is a separate question and each
   goes in the transcript:
 
 ```bash
@@ -167,13 +167,13 @@ grep -c 'SUBAGENT-OK 7919' probe.stream.json
   only the executor model appears, it is not, and Rule 5 records `reader_model` as the model
   actually used.
 
-- [ ] **Step 3: Write the transcript.** Create
+- [x] **Step 3: Write the transcript.** Create
   `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review-derisk.md` containing: the
   exact command, the exit code, the three greps above with their real output, the file content of
   `reader-result.txt`, and a one-line verdict — `DISPATCH AVAILABLE` or `DISPATCH UNAVAILABLE` —
   plus one line stating whether a reader-model override was accepted.
 
-- [ ] **Step 4: Commit** — stage only the new evidence file and this plan, message
+- [x] **Step 4: Commit** — stage only the new evidence file and this plan, message
   `de-risk: prove subagent dispatch inside the harness with_skill leg`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 1/10` as the final paragraph.
 
@@ -201,7 +201,7 @@ checkable claim rather than an intention.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Create
+- [x] **Step 1: Write the failing test.** Create
   `plugins/explaining/skills/explaining/scripts/blind-reader-brief.test.ts`:
 
 ```ts
@@ -267,7 +267,7 @@ bun test blind-reader-brief.test.ts
 
   Expected: every test fails — the template file does not exist yet.
 
-- [ ] **Step 2: Write the template.** Create
+- [x] **Step 2: Write the template.** Create
   `plugins/explaining/skills/explaining/references/blind-reader-brief.md` with exactly this
   content:
 
@@ -283,7 +283,7 @@ the review log records.
 Read the file at {{artifact_path}}. It was written for {{audience}}, in {{language}}.
 
 You are a first-time reader. You have no other context, and you must not go looking for any:
-do not read other files, do not search anywhere, do not guess at what the author meant. Judge
+do not read other files, do not search anywhere, do not guess at what was intended. Judge
 only what is on the page.
 
 Report every place you could not follow, in the order they appear. Give each one as three
@@ -305,8 +305,8 @@ found zero BLOCK findings, or READER: FAIL n BLOCK when you found n of them.
 
 ## Rendering notes (never send these to the reader)
 
-- The three slots are the only values that may cross into the brief: `{{artifact_path}}` is the
-  path of the file on disk, `{{audience}}` is one short phrase, `{{language}}` is the language
+- The three slots are the only values that may cross into the brief: `artifact_path` is the
+  path of the file on disk, `audience` is one short phrase, `language` is the language
   the file is written in. Nothing else crosses — not the user's request, not your sources, not
   your reasoning, not the draft text pasted inline, and not any earlier round's findings. A
   reader that has been told what the draft was supposed to say can no longer tell you what it
@@ -319,7 +319,7 @@ found zero BLOCK findings, or READER: FAIL n BLOCK when you found n of them.
   current session itself: the whole value is a context that has never seen the draft before.
 ```
 
-- [ ] **Step 3: Prove it green.**
+- [x] **Step 3: Prove it green.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -328,7 +328,7 @@ bun test blind-reader-brief.test.ts
 
   Expected: 7 pass, 0 fail.
 
-- [ ] **Step 4: Commit** — stage
+- [x] **Step 4: Commit** — stage
   `plugins/explaining/skills/explaining/references/blind-reader-brief.md`,
   `plugins/explaining/skills/explaining/scripts/blind-reader-brief.test.ts` and this plan;
   message `explaining: add the blind-reader brief template`, with
@@ -347,7 +347,7 @@ the template, decide. No file touches this task at all.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Create
+- [x] **Step 1: Write the failing test.** Create
   `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts`:
 
 ```ts
@@ -367,7 +367,7 @@ import {
 } from './check-review-log';
 
 const INVARIANTS = ['You are a first-time reader.', 'SEVERITY: BLOCK or NIT'];
-const PROMPT = 'Explain how a write-ahead log keeps a database durable and crash consistent across a restart of the process';
+const PROMPT = 'Explain how a journaling log keeps a database durable and crash consistent across a restart of the process';
 
 function brief(extra = ''): string {
   return `Read the file at draft.md. It was written for a backend developer, in English.\nYou are a first-time reader.\nSEVERITY: BLOCK or NIT\n${extra}`;
@@ -565,7 +565,7 @@ bun test check-review-log.test.ts
 
   Expected: the run errors out on a missing module — `check-review-log.ts` does not exist.
 
-- [ ] **Step 2: Write the pure core.** Create
+- [x] **Step 2: Write the pure core.** Create
   `plugins/explaining/skills/explaining/scripts/check-review-log.ts` with exactly this content
   (the impure edge arrives in task 4; this file is complete and importable as it stands):
 
@@ -791,7 +791,7 @@ export function formatSummary(file: string, rounds: RoundRecord[]): string {
 }
 ```
 
-- [ ] **Step 3: Prove it green, and prove nothing else moved.**
+- [x] **Step 3: Prove it green, and prove nothing else moved.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -802,7 +802,7 @@ bun test
   Expected: the new file passes every one of its tests, and the full suite (the two existing
   script suites plus the template suite from task 2) is green with 0 failures.
 
-- [ ] **Step 4: Commit** — stage the two new script files and this plan; message
+- [x] **Step 4: Commit** — stage the two new script files and this plan; message
   `explaining: review-log check, pure core`, with `Tribe-Card: i106-blind-reader-review` and
   `Tribe-Task: 3/10`.
 
@@ -820,7 +820,7 @@ contract, and nothing else.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Append to
+- [x] **Step 1: Write the failing test.** Append to
   `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts` (and extend its import
   list with `main` and `parseArgs`):
 
@@ -941,7 +941,7 @@ bun test check-review-log.test.ts
 
   Expected: the import of `main` and `parseArgs` fails — neither is exported yet.
 
-- [ ] **Step 2: Write the edge.** Append to
+- [x] **Step 2: Write the edge.** Append to
   `plugins/explaining/skills/explaining/scripts/check-review-log.ts`:
 
 ```ts
@@ -1062,7 +1062,7 @@ if (import.meta.main) {
 }
 ```
 
-- [ ] **Step 3: Prove it green, including as a real CLI.**
+- [x] **Step 3: Prove it green, including as a real CLI.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -1076,7 +1076,7 @@ bun check-review-log.ts --dir "$WORK"; echo "no-prompt exit=$?"
   the no-prompt invocation prints a `CANNOT-RUN:` line and exits 2. Those two exit codes are the
   behavioral-fail and harness-failure legs of the harness contract.
 
-- [ ] **Step 4: Commit** — stage the two script files and this plan; message
+- [x] **Step 4: Commit** — stage the two script files and this plan; message
   `explaining: review-log check CLI and exit-code contract`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 4/10`.
 
@@ -1092,7 +1092,7 @@ self-check line, and touches nothing else in the file.
 
 **Steps**
 
-- [ ] **Step 1: Capture the guard.** Record what must not move, so step 3 can prove it did not:
+- [x] **Step 1: Capture the guard.** Record what must not move, so step 3 can prove it did not:
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1103,7 +1103,7 @@ wc -l /tmp/rules-1-to-4-before.txt
 
   Expected: the extract is non-empty and covers Rules 1 through 4.
 
-- [ ] **Step 2: Insert Rule 5 between Rule 4 and the self-check.** Add this section verbatim,
+- [x] **Step 2: Insert Rule 5 between Rule 4 and the self-check.** Add this section verbatim,
   immediately before the `## Self-check before finishing` heading:
 
 ```markdown
@@ -1162,7 +1162,7 @@ self-check, and say so in one line:
 4. Did the blind-reader review run to a verdict, and did the answer say how it ended? (Rule 5)
 ```
 
-- [ ] **Step 3: Prove the rule landed and Rules 1 through 4 did not move.**
+- [x] **Step 3: Prove the rule landed and Rules 1 through 4 did not move.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1178,9 +1178,258 @@ sed -n '/^## Self-check/,/^## Evidence/p' plugins/explaining/skills/explaining/S
   Expected: the `Rule 5` count is at least 1; the `diff` of the Rules 1 through 4 region is empty
   (nothing but the appended Rule 5 differs); the self-check now lists exactly 4 numbered items.
 
-- [ ] **Step 4: Commit** — stage `plugins/explaining/skills/explaining/SKILL.md` and this plan;
+- [x] **Step 4: Commit** — stage `plugins/explaining/skills/explaining/SKILL.md` and this plan;
   message `explaining: add Rule 5, blind-reader review before delivery`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 5/10`.
+
+---
+
+### Task 5b: Harden Rule 5 so a cheap executor cannot skip, mis-log or over-run it
+
+**Why:** Shaman ruling R1 (2026-09-03, `answers.md`). The first Task 8 evidence attempt found
+three conformance defects in Rule 5's *text*, not in the executor: the executor (a) took the
+degrade path while claiming "no subagent dispatch available" without ever attempting a dispatch,
+(b) ran a **fourth** review round, and (c) wrote **no** `*.review.jsonl` at all across four
+rounds. R1's ruling: harden the rule so each step is mechanical and non-optional. Rules 1
+through 4, the Overview and the Evidence section stay frozen — Task 5 step 3's guard is re-run
+here to prove it.
+
+This task also carries, in the same commit, the Shaman's own amendment of the spec (R1 item 2)
+and this plan's Task 8 bookkeeping (R1 item 4). Both document edits are authored by the
+Warchief and are already present in the worktree when this task starts; the Hunter stages them,
+it does not write them.
+
+- Modify: `plugins/explaining/skills/explaining/SKILL.md` (the Rule 5 section only)
+- Modify: `plugins/explaining/skills/explaining/references/blind-reader-brief.md` (the
+  "Rendering notes" section only — the region between `BRIEF-START` and `BRIEF-END` is frozen)
+- Modify: `plugins/explaining/skills/explaining/scripts/check-review-log.ts` (two messages only)
+- Modify: `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts` (new tests)
+
+**Steps**
+
+- [x] **Step 1: Capture the guard, then write the two failing tests.** First record what must
+  not move:
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review
+sed -n '/^## Rule 1/,/^## Rule 5/p' plugins/explaining/skills/explaining/SKILL.md \
+  | sed '/^## Rule 5/,$d' > /tmp/i106-rules-1-to-4-before.txt
+wc -l /tmp/i106-rules-1-to-4-before.txt
+```
+
+  Expected: a non-empty extract covering Rules 1 through 4.
+
+  Then append these two tests to
+  `plugins/explaining/skills/explaining/scripts/check-review-log.test.ts`, inside the existing
+  top-level `describe` that already covers `evaluateLog` and `parseReviewLog` (match the file's
+  existing helper names and import list — add `parseReviewLog` to the import if it is not
+  already there):
+
+```ts
+describe('ruling R1 message hardening', () => {
+  test('the over-cap reason quotes the stop sentence from Rule 5', () => {
+    const rounds = [1, 2, 3, 4].map((round) => ({
+      round,
+      brief: 'x',
+      findings: [],
+      block_count: 0,
+      verdict: 'PASS' as const,
+    }));
+    const reasons = evaluateLog(rounds, { invariants: [], prompt: '' }).reasons.join(' ');
+    expect(reasons).toContain(`cap is ${MAX_ROUNDS}`);
+    expect(reasons).toContain('Round 3 is the last round. After its verdict, stop — even on FAIL.');
+  });
+
+  test('a round 0 record is named as the degrade record, not a type complaint', () => {
+    const line = JSON.stringify({
+      round: 0,
+      brief: 'x',
+      findings: [],
+      block_count: 0,
+      verdict: 'FAIL',
+      author_action: 'dispatch failed: no such tool',
+    });
+    const { rounds, errors } = parseReviewLog(line);
+    expect(rounds).toHaveLength(0);
+    expect(errors.join(' ')).toContain('round 0');
+    expect(errors.join(' ')).toContain('degrade');
+  });
+});
+```
+
+  Run them and watch them FAIL:
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review/plugins/explaining/skills/explaining/scripts
+bun test check-review-log.test.ts
+```
+
+  Expected: RED — the two new tests fail (the cap reason does not yet carry the stop sentence;
+  the round 0 error still reads "round must be an integer of at least 1"). Every other test in
+  the file still passes. Paste the failing output into the report file verbatim.
+
+- [x] **Step 2: Change exactly two messages in `check-review-log.ts`.** Nothing else in that
+  file moves — no exit code, no field, no accepted shape. The two edits:
+
+  In `parseReviewLog`, replace the single round-validity branch with a branch that names round 0
+  specifically and leaves every other invalid value on the existing message:
+
+```ts
+    if (record.round === 0) {
+      errors.push(`${where}: round 0 is the degrade record (the reader dispatch failed) — a review that never dispatched a reader is not a completed review`);
+      continue;
+    }
+    if (!Number.isInteger(record.round) || (record.round as number) < 1) {
+      errors.push(`${where}: round must be an integer of at least 1`);
+      continue;
+    }
+```
+
+  (Keep whatever control-flow keyword the surrounding loop already uses to drop an invalid
+  record — if the existing branch does not `continue`, mirror exactly what it does instead.)
+
+  In `evaluateLog`, extend the over-cap reason so it quotes Rule 5's stop sentence:
+
+```ts
+    reasons.push(`${rounds.length} rounds recorded, cap is ${maxRounds} — Round 3 is the last round. After its verdict, stop — even on FAIL.`);
+```
+
+- [x] **Step 3: Replace the Rule 5 section in `SKILL.md`.** Replace everything from the line
+  `## Rule 5 — Blind-reader review before delivery` up to (but NOT including) the line
+  `## Self-check before finishing` with exactly this text:
+
+````markdown
+## Rule 5 — Blind-reader review before delivery
+
+You cannot see what a reader lacks, because you have the context that makes every jump feel
+smooth. The self-check below is you grading your own homework; this rule is the part a reader
+does.
+
+**When.** The deliverable is a file on disk (HTML or markdown), or the explanatory prose runs to
+600 words or more. Shorter answers keep the self-check alone.
+
+**Draft to disk first.** Write the complete draft to a file — the artifact itself, or
+`explanation.md` in the working directory when the deliverable is prose. The review runs on the
+file, never on pasted text: the path is the reader's entire input, and that is what keeps the
+reader blind.
+
+**Dispatch one blind reader per round.** A fresh subagent — never a fork of this session, never
+this session itself — briefed with `references/blind-reader-brief.md` from this skill directory,
+its three slots filled in: the file path, the audience in one short phrase, and the language.
+Reader model: `sonnet` by default. Dispatch it with `run_in_background: false` and wait for its
+reply: this skill runs in headless sessions, where a backgrounded reader never returns a verdict.
+Nothing else crosses into that brief: not the user's request, not your sources, not your
+reasoning, not the draft text inline, not an earlier round's findings. A reader that has been
+told what the draft was supposed to say can no longer tell you what it actually says.
+
+**Log every round, and open the record before you dispatch.** The log is a file named after the
+draft with `.review.jsonl` appended (a draft at `explanation.md` logs to
+`explanation.md.review.jsonl`). Each round is two writes, in this order:
+
+1. **Open** — before dispatching the reader, append one JSON object carrying `round` and `brief`
+   (the rendered brief, verbatim).
+2. **Complete** — when the reader returns, rewrite that same line with `findings`, `block_count`,
+   `verdict` and `author_action` filled in.
+
+Opening first is not bookkeeping taste. It is what makes a missing log impossible: if the log has
+no record for a round, no reader was dispatched for it.
+
+```json
+{"round": 1, "reader_model": "sonnet", "brief": "the rendered brief, verbatim", "findings": [{"severity": "BLOCK", "location": "the quoted phrase", "issue": "what broke, in the reader's words"}], "block_count": 1, "verdict": "FAIL", "author_action": "what you changed before the next round"}
+```
+
+`block_count` is the number of `BLOCK` findings and `verdict` is `PASS` exactly when that count
+is zero. Check the log with
+`bun scripts/check-review-log.ts --prompt "the request you were given"` from the directory
+holding the draft: exit `0` means the review is well-formed, exit `1` names what is wrong, exit
+`2` means the checker itself could not run.
+
+**Fix and loop. Round 3 is the last round. After its verdict, stop — even on FAIL.** Fix every
+`BLOCK` finding, rewrite the file, and dispatch a NEW reader — fresh context again. Stop at
+`READER: PASS`, or when round 3 returns its verdict, whichever comes first. There is no fourth
+round; the checker fails a log that records one. A `NIT` may be dismissed; record the one-clause
+reason in the log.
+
+**Say how it ended.** The final answer carries exactly one line about the review, never silence:
+
+- `Blind-reader review: PASS after 2 round(s)`
+- `Blind-reader review: ended at cap with 1 open BLOCK finding(s)` followed by the list
+
+**Degrade only after a dispatch has actually failed.** Skipping the review is permitted only
+after you attempted to dispatch a reader and that attempt itself failed. Believing that no
+dispatch tool exists is not a permitted reason — attempt the dispatch and let the failure be the
+evidence. When it fails, write the round 0 record to the log first:
+
+```json
+{"round": 0, "brief": "the rendered brief, verbatim", "findings": [], "block_count": 0, "verdict": "FAIL", "author_action": "dispatch failed: the failure text, verbatim"}
+```
+
+then keep the self-check and say so in one line:
+`Blind-reader review: skipped (dispatch failed, round 0 in the review log carries the error).`
+
+````
+
+- [x] **Step 4: Add two rendering notes to the brief template.** In
+  `plugins/explaining/skills/explaining/references/blind-reader-brief.md`, append these two
+  bullets to the end of the `## Rendering notes (never send these to the reader)` list. Do not
+  touch anything between `BRIEF-START` and `BRIEF-END`, and never introduce a `{{` slot outside
+  that region — two shipped tests assert both:
+
+```markdown
+- Dispatch the reader with `run_in_background: false`, and wait for its reply. This skill runs
+  in headless sessions, where a backgrounded reader never returns a verdict and the round's log
+  record can never be completed.
+- Open the round's log record before you dispatch: the round number and this rendered brief,
+  verbatim. Complete it with the findings, block count, verdict and your action when the reader
+  returns. A round with no opened record is a round whose reader was never dispatched.
+```
+
+- [x] **Step 5: Prove it green, and prove the frozen regions did not move.**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review/plugins/explaining/skills/explaining/scripts
+bun test
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review
+diff <(grep -v '^$' /tmp/i106-rules-1-to-4-before.txt) \
+     <(sed -n '/^## Rule 1/,/^## Rule 5/p' plugins/explaining/skills/explaining/SKILL.md \
+       | sed '/^## Rule 5/,$d' | grep -v '^$')
+sed -n '/^## Self-check/,/^## Evidence/p' plugins/explaining/skills/explaining/SKILL.md | grep -c '^[0-9]\.'
+grep -c "run_in_background: false" plugins/explaining/skills/explaining/SKILL.md
+grep -c "run_in_background: false" plugins/explaining/skills/explaining/references/blind-reader-brief.md
+grep -c "Round 3 is the last round. After its verdict, stop" plugins/explaining/skills/explaining/SKILL.md
+grep -c "Round 3 is the last round. After its verdict, stop" plugins/explaining/skills/explaining/scripts/check-review-log.ts
+python3 -c "import json;json.load(open('plugins/explaining/skills/explaining/evals/evals.json'))" && echo "json ok"
+python3 -m unittest discover -s scripts/evals/tests -t .
+```
+
+  Expected: `bun test` is fully green with two more tests than before (105 pass / 0 fail, up from
+  103); the `diff` of the Rules 1 through 4 region prints nothing; the self-check still lists
+  exactly 4 numbered items; each `grep -c` is at least 1; the evals JSON parses; the harness
+  unittest run reports `OK` (48 tests). Paste every command's output into the report file
+  verbatim.
+
+- [x] **Step 6: Commit.** Stage exactly these six paths and nothing else (`git add` each path
+  explicitly — never `git add -A`, never `git commit -a`; three unrelated dirty files exist in
+  this repo and are not yours):
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/i106-blind-reader-review
+git add plugins/explaining/skills/explaining/SKILL.md \
+        plugins/explaining/skills/explaining/references/blind-reader-brief.md \
+        plugins/explaining/skills/explaining/scripts/check-review-log.ts \
+        plugins/explaining/skills/explaining/scripts/check-review-log.test.ts \
+        docs/superpowers/specs/2026-09-02-explaining-blind-reader-review-design.md \
+        docs/superpowers/plans/2026-09-02-explaining-blind-reader-review.md
+git status --short
+```
+
+  Expected: exactly those six paths staged, nothing else. The spec and plan files are already
+  modified in the worktree by the Warchief (the R1 spec amendment and this task's own section) —
+  stage them as they are; do not edit them beyond ticking this task's six step checkboxes.
+
+  Commit message: `explaining: harden Rule 5 against a cheap reader (ruling R1)`, with a single
+  final paragraph carrying, on three lines, `Tribe-Card: i106-blind-reader-review`,
+  `Tribe-Task: 5b/10` and `Campaign: gh-issues-2026-09`. Never add an agent name as a co-author.
 
 ---
 
@@ -1199,7 +1448,7 @@ check command as a single-quoted argument that the harness splits with `shlex`.
 
 **Steps**
 
-- [ ] **Step 1: Write the failing test.** Create
+- [x] **Step 1: Write the failing test.** Create
   `plugins/explaining/skills/explaining/scripts/evals-case4.test.ts`:
 
 ```ts
@@ -1266,7 +1515,7 @@ bun test evals-case4.test.ts
 
   Expected: every test fails — there is no case with id 4.
 
-- [ ] **Step 2: Add the case.** Append to the `evals` array in
+- [x] **Step 2: Add the case.** Append to the `evals` array in
   `plugins/explaining/skills/explaining/evals/evals.json`, leaving cases 1, 2 and 3 byte-identical:
 
 ```json
@@ -1286,7 +1535,7 @@ bun test evals-case4.test.ts
     }
 ```
 
-- [ ] **Step 3: Prove it green, and prove the harness would really run it.**
+- [x] **Step 3: Prove it green, and prove the harness would really run it.**
 
 ```bash
 cd /Users/hip/repo/todd-skills/plugins/explaining/skills/explaining/scripts
@@ -1304,7 +1553,7 @@ python3 -m unittest discover -s scripts/evals/tests -t .
   the repo resolves to a real subject and that planned check argv point at files that exist, which
   now includes `check-review-log.ts`).
 
-- [ ] **Step 4: Commit** — stage the fixture, the new test and this plan; message
+- [x] **Step 4: Commit** — stage the fixture, the new test and this plan; message
   `explaining: eval case 4 for the blind-reader review`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 6/10`.
 
@@ -1321,7 +1570,7 @@ this task proves that claim rather than asserting it.
 
 **Steps**
 
-- [ ] **Step 1: Rewrite the two affected sections.** In `plugins/explaining/README.md`:
+- [x] **Step 1: Rewrite the two affected sections.** In `plugins/explaining/README.md`:
   rename the heading `## The four rules (skills/explaining/SKILL.md)` to `## The five rules
   (skills/explaining/SKILL.md)`, append item 5, rename `## The two scripts` to `## The three
   scripts` and add the checker, and add one short paragraph on the brief template. The added
@@ -1354,7 +1603,7 @@ this task proves that claim rather than asserting it.
   except `evals/` and `node_modules/`), that its three slots are the only values allowed to reach
   the reader, and that the reader model is a documented knob defaulting to `sonnet`.
 
-- [ ] **Step 2: Prove the installer needs no change.**
+- [x] **Step 2: Prove the installer needs no change.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1369,7 +1618,7 @@ ls ~/.claude/skills/explaining/references/ ~/.claude/skills/explaining/scripts/c
   the new script are already visible through it with no installer edit. If any of those listings
   fail, STOP and report — an installer change is outside this card's fence and needs the Shaman.
 
-- [ ] **Step 3: Verify the README claims against the files.**
+- [x] **Step 3: Verify the README claims against the files.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1381,7 +1630,7 @@ grep -c "blind-reader-brief.md" plugins/explaining/README.md
 
   Expected: each count is at least 1, and no stale "four rules" or "two scripts" phrase survives.
 
-- [ ] **Step 4: Commit** — stage `plugins/explaining/README.md` and this plan; message
+- [x] **Step 4: Commit** — stage `plugins/explaining/README.md` and this plan; message
   `explaining: document Rule 5, the brief template and the review-log checker`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 7/10`.
 
@@ -1390,8 +1639,20 @@ grep -c "blind-reader-brief.md" plugins/explaining/README.md
 ### Task 8: Evidence run — case 4 (G1, G2, G3, G4)
 
 **Why:** spec §6 item 2 and §2.3. This is the paid measurement that decides whether Rule 5 ships.
-**Run by the Warchief**, not a Hunter: capturing evidence through the repo harness is the
-Warchief's own delivery duty, and the eval budget is not a Hunter's to spend.
+Never a Hunter's task: the eval budget is not a Hunter's to spend.
+
+**Amended by ruling R1 (2026-09-03).** Three things changed after the first attempt at this task
+escalated. (a) **Who runs it:** the harness commands below are run by the **Shaman** in its own
+session, because a conformant case-4 run over-runs the 600-second foreground command cap the
+Warchief session is bound by. The commands stay here verbatim as the record of what is run. The
+Warchief's job in this task becomes *incorporating* the Shaman's results: it is handed the path
+of the results directory and writes the evidence document, the benchmark copy and the preserved
+artifacts from it. (b) **Two executor cells, 3 runs each:** `claude-haiku-4-5-20251001` (step 1)
+and `sonnet` (step 1b), plus the pre-change cost cell (step 3). (c) **Which cell gates:** G1's
+≥2/3 gate applies to the **`sonnet`** cell. The Haiku cell is reported in full — pass rate and
+the failure shapes — as the model-transfer measurement, the same way the skill's own Evidence
+section reports its Opus→Fable transfer grid; it does not gate. If the `sonnet` cell also misses
+≥2/3, the rule does not ship: return NEEDS_DIRECTION with the numbers (spec §7 risk 1 stands).
 
 - Create: `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review.md`
 - Create: `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review-benchmark.json`
@@ -1400,7 +1661,7 @@ Warchief's own delivery duty, and the eval budget is not a Hunter's to spend.
 
 **Steps**
 
-- [ ] **Step 1: Run case 4, with the skill, three runs, on the cheap executor model.** Model ids
+- [x] **Step 1: Run case 4, with the skill, three runs, on the cheap executor model.** Model ids
   verbatim from spec §6 item 2:
 
 ```bash
@@ -1416,7 +1677,22 @@ python3 scripts/evals/run_evals.py \
   `with_skill` pass rate over graded runs; each run directory carries an `artifacts/` folder
   holding a draft and a `*.review.jsonl`. The G1 gate is at least 2 of 3 passing.
 
-- [ ] **Step 2: Re-verify one preserved log by hand, and tally G2, G3 and G4.** The check's own
+- [x] **Step 1b: Run the same case on the gating executor model (`sonnet`).** Identical to step
+  1 except for the executor model and the output directory. This is the cell G1 is measured on:
+
+```bash
+cd /Users/hip/repo/todd-skills
+python3 scripts/evals/run_evals.py \
+  --evals plugins/explaining/skills/explaining/evals/evals.json \
+  --eval-id 4 --mode with_skill --runs 3 --jobs 3 \
+  --exec-model sonnet --grader-model sonnet \
+  --out-dir /tmp/i106-case4-sonnet 2>&1 | tee /tmp/i106-case4-sonnet/run.log
+```
+
+  Expected: 3 executor runs complete and at least 2 of 3 pass `checks[]` — that is G1. Each run
+  directory carries an `artifacts/` folder holding a draft and a `*.review.jsonl`.
+
+- [x] **Step 2: Re-verify one preserved log by hand, and tally G2, G3 and G4.** The check's own
   stdout is only captured by the harness on a non-pass, so re-run it over the preserved artifacts
   where it is readable:
 
@@ -1441,7 +1717,7 @@ done
   exiting 0 is G3 for that run; the card's G3 gate is at least 2 of 3. Rounds never exceeding 3
   in any summary line is G4's hard half.
 
-- [ ] **Step 3: Measure the cost delta against the pre-change skill (G4, report only).** Export
+- [x] **Step 3: Measure the cost delta against the pre-change skill (G4, report only).** Export
   the base-commit skill directory and point the harness at it with `--skill-dir`:
 
 ```bash
@@ -1462,7 +1738,7 @@ python3 scripts/evals/run_evals.py \
   `check-review-log.ts` does not exist, and the harness routes a check that cannot run to ungraded
   by design. The evidence document must say so plainly — this cell measures cost, never quality.
 
-- [ ] **Step 4: Write the evidence document.** Create
+- [x] **Step 4: Write the evidence document.** Create
   `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review.md` in the shape of
   `docs/tribe/planning/explaining-illustration/evidence/EVIDENCE.md`: the exact command lines, the
   model ids verbatim, total cost, ungraded and setup-error counts, a per-cell result table, a
@@ -1472,7 +1748,7 @@ python3 scripts/evals/run_evals.py \
   `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review-benchmark.json` and copy at
   least one draft plus its log into the artifacts directory.
 
-- [ ] **Step 5: Commit** — stage only the evidence files and this plan; message
+- [x] **Step 5: Commit** — stage only the evidence files and this plan; message
   `evidence: blind-reader review, eval case 4 on haiku`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 8/10`.
 
@@ -1493,7 +1769,7 @@ can quietly cost the older behavior. This re-measures case 3 against its recorde
 
 **Steps**
 
-- [ ] **Step 1: Re-run case 3, both modes, three runs.**
+- [x] **Step 1: Re-run case 3, both modes, three runs.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1510,13 +1786,13 @@ python3 scripts/evals/run_evals.py \
   `sonnet` here to match the recorded baseline it is being compared against, not the cheap model
   used for the new case.
 
-- [ ] **Step 2: Append the regression section to the evidence document.** Add a `## G5 — no
+- [x] **Step 2: Append the regression section to the evidence document.** Add a `## G5 — no
   regression on case 3` section quoting: the command, both pass rates, the pre-change rates from
   the prior card's evidence file, ungraded counts, and a one-line verdict. If `with_skill` comes
   in below 2 of 3, record it and STOP — that is a regression, not a rounding error, and it goes to
   the Shaman with the numbers rather than being explained away.
 
-- [ ] **Step 3: Commit** — stage the evidence document and this plan; message
+- [x] **Step 3: Commit** — stage the evidence document and this plan; message
   `evidence: case 3 regression check after Rule 5`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 9/10`.
 
@@ -1541,7 +1817,7 @@ substitute for reading it.
 
 **Steps**
 
-- [ ] **Step 1: Run the mandatory file-context gate and read the schema.**
+- [x] **Step 1: Run the mandatory file-context gate and read the schema.**
 
 ```bash
 export C3X=/Users/hip/.claude/plugins/marketplaces/c3-skill-marketplace/skills/c3/bin/c3x.sh
@@ -1556,7 +1832,7 @@ C3X_MODE=agent bash "$C3X" read c3-201 --full
   `lookup` names `c3-201` as the owner plus its governing refs and rules; `schema adr` leads with
   its REJECT-IF list, which the ADR body must honor.
 
-- [ ] **Step 2: Author the ADR and create the change-unit.** Write the body to a scratch file
+- [x] **Step 2: Author the ADR and create the change-unit.** Write the body to a scratch file
   **outside** `.c3/`, then register it:
 
 ```bash
@@ -1578,7 +1854,7 @@ C3X_MODE=agent bash "$C3X" change new adr-20260902-explaining-blind-reader-revie
   `adr-20260902-explaining-blind-reader-review`, and `change new` creates the matching folder
   under `.c3/changes/`.
 
-- [ ] **Step 3: Cite the blocks, author the patches, preview, accept and apply.**
+- [x] **Step 3: Cite the blocks, author the patches, preview, accept and apply.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1627,7 +1903,7 @@ C3X_MODE=agent bash "$C3X" check
   If `apply` rejects, fix the patch body and re-apply — never hand-edit
   `.c3/c3-2-plugins/c3-201-explaining.md`, which is a frozen fact.
 
-- [ ] **Step 4: Prove the sync landed.**
+- [x] **Step 4: Prove the sync landed.**
 
 ```bash
 cd /Users/hip/repo/todd-skills
@@ -1640,7 +1916,7 @@ git status --porcelain .c3 | head -20
   `blind-reader-brief.md`; `git status` lists the ADR, the change folder, the updated `c3-201`
   and `.c3/c3.db`, and nothing outside `.c3/`.
 
-- [ ] **Step 5: Commit** — stage `.c3/` and this plan only; message
+- [x] **Step 5: Commit** — stage `.c3/` and this plan only; message
   `c3: change-unit and ADR for the explaining blind-reader review`, with
   `Tribe-Card: i106-blind-reader-review` and `Tribe-Task: 10/10`.
 

@@ -83,6 +83,17 @@ the contract is not):
 8. **Degrade, never block.** If the session has no subagent dispatch tool, skip the review,
    keep the self-check, and say so in one line.
 
+> **Amended by ruling R1 (2026-09-03):** items 5, 6 and 8 are tightened so a cheap executor
+> cannot skip, mis-log or over-run the review. Degrade (item 8) is permitted only after an
+> actual dispatch attempt has failed, and that failure is recorded as round 0 in the log —
+> believing no dispatch tool exists is not a permitted reason. Each round's log record (item 6)
+> is OPENED with its round number and rendered brief *before* the reader is dispatched and
+> COMPLETED when it returns, which makes a missing log impossible without skipping the dispatch.
+> Item 5's cap is stated as one sentence the check script quotes back: "Round 3 is the last
+> round. After its verdict, stop — even on FAIL." The reader is dispatched with
+> `run_in_background: false` (the skill runs in headless sessions), stated in both the rule text
+> and the brief template's rendering notes.
+
 ### 2.2 The self-check gains item 4
 
 "Did the blind-reader review run (or was its absence stated)?"
@@ -101,6 +112,23 @@ the contract is not):
   PRE-change skill dir on the same prompt (skill-dir override) for the cost/quality delta.
   Record in `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review.md` +
   `benchmark.json`, and preserve at least one review log and draft per cell.
+
+> **Amended by ruling R1 (2026-09-03):** case 4 runs in **two** executor cells of 3 runs each —
+> `claude-haiku-4-5-20251001` and `sonnet` — plus the pre-change cost cell. **G1's ≥2/3 gate
+> applies to the `sonnet` cell.** The Haiku cell is reported in full (pass rate and the failure
+> shapes) as the model-transfer measurement, the way the skill's Evidence section already reports
+> its Opus→Fable transfer grid; it does not gate. If the `sonnet` cell also misses ≥2/3, the rule
+> does not ship — escalate with the numbers (§7 risk 1 stands). The paid runs are executed by the
+> Shaman in its own session (a conformant run over-runs the Warchief session's 600-second command
+> cap); the Warchief incorporates the results into the evidence document.
+
+> **Amended by ruling R2 (2026-09-03):** the prompt-leak check's contract is **word-based** — a
+> shared run of 12 whitespace-normalized words — so any prompt that normalizes to fewer than 12
+> word tokens is **out of contract** (scripts with no whitespace word boundaries, such as Japanese
+> or Chinese, are the motivating case, but a short prompt in any language hits the same condition):
+> `check-review-log.ts` prints `WARN: prompt-leak detection not applicable (prompt has <12 word
+> tokens)` and continues, announcing the gap rather than passing silently, and character-n-gram
+> leak detection for those scripts is a separate follow-up, not part of this card.
 
 ### 2.4 Governance
 
@@ -138,7 +166,7 @@ the contract is not):
 
 | Goal | Evidence the PR must carry | Gate |
 | --- | --- | --- |
-| G1 mechanism | harness run, case 4, 3 runs, artifacts + check output | ≥2/3 runs pass `checks[]` |
+| G1 mechanism | harness run, case 4, 3 runs per executor cell, artifacts + check output | ≥2/3 runs pass `checks[]` in the `sonnet` cell (amended by ruling R1; the `claude-haiku-4-5-20251001` cell is reported, not gating) |
 | G2 blind | check asserts brief == template shape and no prompt leakage | 3/3 of passing runs |
 | G3 catches | round-1 BLOCK ≥1 and round-2 BLOCK < round-1 | ≥2/3 runs |
 | G4 cost | rounds ≤3 (gate); cost/wall-clock delta vs pre-change skill (report) | rounds ≤3 in 3/3 |
@@ -152,6 +180,10 @@ the contract is not):
 1. `cd plugins/explaining/skills/explaining/scripts && bun test` — all green, includes the
    check script's own suite.
 2. From repo root: `python3 scripts/evals/run_evals.py --evals plugins/explaining/skills/explaining/evals/evals.json --eval-id 4 --mode with_skill --runs 3 --exec-model claude-haiku-4-5-20251001 --grader-model sonnet` — ≥2/3 pass; inspect one preserved `*.review.jsonl`: rounds ≤3, brief matches template, findings present.
+   **Amended by ruling R1 (2026-09-03):** run this twice, once per executor cell — the command
+   above (`--exec-model claude-haiku-4-5-20251001`, reported only) and the same command with
+   `--exec-model sonnet`, which is the cell the ≥2/3 gate is read from. Both cells are run by the
+   Shaman and reported in the evidence document.
 3. `--eval-id 3 --mode both --runs 3` — with-skill ≥2/3, baseline 0/3 artifacts (G5).
 4. `grep -c "Rule 5" plugins/explaining/skills/explaining/SKILL.md` ≥1; the self-check lists 4 items.
 5. Diff file list ⊆ scope fence (card §Scope fence).
