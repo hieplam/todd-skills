@@ -78,6 +78,16 @@ describe('parseReviewLog', () => {
     });
     expect(parseReviewLog(bad).errors[0]).toContain('severity');
   });
+
+  test('a stale round 0 degrade record still errors even when a full PASS review follows it', () => {
+    const degrade = JSON.stringify({
+      round: 0, brief: brief(), findings: [], block_count: 0, verdict: 'FAIL',
+      author_action: 'dispatch failed: the failure text, verbatim',
+    });
+    const { rounds, errors } = parseReviewLog(`${degrade}\n${round(1, 1)}\n${round(2, 0)}\n`);
+    expect(errors.some((error) => error.includes('round 0'))).toBe(true);
+    expect(rounds.map((r) => r.round)).toEqual([1, 2]);
+  });
 });
 
 describe('leak detection', () => {

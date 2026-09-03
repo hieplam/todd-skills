@@ -24,8 +24,10 @@ narration nobody can follow.
    subagent reads it with no other context — its brief carries the path, the audience and the
    language and nothing else. It reports what it could not follow as `BLOCK` or `NIT`; the
    author fixes every `BLOCK` and re-dispatches a new reader, at most three rounds, logging
-   every round next to the draft, and the answer always says how the review ended. With no
-   subagent dispatch available the rule degrades to the self-check and says so.
+   every round next to the draft, and the answer always says how the review ended. Each round's
+   log record is opened before the reader is dispatched and completed when it returns; the
+   review degrades to the self-check only after an attempted dispatch actually fails, which is
+   recorded as round 0 in the log.
 
 Rules 1 and 2 are the pair that won an isolated A/B eval against baseline and against
 each rule alone (see `SKILL.md`'s Evidence section for the numbers). Rule 4 is enforced

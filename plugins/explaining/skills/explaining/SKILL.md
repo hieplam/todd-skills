@@ -116,6 +116,11 @@ evidence. When it fails, write the round 0 record to the log first:
 then keep the self-check and say so in one line:
 `Blind-reader review: skipped (dispatch failed, round 0 in the review log carries the error).`
 
+A round 0 record belongs to the session that failed to dispatch. If a later session retries the
+review on the same draft, delete the stale round 0 line before opening round 1: the retry
+supersedes it, and a log that still carries round 0 reads to the checker as a review that never
+dispatched a reader, whatever else the log holds.
+
 ## Self-check before finishing
 
 Scan the draft once and fix:
