@@ -1044,7 +1044,7 @@ and spec §8, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `core/watchdog/decide.test.ts`:
+- [x] **Step 1: Failing test** — `core/watchdog/decide.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -1222,7 +1222,7 @@ describe('overloadBackoffSeconds — the frozen schedule (spec section 8)', () =
 
 Run `bun test core/watchdog/decide.test.ts`. Expected: red (module missing).
 
-- [ ] **Step 2: Implement** `core/watchdog/decide.ts`:
+- [x] **Step 2: Implement** `core/watchdog/decide.ts`:
 
 ```ts
 /**
@@ -1314,7 +1314,7 @@ export function decide(o: WatchdogObservation): WatchdogAction {
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -1322,7 +1322,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 
 Expected: `478 pass, 0 fail` (423 + 55 new: 48 table rows + 7); `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(runner): pure watchdog decision core over the frozen action table (task 4/15)`,
+- [x] **Step 4: Commit** — `feat(runner): pure watchdog decision core over the frozen action table (task 4/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
