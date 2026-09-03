@@ -7,44 +7,54 @@ hand-authored).
 ## Fixed identifiers for this run
 
 - Throwaway target repo (deleted by `stop()` after this run — the path existed at run
-  time): `/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo`
-- Campaign home (kept — the Warchief re-inspects it): `/Users/hip/.tribe/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo/campaigns/e2e-1788451303167`
-- Repo key (from `tribe-home.sh`): `-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo`
-- Campaign slug: `e2e-1788451303167`
+  time): `/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo`
+- Campaign home (kept — the Warchief re-inspects it): `/Users/hip/.tribe/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo/campaigns/e2e-1788453031276`
+- Repo key (from `tribe-home.sh`): `-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo`
+- Campaign slug: `e2e-1788453031276`
 - Card id: `C1`
 - Viewer port: `4399` (never the default 4321)
 
 ## Runner's printed viewer URL line (G3 evidence)
 
 ```
-campaign viewer: http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167 (read-only)
+campaign viewer: http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276 (read-only)
 ```
 
 ## Commands
 
 ```sh
-$ git init -q  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo)
-$ git -c user.email=tribe-e2e@example.com -c "user.name=Tribe E2E Fixture" commit --allow-empty -q -m "initial commit"  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo)
-$ git add -A  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo)
-$ git -c user.email=tribe-e2e@example.com -c "user.name=Tribe E2E Fixture" commit -q -m "seed fixture card"  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo)
-$ git remote -v  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo)
-$ bash /Users/hip/repo/todd-skills-wt/campaign-live-viewer/plugins/tribe/scripts/tribe-home.sh /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo)
-$ bun /Users/hip/repo/todd-skills-wt/campaign-live-viewer/plugins/tribe/scripts/runner/run.ts --repo /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo --model claude-haiku-4-5-20251001 --home /Users/hip/.tribe/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo/campaigns/e2e-1788451303167 --dry-run
-$ bun /Users/hip/repo/todd-skills-wt/campaign-live-viewer/plugins/tribe/scripts/runner/run.ts --repo /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo --model claude-haiku-4-5-20251001 --home /Users/hip/.tribe/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo/campaigns/e2e-1788451303167 --session-timeout 6m --viewer-port 4399  (detached, cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-4DT0xF/repo)
-$ curl -N "http://127.0.0.1:4399/events?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167&process=card:C1"  (SSE, watched via fetch()/ReadableStream, not EventSource; reconnects transparently on any transport hiccup — see the doc comment above measureAppendLatencies in harness.ts)
-$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-parent.png --window-size=1600,1200 --virtual-time-budget=8000 "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167&process=card:C1"
-$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-parent.png --window-size=1600,1200 --virtual-time-budget=8000 --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-RJ7ErE --no-sandbox "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167&process=card:C1"
-$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-cdp-io4VA6 --no-sandbox --remote-debugging-port=9422 "--remote-allow-origins=*" --window-size=1600,1200  (CDP-driven: Page.navigate via /json/new, then Page.captureScreenshot, for http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167&process=card:C1)
-$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-subagent.png --window-size=1600,1200 --virtual-time-budget=8000 "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167&process=agent:C1:a130e0d5d862ee2c1"
-$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-subagent.png --window-size=1600,1200 --virtual-time-budget=8000 --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-1YuoeE --no-sandbox "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167&process=agent:C1:a130e0d5d862ee2c1"
-$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-cdp-Dg64sr --no-sandbox --remote-debugging-port=9422 "--remote-allow-origins=*" --window-size=1600,1200  (CDP-driven: Page.navigate via /json/new, then Page.captureScreenshot, for http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-4DT0xF-repo&slug=e2e-1788451303167&process=agent:C1:a130e0d5d862ee2c1)
+$ git init -q  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo)
+$ git -c user.email=tribe-e2e@example.com -c "user.name=Tribe E2E Fixture" commit --allow-empty -q -m "initial commit"  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo)
+$ git add -A  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo)
+$ git -c user.email=tribe-e2e@example.com -c "user.name=Tribe E2E Fixture" commit -q -m "seed fixture card"  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo)
+$ git remote -v  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo)
+$ bash /Users/hip/repo/todd-skills-wt/campaign-live-viewer/plugins/tribe/scripts/tribe-home.sh /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo  (cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo)
+$ bun /Users/hip/repo/todd-skills-wt/campaign-live-viewer/plugins/tribe/scripts/runner/run.ts --repo /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo --model claude-haiku-4-5-20251001 --home /Users/hip/.tribe/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo/campaigns/e2e-1788453031276 --dry-run
+$ bun /Users/hip/repo/todd-skills-wt/campaign-live-viewer/plugins/tribe/scripts/runner/run.ts --repo /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo --model claude-haiku-4-5-20251001 --home /Users/hip/.tribe/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo/campaigns/e2e-1788453031276 --session-timeout 6m --viewer-port 4399  (detached, cwd: /var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-PLbvI8/repo)
+$ curl -N "http://127.0.0.1:4399/events?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276&process=card:C1"  (SSE, watched via fetch()/ReadableStream, not EventSource; reconnects transparently on any transport hiccup — see the doc comment above measureAppendLatencies in harness.ts)
+$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-parent.png --window-size=1600,1200 --virtual-time-budget=8000 "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276&process=card:C1"
+$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-parent.png --window-size=1600,1200 --virtual-time-budget=8000 --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-1mx1yK --no-sandbox "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276&process=card:C1"
+$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-cdp-XTreec --no-sandbox --remote-debugging-port=9422 "--remote-allow-origins=*" --window-size=1600,1200  (CDP-driven: Page.navigate via /json/new, then Page.captureScreenshot, for http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276&process=card:C1)
+$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-subagent.png --window-size=1600,1200 --virtual-time-budget=8000 "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276&process=agent:C1:ae7defa1c41124240"
+$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --screenshot=/Users/hip/repo/todd-skills-wt/campaign-live-viewer/docs/superpowers/evidence/2026-09-02-campaign-live-viewer/after-live-subagent.png --window-size=1600,1200 --virtual-time-budget=8000 --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-CfqYxi --no-sandbox "http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276&process=agent:C1:ae7defa1c41124240"
+$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-cdp-h6PUz0 --no-sandbox --remote-debugging-port=9422 "--remote-allow-origins=*" --window-size=1600,1200  (CDP-driven: Page.navigate via /json/new, then Page.captureScreenshot, for http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo&slug=e2e-1788453031276&process=agent:C1:ae7defa1c41124240)
 ```
+
+## What the latency number measures
+
+`latency.json`'s samples are `SSE-frame-arrival - Date.parse(event.timestamp)`, one sample per
+event carried by an `append` frame, where `timestamp` is the transcript record's own timestamp as
+Claude Code wrote it. That is deliberately CONSERVATIVE: it starts the clock when the record was
+stamped, which is at or before the moment its bytes hit disk, so the number is an **upper bound**
+on the disk-to-browser delay the card's 2-second budget is about. `sampleMethods` records, per
+sample, which signal produced it (`timestamp`, or `mtime-fallback` for an event with no timestamp
+of its own). Nothing is ever clamped, floored, or discarded to make a budget pass.
 
 ## Before capture (the Warchief's, not this harness')
 
 `before-status-page.png` is the OLD status page - the surface this card replaces - rendered
-against a campaign home produced by this same e2e harness, so before and after show the same
-kind of data. Captured from a detached worktree at `master` `9b1b502`; the viewer package is
+against a campaign home produced by this same e2e harness, so before and after show the same kind
+of data. Captured from a detached worktree at `master` `9b1b502`; the viewer package is
 byte-identical between the card's base `5e8c095` and `9b1b502`
 (`git diff --stat 5e8c095 9b1b502 -- plugins/tribe/scripts/viewer/` is empty), so this is the
 pre-card surface. The campaign home was copied into an isolated tribe-root so the page renders
