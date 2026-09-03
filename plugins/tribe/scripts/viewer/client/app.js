@@ -7,6 +7,10 @@
 // back beyond opening the read-only event stream (card G4).
 
 const SCROLL_PIN_THRESHOLD_PX = 24;
+// Five times the server's MAX_SNAPSHOT_EVENTS (core/live/model.ts) so scrollback stays
+// generous while a long-running campaign's page can't grow DOM nodes without bound (F14).
+// A local constant, not an import: the browser client imports nothing at all (Task 11).
+const MAX_RENDERED_EVENTS = 2000;
 
 function escapeAttr(value) {
   return String(value)
@@ -22,7 +26,7 @@ function eventNodeHtml(evt) {
   const errorClass = evt.isError ? ' event-error' : '';
   // Thinking blocks are collapsed by default — the reader opts in to reading them.
   if (evt.kind === 'thinking') {
-    return `<details class="event event-${kind}" data-seq="${seq}"><summary>thinking</summary>${evt.html}</details>`;
+    return `<details class="event event-${kind}${errorClass}" data-seq="${seq}"><summary>thinking</summary>${evt.html}</details>`;
   }
   return `<div class="event event-${kind}${errorClass}" data-seq="${seq}">${evt.html}</div>`;
 }
@@ -34,8 +38,21 @@ function processNodeHtml(node) {
 
 export function createLiveClient({ EventSource, document, location }) {
   let source = null;
-  let currentProcessId = null;
   let processListenerBound = false;
+
+  // A deep link or reload of a process-filtered live page must keep the filter on the very
+  // first connection (F12): seed from the URL's `process` param, falling back to the
+  // `data-process` attribute `core/live/page.ts` server-renders onto `#live-root` for exactly
+  // this purpose when the URL doesn't carry one.
+  function seedProcessId() {
+    const fromUrl = new URLSearchParams(location.search).get('process');
+    if (fromUrl !== null && fromUrl !== '') return fromUrl;
+    const root = document.getElementById('live-root');
+    const fromAttr = root && root.dataset ? root.dataset.process : undefined;
+    return fromAttr ? fromAttr : null;
+  }
+
+  let currentProcessId = seedProcessId();
 
   function buildEventsUrl() {
     const params = new URLSearchParams(location.search);
@@ -70,18 +87,36 @@ export function createLiveClient({ EventSource, document, location }) {
     const pinned = isPinnedToBottom(el);
     for (const evt of events) {
       el.insertAdjacentHTML('beforeend', eventNodeHtml(evt));
+      // Bound rendered-card growth (F14): a page left open through a long campaign run must
+      // not accumulate DOM nodes without limit, so the oldest card is evicted once the cap is
+      // exceeded.
+      while (el.childElementCount > MAX_RENDERED_EVENTS) {
+        el.removeChild(el.firstElementChild);
+      }
     }
     if (pinned) pinToBottom(el);
   }
 
   // A `tool_result` arriving after its call was already rendered patches the existing call card
   // by `seq` rather than appending a second, disconnected node (normalize.ts's pending-map).
+  // This loop must be TOTAL (same shape as routes.ts's `encodeSseFrame`, F8's fix): a single
+  // malformed `seq` must never take out its well-formed siblings in the same batch (F15).
   function applyPatches(patches) {
     const el = transcriptEl();
     if (!el || !Array.isArray(patches)) return;
     for (const patch of patches) {
-      const card = el.querySelector(`[data-seq="${patch.seq}"]`);
-      if (card) card.innerHTML = patch.html;
+      try {
+        const card = el.querySelector(`[data-seq="${patch.seq}"]`);
+        if (!card) continue;
+        card.innerHTML = patch.html;
+        // A tool call that later resolves to an error must be highlighted, same as any
+        // directly-rendered error event (F13).
+        if (patch.isError && !card.className.includes('event-error')) {
+          card.className += ' event-error';
+        }
+      } catch {
+        // Drop this one malformed patch; keep processing the rest of the batch.
+      }
     }
   }
 
@@ -134,6 +169,8 @@ export function createLiveClient({ EventSource, document, location }) {
   }
 
   function start() {
+    // Re-entrancy guard (F17): a second `start()` call must never leak the first `EventSource`.
+    if (source) return;
     open();
   }
 
