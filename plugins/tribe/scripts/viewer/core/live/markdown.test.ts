@@ -61,3 +61,47 @@ test('F24: a CRLF blank line separates blocks with no stray carriage return', ()
 test('F25: combined bold and italic emphasis nests instead of overlapping', () => {
   expect(renderMarkdown('***text***')).toBe('<p><strong><em>text</em></strong></p>');
 });
+
+// F31: a regex allowlist rejected only a literal second `/`, so a
+// backslash or an ASCII whitespace control character before the host
+// still produced a live anchor a browser resolves to an arbitrary
+// external origin. The real URL parser closes the whole class.
+test('F31: a backslash-prefixed href is rejected, never rendered as a live link', () => {
+  expect(renderMarkdown('[x](/\\evil.example.com/phish)')).not.toContain('<a ');
+});
+
+test('F31: a tab-prefixed href is rejected, never rendered as a live link', () => {
+  expect(renderMarkdown('[x](/\t/evil.com/p)')).not.toContain('<a ');
+});
+
+test('F31: ordinary relative and absolute hrefs are still allowed', () => {
+  expect(renderMarkdown('[x](/local/path)')).toContain('<a href="/local/path"');
+  expect(renderMarkdown('[x](https://ok.example/x)')).toContain('<a href="https://ok.example/x"');
+});
+
+// F32: the emphasis/inline-code passes ran over the whole inline string
+// BEFORE LINK_RE extracted the href, so `*`/`` ` `` characters inside a
+// URL rewrote into tag markup landing inside the href attribute, and an
+// emphasis span opened inside an href could close outside the anchor.
+test('F32: a `*` inside an href never becomes markup inside the href attribute', () => {
+  const out = renderMarkdown('[x](https://evil.com/**pwn**)');
+  expect(out).toContain('href="https://evil.com/**pwn**"');
+  expect(out).not.toContain('<strong>pwn</strong>"');
+});
+
+test('F32: a backtick inside an href never becomes markup inside the href attribute', () => {
+  const out = renderMarkdown('[x](https://ex.com/a`b`c)');
+  expect(out).toContain('href="https://ex.com/a`b`c"');
+  expect(out).not.toContain('<code>b</code>');
+});
+
+test('F32: an emphasis marker inside an href never leaks a span across the anchor boundary', () => {
+  const out = renderMarkdown('see [x](https://ex.com/a*b) and 5*6 stars');
+  expect(out).toBe('<p>see <a href="https://ex.com/a*b" rel="noreferrer noopener" target="_blank">x</a> and 5*6 stars</p>');
+});
+
+// F33: the fenced-block trailing-newline strip only matched a bare `\n`,
+// leaving a stray `\r` inside <code> for a CRLF transcript.
+test('F33: a CRLF-terminated fenced block leaves no stray carriage return', () => {
+  expect(renderMarkdown('```\r\ncode\r\n```')).toBe('<pre><code>code</code></pre>');
+});

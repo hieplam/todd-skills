@@ -51,3 +51,34 @@ test('an unreadable sidecar still yields a visible entry', () => {
   expect(nodes[1]!.agentType).toBeNull();
   expect(nodes[1]!.label).toBe('agent x9');
 });
+
+// F30: the session node's `done` branch (cardStatus !== 'running') was
+// never exercised by any test in this file.
+test('F30: a non-running card yields a done session node', () => {
+  const nodes = deriveProcesses({ ...base, cardStatus: 'done', subagents: [] });
+  expect(nodes[0]!.status).toBe('done');
+});
+
+// F34: a subagent naming a parentAgentId that is not present in the SAME
+// batch -- the ordinary race of discovering a child before its parent --
+// hangs off the session node instead of pointing at a dangling id.
+test('F34: an orphaned parentAgentId hangs off the session node', () => {
+  const nodes = deriveProcesses({ ...base, subagents: [
+    { agentId: 'orphan', meta: { agentType: 'x', parentAgentId: 'ghost', spawnDepth: 2 }, sizeBytes: 1, mtimeIso: base.nowIso, firstSeenIso: base.nowIso },
+  ] });
+  const ids = new Set(nodes.map((n) => n.id));
+  const orphan = nodes.find((n) => n.agentId === 'orphan')!;
+  expect(ids.has(orphan.parentId as string)).toBe(true);
+  expect(orphan.parentId).toBe('card:T20');
+});
+
+// F34: a sidecar naming itself as its own parent (a 1-node cycle) must
+// not produce a self-referential parentId.
+test('F34: a self-referential parentAgentId hangs off the session node', () => {
+  const nodes = deriveProcesses({ ...base, subagents: [
+    { agentId: 'a1', meta: { agentType: 'x', parentAgentId: 'a1', spawnDepth: 1 }, sizeBytes: 1, mtimeIso: base.nowIso, firstSeenIso: base.nowIso },
+  ] });
+  const a1 = nodes.find((n) => n.agentId === 'a1')!;
+  expect(a1.parentId).not.toBe(a1.id);
+  expect(a1.parentId).toBe('card:T20');
+});

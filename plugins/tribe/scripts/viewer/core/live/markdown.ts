@@ -35,9 +35,24 @@ const NUMBERED_LINE_RE = /^\d+\.\s+(.*)$/;
 // force the engine to rescan to the end of the string from every start
 // position (F23): each attempt is now capped, keeping the whole pass linear.
 const LINK_RE = /\[([^\]\n]{0,500})\]\(([^)\n]{0,2000})\)/g;
-// `/(?!\/)` rejects a protocol-relative `//host/...` href, which browsers
-// resolve against the CURRENT scheme to an arbitrary external origin (F22).
-const ALLOWED_HREF_RE = /^(https?:\/\/|\/(?!\/))/;
+// Gate the href with the runtime's real URL parser rather than a regex
+// allowlist (F31): a regex can only reject the shapes its author thought
+// of, while `//host`, `/\host`, and whitespace-prefixed hosts (the WHATWG
+// parser strips ASCII tab/CR/LF before resolving) all still resolve to an
+// arbitrary external origin through a hand-rolled pattern. `URL` is a
+// deterministic, side-effect-free global -- using it adds no world import
+// and keeps this module pure.
+const HREF_BASE = 'https://viewer.invalid/';
+
+function isAllowedHref(href: string): boolean {
+  try {
+    const u = new URL(href, HREF_BASE);
+    if (/^https?:\/\//i.test(href)) return u.protocol === 'http:' || u.protocol === 'https:';
+    return u.origin === 'https://viewer.invalid'; // a relative href must stay same-origin
+  } catch {
+    return false;
+  }
+}
 
 interface Segment {
   fenced: boolean;
@@ -69,7 +84,9 @@ export function renderMarkdown(text: string): string {
 
 function renderSegment(segment: Segment): string {
   if (segment.fenced) {
-    const content = escapeHtml(segment.text.replace(/\n$/, ''));
+    // Strip a trailing CRLF or bare LF (F33): stripping only `\n` left a
+    // stray `\r` inside <code> for a Windows-style (CRLF) fenced block.
+    const content = escapeHtml(segment.text.replace(/\r?\n$/, ''));
     const cls = segment.lang ? ` class="lang-${segment.lang}"` : '';
     return `<pre><code${cls}>${content}</code></pre>`;
   }
@@ -108,18 +125,52 @@ function renderBlock(block: string): string {
   return `<p>${lines.map(renderInline).join('<br>')}</p>`;
 }
 
+// Combined emphasis first (F25): matching `***...***` before the separate
+// bold/italic passes below produces valid nesting instead of two
+// independent passes emitting overlapping, mismatched tags.
+function applyEmphasisAndCode(text: string): string {
+  let out = text;
+  out = out.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  out = out.replace(/`([^`]+?)`/g, '<code>$1</code>');
+  return out;
+}
+
 function renderInline(raw: string): string {
-  let text = escapeHtml(raw);
-  // Combined emphasis first (F25): matching `***...***` before the separate
-  // bold/italic passes below produces valid nesting instead of two
-  // independent passes emitting overlapping, mismatched tags.
-  text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  text = text.replace(/`([^`]+?)`/g, '<code>$1</code>');
-  text = text.replace(LINK_RE, (match, label: string, href: string) => {
-    if (!ALLOWED_HREF_RE.test(href)) return match;
-    return `<a href="${href}" rel="noreferrer noopener" target="_blank">${label}</a>`;
-  });
-  return text;
+  const escaped = escapeHtml(raw);
+  // Segment the escaped string on LINK_RE FIRST, then run the emphasis and
+  // inline-code passes only over the non-link text and over each link's
+  // LABEL -- never over an href (F32). Running those passes over the whole
+  // string before LINK_RE extracted the href let `*`/`` ` `` characters
+  // inside a URL turn into tag markup landing inside the `href` attribute,
+  // and let an emphasis span opened inside an href close outside the
+  // anchor. Same discipline as the fence segmentation above: segment,
+  // render each piece independently, concatenate -- never splice a
+  // placeholder into the string and re-scan for it.
+  let result = '';
+  let lastIndex = 0;
+  LINK_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = LINK_RE.exec(escaped)) !== null) {
+    if (match.index > lastIndex) {
+      result += applyEmphasisAndCode(escaped.slice(lastIndex, match.index));
+    }
+    const full = match[0];
+    const label = match[1] ?? '';
+    const href = match[2] ?? '';
+    if (isAllowedHref(href)) {
+      result += `<a href="${href}" rel="noreferrer noopener" target="_blank">${applyEmphasisAndCode(label)}</a>`;
+    } else {
+      // A disallowed href degrades exactly as before: the original matched
+      // text goes through the same text path as ordinary content, never as
+      // a live anchor.
+      result += applyEmphasisAndCode(full);
+    }
+    lastIndex = match.index + full.length;
+  }
+  if (lastIndex < escaped.length) {
+    result += applyEmphasisAndCode(escaped.slice(lastIndex));
+  }
+  return result;
 }
