@@ -85,6 +85,53 @@ describe('parseArgs — --remote', () => {
   });
 });
 
+// Task 13 (spec D11): the live viewer's two flags. Additive — every other flag's
+// rejected-by-name behaviour is unchanged, asserted directly below alongside them.
+describe('parseArgs — --viewer-port / --no-viewer (Task 13, spec D11)', () => {
+  test('--viewer-port defaults to 4321 when omitted', () => {
+    const result = parseArgs(validArgv(), RUN_ID);
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.viewerPort).toBe(4321);
+    }
+  });
+
+  test('--viewer-port 4399 overrides the default', () => {
+    const result = parseArgs([...validArgv(), '--viewer-port', '4399'], RUN_ID);
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.viewerPort).toBe(4399);
+    }
+  });
+
+  test('--viewer-port rejects a non-positive-integer value', () => {
+    const result = parseArgs([...validArgv(), '--viewer-port', 'nope'], RUN_ID);
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('--viewer-port');
+    }
+  });
+
+  test('--no-viewer defaults to false, and disables the viewer when passed', () => {
+    const withoutFlag = parseArgs(validArgv(), RUN_ID);
+    expect('error' in withoutFlag).toBe(false);
+    if (!('error' in withoutFlag)) {
+      expect(withoutFlag.viewerDisabled).toBe(false);
+    }
+
+    const withFlag = parseArgs([...validArgv(), '--no-viewer'], RUN_ID);
+    expect('error' in withFlag).toBe(false);
+    if (!('error' in withFlag)) {
+      expect(withFlag.viewerDisabled).toBe(true);
+    }
+  });
+
+  test('an unknown flag is still rejected by name alongside the new viewer flags', () => {
+    const result = parseArgs([...validArgv(), '--viewer-port', '4399', '--no-viewer', '--bogus-flag'], RUN_ID);
+    expect(result).toEqual({ error: 'unknown flag: --bogus-flag' });
+  });
+});
+
 describe('parseArgs — --home / runId (Task 2, spec §4)', () => {
   test('--home is required: missing flag is a usage error', () => {
     const result = parseArgs(validArgvWithout('--home'), RUN_ID);
