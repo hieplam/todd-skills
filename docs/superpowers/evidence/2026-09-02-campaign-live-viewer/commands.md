@@ -40,8 +40,25 @@ $ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new 
 $ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --user-data-dir=/var/folders/t2/s0b8z5m947l7kdcvwtrtrt480000gn/T/tribe-e2e-chrome-cdp-iFVIKB --no-sandbox --remote-debugging-port=9422 --remote-allow-origins=* --window-size=1600,1200  (CDP-driven: Page.navigate via /json/new, then Page.captureScreenshot, for http://127.0.0.1:4399/live?repo=-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-vq7mTH-repo&slug=e2e-1788444148873&process=agent:C1:a06427f44bbceb78e)
 ```
 
+## Before capture (the Warchief's, not this harness')
 
-## Screenshots not captured by this harness
+`before-status-page.png` is the OLD status page — the surface this card replaces — rendered
+against the **same** campaign home this run produced, so before and after show the same data.
+Captured from a detached worktree at `master` `9b1b502` (the viewer package is byte-identical
+between the card's base `5e8c095` and `9b1b502`: `git diff --stat 5e8c095 9b1b502 --
+plugins/tribe/scripts/viewer/` is empty). The campaign home was copied into an isolated
+tribe-root so the page renders only this campaign and no unrelated local state.
 
-`before-status-page.png` is the Warchief's to capture (the status page, before this run
-started) — this harness never creates it.
+```sh
+$ cp -R ~/.tribe/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-vq7mTH-repo <scratch>/before-tribe-root/
+$ cd <worktree@9b1b502>/plugins/tribe/scripts/viewer && bun serve.ts --tribe-root <scratch>/before-tribe-root --port 4398
+tribe viewer: http://127.0.0.1:4398 (root: <scratch>/before-tribe-root) - read-only, refresh to update
+$ "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --no-sandbox \
+    --user-data-dir=<scratch>/chrome-profile \
+    --screenshot=docs/superpowers/evidence/2026-09-02-campaign-live-viewer/before-status-page.png \
+    --window-size=1600,900 --virtual-time-budget=6000 http://127.0.0.1:4398/
+```
+
+Result: `before-status-page.png`, PNG 1600x900. It shows one campaign card row and a
+`Session tail - C1-28e3046e-....log (159295 bytes)` block: 40 lines of raw runner JSONL in a
+`<pre>`. No subagents, no rendered messages, no live update - the exact gap this card closes.
