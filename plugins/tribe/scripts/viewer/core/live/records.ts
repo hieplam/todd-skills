@@ -46,7 +46,7 @@ function parseLine(line: string): TranscriptRecord | null {
   if (typeof obj.type !== 'string') return null;
 
   const record: TranscriptRecord = { type: obj.type };
-  const sessionId = obj.sessionId ?? obj.session_id;
+  const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId : obj.session_id;
   if (typeof sessionId === 'string') record.sessionId = sessionId;
   if (typeof obj.uuid === 'string') record.uuid = obj.uuid;
   if (typeof obj.parentUuid === 'string') record.parentUuid = obj.parentUuid;
