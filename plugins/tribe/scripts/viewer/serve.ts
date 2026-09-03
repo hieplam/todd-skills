@@ -9,6 +9,7 @@ import { renderLivePage } from './core/live/page.ts';
 import { encodeSseFrame, parseLiveRoute } from './core/live/routes.ts';
 import { sanitizeProjectDirName, projectDirOf, transcriptPathOf, subagentsDirOf } from './core/live/paths.ts';
 import { MAX_LIVE_STREAMS, POLL_INTERVAL_MS, type ProcessNode } from './core/live/model.ts';
+import { isStateFile, latestRunRecord, selectLiveCard } from './core/live/campaign.ts';
 import { scanTribeRoot, processKillProbe } from './adapters/scan.adapter.ts';
 import { createTranscriptIo, type TranscriptIo } from './adapters/transcript.adapter.ts';
 import { createLivePoller, type LiveCampaignContext } from './adapters/poller.adapter.ts';
@@ -32,50 +33,12 @@ const ASSET_CONTENT_TYPE: Record<'app.js' | 'app.css', string> = {
   'app.css': 'text/css; charset=utf-8',
 };
 
-interface RunRecord {
-  repo: string;
-  statePath: string;
-  startedAt: string;
-}
-
-function isRunRecord(value: unknown): value is RunRecord {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return typeof v.repo === 'string' && typeof v.statePath === 'string' && typeof v.startedAt === 'string';
-}
-
-/** The run with the max `startedAt` across every `runs/<id>/run.json` under `homeDir` — same
- * "latest run" identity `core/derive.ts`'s `latestRunOf` uses for the status page, so the live
- * link on `/` and the live view it opens always agree on which run they mean. */
-function latestRun(tio: TranscriptIo, homeDir: string): RunRecord | null {
-  const runsDir = join(homeDir, 'runs');
-  let best: RunRecord | null = null;
-  for (const runId of tio.listDirOrEmpty(runsDir)) {
-    const raw = tio.readJsonOrNull(join(runsDir, runId, 'run.json'));
-    if (!isRunRecord(raw)) continue;
-    if (best === null || raw.startedAt > best.startedAt) best = raw;
-  }
-  return best;
-}
-
-interface StateFile {
-  sequence: unknown[];
-  cards: Record<string, { status?: unknown; sessionId?: unknown } | undefined>;
-}
-
-function isStateFile(value: unknown): value is StateFile {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return Array.isArray(v.sequence) && typeof v.cards === 'object' && v.cards !== null;
-}
-
 /** Resolves everything the poller needs to locate a campaign's transcripts, from nothing but
- * `repo`+`slug` (card D5 — no new persisted field, nothing cached across requests). Picks the
- * newest-in-sequence card whose state is `running` as the default session (spec §5 step 2);
- * falls back to the last card in sequence when none is running (e.g. the run already ended) so
- * a finished campaign's live page still resolves to its most recent session rather than 404-ing.
- * Any missing piece (no run, unreadable state, no cards, no recorded session id) degrades to
- * `null` — the caller turns that into an empty process list / 404, never a throw. */
+ * `repo`+`slug` (card D5 — no new persisted field, nothing cached across requests). Every
+ * decision — which run is latest, whether the state file is well-shaped, which card/session it
+ * selects — is `core/live/campaign.ts` (F46): this function does I/O and path-joining only. Any
+ * missing piece (no run, unreadable state, no cards, no recorded session id) degrades to `null`
+ * — the caller turns that into an empty process list / 404, never a throw. */
 function resolveCampaignContext(
   tio: TranscriptIo,
   root: string,
@@ -83,30 +46,26 @@ function resolveCampaignContext(
   slug: string,
 ): LiveCampaignContext | null {
   const homeDir = join(root, repoKey, 'campaigns', slug);
-  const run = latestRun(tio, homeDir);
+  const runsDir = join(homeDir, 'runs');
+  const rawRuns = tio.listDirOrEmpty(runsDir).map((runId) => tio.readJsonOrNull(join(runsDir, runId, 'run.json')));
+  const run = latestRunRecord(rawRuns);
   if (run === null) return null;
 
-  const state = tio.readJsonOrNull(run.statePath);
-  if (!isStateFile(state)) return null;
-  const sequence = state.sequence.filter((id): id is string => typeof id === 'string');
-  if (sequence.length === 0) return null;
-
-  const runningId = [...sequence].reverse().find((id) => state.cards[id]?.status === 'running');
-  const cardId = runningId ?? sequence[sequence.length - 1]!;
-  const card = state.cards[cardId];
-  const sessionId = card?.sessionId;
-  if (typeof sessionId !== 'string') return null;
+  const rawState = tio.readJsonOrNull(run.statePath);
+  if (!isStateFile(rawState)) return null;
+  const selected = selectLiveCard(rawState);
+  if (selected === null) return null;
 
   const homeUserDir = process.env.HOME ?? '';
   const realCwd = tio.realpathOrNull(run.repo) ?? run.repo;
   const projectDir = projectDirOf(homeUserDir, sanitizeProjectDirName(realCwd));
 
   return {
-    cardId,
-    sessionId,
-    transcriptPath: transcriptPathOf(projectDir, sessionId),
-    subagentsDir: subagentsDirOf(projectDir, sessionId),
-    cardStatus: typeof card?.status === 'string' ? card.status : 'unknown',
+    cardId: selected.cardId,
+    sessionId: selected.sessionId,
+    transcriptPath: transcriptPathOf(projectDir, selected.sessionId),
+    subagentsDir: subagentsDirOf(projectDir, selected.sessionId),
+    cardStatus: selected.cardStatus,
   };
 }
 

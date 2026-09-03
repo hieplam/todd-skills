@@ -22,9 +22,15 @@ export interface TranscriptStat {
 export interface TranscriptIo {
   realpathOrNull(path: string): string | null;
   statFileOrNull(path: string): TranscriptStat | null;
-  /** Reads exactly the bytes in `[start, end)` of `path`. Throws on a genuine read failure —
+  /** Reads exactly the bytes in `[start, end)` of `path`, RAW — never decoded here. A
+   * multi-byte UTF-8 character can straddle two calls (this file is read while it's still being
+   * appended, spec §4/§7); decoding each range independently would turn the split character
+   * into `U+FFFD` on both sides and lose it permanently (F44). Decoding — with a streaming
+   * `TextDecoder` that carries the incomplete trailing byte sequence forward — is the caller's
+   * job, because only the caller (the poller, one `TrackedTranscript` per tailed file) has the
+   * per-file state a stateful decoder must live alongside. Throws on a genuine read failure —
    * callers (the poller) catch it and turn it into an `error` frame. */
-  readRange(path: string, start: number, end: number): string;
+  readRange(path: string, start: number, end: number): Uint8Array;
   listDirOrEmpty(dir: string): string[];
   readJsonOrNull(path: string): unknown | null;
   /** Reads one of the two allowlisted browser client files, from the fixed sibling `client/`
@@ -57,12 +63,12 @@ export function createTranscriptIo(): TranscriptIo {
     },
     readRange(path, start, end) {
       const length = Math.max(0, end - start);
-      if (length === 0) return '';
+      if (length === 0) return new Uint8Array(0);
       const buffer = Buffer.alloc(length);
       const fd = openSync(path, 'r');
       try {
         const bytesRead = readSync(fd, buffer, 0, length, start);
-        return buffer.subarray(0, bytesRead).toString('utf8');
+        return buffer.subarray(0, bytesRead);
       } finally {
         closeSync(fd);
       }

@@ -13,6 +13,23 @@ function isValidIdentifier(value: string | null): value is string {
   return value !== null && IDENTIFIER_PATTERN.test(value) && !DOTS_ONLY_PATTERN.test(value);
 }
 
+// `process` selects either the campaign's own session (`card:<cardId>`) or one of its
+// subagents (`agent:<cardId>:<agentId>`) — the two `ProcessNode.id` shapes core/live/model.ts
+// documents. `:` is never in IDENTIFIER_PATTERN's character class, so each segment below is
+// validated with the exact same hardened identifier check `repo`/`slug` already use (F43): `/`
+// is unrepresentable in a valid segment, which makes path traversal through this parameter
+// structurally impossible rather than merely filtered.
+const CARD_PROCESS_PATTERN = /^card:([A-Za-z0-9._-]+)$/;
+const AGENT_PROCESS_PATTERN = /^agent:([A-Za-z0-9._-]+):([A-Za-z0-9._-]+)$/;
+
+function isValidProcessId(value: string): boolean {
+  const cardMatch = CARD_PROCESS_PATTERN.exec(value);
+  if (cardMatch) return !DOTS_ONLY_PATTERN.test(cardMatch[1]!);
+  const agentMatch = AGENT_PROCESS_PATTERN.exec(value);
+  if (agentMatch) return !DOTS_ONLY_PATTERN.test(agentMatch[1]!) && !DOTS_ONLY_PATTERN.test(agentMatch[2]!);
+  return false;
+}
+
 export function parseLiveRoute(url: string): LiveRoute {
   const parsed = new URL(url);
   const { pathname, searchParams } = parsed;
@@ -37,6 +54,12 @@ export function parseLiveRoute(url: string): LiveRoute {
     }
 
     const rawProcessId = searchParams.get('process');
+    if (rawProcessId !== null && rawProcessId !== '' && !isValidProcessId(rawProcessId)) {
+      return {
+        kind: 'bad_request',
+        reason: 'process must match ^card:[A-Za-z0-9._-]+$ or ^agent:[A-Za-z0-9._-]+:[A-Za-z0-9._-]+$',
+      };
+    }
     const processId = rawProcessId === null || rawProcessId === '' ? null : rawProcessId;
 
     return pathname === '/live'

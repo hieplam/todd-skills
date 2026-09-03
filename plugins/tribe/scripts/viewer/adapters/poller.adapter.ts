@@ -9,7 +9,7 @@
 // `tool_use` gets resolved (spec D3) — and, when the caller selected a different process, tails
 // that process's own transcript too. `deriveProcesses`/`normalizeRecords`/`advanceTail` do every
 // decision; this file only feeds them already-read bytes and turns their output into SSE frames.
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { advanceTail, initialTailState, type TailState } from '../core/live/tail.ts';
 import { parseRecordLines } from '../core/live/records.ts';
 import { initialNormalizeState, normalizeRecords, type NormalizeState, type NormalizePatch } from '../core/live/normalize.ts';
@@ -46,6 +46,14 @@ interface TrackedTranscript {
   path: string;
   tail: TailState;
   normalize: NormalizeState;
+  /** Streaming UTF-8 decoder (F44): a multi-byte character can straddle two polls of a file
+   * that is actively being appended to. Decoding each `readRange` independently (the old
+   * behavior) turns the split character into `U+FFFD` on both sides and loses it permanently.
+   * `TextDecoder` is STATEFUL when used with `{ stream: true }` — it withholds an incomplete
+   * trailing byte sequence internally and prepends it to the next `decode()` call — so this
+   * instance must live here, alongside this track's offset/carry, and never be recreated per
+   * read (recreating it per call would throw away exactly the state that makes it work). */
+  decoder: TextDecoder;
 }
 
 interface PullOutcome {
@@ -54,7 +62,7 @@ interface PullOutcome {
 }
 
 function freshTrack(path: string): TrackedTranscript {
-  return { path, tail: initialTailState(), normalize: initialNormalizeState() };
+  return { path, tail: initialTailState(), normalize: initialNormalizeState(), decoder: new TextDecoder('utf-8') };
 }
 
 function describeError(err: unknown): string {
@@ -74,7 +82,12 @@ function defaultSchedule(fn: () => void, ms: number): { stop: () => void } {
 function readNewLines(io: TranscriptIo, track: TrackedTranscript): string[] {
   const stat = io.statFileOrNull(track.path);
   if (stat === null) throw new Error(`transcript not found: ${track.path}`);
-  const chunk = stat.sizeBytes > track.tail.offset ? io.readRange(track.path, track.tail.offset, stat.sizeBytes) : '';
+  // A shrink/rotate (spec D2/D8) means whatever incomplete byte sequence the decoder was
+  // carrying belonged to content that no longer exists at this offset — start it fresh so those
+  // stale pending bytes never get prepended to the rewritten file's unrelated bytes.
+  if (stat.sizeBytes < track.tail.offset) track.decoder = new TextDecoder('utf-8');
+  const bytes = stat.sizeBytes > track.tail.offset ? io.readRange(track.path, track.tail.offset, stat.sizeBytes) : new Uint8Array(0);
+  const chunk = track.decoder.decode(bytes, { stream: true });
   const advanced = advanceTail(track.tail, chunk, stat.sizeBytes);
   track.tail = advanced.state;
   return advanced.lines;
@@ -109,6 +122,17 @@ function agentIdOf(processId: string, cardId: string): string | null {
   return processId.startsWith(prefix) ? processId.slice(prefix.length) : null;
 }
 
+/** Second, independent boundary (F43 layer 2) — refuses to read outside `dir` regardless of
+ * what `filePath` was built from. `core/live/routes.ts` already validates `process` so this
+ * should never fire in practice, but this endpoint is unauthenticated by design: one layer is a
+ * filter, two layers is a boundary. Resolves and normalizes both paths before comparing so
+ * `..` segments (however they got there) can never slip through as a false "inside". */
+function isWithinDir(dir: string, filePath: string): boolean {
+  const normalizedDir = resolve(dir);
+  const normalizedFile = resolve(filePath);
+  return normalizedFile === normalizedDir || normalizedFile.startsWith(normalizedDir + sep);
+}
+
 export function createLivePoller(input: CreateLivePollerInput): { stop: () => void } {
   const { io, intervalMs, campaign, emit } = input;
   const now = input.now ?? (() => new Date().toISOString());
@@ -118,8 +142,10 @@ export function createLivePoller(input: CreateLivePollerInput): { stop: () => vo
   const effectiveProcessId = input.processId ?? sessionProcessId;
   const isSessionSelected = effectiveProcessId === sessionProcessId;
   const selectedAgentId = isSessionSelected ? null : agentIdOf(effectiveProcessId, campaign.cardId);
-  const selectedPath =
+  const rawSelectedPath =
     selectedAgentId === null ? null : join(campaign.subagentsDir, `agent-${selectedAgentId}.jsonl`);
+  const selectedPath =
+    rawSelectedPath !== null && isWithinDir(campaign.subagentsDir, rawSelectedPath) ? rawSelectedPath : null;
 
   const parentTrack = freshTrack(campaign.transcriptPath);
   const selectedTrack = selectedPath === null ? null : freshTrack(selectedPath);
