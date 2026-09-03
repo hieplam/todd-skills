@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import {
   EXIT_CODE,
   LEAK_NGRAM,
@@ -353,6 +353,35 @@ describe('main() exit codes', () => {
       expect(await main(['--prompt', PROMPT, '--dir', dir, '--template', template, '--require-catch']))
         .toBe(EXIT_CODE.FAIL);
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ruling R2 — WARN when the prompt has no whitespace word boundaries', () => {
+  test('a CJK prompt (<12 word tokens) prints the WARN line once; a long English prompt does not', async () => {
+    const dir = scratch();
+    const template = join(dir, 'template.md');
+    writeFileSync(template, TEMPLATE_TEXT);
+    writeFileSync(join(dir, 'draft.md.review.jsonl'), `${round(1, 0)}\n`);
+    const logSpy = spyOn(console, 'log');
+    try {
+      const cjkPrompt = '説明の内容を漏らさないでください';
+      expect(normalizeWords(cjkPrompt).length).toBeLessThan(LEAK_NGRAM);
+      await main(['--prompt', cjkPrompt, '--dir', dir, '--template', template]);
+      const cjkWarnCalls = logSpy.mock.calls.filter(
+        (call) => call[0] === 'WARN: prompt-leak detection not applicable (prompt has <12 word tokens)',
+      );
+      expect(cjkWarnCalls).toHaveLength(1);
+
+      logSpy.mockClear();
+      await main(['--prompt', PROMPT, '--dir', dir, '--template', template]);
+      const englishWarnCalls = logSpy.mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].startsWith('WARN: prompt-leak'),
+      );
+      expect(englishWarnCalls).toHaveLength(0);
+    } finally {
+      logSpy.mockRestore();
       rmSync(dir, { recursive: true, force: true });
     }
   });

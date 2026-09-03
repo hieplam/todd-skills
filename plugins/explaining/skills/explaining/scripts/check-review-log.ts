@@ -127,6 +127,16 @@ export function normalizeWords(text: string): string[] {
     .filter((word) => word.length > 0);
 }
 
+/** Pure: true when the prompt normalizes to fewer word tokens than the leak window, so
+ * n-gram leak detection can never fire (ruling R2). A script with no whitespace word
+ * boundaries — Japanese, Chinese — normalizes a whole prompt to about one token; this is
+ * out of the word-based detector's contract, and callers must announce that rather than
+ * pass silently. Deliberately does not attempt character-n-gram detection for those
+ * scripts — that is a separate follow-up. */
+export function isLeakDetectionInapplicable(prompt: string, leakNgram: number = LEAK_NGRAM): boolean {
+  return normalizeWords(prompt).length < leakNgram;
+}
+
 /** Pure: every sliding window of n words. */
 export function ngrams(words: string[], n: number): string[] {
   const out: string[] = [];
@@ -305,6 +315,9 @@ export async function main(argv: string[]): Promise<number> {
   if (args.error !== null) {
     console.error(`CANNOT-RUN: ${args.error}`);
     return EXIT_CODE.CANNOT_RUN;
+  }
+  if (isLeakDetectionInapplicable(args.prompt as string)) {
+    console.log(`WARN: prompt-leak detection not applicable (prompt has <${LEAK_NGRAM} word tokens)`);
   }
   const templatePath = args.template
     ?? resolve(SCRIPT_DIR, '..', 'references', 'blind-reader-brief.md');
