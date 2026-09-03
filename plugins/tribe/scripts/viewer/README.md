@@ -52,6 +52,12 @@ bun serve.ts --tribe-root ~/.tribe --port 4321
 `repo` and `slug` are separate query parameters (never one slash-joined value) and must each
 match `^[A-Za-z0-9._-]+$`; anything else is `400` before a single path is built.
 
+An `/events` connection sends a `ping` frame every 15s (`PING_INTERVAL_MS`,
+`adapters/poller.adapter.ts`) to keep it alive across quiet periods. `Bun.serve()` is started
+with `idleTimeout: SSE_IDLE_TIMEOUT_SECONDS` (`core/live/model.ts`, currently 60s) — comfortably
+above the ping interval — so Bun's own connection-idle timeout never races the keepalive and
+closes a quiet stream first (F55).
+
 ## How the live view finds a campaign's transcripts
 
 Given `repo` + `slug` alone (no new persisted field — nothing under `~/.tribe` gained a new

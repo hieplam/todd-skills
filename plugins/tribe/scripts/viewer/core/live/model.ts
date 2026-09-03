@@ -40,6 +40,12 @@ export const POLL_INTERVAL_MS = 400;
 export const ACTIVE_WINDOW_MS = 10_000;
 export const MAX_SNAPSHOT_EVENTS = 400;
 export const MAX_LIVE_STREAMS = 8;
+// F55: Bun's own `Bun.serve` default idle timeout is ~10s, shorter than the poller's 15s
+// keepalive ping (`PING_INTERVAL_MS`, `adapters/poller.adapter.ts`) — a quiet `/events`
+// connection was being closed by Bun itself before the ping ever got a chance to refresh it.
+// MUST exceed the keepalive interval (with headroom for jitter) or the same regression comes
+// back; `serve.ts` passes this to `Bun.serve({ idleTimeout })`. Bun caps `idleTimeout` at 255s.
+export const SSE_IDLE_TIMEOUT_SECONDS = 60;
 export const SSE_EVENT_NAMES = ['processes', 'snapshot', 'append', 'ping', 'error'] as const;
 export type SseEventName = (typeof SSE_EVENT_NAMES)[number];
 

@@ -40,9 +40,15 @@ the run is the viewer, not the card's outcome: it only needs to get far enough t
 5. Spawns the real `run.ts` (`--viewer-port 4399`, never the default 4321), waits for the
    viewer's `/healthz` identity body, then polls `/api/processes` until a session **and** a
    subagent node both appear.
-6. Opens a real SSE connection to `/events` and measures append-to-arrival latency for real
-   frames (never fabricated or clamped), asserting the worst sample stays inside the 2000ms
-   budget (card D3/G2).
+6. Opens a real SSE connection to `/events` and measures append-to-arrival latency **per
+   transcript event**, not per frame (F51): the production poller batches every line written
+   since its last 400ms tick into one `append` frame, so a frame can carry several events with
+   different true delays. Each event's own `timestamp` (carried on the wire, `core/live/model.ts`)
+   is the honest per-line sample — `arrivalMs - Date.parse(event.timestamp)`, which can only ever
+   over-state the true delay, never under-state it. The transcript file's mtime is used ONLY as a
+   fallback for an event whose `timestamp` is null. Never fabricated, clamped, or discarded — a
+   negative sample (clock skew) is reported as measured. The worst sample across all events must
+   stay inside the 2000ms budget (card D3/G2).
 7. Takes two real screenshots with the machine's installed Chrome
    (`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new`) of the live
    parent view and the live subagent view, verifying each is a real, non-trivial PNG.
@@ -55,7 +61,9 @@ the run is the viewer, not the card's outcome: it only needs to get far enough t
 
 `docs/superpowers/evidence/2026-09-02-campaign-live-viewer/`:
 
-- `latency.json` — `{ measuredAt, budgetMs, latenciesMs, worstMs, sampleCount }`.
+- `latency.json` — `{ measuredAt, budgetMs, latenciesMs, worstMs, sampleCount, sampleMethods }`.
+  `sampleMethods[i]` names how `latenciesMs[i]` was derived — `"timestamp"` (the per-event
+  signal, the normal case) or `"mtime-fallback"` (only when that event's `timestamp` was null).
 - `processes.json` — the real `/api/processes` payload (a session node and ≥1 subagent node).
 - `after-live-parent.png` / `after-live-subagent.png` — real Chrome screenshots of the live page.
 - `commands.md` — every command actually run (repo creation, the runner invocation, the printed

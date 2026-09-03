@@ -9,7 +9,7 @@
 // Every wait below is a bounded deadline loop or an explicit `timeout`/`AbortSignal.timeout`
 // value — this machine has no `timeout` binary (task brief constraint).
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ProcessNode } from '../core/live/model.ts';
@@ -27,13 +27,63 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function quote(arg: string): string {
-  return /[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg;
+// F54: every /events and /live URL this harness logs (`?repo=...&slug=...&process=...`)
+// contains a bare `&`, which the OLD pattern here (`/[\s"]/`) never quoted — pasted into a real
+// shell, the unquoted `&` backgrounds the command mid-URL and silently drops everything after
+// it. Quoting on whitespace/`"` alone is never enough for a `commands.md` a reader is meant to
+// copy-paste; this now quotes on any shell metacharacter, matching the full class this repo's
+// F54 finding named. Exported so `e2e/harness.test.ts` can prove a URL containing `&`
+// round-trips through a real shell unchanged.
+const SHELL_METACHARACTERS = /[\s"&|;<>$`()*?~!#]/;
+export function quote(arg: string): string {
+  return SHELL_METACHARACTERS.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg;
+}
+
+export interface LatencySample {
+  valueMs: number;
+  /** Which signal produced this sample — `timestamp` (the event's own `TranscriptEvent.timestamp`,
+   * the honest per-line number) or `mtime-fallback` (the transcript file's mtime at arrival,
+   * used ONLY when an event's `timestamp` is null — F51). */
+  method: 'timestamp' | 'mtime-fallback';
+}
+
+/** Pure (F51): parses one already-received `append` SSE frame's `data:` JSON and returns ONE
+ * latency sample per event in `data.events`, never one sample for the whole (possibly batched)
+ * frame. The production poller (`adapters/poller.adapter.ts`) batches every line written since
+ * the last 400ms tick into a single `append` frame, so measuring "how stale is the file's mtime
+ * right now" silently discards every event's true delay except the last one in the batch. Each
+ * `TranscriptEvent` on the wire carries its own `timestamp` (`core/live/model.ts`), which is the
+ * honest per-line signal: `arrivalMs - Date.parse(event.timestamp)` can only ever OVER-state the
+ * true delay (the write necessarily happened at or before its own timestamp is later read as
+ * elapsed), never under-state it. An event with a null `timestamp` has no better signal over the
+ * wire and falls back to `arrivalMs - mtimeFallbackMs` — the caller passes the transcript file's
+ * mtime read at the instant the frame arrived. No sample is ever clamped, floored, or discarded:
+ * a negative value (clock skew) is returned exactly as measured. Takes `rawFrame` (the frame
+ * text with its `event:`/`data:` lines, no trailing blank-line terminator), `arrivalMs`, and the
+ * pre-read `mtimeFallbackMs` as plain arguments — no filesystem or clock access of its own — so
+ * it is fully testable without a live server (`e2e/harness.test.ts`). */
+export function sampleAppendFrameLatencies(rawFrame: string, arrivalMs: number, mtimeFallbackMs: number): LatencySample[] {
+  const dataMatch = /^data: (.+)$/m.exec(rawFrame);
+  if (!dataMatch) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(dataMatch[1]!);
+  } catch {
+    return [];
+  }
+  const events = (parsed as { events?: unknown }).events;
+  if (!Array.isArray(events)) return [];
+  return events.map((event): LatencySample => {
+    const timestamp = (event as { timestamp?: unknown }).timestamp;
+    return typeof timestamp === 'string'
+      ? { valueMs: arrivalMs - Date.parse(timestamp), method: 'timestamp' }
+      : { valueMs: arrivalMs - mtimeFallbackMs, method: 'mtime-fallback' };
+  });
 }
 
 export interface WriteEvidenceInput {
   processes: ProcessNode[];
-  latencies: number[];
+  samples: LatencySample[];
   worst: number;
 }
 
@@ -45,7 +95,7 @@ export interface RunHandle {
   cardId: string;
   port: number;
   waitForProcesses(pred: (nodes: ProcessNode[]) => boolean, timeoutMs: number): Promise<ProcessNode[]>;
-  measureAppendLatencies(n: number, timeoutMs: number): Promise<number[]>;
+  measureAppendLatencies(n: number, timeoutMs: number): Promise<LatencySample[]>;
   writeEvidence(input: WriteEvidenceInput): Promise<void>;
   stop(): Promise<void>;
 }
@@ -243,11 +293,20 @@ export async function runCampaignFixture(opts: { model: string; sessionTimeout: 
     '--viewer-port', String(PORT),
   ];
   log(`$ bun ${runnerArgs.map(quote).join(' ')}  (detached, cwd: ${repoDir})`);
-  const runnerChild: ChildProcess = spawn('bun', runnerArgs, {
-    cwd: repoDir,
-    detached: true,
-    stdio: ['ignore', runnerLogFd, runnerLogFd],
-  });
+  let runnerChild: ChildProcess;
+  try {
+    runnerChild = spawn('bun', runnerArgs, {
+      cwd: repoDir,
+      detached: true,
+      stdio: ['ignore', runnerLogFd, runnerLogFd],
+    });
+  } finally {
+    // F52: `spawn`'s numeric-fd stdio dup()s into the child (not a transfer) — the parent's
+    // own copy of `runnerLogFd` is never used again after this call, whether it succeeded or
+    // threw, and must be closed explicitly or it leaks for the whole process lifetime (one
+    // leaked fd per `runCampaignFixture` call).
+    closeSync(runnerLogFd);
+  }
   runnerChild.unref();
   if (runnerChild.pid === undefined) throw new Error('failed to spawn the campaign runner');
   const runnerPid: number = runnerChild.pid;
@@ -314,33 +373,29 @@ export async function runCampaignFixture(opts: { model: string; sessionTimeout: 
     return sessionNode.transcriptPath;
   }
 
-  /** FINDING (documented in the e2e report, not fixed here — task brief forbids product-code
-   * changes): `serve.ts`'s `Bun.serve()` call never sets an explicit `idleTimeout`, so Bun's
-   * own default (~10s) can close an `/events` connection that has gone quiet — which routinely
-   * happens between transcript writes — before the poller's own 15s keepalive `ping`
-   * (`PING_INTERVAL_MS`, `poller.adapter.ts`) ever gets a chance to fire. Reproduced by hand
-   * against a real idle campaign context (curl -N, no writes): the connection was cut at ~12s,
-   * well before any ping. A real browser's native `EventSource` reconnects on exactly this
-   * transparently, which is why nobody watching the page in a browser notices it; the task
-   * brief requires this harness to use raw `fetch()` instead of `EventSource` (Bun has no
-   * `EventSource`), so this harness mirrors that same reconnect behavior itself rather than
-   * treating a routine idle-drop as a hard failure. */
-  async function measureAppendLatencies(n: number, timeoutMs: number): Promise<number[]> {
+  /** `serve.ts`'s `Bun.serve()` now sets an explicit `idleTimeout` (`SSE_IDLE_TIMEOUT_SECONDS`,
+   * `core/live/model.ts`) comfortably above the poller's 15s keepalive `ping`
+   * (`PING_INTERVAL_MS`, `poller.adapter.ts`) — F55. A real browser's native `EventSource`
+   * still reconnects transparently on any transport hiccup regardless, so this harness — which
+   * the task brief requires to use raw `fetch()` instead of `EventSource` (Bun has no
+   * `EventSource`) — keeps mirroring that same reconnect behavior itself as ordinary defensive
+   * robustness, not as a workaround for a still-open bug. */
+  async function measureAppendLatencies(n: number, timeoutMs: number): Promise<LatencySample[]> {
     const transcriptPath = await fetchTranscriptPathForCard();
     const url = `http://127.0.0.1:${PORT}/events?repo=${repoKey}&slug=${slug}&process=card:${cardId}`;
     log(`$ curl -N ${quote(url)}  (SSE, watched via fetch()/ReadableStream, not EventSource; ` +
-      'reconnects transparently on an idle-timeout drop — see the doc comment above ' +
+      'reconnects transparently on any transport hiccup — see the doc comment above ' +
       'measureAppendLatencies in harness.ts)');
 
     const deadline = Date.now() + timeoutMs;
-    const latencies: number[] = [];
+    const samples: LatencySample[] = [];
     let reconnects = 0;
 
-    while (latencies.length < n) {
+    while (samples.length < n) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
         throw new Error(
-          `measureAppendLatencies: timed out after ${timeoutMs}ms with only ${latencies.length}/${n} ` +
+          `measureAppendLatencies: timed out after ${timeoutMs}ms with only ${samples.length}/${n} ` +
             `append frames (${reconnects} reconnect(s))`,
         );
       }
@@ -353,17 +408,22 @@ export async function runCampaignFixture(opts: { model: string; sessionTimeout: 
         const decoder = new TextDecoder();
         let buffer = '';
 
-        readLoop: while (latencies.length < n) {
+        readLoop: while (samples.length < n) {
           const remainingInner = deadline - Date.now();
           if (remainingInner <= 0) break;
+          // F53: the losing side of this race (whichever one does NOT settle first) must have
+          // its timer cleared — otherwise every loop iteration where `reader.read()` wins (the
+          // normal case) leaks one more `setTimeout` scheduled up to `remainingInner` ms ahead.
+          // Same pattern as `runner/core/session.ts`'s identical race.
+          let stallTimer: ReturnType<typeof setTimeout>;
           const readResult = await Promise.race([
             reader.read(),
             new Promise<never>((_resolve, reject) => {
-              setTimeout(() => reject(new Error('measureAppendLatencies: read stalled')), remainingInner);
+              stallTimer = setTimeout(() => reject(new Error('measureAppendLatencies: read stalled')), remainingInner);
             }),
-          ]);
+          ]).finally(() => clearTimeout(stallTimer!));
           if (readResult.done) {
-            // Graceful EOF — the idle-timeout finding above. Reconnect, do not fail.
+            // Graceful EOF (e.g. a transport hiccup). Reconnect, do not fail.
             reconnects += 1;
             break readLoop;
           }
@@ -375,16 +435,19 @@ export async function runCampaignFixture(opts: { model: string; sessionTimeout: 
             const arrivalMs = Date.now();
             const eventMatch = /^event: (.+)$/m.exec(rawFrame);
             if (eventMatch?.[1] === 'append') {
-              // Never fabricate or clamp a number: the transcript file's real mtime, read at
-              // the instant the frame arrives, is the only source of truth for this measurement.
-              const mtimeMs = statSync(transcriptPath).mtimeMs;
-              latencies.push(arrivalMs - mtimeMs);
-              if (latencies.length >= n) break;
+              // F51: the file's mtime is read ONLY as the fallback for an event with a null
+              // `timestamp` — never as the primary signal, which silently discarded every
+              // event's true delay in a batched frame except the last one written.
+              const mtimeFallbackMs = statSync(transcriptPath).mtimeMs;
+              for (const sample of sampleAppendFrameLatencies(rawFrame, arrivalMs, mtimeFallbackMs)) {
+                samples.push(sample);
+                if (samples.length >= n) break;
+              }
             }
           }
         }
       } catch (err) {
-        if (latencies.length >= n) break;
+        if (samples.length >= n) break;
         const remainingAfterError = deadline - Date.now();
         if (remainingAfterError <= 0) {
           throw new Error(
@@ -402,10 +465,10 @@ export async function runCampaignFixture(opts: { model: string; sessionTimeout: 
     if (reconnects > 0) {
       log(
         `# measureAppendLatencies reconnected ${reconnects} time(s) mid-measurement — see the ` +
-          'SSE idle-timeout finding documented above measureAppendLatencies in harness.ts',
+          'doc comment above measureAppendLatencies in harness.ts',
       );
     }
-    return latencies;
+    return samples;
   }
 
   /** execFileSync's own `timeout` option does not reliably bound a headless Chrome child under
@@ -631,9 +694,13 @@ export async function runCampaignFixture(opts: { model: string; sessionTimeout: 
     const latencyPayload = {
       measuredAt: new Date().toISOString(),
       budgetMs: 2000,
-      latenciesMs: input.latencies,
+      latenciesMs: input.samples.map((s) => s.valueMs),
       worstMs: input.worst,
-      sampleCount: input.latencies.length,
+      sampleCount: input.samples.length,
+      // F51: which signal produced each `latenciesMs` entry, same index order — 'timestamp'
+      // (the honest per-event number) or 'mtime-fallback' (only for an event with a null
+      // `timestamp`). Evidence-file-only field; never a persisted product format.
+      sampleMethods: input.samples.map((s) => s.method),
     };
     writeFileSync(join(EVIDENCE_DIR, 'latency.json'), `${JSON.stringify(latencyPayload, null, 2)}\n`);
     writeFileSync(

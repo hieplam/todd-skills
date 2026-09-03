@@ -10,11 +10,11 @@ test.skipIf(!ENABLED)('a real haiku campaign renders parent and subagent, tailed
       nodes.some((n) => n.kind === 'session') && nodes.some((n) => n.kind === 'subagent'), 300_000);
     expect(processes.filter((n) => n.kind === 'subagent').length).toBeGreaterThanOrEqual(1);
 
-    const latencies = await run.measureAppendLatencies(5, 120_000);
-    const worst = Math.max(...latencies);
+    const samples = await run.measureAppendLatencies(5, 120_000);
+    const worst = Math.max(...samples.map((s) => s.valueMs));
     expect(worst).toBeLessThanOrEqual(2000);
 
-    await run.writeEvidence({ processes, latencies, worst });
+    await run.writeEvidence({ processes, samples, worst });
   } finally {
     await run.stop();
   }

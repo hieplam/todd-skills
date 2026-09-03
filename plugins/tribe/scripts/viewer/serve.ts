@@ -8,7 +8,7 @@ import { renderPage } from './core/render.ts';
 import { renderLivePage } from './core/live/page.ts';
 import { encodeSseFrame, parseLiveRoute } from './core/live/routes.ts';
 import { sanitizeProjectDirName, projectDirOf, transcriptPathOf, subagentsDirOf } from './core/live/paths.ts';
-import { MAX_LIVE_STREAMS, POLL_INTERVAL_MS, type ProcessNode } from './core/live/model.ts';
+import { MAX_LIVE_STREAMS, POLL_INTERVAL_MS, SSE_IDLE_TIMEOUT_SECONDS, type ProcessNode } from './core/live/model.ts';
 import { isStateFile, latestRunRecord, selectLiveCard } from './core/live/campaign.ts';
 import { scanTribeRoot, processKillProbe } from './adapters/scan.adapter.ts';
 import { createTranscriptIo, type TranscriptIo } from './adapters/transcript.adapter.ts';
@@ -93,6 +93,10 @@ let activeStreams = 0;
 Bun.serve({
   hostname: '127.0.0.1',
   port,
+  // F55: without this, Bun's own ~10s default idle timeout closes a quiet `/events` connection
+  // before the poller's 15s keepalive `ping` (`PING_INTERVAL_MS`) ever fires — see the doc
+  // comment on `SSE_IDLE_TIMEOUT_SECONDS` in `core/live/model.ts`.
+  idleTimeout: SSE_IDLE_TIMEOUT_SECONDS,
   fetch(req) {
     const route = parseLiveRoute(req.url);
 

@@ -18,7 +18,10 @@ import { agentIdFromFileName, metaFileNameFor } from '../core/live/paths.ts';
 import { MAX_SNAPSHOT_EVENTS, type ProcessNode, type SseFrame, type TranscriptEvent } from '../core/live/model.ts';
 import type { TranscriptIo } from './transcript.adapter.ts';
 
-const PING_INTERVAL_MS = 15_000;
+// Exported so `core/live/model.test.ts` can assert `SSE_IDLE_TIMEOUT_SECONDS` (serve.ts's
+// Bun.serve idleTimeout) actually exceeds this interval (F55) — the two constants must never
+// drift apart silently.
+export const PING_INTERVAL_MS = 15_000;
 
 export interface LiveCampaignContext {
   cardId: string;
