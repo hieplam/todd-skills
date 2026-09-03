@@ -495,7 +495,7 @@ class ExplainingIllustrationCase(unittest.TestCase):
                          f"check points at a missing script: {planned[0]['argv']}")
 
     def test_existing_cases_are_untouched(self):
-        self.assertEqual([c["id"] for c in self.data["evals"]], [1, 2, 3])
+        self.assertEqual([c["id"] for c in self.data["evals"]][:3], [1, 2, 3])
 
     def test_expected_output_is_gradeable_from_the_transcript_alone(self):
         """The grader (run_evals.grade()) only ever sees parsed["transcript"] and

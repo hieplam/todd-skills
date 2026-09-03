@@ -1,0 +1,166 @@
+{
+  "metadata": {
+    "timestamp": "20260903T044233Z",
+    "label": "(unlabeled)",
+    "runs_per_configuration": 3,
+    "jobs": 3,
+    "exec_model": "sonnet",
+    "grader_model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "agents_dir": "(default)",
+    "arms": [
+      "clean"
+    ],
+    "evals_run": [
+      {
+        "skill_name": "explaining",
+        "kind": "skill",
+        "evals_json": "plugins/explaining/skills/explaining/evals/evals.json",
+        "subjects": {
+          "explaining": {
+            "sha256": "df18cb701a17f258",
+            "chars": 10363,
+            "lines": 140
+          }
+        },
+        "case_ids": [
+          4
+        ]
+      }
+    ]
+  },
+  "runs": [
+    {
+      "eval_id": 4,
+      "eval_name": "write-ahead-log-explained-and-blind-read",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 263.6,
+        "tokens": 743372,
+        "cost_usd": 0.539961,
+        "tool_calls": 17,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent wrote explanation.md to disk (Write tool call, verified by later Read/Edit calls), included concrete worked examples (LSN table, ARIES phases, 2018 PostgreSQL fsync bug), defined terms at first use (WAL, checkpoint, LSN, fsync, page cache, redo/undo), and ended the reply with exactly one review-outcome line: 'Blind-reader review: PASS after 1 round.'"
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "write-ahead-log-explained-and-blind-read",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 375.3,
+        "tokens": 1203716,
+        "cost_usd": 0.7573470999999999,
+        "tool_calls": 28,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent wrote the deliverable to explanation.md on disk (via Write and subsequent Edits), included a supporting diagram file wal-flow.html, and the final message ends with exactly one review-outcome line: 'Blind-reader review: PASS after 2 round(s).' followed by a summary of what was found and fixed, satisfying both the file-persistence and single-line review-report requirements."
+        }
+      ],
+      "run_number": 2,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "write-ahead-log-explained-and-blind-read",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 346.6,
+        "tokens": 843986,
+        "cost_usd": 0.6775652,
+        "tool_calls": 21,
+        "errors": 0,
+        "model": "sonnet"
+      },
+      "expectations": [
+        {
+          "text": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent wrote a self-contained explanation to explanation.md covering ordering of log writes, fsync semantics, checkpoint/truncation interaction, and ARIES-style recovery, and ended its reply with exactly one review-outcome line: 'Blind-reader review: PASS after 2 round(s) \u2014 round 1 found one BLOCK ... round 2 came back clean with only NITs.' It also ran a two-round blind-reader review process via subagents and a check-review-log.ts validator before delivering, satisfying the review-reporting requirement."
+        }
+      ],
+      "run_number": 3,
+      "skill_name": "explaining",
+      "agent": null
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "time_seconds": {
+        "mean": 328.5,
+        "stddev": 58.0,
+        "min": 263.6,
+        "max": 375.3
+      },
+      "tokens": {
+        "mean": 930358,
+        "stddev": 242021,
+        "min": 743372,
+        "max": 1203716
+      },
+      "ungraded": 0,
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      }
+    },
+    "by_arm": {
+      "clean": {
+        "time_seconds": {
+          "mean": 328.5,
+          "stddev": 58.0,
+          "min": 263.6,
+          "max": 375.3
+        },
+        "tokens": {
+          "mean": 930358,
+          "stddev": 242021,
+          "min": 743372,
+          "max": 1203716
+        },
+        "ungraded": 0,
+        "pass_rate": {
+          "mean": 1.0,
+          "stddev": 0.0,
+          "min": 1.0,
+          "max": 1.0
+        }
+      }
+    }
+  },
+  "setup_errors": [],
+  "notes": []
+}

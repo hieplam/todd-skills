@@ -1,0 +1,110 @@
+{
+  "metadata": {
+    "timestamp": "20260903T045851Z",
+    "label": "(unlabeled)",
+    "runs_per_configuration": 1,
+    "jobs": 4,
+    "exec_model": "claude-haiku-4-5-20251001",
+    "grader_model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "agents_dir": "(default)",
+    "arms": [
+      "clean"
+    ],
+    "evals_run": [
+      {
+        "skill_name": "explaining",
+        "kind": "skill",
+        "evals_json": "plugins/explaining/skills/explaining/evals/evals.json",
+        "subjects": {
+          "explaining": {
+            "sha256": "e960cfadb6bae5c2",
+            "chars": 5827,
+            "lines": 66
+          }
+        },
+        "case_ids": [
+          4
+        ]
+      }
+    ]
+  },
+  "runs": [
+    {
+      "eval_id": 4,
+      "eval_name": "write-ahead-log-explained-and-blind-read",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 34.7,
+        "tokens": 45897,
+        "cost_usd": 0.0355512,
+        "tool_calls": 1,
+        "errors": 0,
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "expectations": [
+        {
+          "text": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'blind-reader-review-log' failed \u2014 exit 1: error: Module not found \"/Users/hip/.tribe/-Users-hip-repo-todd-skills/campaigns/gh-issues-2026-09/evidence/i106/preskill/plugins/explaining/skills/explaining/scripts/check-review-log.ts\""
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "explaining",
+      "agent": null
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "time_seconds": {
+        "mean": 34.7,
+        "stddev": 0.0,
+        "min": 34.7,
+        "max": 34.7
+      },
+      "tokens": {
+        "mean": 45897,
+        "stddev": 0,
+        "min": 45897,
+        "max": 45897
+      },
+      "ungraded": 0,
+      "pass_rate": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "by_arm": {
+      "clean": {
+        "time_seconds": {
+          "mean": 34.7,
+          "stddev": 0.0,
+          "min": 34.7,
+          "max": 34.7
+        },
+        "tokens": {
+          "mean": 45897,
+          "stddev": 0,
+          "min": 45897,
+          "max": 45897
+        },
+        "ungraded": 0,
+        "pass_rate": {
+          "mean": 0.0,
+          "stddev": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        }
+      }
+    }
+  },
+  "setup_errors": [],
+  "notes": []
+}

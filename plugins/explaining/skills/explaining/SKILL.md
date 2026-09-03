@@ -48,6 +48,79 @@ Follow:  // Never throws: persists the snapshot, or logs and swallows on failure
 - Wrap a label in double quotes when it contains `(` `)` `[` `]` `{` `}` `|` or `"`, or when it starts with `/` or `\`.
 - Write a literal double quote inside a quoted label as `#quot;`.
 
+## Rule 5 — Blind-reader review before delivery
+
+You cannot see what a reader lacks, because you have the context that makes every jump feel
+smooth. The self-check below is you grading your own homework; this rule is the part a reader
+does.
+
+**When.** The deliverable is a file on disk (HTML or markdown), or the explanatory prose runs to
+600 words or more. Shorter answers keep the self-check alone.
+
+**Draft to disk first.** Write the complete draft to a file — the artifact itself, or
+`explanation.md` in the working directory when the deliverable is prose. The review runs on the
+file, never on pasted text: the path is the reader's entire input, and that is what keeps the
+reader blind.
+
+**Dispatch one blind reader per round.** A fresh subagent — never a fork of this session, never
+this session itself — briefed with `references/blind-reader-brief.md` from this skill directory,
+its three slots filled in: the file path, the audience in one short phrase, and the language.
+Reader model: `sonnet` by default. Dispatch it with `run_in_background: false` and wait for its
+reply: this skill runs in headless sessions, where a backgrounded reader never returns a verdict.
+Nothing else crosses into that brief: not the user's request, not your sources, not your
+reasoning, not the draft text inline, not an earlier round's findings. A reader that has been
+told what the draft was supposed to say can no longer tell you what it actually says.
+
+**Log every round, and open the record before you dispatch.** The log is a file named after the
+draft with `.review.jsonl` appended (a draft at `explanation.md` logs to
+`explanation.md.review.jsonl`). Each round is two writes, in this order:
+
+1. **Open** — before dispatching the reader, append one JSON object carrying `round` and `brief`
+   (the rendered brief, verbatim).
+2. **Complete** — when the reader returns, rewrite that same line with `findings`, `block_count`,
+   `verdict` and `author_action` filled in.
+
+Opening first is not bookkeeping taste. It is what makes a missing log impossible: if the log has
+no record for a round, no reader was dispatched for it.
+
+```json
+{"round": 1, "reader_model": "sonnet", "brief": "the rendered brief, verbatim", "findings": [{"severity": "BLOCK", "location": "the quoted phrase", "issue": "what broke, in the reader's words"}], "block_count": 1, "verdict": "FAIL", "author_action": "what you changed before the next round"}
+```
+
+`block_count` is the number of `BLOCK` findings and `verdict` is `PASS` exactly when that count
+is zero. Check the log with
+`bun scripts/check-review-log.ts --prompt "the request you were given"` from the directory
+holding the draft: exit `0` means the review is well-formed, exit `1` names what is wrong, exit
+`2` means the checker itself could not run.
+
+**Fix and loop. Round 3 is the last round. After its verdict, stop — even on FAIL.** Fix every
+`BLOCK` finding, rewrite the file, and dispatch a NEW reader — fresh context again. Stop at
+`READER: PASS`, or when round 3 returns its verdict, whichever comes first. There is no fourth
+round; the checker fails a log that records one. A `NIT` may be dismissed; record the one-clause
+reason in the log.
+
+**Say how it ended.** The final answer carries exactly one line about the review, never silence:
+
+- `Blind-reader review: PASS after 2 round(s)`
+- `Blind-reader review: ended at cap with 1 open BLOCK finding(s)` followed by the list
+
+**Degrade only after a dispatch has actually failed.** Skipping the review is permitted only
+after you attempted to dispatch a reader and that attempt itself failed. Believing that no
+dispatch tool exists is not a permitted reason — attempt the dispatch and let the failure be the
+evidence. When it fails, write the round 0 record to the log first:
+
+```json
+{"round": 0, "brief": "the rendered brief, verbatim", "findings": [], "block_count": 0, "verdict": "FAIL", "author_action": "dispatch failed: the failure text, verbatim"}
+```
+
+then keep the self-check and say so in one line:
+`Blind-reader review: skipped (dispatch failed, round 0 in the review log carries the error).`
+
+A round 0 record belongs to the session that failed to dispatch. If a later session retries the
+review on the same draft, delete the stale round 0 line before opening round 1: the retry
+supersedes it, and a log that still carries round 0 reads to the checker as a review that never
+dispatched a reader, whatever else the log holds.
+
 ## Self-check before finishing
 
 Scan the draft once and fix:
@@ -55,6 +128,7 @@ Scan the draft once and fix:
 1. Any technical term at first use without a lead-in or definition? (Rule 1)
 2. Any abstract claim with no code/example/fact anchor and no "unverified" marker? (Rule 2)
 3. Any multi-actor or conditional flow that got narrated instead of drawn? (Rule 4)
+4. Did the blind-reader review run to a verdict, and did the answer say how it ended? (Rule 5)
 
 ## Evidence — why exactly these two rules
 

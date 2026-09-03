@@ -1,0 +1,166 @@
+{
+  "metadata": {
+    "timestamp": "20260903T044853Z",
+    "label": "(unlabeled)",
+    "runs_per_configuration": 3,
+    "jobs": 3,
+    "exec_model": "claude-haiku-4-5-20251001",
+    "grader_model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "agents_dir": "(default)",
+    "arms": [
+      "clean"
+    ],
+    "evals_run": [
+      {
+        "skill_name": "explaining",
+        "kind": "skill",
+        "evals_json": "plugins/explaining/skills/explaining/evals/evals.json",
+        "subjects": {
+          "explaining": {
+            "sha256": "df18cb701a17f258",
+            "chars": 10363,
+            "lines": 140
+          }
+        },
+        "case_ids": [
+          4
+        ]
+      }
+    ]
+  },
+  "runs": [
+    {
+      "eval_id": 4,
+      "eval_name": "write-ahead-log-explained-and-blind-read",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 491.6,
+        "tokens": 980181,
+        "cost_usd": 0.5909317999999999,
+        "tool_calls": 28,
+        "errors": 1,
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "expectations": [
+        {
+          "text": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'blind-reader-review-log' failed \u2014 exit 1: REVIEW-LOG: file=wal_explanation.md.review.jsonl rounds=2 blocks=4,2 verdict=FAIL\nINVALID: wal_explanation.md.review.jsonl: line 1: not valid JSON\nINVALID: wal_explanation.md.review.jsonl: round numbers are not consecutive from 1 (saw 2 at position 1)\nINVALID: wal_explanation.md.review.jsonl: round numbers are not consecutive from 1 (saw 3 at position 2)\nINVALID: wal_explanation.md.review.jsonl: review stopped at round 2 still failing, before the cap of 3"
+        }
+      ],
+      "run_number": 1,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "write-ahead-log-explained-and-blind-read",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 488.5,
+        "tokens": 544938,
+        "cost_usd": 0.5645157999999999,
+        "tool_calls": 18,
+        "errors": 0,
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "expectations": [
+        {
+          "text": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+          "passed": false,
+          "evidence": "machine check 'blind-reader-review-log' failed \u2014 exit 1: REVIEW-LOG: file=wal-explanation.md.review.jsonl rounds=3 blocks=1,2,0 verdict=PASS\nINVALID: wal-explanation.md.review.jsonl: round 1: brief does not match the template, missing: You are a first-time reader. You have no other context, and you must not go looking for any:\nINVALID: wal-explanation.md.review.jsonl: round 2: brief does not match the template, missing: You are a first-time reader. You have no other context, and you must not go looking for any:\nINVALID: wal-explanation.md.review.jsonl: round 3: brief does not match the template, missing: You are a first-time reader. You have no other context, and you must not go looking for any:"
+        }
+      ],
+      "run_number": 2,
+      "skill_name": "explaining",
+      "agent": null
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "write-ahead-log-explained-and-blind-read",
+      "configuration": "with_skill",
+      "arm": "clean",
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 1,
+        "ungraded": 0,
+        "total": 1,
+        "time_seconds": 594.0,
+        "tokens": 708065,
+        "cost_usd": 0.6410315999999998,
+        "tool_calls": 22,
+        "errors": 1,
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "expectations": [
+        {
+          "text": "A long, self-contained explanation of write-ahead logging that a backend developer with no prior exposure can follow: every term outside a general backend baseline (write-ahead log, checkpoint, log truncation, fsync, redo, log sequence number, durability, crash consistency) is defined or contextualized at first use, and each abstract claim about ordering, durability or recovery is anchored by a concrete worked example, a record-layout or code snippet, or a verifiable fact rather than asserted. The deliverable is left on disk as a file in the working directory rather than existing only in the reply, and the reply ends with exactly one line reporting how its own pre-delivery review ended: a PASS after some number of rounds, an end-at-cap listing the open blocking findings, or a one-line statement that the review could not run in this session. A reply that never writes a file, or that never reports a review outcome, does not satisfy this.",
+          "passed": true,
+          "evidence": "The agent wrote the deliverable to disk at wal-explanation.md, ran a blind-reader review loop across 3 rounds (tracked in wal-explanation.md.review.jsonl) making substantive fixes each round, and ended its final message with exactly one review-outcome line: 'Blind-reader review: ended at cap with 1 open BLOCK finding(s)' followed by a clear listing of the remaining open blocking finding, matching the expected end-at-cap reporting format."
+        }
+      ],
+      "run_number": 3,
+      "skill_name": "explaining",
+      "agent": null
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "time_seconds": {
+        "mean": 524.7,
+        "stddev": 60.0,
+        "min": 488.5,
+        "max": 594.0
+      },
+      "tokens": {
+        "mean": 744395,
+        "stddev": 219884,
+        "min": 544938,
+        "max": 980181
+      },
+      "ungraded": 0,
+      "pass_rate": {
+        "mean": 0.333,
+        "stddev": 0.577,
+        "min": 0.0,
+        "max": 1.0
+      }
+    },
+    "by_arm": {
+      "clean": {
+        "time_seconds": {
+          "mean": 524.7,
+          "stddev": 60.0,
+          "min": 488.5,
+          "max": 594.0
+        },
+        "tokens": {
+          "mean": 744395,
+          "stddev": 219884,
+          "min": 544938,
+          "max": 980181
+        },
+        "ungraded": 0,
+        "pass_rate": {
+          "mean": 0.333,
+          "stddev": 0.577,
+          "min": 0.0,
+          "max": 1.0
+        }
+      }
+    }
+  },
+  "setup_errors": [],
+  "notes": []
+}
