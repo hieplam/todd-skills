@@ -56,7 +56,10 @@ by the two rendering scripts below plus a machine check in this skill's own eval
   is not, and `2` when the checker itself could not run — the same three-outcome vocabulary the
   eval harness reads. `--require-catch` additionally demands that round 1 found something and
   round 2 found less, which is how the "the reader actually catches things" evidence is tallied
-  after a run rather than gated during it.
+  after a run rather than gated during it. The 12-word overlap check is word-based, so a prompt
+  with no whitespace word boundaries (e.g. Japanese, Chinese) is out of contract for leak
+  detection (ruling R2): the checker prints a `WARN: prompt-leak detection not applicable` line
+  and continues rather than passing silently.
 
 Both rendering scripts (`validate-mermaid.ts` and `render-illustration.ts`) are `bun` CLIs, run
 from the directory where the diagram/output files live (their path flags — `--diagram`,

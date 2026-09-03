@@ -59,7 +59,7 @@ review log plus eval case `write-ahead-log-explained-and-blind-read` as its evid
 2. `02-derived-skillmd-row.patch.md` — `scope: block` on Derived Materials row 1: the Evidence
 cell additionally cites `docs/superpowers/evidence/2026-09-02-explaining-blind-reader-review.md`.
 3. `03-derived-scripts-row.patch.md` — `scope: block` on the Derived Materials scripts row: add
-`check-review-log.ts` and its exit-code contract (`0` sound, `1` unsound, `2` could not run).
+`check-review-log.ts` and its exit-code contract (`0` sound, `1` unsound, `2` could not run). Ruling R2 (2026-09-03) notes the leak-detection sub-check is word-based, so scripts with no whitespace word boundaries (e.g. Japanese, Chinese) are out of contract and the checker prints a `WARN: prompt-leak detection not applicable` line rather than passing silently.
 4. `04-derived-brief-template-row.patch.md` — `scope: insert`, based on the row it follows: a new
 Derived Materials row for `plugins/explaining/skills/explaining/references/blind-reader-brief.md`,
 deriving from the Contract row for `SKILL.md` (Rule 5's dispatch paragraph), allowed variance
