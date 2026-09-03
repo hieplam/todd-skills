@@ -97,11 +97,21 @@ function renderErrors(errors: string[]): string {
   return `<div class="error-panel">${errors.map(escapeHtml).join('<br>')}</div>`;
 }
 
+// One "watch live" link per campaign section (spec §4.2 `GET /` row, Task 12), pointed at the
+// live route this task adds. `repo`/`slug` are percent-encoded query values, then the whole
+// href is still routed through `escapeHtml` before interpolation — same rule as every other
+// dynamic string on this page: a hostile repo key or slug must never become markup.
+function liveLinkFor(status: CampaignStatus): string {
+  const href = `/live?repo=${encodeURIComponent(status.repoKey)}&slug=${encodeURIComponent(status.campaignSlug)}`;
+  return `<p><a href="${escapeHtml(href)}">watch live</a></p>`;
+}
+
 function renderCampaign(status: CampaignStatus): string {
   return `<section class="campaign">
     <h2>${escapeHtml(status.repoKey)} / ${escapeHtml(status.campaignSlug)}</h2>
     <p>${badgeFor(status.liveness)}</p>
     <p>home: <code>${escapeHtml(status.homeDir)}</code></p>
+    ${liveLinkFor(status)}
     ${status.stopRequested ? '<div class="stop-banner">STOP requested</div>' : ''}
     ${renderErrors(status.errors)}
     ${renderCards(status.cards)}

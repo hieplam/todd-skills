@@ -39,6 +39,32 @@ test('a bodiless keep-alive frame encodes rather than throwing (F4)', () => {
     .toBe('event: ping\ndata: null\n\n');
 });
 
+test('the process parameter is validated at the same choke point as repo/slug (F43 layer 1)', () => {
+  // Warchief's exact traversal payload: after unescaping, `process` carries `../../../../` —
+  // this must be rejected here, before it ever reaches the poller/adapter's `join`.
+  const traversal =
+    parseLiveRoute('http://127.0.0.1:4399/events?repo=myrepo&slug=myslug&process=agent%3AT1%3A..%2F..%2F..%2F..%2Fsecret-session');
+  expect(traversal.kind).toBe('bad_request');
+
+  // A dot-only segment must be rejected exactly like a dot-only repo/slug (F3's rule, applied
+  // to the same character class).
+  expect(parseLiveRoute('http://127.0.0.1:4321/events?repo=a&slug=b&process=agent:T1:..').kind).toBe('bad_request');
+  expect(parseLiveRoute('http://127.0.0.1:4321/events?repo=a&slug=b&process=agent:..:x').kind).toBe('bad_request');
+  expect(parseLiveRoute('http://127.0.0.1:4321/events?repo=a&slug=b&process=card:.').kind).toBe('bad_request');
+
+  // An ordinary agent id still parses.
+  expect(parseLiveRoute('http://127.0.0.1:4321/events?repo=a&slug=b&process=agent:T1:a1b2c3'))
+    .toEqual({ kind: 'events', repoKey: 'a', slug: 'b', processId: 'agent:T1:a1b2c3' });
+
+  // The `card:<id>` form (selecting the session itself) still parses.
+  expect(parseLiveRoute('http://127.0.0.1:4321/events?repo=a&slug=b&process=card:T1'))
+    .toEqual({ kind: 'events', repoKey: 'a', slug: 'b', processId: 'card:T1' });
+
+  // Absent process keeps meaning "no filter" — never turned into an error.
+  expect(parseLiveRoute('http://127.0.0.1:4321/events?repo=a&slug=b'))
+    .toEqual({ kind: 'events', repoKey: 'a', slug: 'b', processId: null });
+});
+
 test('the processes route parses to the processes variant (Warchief ruling)', () => {
   expect(parseLiveRoute('http://127.0.0.1:4321/api/processes?repo=r&slug=s'))
     .toEqual({ kind: 'processes', repoKey: 'r', slug: 's' });
