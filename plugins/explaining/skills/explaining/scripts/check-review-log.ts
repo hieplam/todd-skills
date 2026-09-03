@@ -117,9 +117,13 @@ export function parseReviewLog(text: string): { rounds: RoundRecord[]; errors: s
 }
 
 /** Pure: lowercase words with punctuation dropped — the unit both leak sides compare in,
- * so re-wrapping or re-punctuating a leaked sentence does not hide it. */
+ * so re-wrapping or re-punctuating a leaked sentence does not hide it. Splits on Unicode
+ * letters and numbers rather than ASCII a-z0-9 only, so a prompt written in a non-Latin
+ * script (Cyrillic, Arabic, Hebrew, accented Latin, etc.) still tokenizes instead of
+ * collapsing to nothing — {{language}} is one of the three slots this whole feature
+ * exists to gate. For pure-ASCII input this is byte-identical to the old a-z0-9 rule. */
 export function normalizeWords(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/)
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(/\s+/)
     .filter((word) => word.length > 0);
 }
 
@@ -139,17 +143,40 @@ export function findLeakedNgram(brief: string, prompt: string, n: number): strin
   return null;
 }
 
-/** Pure: the template lines a rendered brief must reproduce — the non-empty, slot-free
- * lines between the BRIEF-START and BRIEF-END markers. Everything outside the markers is
- * rendering guidance for the author and must NOT appear in the brief. */
+/** A fixed-text segment left over after splitting a slot-bearing line on its {{slot}}
+ * placeholders must carry at least this many words to count as an invariant — this
+ * filters out trivial connective fragments (a bare "in" or ".") while keeping the
+ * meaningful fixed wording around a slot ("Read the file at", "It was written for"). */
+const MIN_INVARIANT_SEGMENT_WORDS = 3;
+
+/** Pure: the template lines a rendered brief must reproduce — every non-empty line
+ * between the BRIEF-START and BRIEF-END markers. A line with no slot survives whole, as
+ * before. A line WITH a slot is split on its {{slot}} placeholders, and each fixed-text
+ * segment substantial enough to be meaningful (see MIN_INVARIANT_SEGMENT_WORDS) is kept
+ * as its own invariant — so the fixed wording around a slot is still checked even though
+ * the slot's rendered value is not. Everything outside the markers is rendering guidance
+ * for the author and must NOT appear in the brief. */
 export function templateInvariants(template: string): string[] {
   const lines = template.split('\n');
   const start = lines.findIndex((line) => line.includes('BRIEF-START'));
   const end = lines.findIndex((line) => line.includes('BRIEF-END'));
   if (start < 0 || end < 0 || end <= start) return [];
-  return lines.slice(start + 1, end)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.includes('{{'));
+  const invariants: string[] = [];
+  for (const raw of lines.slice(start + 1, end)) {
+    const line = raw.trim();
+    if (line.length === 0) continue;
+    if (!line.includes('{{')) {
+      invariants.push(line);
+      continue;
+    }
+    for (const segment of line.split(/\{\{[^}]*\}\}/g)) {
+      const fixed = segment.trim();
+      if (fixed.length === 0) continue;
+      const wordCount = fixed.split(/\s+/).filter((word) => word.length > 0).length;
+      if (wordCount >= MIN_INVARIANT_SEGMENT_WORDS) invariants.push(fixed);
+    }
+  }
+  return invariants;
 }
 
 /** Pure: which invariant lines the rendered brief dropped. Both sides are compared with
