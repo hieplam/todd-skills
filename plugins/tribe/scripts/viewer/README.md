@@ -82,6 +82,13 @@ adapters/poller.adapter.ts      the live view's clock — one 400ms poll loop pe
 serve.ts                 composition root: routes + wiring
 structure.test.ts         executable purity wall for this package
 fixtures/                hand-authored transcript shapes used by the live-view unit tests
+e2e/                      opt-in, real end-to-end proof (card D4/G5) — see e2e/README.md
 ```
 
 Check command: `bun run check` (`tsc --noEmit && bun test`).
+
+## Opt-in end-to-end proof
+
+`e2e/` proves the whole picture — a real campaign run through the real runner, watched through
+this viewer — with a real (billed) Claude session. It never runs as part of `bun test`; see
+[`e2e/README.md`](e2e/README.md) for the opt-in gate, cost, and what it writes.

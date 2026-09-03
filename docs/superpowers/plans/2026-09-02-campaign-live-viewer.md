@@ -1247,7 +1247,7 @@ viewer that the parent session and at least one subagent are visible and that th
 stays inside the budget. Every wait is bounded in TypeScript (`AbortSignal.timeout` or a deadline
 loop) — this machine has no `timeout` binary.
 
-- [ ] **Step 1: Write the failing test.** Create `e2e/live-viewer.e2e.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `e2e/live-viewer.e2e.test.ts`:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -1277,7 +1277,7 @@ test.skipIf(!ENABLED)('a real haiku campaign renders parent and subagent, tailed
   Expected: the test is reported as skipped (no `TRIBE_VIEWER_E2E`), and with the variable set it
   fails because `./harness.ts` does not exist.
 
-- [ ] **Step 2: Implement** `e2e/harness.ts`: temp repo creation, campaign home authoring, the
+- [x] **Step 2: Implement** `e2e/harness.ts`: temp repo creation, campaign home authoring, the
   detached `run.ts` spawn, an SSE client built on `fetch` (verified working under Bun 1.3.14),
   latency measurement as `sseArrivalMs` minus the transcript file's `mtimeMs` for the bytes that
   produced the frame, and `writeEvidence` emitting `latency.json` and `processes.json` under
@@ -1291,7 +1291,7 @@ test.skipIf(!ENABLED)('a real haiku campaign renders parent and subagent, tailed
   "http://127.0.0.1:4399/live?repo=<repoKey>&slug=<slug>"
 ```
 
-- [ ] **Step 3: Verify.**
+- [x] **Step 3: Verify.**
 
 ```sh
 cd plugins/tribe/scripts/viewer && bun test e2e/
@@ -1303,7 +1303,7 @@ ls docs/superpowers/evidence/2026-09-02-campaign-live-viewer/
   asserted present, the worst measured latency is at or under 2000 ms, and the evidence
   directory lists `latency.json`, `processes.json`, `commands.md` and the captured screenshots.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/e2e docs/superpowers/evidence/2026-09-02-campaign-live-viewer docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
