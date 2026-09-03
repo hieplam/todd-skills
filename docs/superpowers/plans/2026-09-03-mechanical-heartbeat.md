@@ -232,7 +232,7 @@ file, `core/watchdog/model.ts`. `core/types.ts` stays byte-identical — it is a
 
 **Steps**
 
-- [ ] **Step 1: Failing test.** Create `core/watchdog/args.test.ts`:
+- [x] **Step 1: Failing test.** Create `core/watchdog/args.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -335,7 +335,7 @@ describe('parseWatchdogArgs', () => {
 Run `cd plugins/tribe/scripts/runner && bun test core/watchdog/args.test.ts`. Expected: the file
 fails to resolve `./args.ts` — that is the red.
 
-- [ ] **Step 2: Create the vocabulary** as a new file, `core/watchdog/model.ts` (a leaf core
+- [x] **Step 2: Create the vocabulary** as a new file, `core/watchdog/model.ts` (a leaf core
   module: it imports nothing local, so it is legal under `structure.test.ts` exactly as
   `core/types.ts` is):
 
@@ -455,7 +455,7 @@ export interface WatchdogEvent {
 }
 ```
 
-- [ ] **Step 3: Implement** `core/watchdog/args.ts`:
+- [x] **Step 3: Implement** `core/watchdog/args.ts`:
 
 ```ts
 /**
@@ -573,7 +573,7 @@ export function parseWatchdogArgs(argv: string[]): ParseWatchdogArgsResult | Par
 }
 ```
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -586,7 +586,7 @@ Expected: the new file's tests pass; the full suite reports `404 pass, 0 fail` (
 12 new); `tsc` prints nothing; `structure.test.ts` stays green (proving `core/watchdog/args.ts`
 names no world module and declares no `*IO`/`*Port`).
 
-- [ ] **Step 5: Commit** — `feat(runner): watchdog vocabulary and CLI parsing (task 1/15)`, with
+- [x] **Step 5: Commit** — `feat(runner): watchdog vocabulary and CLI parsing (task 1/15)`, with
   this task's boxes ticked in the same commit and the trailer `Campaign: gh-issues-2026-09`.
 
 ---
