@@ -111,3 +111,44 @@ export function parseWatchdogArgs(argv: string[]): ParseWatchdogArgsResult | Par
     },
   };
 }
+
+import { join, normalize, isAbsolute, sep } from 'node:path';
+
+/** Pure: the `--home` string exactly as typed, resolved against `cwd` when relative and
+ * normalized. Symlink resolution is the edge's job (fs is banned in core/**). Trailing
+ * separators are dropped so segment comparison below is exact. */
+export function resolveHomeArg(rawHome: string, cwd: string): string {
+  const joined = isAbsolute(rawHome) ? rawHome : join(cwd, rawHome);
+  const normalized = normalize(joined);
+  return normalized.length > 1 && normalized.endsWith(sep) ? normalized.slice(0, -1) : normalized;
+}
+
+export type ContainHomeResult = { ok: true } | { ok: false; error: string };
+
+/** Pure containment (fail-closed-edges obligation 4). Both arguments are already absolute and
+ * symlink-resolved by the caller (W-P10: realpathing the ROOT too is load-bearing — a
+ * throwaway HOME under /var/folders realpaths to /private/var/folders, and a string-prefix
+ * test would refuse a legitimate home). Compares PATH SEGMENTS, so `<root>-old` is not
+ * "inside" `<root>`. */
+export function containHome(absHome: string, absTribeRoot: string): ContainHomeResult {
+  const home = absHome.split(sep).filter(Boolean);
+  const root = absTribeRoot.split(sep).filter(Boolean);
+  if (home.length === root.length && home.every((s, i) => s === root[i])) {
+    return {
+      ok: false,
+      error:
+        `watchdog: --home "${absHome}" is the tribe root itself — pass a single campaign's ` +
+        'home (…/campaigns/<slug>), never the root',
+    };
+  }
+  const inside = home.length > root.length && root.every((segment, i) => home[i] === segment);
+  if (!inside) {
+    return {
+      ok: false,
+      error:
+        `watchdog: --home "${absHome}" is outside the tribe root "${absTribeRoot}" — ` +
+        'a campaign home always lives under it (see tribe-home.sh)',
+    };
+  }
+  return { ok: true };
+}

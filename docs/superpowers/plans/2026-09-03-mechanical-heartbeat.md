@@ -625,7 +625,7 @@ and `plugins/tribe/rules/fail-closed-edges.md` obligation 4, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `core/watchdog/args.test.ts`:
+- [x] **Step 1: Failing test** — append to `core/watchdog/args.test.ts`:
 
 ```ts
 import { containHome, resolveHomeArg } from './args.ts';
@@ -673,7 +673,7 @@ describe('containHome (pure, root supplied by the edge)', () => {
 Run `bun test core/watchdog/args.test.ts`. Expected: red — `containHome`/`resolveHomeArg` are not
 exported yet.
 
-- [ ] **Step 2: Implement** — append to `core/watchdog/args.ts`:
+- [x] **Step 2: Implement** — append to `core/watchdog/args.ts`:
 
 ```ts
 import { join, normalize, isAbsolute, sep } from 'node:path';
@@ -718,7 +718,7 @@ export function containHome(absHome: string, absTribeRoot: string): ContainHomeR
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -727,7 +727,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 Expected: `413 pass, 0 fail` (404 + 9 new); `tsc` silent. The `…/campaigns/<slug>` text inside
 the error string is prose in a template literal — it is not a path the code builds.
 
-- [ ] **Step 4: Commit** — `feat(runner): contain the watchdog --home to the tribe root (task 2/15)`,
+- [x] **Step 4: Commit** — `feat(runner): contain the watchdog --home to the tribe root (task 2/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---

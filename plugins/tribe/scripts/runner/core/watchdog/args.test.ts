@@ -93,3 +93,44 @@ describe('parseWatchdogArgs', () => {
     expect('error' in got && got.error).toBe('--home requires a value');
   });
 });
+
+import { containHome, resolveHomeArg } from './args.ts';
+
+describe('resolveHomeArg (pure, no fs)', () => {
+  test('an absolute home is normalized and returned', () => {
+    expect(resolveHomeArg('/h/.tribe/k/campaigns/c/', '/anywhere')).toBe('/h/.tribe/k/campaigns/c');
+  });
+  test('a relative home resolves against cwd — the shape a person actually types', () => {
+    expect(resolveHomeArg('campaigns/c', '/h/.tribe/k')).toBe('/h/.tribe/k/campaigns/c');
+  });
+  test('dot segments collapse', () => {
+    expect(resolveHomeArg('./a/../b', '/h/.tribe/k')).toBe('/h/.tribe/k/b');
+  });
+});
+
+describe('containHome (pure, root supplied by the edge)', () => {
+  const ROOT = '/private/var/folders/xy/T/home/.tribe';
+
+  test('a home inside the root is accepted', () => {
+    expect(containHome(`${ROOT}/k/campaigns/c`, ROOT)).toEqual({ ok: true });
+  });
+  test('the root itself is refused — a campaign home is never the root', () => {
+    const got = containHome(ROOT, ROOT);
+    expect(got.ok).toBe(false);
+    expect(!got.ok && got.error).toContain('is the tribe root itself');
+  });
+  test('a path outside the root is refused with a typed message naming both paths', () => {
+    const got = containHome('/tmp/elsewhere/campaigns/c', ROOT);
+    expect(got.ok).toBe(false);
+    expect(!got.ok && got.error).toBe(
+      'watchdog: --home "/tmp/elsewhere/campaigns/c" is outside the tribe root ' +
+        `"${ROOT}" — a campaign home always lives under it (see tribe-home.sh)`,
+    );
+  });
+  test('a sibling directory sharing a name prefix is refused (segment compare, not string)', () => {
+    expect(containHome(`${ROOT}-old/k/campaigns/c`, ROOT).ok).toBe(false);
+  });
+  test('a traversal escape is refused after normalization', () => {
+    expect(containHome(resolveHomeArg('../../../etc', `${ROOT}/k/campaigns`), ROOT).ok).toBe(false);
+  });
+});
