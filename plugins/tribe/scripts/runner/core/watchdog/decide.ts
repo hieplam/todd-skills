@@ -21,8 +21,21 @@ export function overloadBackoffSeconds(attempt: number): number {
 const STOP: WatchdogAction = { kind: 'exit', status: 'done', reason: 'stop_requested' };
 
 export function decide(o: WatchdogObservation): WatchdogAction {
-  // --- 1. A live runner: never launch a second one (D74-7). Task 5 refines with stall/once.
+  // --- 1. A live runner: never launch a second one (D74-7). Stall is the only thing that can
+  // end the wait, and it NEVER kills the runner (card G4: the runner's own --session-timeout
+  // owns that) — it reports, and in follow mode hands the decision to a human.
   if (o.run?.alive) {
+    const mtime = o.run.newestLogMtimeMs;
+    const stalled = mtime !== null && o.nowMs - mtime > o.limits.stallMinutes * 60_000;
+    if (stalled) {
+      return {
+        kind: 'stall',
+        logPath: o.run.newestLogPath,
+        lastMtimeMs: mtime,
+        exit: { status: o.mode === 'once' ? 'running' : 'needs_human', reason: 'stalled' },
+      };
+    }
+    if (o.mode === 'once') return { kind: 'exit', status: 'running', reason: 'runner_alive' };
     return { kind: 'attach', runnerPid: o.run.runnerPid ?? 0 };
   }
 
@@ -58,6 +71,9 @@ export function decide(o: WatchdogObservation): WatchdogAction {
       if (o.counters.quotaWaits >= o.limits.maxQuotaWaits) {
         return { kind: 'exit', status: 'needs_human', reason: 'quota_cap' };
       }
+      if (o.mode === 'once') {
+        return { kind: 'exit', status: 'running', reason: 'quota_wait_pending' };
+      }
       return { kind: 'wait_until', untilMs: quotaUntilMs as number, cause: 'quota' };
     }
 
@@ -68,6 +84,9 @@ export function decide(o: WatchdogObservation): WatchdogAction {
           return { kind: 'relaunch', cause: 'overload', model: o.fallbackModel };
         }
         return { kind: 'exit', status: 'needs_human', reason: 'overloaded' };
+      }
+      if (o.mode === 'once') {
+        return { kind: 'exit', status: 'running', reason: 'overload_backoff_pending' };
       }
       const seconds = overloadBackoffSeconds(o.counters.overloadBackoffs);
       return { kind: 'wait_until', untilMs: o.nowMs + seconds * 1000, cause: 'overload' };

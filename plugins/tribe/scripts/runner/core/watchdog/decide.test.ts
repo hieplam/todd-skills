@@ -169,3 +169,164 @@ describe('overloadBackoffSeconds — the frozen schedule (spec section 8)', () =
     ]);
   });
 });
+
+const STALE_MS = NOW - 31 * 60 * 1000;
+
+describe('decide — a live runner (follow mode)', () => {
+  const alive = (over: Partial<WatchdogObservation> = {}) =>
+    obs({
+      lastExitCode: null,
+      run: {
+        runId: 'r', runnerPid: 4242, alive: true, endedAt: null,
+        newestLogPath: '/h/logs/card-sid.log', newestLogMtimeMs: NOW - 1000,
+      },
+      ...over,
+    });
+
+  test('a fresh live runner is attached to, never relaunched', () => {
+    expect(encode(decide(alive()))).toBe('attach:4242');
+  });
+
+  test('a stalled live runner reports the log and exits needs_human in follow mode', () => {
+    const action = decide(
+      alive({
+        run: {
+          runId: 'r', runnerPid: 4242, alive: true, endedAt: null,
+          newestLogPath: '/h/logs/card-sid.log', newestLogMtimeMs: STALE_MS,
+        },
+      }),
+    );
+    expect(encode(action)).toBe('stall:needs_human:stalled');
+    expect(action.kind === 'stall' && action.logPath).toBe('/h/logs/card-sid.log');
+    expect(action.kind === 'stall' && action.lastMtimeMs).toBe(STALE_MS);
+  });
+
+  test('a live runner with no log yet is starting, not stalled', () => {
+    const action = decide(
+      alive({
+        run: {
+          runId: 'r', runnerPid: 4242, alive: true, endedAt: null,
+          newestLogPath: null, newestLogMtimeMs: null,
+        },
+      }),
+    );
+    expect(encode(action)).toBe('attach:4242');
+  });
+
+  test('a STOP file never terminates a live runner (G4: never kills)', () => {
+    expect(encode(decide(alive({ stopFilePresent: true })))).toBe('attach:4242');
+  });
+});
+
+describe('decide — caps', () => {
+  test('quota waits over cap park for a human', () => {
+    const action = decide(
+      obs({
+        lastExitCode: 3,
+        quota: { resetsAtEpochS: FUTURE_RESET_S },
+        counters: { ...ZERO, quotaWaits: 6 },
+      }),
+    );
+    expect(encode(action)).toBe('exit:needs_human:quota_cap');
+  });
+
+  test('overload backoffs over cap park for a human when no fallback model is configured', () => {
+    const action = decide(
+      obs({
+        lastExitCode: 3, overload: { apiErrorStatus: 529 },
+        counters: { ...ZERO, overloadBackoffs: 5 },
+      }),
+    );
+    expect(encode(action)).toBe('exit:needs_human:overloaded');
+  });
+
+  test('over cap with --fallback-model, it relaunches once on that tier', () => {
+    const action = decide(
+      obs({
+        lastExitCode: 3, overload: { apiErrorStatus: 529 },
+        counters: { ...ZERO, overloadBackoffs: 5 }, fallbackModel: 'sonnet',
+      }),
+    );
+    expect(encode(action)).toBe('relaunch:overload:sonnet');
+  });
+
+  test('the fallback is used at most once', () => {
+    const action = decide(
+      obs({
+        lastExitCode: 3, overload: { apiErrorStatus: 529 },
+        counters: { ...ZERO, overloadBackoffs: 5, fallbackUsed: true }, fallbackModel: 'sonnet',
+      }),
+    );
+    expect(encode(action)).toBe('exit:needs_human:overloaded');
+  });
+
+  test('a second crash relaunch is refused (max 1, D74-5)', () => {
+    const action = decide(obs({ lastExitCode: 3, counters: { ...ZERO, crashRelaunches: 1 } }));
+    expect(encode(action)).toBe('exit:needs_human:session_incomplete');
+  });
+
+  test('a repeated lock conflict parks rather than looping', () => {
+    const action = decide(obs({ lastExitCode: 1, counters: { ...ZERO, lockRelaunches: 1 } }));
+    expect(encode(action)).toBe('exit:needs_human:lock_conflict');
+  });
+});
+
+describe('decide — adopt, never duplicate (D74-7)', () => {
+  test('a live lock holder is adopted instead of launching', () => {
+    const action = decide(
+      obs({ run: null, lastExitCode: null, lockHolder: { pid: 777, alive: true } }),
+    );
+    expect(encode(action)).toBe('attach:777');
+  });
+  test('a dead lock holder does not block a launch', () => {
+    const action = decide(
+      obs({ run: null, lastExitCode: null, lockHolder: { pid: 777, alive: false } }),
+    );
+    expect(encode(action)).toBe('launch');
+  });
+  test('STOP before anything started means done, with nothing launched', () => {
+    const action = decide(obs({ run: null, lastExitCode: null, stopFilePresent: true }));
+    expect(encode(action)).toBe('exit:done:stop_requested');
+  });
+});
+
+// W-P5: a tick observes and acts AT MOST ONCE — it never sleeps.
+const ONCE_TABLE: Array<[name: string, over: Partial<WatchdogObservation>, want: string]> = [
+  ['exit 3 + quota', { lastExitCode: 3, quota: { resetsAtEpochS: FUTURE_RESET_S } },
+    'exit:running:quota_wait_pending'],
+  ['exit 3 + quota + STOP',
+    { lastExitCode: 3, quota: { resetsAtEpochS: FUTURE_RESET_S }, stopFilePresent: true },
+    'exit:done:stop_requested'],
+  ['exit 3 + 529', { lastExitCode: 3, overload: { apiErrorStatus: 529 } },
+    'exit:running:overload_backoff_pending'],
+  ['exit 3 + 529 + STOP',
+    { lastExitCode: 3, overload: { apiErrorStatus: 529 }, stopFilePresent: true },
+    'exit:done:stop_requested'],
+  ['exit 3 + quota + 529',
+    { lastExitCode: 3, quota: { resetsAtEpochS: FUTURE_RESET_S }, overload: { apiErrorStatus: 529 } },
+    'exit:running:quota_wait_pending'],
+  ['exit 3, no signal', { lastExitCode: 3 }, 'relaunch:crash'],
+  ['exit 3, no signal + STOP', { lastExitCode: 3, stopFilePresent: true },
+    'exit:done:stop_requested'],
+  ['exit 0', { lastExitCode: 0 }, 'exit:done:runner_done'],
+  ['exit 2', { lastExitCode: 2 }, 'exit:needs_human:escalations_pending'],
+  ['alive, fresh log', {
+    lastExitCode: null,
+    run: { runId: 'r', runnerPid: 42, alive: true, endedAt: null,
+           newestLogPath: '/h/l.log', newestLogMtimeMs: NOW - 1000 },
+  }, 'exit:running:runner_alive'],
+  ['alive, stale log', {
+    lastExitCode: null,
+    run: { runId: 'r', runnerPid: 42, alive: true, endedAt: null,
+           newestLogPath: '/h/l.log', newestLogMtimeMs: STALE_MS },
+  }, 'stall:running:stalled'],
+  ['nothing running', { run: null, lastExitCode: null }, 'launch'],
+];
+
+describe('decide — --once mode never sleeps (W-P5)', () => {
+  for (const [name, over, want] of ONCE_TABLE) {
+    test(`once: ${name} -> ${want}`, () => {
+      expect(encode(decide(obs({ mode: 'once', ...over })))).toBe(want);
+    });
+  }
+});

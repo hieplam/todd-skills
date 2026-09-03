@@ -1357,7 +1357,7 @@ and the card's G4, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `core/watchdog/decide.test.ts`:
+- [x] **Step 1: Failing test** — append to `core/watchdog/decide.test.ts`:
 
 ```ts
 const STALE_MS = NOW - 31 * 60 * 1000;
@@ -1525,7 +1525,7 @@ describe('decide — --once mode never sleeps (W-P5)', () => {
 Run `bun test core/watchdog/decide.test.ts`. Expected: red on the stall, once-mode and cap rows;
 Task 4's 48 rows still green.
 
-- [ ] **Step 2: Implement** — edit `decide.ts`'s section 1 and add the once-mode guards:
+- [x] **Step 2: Implement** — edit `decide.ts`'s section 1 and add the once-mode guards:
 
 ```ts
   // --- 1. A live runner: never launch a second one (D74-7). Stall is the only thing that can
@@ -1562,7 +1562,7 @@ pending wake-up and returns; it never sleeps):
         }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -1570,7 +1570,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 
 Expected: `509 pass, 0 fail` (478 + 31 new); Task 4's rows unchanged; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(runner): watchdog stall, adopt, caps and --once semantics (task 5/15)`,
+- [x] **Step 4: Commit** — `feat(runner): watchdog stall, adopt, caps and --once semantics (task 5/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
