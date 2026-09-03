@@ -300,9 +300,9 @@ exit=1
 
 == case4-haiku run-2  (FAIL)
 REVIEW-LOG: file=wal-explanation.md.review.jsonl rounds=3 blocks=1,2,0 verdict=PASS
-INVALID: round 1: brief does not match the template, missing: You are a first-time reader. You have no other context, and you must not go looking for any:
-INVALID: round 2: brief does not match the template, missing: (same line)
-INVALID: round 3: brief does not match the template, missing: (same line)
+INVALID: round 1: brief does not match the template, missing: . It was written for
+INVALID: round 2: brief does not match the template, missing: Read the file at
+INVALID: round 3: brief does not match the template, missing: Read the file at
 exit=1
 
 == case4-haiku run-3  (PASS)
@@ -394,3 +394,67 @@ run out of three, which at n=3 is within noise and is reported as "no regression
 3. **The pre-change cost cell cannot speak to quality**, only to cost — see the caveat in G4.
 4. **The cost is real.** ~16× the tokens of the pre-change skill on this prompt. Rule 5's `When`
    clause (an on-disk artifact, or ≥600 words) is what keeps that cost off short answers.
+
+## The checker was strengthened after these runs — and every verdict was re-proved
+
+The final whole-branch audit found two real holes in `check-review-log.ts`, both in the part of
+it that enforces G2 (that the reader is genuinely blind). They were fixed in commit `4a1f5f1`,
+**after** the paid runs above had already been executed against the pre-fix checker. That
+sequence is a hazard to the integrity of this document, so it is stated plainly and then closed
+with a measurement rather than an assurance.
+
+**What was wrong.**
+
+1. `normalizeWords` normalized on ASCII `a-z0-9` only, so a prompt written in any non-Latin
+   script collapsed to nearly no tokens and the 12-word prompt-leak detector could not fire at
+   all — a verbatim leak of the entire request went undetected.
+2. `templateInvariants` dropped a template line from the invariant set entirely if the line
+   contained a `{{slot}}`. The only line that tells the reader *which file to read and for whom*
+   is a slot-bearing line, so none of its fixed wording was ever enforced. A brief that replaced
+   that whole line — accidentally, or with an injected instruction — was judged compliant.
+
+**Why this document is still true.** The check is deterministic and reads only the log, the
+template and the prompt, so the strengthened checker can be re-run over the preserved artifacts
+and compared verdict-for-verdict against the recorded run. The Warchief did exactly that, from
+the original run directories, for all six case-4 runs:
+
+| Run | Pre-fix | Post-fix | `--require-catch` pre → post |
+| --- | --- | --- | --- |
+| `case4-sonnet` run-1 | exit 0 VALID | exit 0 VALID | 1 → 1 |
+| `case4-sonnet` run-2 | exit 0 VALID | exit 0 VALID | 0 → 0 |
+| `case4-sonnet` run-3 | exit 0 VALID | exit 0 VALID | 0 → 0 |
+| `case4-haiku` run-1 | exit 1 INVALID | exit 1 INVALID | 1 → 1 |
+| `case4-haiku` run-2 | exit 1 INVALID | exit 1 INVALID | 1 → 1 |
+| `case4-haiku` run-3 | exit 0 VALID | exit 0 VALID | 1 → 1 |
+
+**Every verdict is unchanged**, so G1 (3/3), G2 (3/3), G3 (2/3) and G4 (rounds 1, 2, 2) all stand
+exactly as measured, and the paid runs were not repeated. The one difference is diagnostic, not
+directional: `case4-haiku` run-2 now names a different first missing invariant, because the
+strengthened check additionally notices that its briefs dropped the artifact-path line's fixed
+wording on top of the drift already recorded. It failed before and it fails now — the new check
+simply explains the failure better.
+
+`normalizeWords` was additionally pinned by a committed test asserting byte-identical output to
+the old rule for ASCII input, which is the regime every number in this document was measured in.
+
+**A residual remains open, and it is not fixed here.** The Unicode fix repairs every
+space-separated script — measured: French with diacritics, Russian, Arabic and Thai all now
+detect a verbatim full-prompt leak, where before they did not. It does **not** repair
+scriptio-continua scripts: Japanese and Chinese prompts still tokenize to a single "word", so the
+12-word window cannot fire and a full leak stays undetected there.
+
+| Prompt script | Tokens | Verbatim full-prompt leak detected |
+| --- | --- | --- |
+| English | 17 | yes |
+| French (diacritics) | 20 | yes |
+| Russian | 15 | yes |
+| Arabic | 17 | yes |
+| Thai | 14 | yes |
+| **Japanese** | **1** | **no** |
+| **Chinese** | **1** | **no** |
+
+Closing that residual means deciding what "a 12-word run" should mean in a language with no word
+boundaries — a change to the check's contract, which ruling R1 froze and which the spec's
+`LEAK_NGRAM = 12` definition assumes is word-based. That is a decision for the Shaman, not a fix
+the Warchief may make on its own authority, so it is escalated with this PR rather than guessed
+at. It does not affect any number in this document: case 4's prompt is English.
