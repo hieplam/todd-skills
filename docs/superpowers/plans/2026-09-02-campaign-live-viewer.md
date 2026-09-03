@@ -898,7 +898,7 @@ directory roles to the viewer: `core/` is pure, `adapters/*.adapter.ts` own ever
 `serve.ts` is the composition root, `client/` is browser code and is exempt from the Node-module
 ban but must import nothing.
 
-- [ ] **Step 1: Write the failing test.** Create `structure.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `structure.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -953,13 +953,13 @@ describe('viewer structural contract', () => {
   Expected: it fails on the last test until `client/app.js` exists in this worktree (Task 10
   precedes it in the same worktree, so run Task 10 first and expect only genuine violations).
 
-- [ ] **Step 2: Implement.** Fix any violation the wall reports in this worktree's own files;
+- [x] **Step 2: Implement.** Fix any violation the wall reports in this worktree's own files;
   never weaken an assertion to make it pass.
 
-- [ ] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
+- [x] **Step 3: Verify.** `cd plugins/tribe/scripts/viewer && bun run check`.
   Expected: green, with the four structural tests passing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```sh
 git add plugins/tribe/scripts/viewer/structure.test.ts docs/superpowers/plans/2026-09-02-campaign-live-viewer.md
