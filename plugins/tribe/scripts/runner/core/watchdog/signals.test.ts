@@ -67,6 +67,18 @@ describe('parseSessionSignals — against real captured logs', () => {
     }
   });
 
+  test('a truncated FINAL line surfaces finalLineUnparseable, and quota is not silently ' +
+    'reported as clear (F3)', () => {
+    const lines = read('quota-real-429.log').trim().split('\n');
+    const rejectedIdx = lines.findIndex((l) => l.includes('"type":"rate_limit_event"'));
+    const rejectedLine = lines[rejectedIdx] as string;
+    const truncated = rejectedLine.slice(0, 60); // byte-bounded tail cut mid-JSON, at the END
+    const tail = [...lines.slice(0, rejectedIdx), truncated].join('\n');
+    const got = parseSessionSignals(tail);
+    expect(got.finalLineUnparseable).toBe(true);
+    expect(got.quota).toBe(null);
+  });
+
   test('every 5xx overload status is recognized, 429 excluded', () => {
     for (const status of [500, 502, 503, 504, 529]) {
       const line = JSON.stringify({ type: 'result', is_error: true, api_error_status: status });

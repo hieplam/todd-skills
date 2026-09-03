@@ -92,6 +92,45 @@ describe('parseWatchdogArgs', () => {
     const got = parseWatchdogArgs(['--repo', '/repo', '--model', 'opus', '--home']);
     expect('error' in got && got.error).toBe('--home requires a value');
   });
+
+  test('an own value flag refuses a flag-shaped value instead of swallowing it (F1)', () => {
+    const got = parseWatchdogArgs([...REQUIRED, '--fallback-model', '--once']);
+    expect('error' in got && got.error).toBe(
+      '--fallback-model requires a value, got flag "--once"',
+    );
+  });
+
+  test('a passthrough value flag refuses a flag-shaped value instead of swallowing it (F1)', () => {
+    const got = parseWatchdogArgs([...REQUIRED, '--logs-dir', '--follow']);
+    expect('error' in got && got.error).toBe(
+      '--logs-dir requires a value, got flag "--follow"',
+    );
+  });
+
+  test('numeric flags reject a non-integer-literal string: empty, hex, scientific, padded (F2)', () => {
+    for (const bad of ['', '0x10', '3e1', ' 5 ']) {
+      const got = parseWatchdogArgs([...REQUIRED, '--poll-seconds', bad]);
+      expect('error' in got && got.error.startsWith('--poll-seconds:')).toBe(true);
+    }
+  });
+
+  test('--max-overload-backoffs accepts a valid override (M1)', () => {
+    const got = parseWatchdogArgs([...REQUIRED, '--max-overload-backoffs', '7']);
+    if ('error' in got) throw new Error(got.error);
+    expect(got.config.maxOverloadBackoffs).toBe(7);
+  });
+
+  test('--max-overload-backoffs rejects an out-of-bound value by name (M1)', () => {
+    const got = parseWatchdogArgs([...REQUIRED, '--max-overload-backoffs', '101']);
+    expect('error' in got && got.error).toBe(
+      '--max-overload-backoffs: must be between 0 and 100, got "101"',
+    );
+  });
+
+  test('a stray positional token is rejected, never silently dropped (M2)', () => {
+    const got = parseWatchdogArgs([...REQUIRED, 'stray']);
+    expect('error' in got && got.error).toBe('unexpected argument: stray');
+  });
 });
 
 import { containHome, resolveHomeArg } from './args.ts';

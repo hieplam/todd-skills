@@ -22,6 +22,14 @@ const OWN_VALUE_FLAGS = new Set([
 ]);
 const OWN_BOOLEAN_FLAGS = new Set(['--once', '--follow']);
 
+/** Every recognized flag token, own or passthrough, value-taking or boolean — used to refuse a
+ * value-taking flag being handed another flag's token as its "value" (audit F1): without this,
+ * `--fallback-model --once` would silently swallow `--once` as the fallback model string and
+ * leave `mode` at its default, with zero error. */
+const ALL_FLAG_TOKENS = new Set<string>([
+  ...PASSTHROUGH_VALUE_FLAGS, ...PASSTHROUGH_BOOLEAN_FLAGS, ...OWN_VALUE_FLAGS, ...OWN_BOOLEAN_FLAGS,
+]);
+
 interface Bound { min: number; max: number }
 const BOUNDS: Record<string, Bound> = {
   '--stall-minutes': { min: 1, max: 24 * 60 },
@@ -33,10 +41,18 @@ const BOUNDS: Record<string, Bound> = {
   '--poll-seconds': { min: 1, max: 60 },
 };
 
+// A plain non-negative decimal integer literal — no sign, no whitespace, no hex/scientific
+// notation, never empty (audit F2: `Number(raw)` alone silently coerces "", "0x10", "3e1" and
+// " 5 " into valid integers; the contract's direction is strictness, never leniency).
+const INT_LITERAL = /^\d+$/;
+
 function parseBoundedInt(flag: string, raw: string): number | string {
   const bound = BOUNDS[flag] as Bound;
+  if (!INT_LITERAL.test(raw)) {
+    return `${flag}: must be between ${bound.min} and ${bound.max}, got "${raw}"`;
+  }
   const value = Number(raw);
-  if (!Number.isInteger(value) || value < bound.min || value > bound.max) {
+  if (value < bound.min || value > bound.max) {
     return `${flag}: must be between ${bound.min} and ${bound.max}, got "${raw}"`;
   }
   return value;
@@ -54,6 +70,9 @@ export function parseWatchdogArgs(argv: string[]): ParseWatchdogArgsResult | Par
     if (PASSTHROUGH_VALUE_FLAGS.has(token)) {
       const value = argv[i + 1];
       if (value === undefined) return { error: `${token} requires a value` };
+      if (ALL_FLAG_TOKENS.has(value)) {
+        return { error: `${token} requires a value, got flag "${value}"` };
+      }
       passthrough.push(token, value);
       i += 1;
       continue;
@@ -62,6 +81,9 @@ export function parseWatchdogArgs(argv: string[]): ParseWatchdogArgsResult | Par
     if (OWN_VALUE_FLAGS.has(token)) {
       const value = argv[i + 1];
       if (value === undefined) return { error: `${token} requires a value` };
+      if (ALL_FLAG_TOKENS.has(value)) {
+        return { error: `${token} requires a value, got flag "${value}"` };
+      }
       own.set(token, value);
       i += 1;
       continue;
