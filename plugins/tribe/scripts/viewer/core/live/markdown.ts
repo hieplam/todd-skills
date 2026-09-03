@@ -42,13 +42,31 @@ const LINK_RE = /\[([^\]\n]{0,500})\]\(([^)\n]{0,2000})\)/g;
 // arbitrary external origin through a hand-rolled pattern. `URL` is a
 // deterministic, side-effect-free global -- using it adds no world import
 // and keeps this module pure.
-const HREF_BASE = 'https://viewer.invalid/';
-
+//
+// A SINGLE base is not enough (F35): an href that shares the base's scheme
+// but omits the literal `//` -- e.g. `https:/evil.com` or `https:evil.com`
+// -- is resolved by WHATWG as a *relative path* under that one base, so
+// `u.origin` stays the base's origin and the gate wrongly allows it. The
+// real page has no scheme in common with a `https://viewer.invalid/` base
+// when served over plain HTTP, so a browser resolves that same literal
+// href to the attacker's origin instead. Requiring same-origin under TWO
+// bases of DIFFERENT schemes closes this: an href with no scheme and no
+// authority of its own resolves to the base origin under both schemes;
+// one that smuggles in a scheme (like `https:/evil.com`) only matches one
+// of the two and is rejected.
 function isAllowedHref(href: string): boolean {
+  if (/^https?:\/\//i.test(href)) {
+    try {
+      const u = new URL(href);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
   try {
-    const u = new URL(href, HREF_BASE);
-    if (/^https?:\/\//i.test(href)) return u.protocol === 'http:' || u.protocol === 'https:';
-    return u.origin === 'https://viewer.invalid'; // a relative href must stay same-origin
+    const a = new URL(href, 'http://viewer.invalid/');
+    const b = new URL(href, 'https://viewer.invalid/');
+    return a.origin === 'http://viewer.invalid' && b.origin === 'https://viewer.invalid';
   } catch {
     return false;
   }
@@ -84,9 +102,11 @@ export function renderMarkdown(text: string): string {
 
 function renderSegment(segment: Segment): string {
   if (segment.fenced) {
-    // Strip a trailing CRLF or bare LF (F33): stripping only `\n` left a
-    // stray `\r` inside <code> for a Windows-style (CRLF) fenced block.
-    const content = escapeHtml(segment.text.replace(/\r?\n$/, ''));
+    // Strip a trailing CRLF, bare LF, or bare CR (F33, F37): stripping only
+    // `\n` left a stray `\r` inside <code> for a Windows-style (CRLF)
+    // fenced block; matching only `\r?\n` still left a lone trailing `\r`
+    // (classic-Mac line ending, no following `\n`) inside <code>.
+    const content = escapeHtml(segment.text.replace(/\r\n$|\n$|\r$/, ''));
     const cls = segment.lang ? ` class="lang-${segment.lang}"` : '';
     return `<pre><code${cls}>${content}</code></pre>`;
   }

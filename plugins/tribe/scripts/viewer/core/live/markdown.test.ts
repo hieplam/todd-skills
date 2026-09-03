@@ -105,3 +105,36 @@ test('F32: an emphasis marker inside an href never leaks a span across the ancho
 test('F33: a CRLF-terminated fenced block leaves no stray carriage return', () => {
   expect(renderMarkdown('```\r\ncode\r\n```')).toBe('<pre><code>code</code></pre>');
 });
+
+// F35: a single-base gate resolved `https:/evil.com`/`https:evil.com` as a
+// RELATIVE reference under that one base, so `u.origin` stayed the base's
+// origin and the literal, unresolved string was written into the anchor.
+// Served over plain HTTP with no shared scheme, a real browser resolves
+// that same literal to the attacker's origin -- these must render inert.
+test('F35: a scheme-relative href sharing the base scheme without `//` is rejected', () => {
+  expect(renderMarkdown('[x](https:/evil.com)')).not.toContain('<a ');
+  expect(renderMarkdown('[x](https:evil.com)')).not.toContain('<a ');
+  expect(renderMarkdown('[x](https:/evil.com)')).toBe('<p>[x](https:/evil.com)</p>');
+  expect(renderMarkdown('[x](https:evil.com)')).toBe('<p>[x](https:evil.com)</p>');
+});
+
+// F35: the fix must not over-narrow -- every previously-allowed shape,
+// including an ordinary external https link and one with an extra `/`
+// (still a genuine absolute https URL matching `^https?://`), stays live.
+test('F35: ordinary relative and absolute hrefs stay allowed after the two-base fix', () => {
+  expect(renderMarkdown('[x](/local/path)')).toContain('<a href="/local/path"');
+  expect(renderMarkdown('[x](/)')).toContain('<a href="/"');
+  expect(renderMarkdown('[x](?q=1)')).toContain('<a href="?q=1"');
+  expect(renderMarkdown('[x](#frag)')).toContain('<a href="#frag"');
+  expect(renderMarkdown('[x](relative/path)')).toContain('<a href="relative/path"');
+  expect(renderMarkdown('[x](https://ok.example/x)')).toContain('<a href="https://ok.example/x"');
+  expect(renderMarkdown('[x](HTTPS://ok.example/x)')).toContain('<a href="HTTPS://ok.example/x"');
+  expect(renderMarkdown('[x](https:///evil.com)')).toContain('<a href="https:///evil.com"');
+});
+
+// F37: the fenced-block trailing strip matched only `\r?\n`, so a
+// classic-Mac (lone `\r`, no following `\n`) line ending before the
+// closing fence left a stray `\r` inside <code>.
+test('F37: a lone trailing carriage return before the closing fence leaves no stray `\\r`', () => {
+  expect(renderMarkdown('```\r\ncode\r```')).toBe('<pre><code>code</code></pre>');
+});

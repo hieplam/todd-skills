@@ -82,3 +82,23 @@ test('F34: a self-referential parentAgentId hangs off the session node', () => {
   expect(a1.parentId).not.toBe(a1.id);
   expect(a1.parentId).toBe('card:T20');
 });
+
+// F36: two sidecars naming each other as parent both pass the
+// knownAgentIds check individually and form a 2-node cycle that is
+// unreachable from the session root -- a consumer walking parent
+// pointers infinite-loops, and one building a tree from the root
+// silently drops both nodes. Both must hang off the session node
+// instead, same as the 1-node self-cycle case above.
+test('F36: a mutual 2-node parentAgentId cycle hangs both nodes off the session node', () => {
+  const nodes = deriveProcesses({ ...base, subagents: [
+    { agentId: 'a1', meta: { agentType: 'x', parentAgentId: 'b1', spawnDepth: 2 }, sizeBytes: 1, mtimeIso: base.nowIso, firstSeenIso: base.nowIso },
+    { agentId: 'b1', meta: { agentType: 'x', parentAgentId: 'a1', spawnDepth: 2 }, sizeBytes: 1, mtimeIso: base.nowIso, firstSeenIso: base.nowIso },
+  ] });
+  const ids = new Set(nodes.map((n) => n.id));
+  const a1 = nodes.find((n) => n.agentId === 'a1')!;
+  const b1 = nodes.find((n) => n.agentId === 'b1')!;
+  expect(a1.parentId).toBe('card:T20');
+  expect(b1.parentId).toBe('card:T20');
+  expect(ids.has(a1.parentId as string)).toBe(true);
+  expect(ids.has(b1.parentId as string)).toBe(true);
+});
