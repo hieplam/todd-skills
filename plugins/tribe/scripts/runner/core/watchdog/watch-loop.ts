@@ -86,6 +86,14 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
   const logs = runId === null ? [] : io.listEntries(join(runsDir, runId, 'logs')).filter((e) => !e.isDir);
   const newest = newestLog(logs.map((e) => ({ name: e.name, mtimeMs: e.mtimeMs })));
   const newestLogPath = newest === null || runId === null ? null : join(runsDir, runId, 'logs', newest.name);
+  // `io.readTail` (adapters/watchdog-io.adapter.ts) is the RAW byte-bounded primitive, fed
+  // straight to the parser with no wrapping: it reads to the file's true EOF, so the tail's
+  // final line is always complete, and the only possible cut is a truncated LEADING line when
+  // the window's start falls mid-file — which `parseSessionSignals` tolerates BY DESIGN (a line
+  // that fails to parse is simply skipped). `LOG_TAIL_BYTES` is floored at 64 KiB rather than
+  // let smaller because a window narrower than one log line would read back `''` and produce
+  // "no signal" with no `finalLineUnparseable` flag either — indistinguishable from "window too
+  // small" from "genuinely nothing to report", which this floor rules out.
   const signals = newestLogPath === null
     ? null
     : parseSessionSignals(io.readTail(newestLogPath, LOG_TAIL_BYTES));

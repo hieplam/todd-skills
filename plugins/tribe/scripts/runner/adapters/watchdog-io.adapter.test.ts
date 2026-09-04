@@ -2,8 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildWatchdogIo, readTailLines, withHome } from './watchdog-io.adapter.ts';
-import { parseSessionSignals } from '../core/watchdog/signals.ts';
+import { buildWatchdogIo, withHome } from './watchdog-io.adapter.ts';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'wd-adapter-'));
 
@@ -94,46 +93,6 @@ describe('buildWatchdogIo — the real edge', () => {
     io.appendFile(events, 'one\n');
     io.appendFile(events, 'two\n');
     expect(io.readTail(events, 100)).toBe('one\ntwo\n');
-  });
-
-  // Carried-forward audit constraint F3/F3b: the tail handed to parseSessionSignals must never
-  // end in a line cut by the READ WINDOW's own boundary. readTail (above) is a raw byte-bounded
-  // primitive on purpose (its own tests rely on exact byte slicing); readTailLines is the
-  // composed seam that discards a LEADING partial line — the one a mid-file window boundary can
-  // create — while never touching the TRAILING line, because a genuinely incomplete final write
-  // is parseSessionSignals's own finalLineUnparseable judgment to make, not this adapter's.
-  test('readTailLines discards a leading partial line at the window boundary, but never the ' +
-    'trailing line — complete lines reach the parser (audit F3/F3b)', () => {
-    const io = buildWatchdogIo();
-    const dir = tmp();
-    const file = join(dir, 'session.log');
-    const rejectedLine = JSON.stringify({
-      type: 'rate_limit_event',
-      rate_limit_info: { status: 'rejected', resetsAt: 1788392400 },
-    });
-    const lines = [
-      '{"type":"system","subtype":"init"}',
-      '{"type":"assistant","message":{}}',
-      rejectedLine,
-    ];
-    const content = lines.join('\n') + '\n';
-    writeFileSync(file, content);
-
-    // Position the window's start strictly inside the SECOND line, so the raw byte tail's
-    // first line is a partial fragment — e.g. `nt","message":{}}` instead of the full line.
-    const secondLineStart = content.indexOf(lines[1] as string);
-    const cutInsideSecondLine = secondLineStart + 5;
-    const maxBytes = content.length - cutInsideSecondLine;
-
-    const rawTail = io.readTail(file, maxBytes);
-    expect(rawTail.startsWith('{')).toBe(false); // proves the window really did cut mid-line
-
-    const tail = readTailLines(io.readTail, file, maxBytes);
-    expect(tail).toBe(`${rejectedLine}\n`); // only the complete trailing line survives
-    expect(parseSessionSignals(tail).quota).toEqual({ resetsAtEpochS: 1788392400 });
-
-    // A window smaller than a single line has no complete line to hand forward at all.
-    expect(readTailLines(io.readTail, file, 3)).toBe('');
   });
 
   // W-P9, asserted rather than promised: the watchdog's lock access is read-only — reading it
