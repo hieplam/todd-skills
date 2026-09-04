@@ -119,7 +119,7 @@ snippet break the hash. Therefore, in every cell you author in this card:
 - Create: `.c3/changes/adr-20260904-fix-c3-213-derived-materials-grounding/01-reground-published-blog-posts.patch.md`
 - Modify: `.c3/c3-2-plugins/c3-213-research-to-blog.md` (row 1 of Derived Materials, via `c3x change apply`)
 
-- [ ] **Step 1: Watch it fail**
+- [x] **Step 1: Watch it fail**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -133,13 +133,13 @@ Expected: `exit=1` with `Checked 47 docs — 2 errors` and both the `x c3-213:` 
 ungrounded-derivation lines; `only-exit=1` with the `x c3-213:` line present. Paste both
 transcripts into the report file — they are this task's RED proof.
 
-- [ ] **Step 2: Derive the two anchors for c3-213**
+- [x] **Step 2: Derive the two anchors for c3-213**
 
 Run the anchor script from "How to derive a cite anchor" above and keep the two `c3-213` lines.
 Expected: one anchor whose snippet starts `Published blog posts | Business Flow section` (the
 patch base) and one whose snippet starts `Owns the insight` (the ADR Evidence cite).
 
-- [ ] **Step 3: Author the ADR draft and import it with the tool**
+- [x] **Step 3: Author the ADR draft and import it with the tool**
 
 Write `/tmp/adr-c3-213-draft.md` with exactly this body, substituting `PURPOSE_CITE_213` with
 the `Owns the insight...` anchor line from Step 2 (whole line, including the quoted snippet):
@@ -224,7 +224,7 @@ ls .c3/adr/adr-20260904-fix-c3-213-derived-materials-grounding.md
 
 Expected: `add-exit=0` and the `ls` prints the new ADR path.
 
-- [ ] **Step 4: Scaffold the change unit and author the one block patch**
+- [x] **Step 4: Scaffold the change unit and author the one block patch**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -253,7 +253,7 @@ copying the Contract row's own "Research repo + blog repo commits" wording, and 
 published to" rather than "pushed/published": both avoid characters that have bitten this repo
 before, and neither changes the meaning.
 
-- [ ] **Step 5: Apply the change unit and watch it go green**
+- [x] **Step 5: Apply the change unit and watch it go green**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -272,7 +272,7 @@ folder, and a modified `.c3/c3-2-plugins/c3-213-research-to-blog.md` — plus po
 `.c3/` shows as modified, that is unrelated reseal churn: `git checkout -- <that path>` and
 re-run `check` to confirm it stays green.
 
-- [ ] **Step 6: Confirm the fence held**
+- [x] **Step 6: Confirm the fence held**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -283,7 +283,7 @@ Expected: exactly two changed lines — the `c3-seal:` line in the frontmatter (
 tool, never by hand) and the one Derived Materials row. Nothing else in the file moves. If more
 lines changed, stop and report `BLOCKED` rather than committing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift

@@ -1,6 +1,6 @@
 ---
 id: c3-213
-c3-seal: bbbe6208cb70141d597d4b63d9378b7ea5b3082962aecd40313ac6c68d075ef8
+c3-seal: a858f5061bc60cb581ab6ca394ff269bdc4b73892c09853d0b468b7c0a30568b
 title: research-to-blog
 type: component
 category: feature
@@ -69,4 +69,4 @@ Owns the insight→published-post pipeline in two modes: (a) format-and-publish 
 
 | Material | Must derive from | Allowed variance | Evidence |
 | --- | --- | --- | --- |
-| Published blog posts | Business Flow section (primary path: the note precedes and sources the posts) | Presentation/formatting per blog conventions | plugins/research-to-blog/agents/research-to-blog.md |
+| Published blog posts | Contract section (the research repo and blog repo commits OUT surface: bilingual note plus posts published to GitHub Pages) and Business Flow section (primary path: the note precedes and sources the posts) | Presentation/formatting per blog conventions | plugins/research-to-blog/agents/research-to-blog.md |
