@@ -52,8 +52,10 @@ change here; a test that needs a new knob in `doctor.sh` is a bug.
 ### C1 — a helper that builds a doctor fixture by copy
 
 Add a helper `doctor_fixture DIR provisioned|unprovisioned` that creates `DIR/`, copies (`cp`,
-never a symlink — `doctor.sh` resolves its own directory with `pwd -P`, so a symlink would point
-`HERE` back at the real checkout) `$DOCTOR` to `DIR/doctor.sh`, creates `DIR/runner/`, and for
+never a symlink — `cp` keeps the fixture self-contained and independent of the checkout;
+`doctor.sh` resolves `HERE` from its own path with `pwd -P`, and a symlink would leave the
+fixture's identity tied to the real file. Wording corrected at the campaign's closing pass, ruling R6)
+`$DOCTOR` to `DIR/doctor.sh`, creates `DIR/runner/`, and for
 `provisioned` also creates `DIR/runner/node_modules/` (an empty directory satisfies
 `doctor.sh:80`'s `[ -d "$RUNNER/node_modules" ]`; doctor inspects nothing inside it). No network,
 no writes outside `$TMP`.
