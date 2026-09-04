@@ -48,7 +48,7 @@ bash 3.2.57 does not treat that heredoc body as literal while scanning for the c
 apostrophe in the Python comment at line 181 (`# Must NOT still assert idea 01's superseded,`)
 opens a quote that never closes and the whole file fails to parse.
 
-- [ ] **Step 1: Watch the test fail (RED)**
+- [x] **Step 1: Watch the test fail (RED)**
 
 The failing test IS the suite's own parse. Run both of these and paste both outputs into your
 report:
@@ -69,7 +69,7 @@ parse rc=2
 
 If you do not see `parse rc=2`, stop and report `BLOCKED` — you are not on the right bash.
 
-- [ ] **Step 2: Make it parse (GREEN)**
+- [x] **Step 2: Make it parse (GREEN)**
 
 Move the heredoc to statement level inside a shell function, and call that function from the
 command substitution. This is the repo's own established idiom — see the `jget` function at
@@ -112,7 +112,7 @@ EVAL_CHECKS="$(eval_checks "$EVALS")"
 re-indent it: the heredoc is quoted (`<<'PY'`) and un-indented (`<<`, not `<<-`), so the
 terminator `PY` must stay at column 0 and the body must keep its exact current text.
 
-- [ ] **Step 3: Verify green**
+- [x] **Step 3: Verify green**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/fix-red-shell-suites
@@ -128,7 +128,7 @@ number the governing plan records for this suite
 47/0"*), so a different tally means something else moved — stop and report it rather than adjusting
 an assertion.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/fix-red-shell-suites

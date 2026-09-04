@@ -150,7 +150,8 @@ has "F10: pre-Lens-mode persona/scope text is declared contract-lens only" \
 EVALS="$HERE/../../evals/evals.json"
 [[ -f "$EVALS" ]] || { printf 'not ok - evals.json not found\n'; exit 1; }
 
-EVAL_CHECKS="$(python3 - "$EVALS" <<'PY'
+eval_checks() {
+  python3 - "$1" <<'PY'
 import json, sys
 
 path = sys.argv[1]
@@ -187,7 +188,8 @@ out("eval11-no-longer-claims-both-must-pass",
 out("eval12-no-longer-claims-identical-briefs",
     "identical, isolated briefs" not in e12)
 PY
-)"
+}
+EVAL_CHECKS="$(eval_checks "$EVALS")"
 
 while IFS= read -r _line; do
   [[ -n "$_line" ]] || continue
