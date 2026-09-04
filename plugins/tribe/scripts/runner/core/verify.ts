@@ -328,11 +328,21 @@ async function checkSchemaGuard(card: Card, config: VerifyConfig, io: VerifyIO):
     };
   }
 
+  // C1 (HARDENING-BACKLOG): this point runs AFTER the merge, and a card is permitted to delete
+  // its own planning docs as part of its work (T26's release commit removed docs/plans/). A
+  // plan that is gone by now is therefore a guard INPUT — it simply grants no waiver — never
+  // an ENOENT thrown out of verifyShipped, which left T26 `running` although it had merged.
+  // The pre-flight read (`nextCard`'s PLANNING_NEEDED check) still requires the file.
   let allowsSchemaChange = false;
+  let planGone = false;
   if (card.plan) {
     const resolvedPlanPath = join(config.repoRoot, card.plan);
-    const planContent = await io.readFile(resolvedPlanPath);
-    allowsSchemaChange = readAllowsSchemaChange(planContent);
+    if (io.fileExists(resolvedPlanPath)) {
+      const planContent = await io.readFile(resolvedPlanPath);
+      allowsSchemaChange = readAllowsSchemaChange(planContent);
+    } else {
+      planGone = true;
+    }
   }
 
   const result = await run(io, config.repoRoot, [
@@ -356,10 +366,13 @@ async function checkSchemaGuard(card: Card, config: VerifyConfig, io: VerifyIO):
     };
   }
 
+  const planNote = planGone
+    ? ` (the plan ${card.plan} is no longer on disk — the card may have deleted it — so no allowsSchemaChange waiver could be read)`
+    : '';
   return {
     id: 'schemaGuard',
     passed: false,
-    detail: `schema-lock paths (${config.schemaLockPaths.join(', ')}) changed since ${card.baseSha} and allowsSchemaChange is not true`,
+    detail: `schema-lock paths (${config.schemaLockPaths.join(', ')}) changed since ${card.baseSha} and allowsSchemaChange is not true${planNote}`,
   };
 }
 
