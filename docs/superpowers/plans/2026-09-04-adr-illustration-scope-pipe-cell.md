@@ -44,7 +44,7 @@ One task, one commit.
 
 **Contract:** spec sections "C1", "C2". **File:** `.c3/adr/adr-20260821-explaining-illustration-scope.md`.
 
-- [ ] **Step 1: RED on a throwaway copy of the base**
+- [x] **Step 1: RED on a throwaway copy of the base**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/adr-illustration-scope-pipe-cell
@@ -56,13 +56,13 @@ rm -rf /tmp/adr-before && mkdir -p /tmp/adr-before && git archive HEAD | tar -x 
 
 Expected: `1`, `8`, repair rc 0 with "all clear", then `0` — the cell is gone. Paste it.
 
-- [ ] **Step 2: Reword**
+- [x] **Step 2: Reword**
 
 On line 87 of `$F` replace the substring `a raw | inside` with `a raw pipe character inside`
 (one occurrence). Verify: `awk -F'|' 'NR==87{print NF}' $F` → `7`;
 `grep -c 'raw pipe character' $F` → `1`; `git diff --stat` → one file, one line.
 
-- [ ] **Step 3: Reseal in the worktree, once**
+- [x] **Step 3: Reseal in the worktree, once**
 
 ```bash
 bunx @c3x/cli@11.6.3 repair; echo "rc=$?"
@@ -74,7 +74,7 @@ Expected: rc 0; porcelain lists only `$F` (no `c3.db*`, nothing else — if anyt
 stop and report `NEEDS_DIRECTION` with the list); the diff shows four changed lines total: the old
 and new cell line, the old and new `c3-seal`. Then `grep -c "This unit's three patches are the review" $F` → `1`.
 
-- [ ] **Step 4: GREEN on a throwaway copy of the branch (idempotent round-trip)**
+- [x] **Step 4: GREEN on a throwaway copy of the branch (idempotent round-trip)**
 
 ```bash
 rm -rf /tmp/adr-after && mkdir -p /tmp/adr-after && git archive HEAD | tar -x -C /tmp/adr-after
@@ -86,7 +86,7 @@ cp $F /tmp/adr-after/$F
 
 Expected: rc 0, empty porcelain under `.c3` after the second repair, `1`, check "all clear" rc 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Stage only `$F` and this plan. Subject
 `docs(c3): reword the illustration-scope ADR cell so c3x repair round-trips it`,

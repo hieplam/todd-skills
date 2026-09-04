@@ -1,6 +1,6 @@
 ---
 id: adr-20260821-explaining-illustration-scope
-c3-seal: b0216743825e92ff219fd76469968da24212e73c371c2766d6ca50dd7c6f3e55
+c3-seal: 5d6c4763a7a4ef5543624e9aa8a5697bd9b3334b61c6b74af80a7ccb525f1100
 title: explaining-illustration-scope
 type: adr
 goal: |-
@@ -84,7 +84,7 @@ already established for `ref-evals-fixture`/`c3-301`.
 
 | Entity | Type | Why affected | Evidence | Governance review |
 | --- | --- | --- | --- | --- |
-| c3-201 | component | Its Parent-Fit Boundary cell claims "no scripts"; its Contract row for SKILL.md names only the original two-rule pair; its Derived Materials table has no row for the shipped scripts/ directory — all three are now stale against the shipped illustration capability (a table-row cite here would embed a raw | inside this ADR's own table cell, which c3x 11.6.3's table parser cannot round-trip — same class of serializer limitation as F23 — so this cites the fact's prose Purpose section instead as proof of the entity, with the exact stale cells named in this column) | c3-201#n1181@v1:sha256:57c71c2e4b981617989f16a57bc6a0ada08e1cc187f27cdcdb3fc3249cb18793 "Owns the explaining skill definition (skills/explaining/SKILL.md) and its regression eval fixtures (evals/evals.json). The skill encodes exactly the rule " | This unit's three patches are the review |
+| c3-201 | component | Its Parent-Fit Boundary cell claims "no scripts"; its Contract row for SKILL.md names only the original two-rule pair; its Derived Materials table has no row for the shipped scripts/ directory — all three are now stale against the shipped illustration capability (a table-row cite here would embed a raw pipe character inside this ADR's own table cell, which c3x 11.6.3's table parser cannot round-trip — same class of serializer limitation as F23 — so this cites the fact's prose Purpose section instead as proof of the entity, with the exact stale cells named in this column) | c3-201#n1181@v1:sha256:57c71c2e4b981617989f16a57bc6a0ada08e1cc187f27cdcdb3fc3249cb18793 "Owns the explaining skill definition (skills/explaining/SKILL.md) and its regression eval fixtures (evals/evals.json). The skill encodes exactly the rule " | This unit's three patches are the review |
 
 ## Verification
 
