@@ -79,4 +79,30 @@ describe('actionLine — one human stdout line per action', () => {
     ];
     for (const [action, want] of cases) expect(actionLine(action)).toBe(want);
   });
+
+  // G1 (group-B audit round 1): a non-finite millisecond value is a legally constructible
+  // `WatchdogAction` field — must never throw `new Date(NaN).toISOString()`'s uncaught
+  // RangeError. Surface it as a clearly invalid marker instead.
+  test('a non-finite wait_until.untilMs renders as invalid, not a thrown RangeError', () => {
+    const line = actionLine({ kind: 'wait_until', untilMs: Number.NaN, cause: 'overload' });
+    expect(line).toBe('overload_backoff: upstream overloaded — waiting until (invalid-timestamp)');
+  });
+
+  test('a non-finite stall.lastMtimeMs renders as invalid, not a thrown RangeError', () => {
+    const line = actionLine({
+      kind: 'stall', logPath: '/h/l.log', lastMtimeMs: Number.NaN,
+      exit: { status: 'needs_human', reason: 'stalled' },
+    });
+    expect(line).toBe('stall: no log activity in /h/l.log since (invalid-timestamp)');
+  });
+
+  // G5 (group-B audit round 1): the stall case's null-coalescing branches
+  // (`logPath ?? …`, `lastMtimeMs ?? …`) were never exercised by the test table.
+  test('a stall with no log path or mtime yet renders the fallback text', () => {
+    const line = actionLine({
+      kind: 'stall', logPath: null, lastMtimeMs: null,
+      exit: { status: 'needs_human', reason: 'stalled' },
+    });
+    expect(line).toBe('stall: no log activity in (no log yet) since 1970-01-01T00:00:00.000Z');
+  });
 });

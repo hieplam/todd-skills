@@ -9,12 +9,21 @@
  * wall has a known reset instant, a 529 is transient.
  */
 import type { WatchdogAction, WatchdogObservation } from './model.ts';
+// G3 (group-B audit round 1, class `agreed`): delegate to select.ts's isStale rather than
+// duplicate its `>` inline — a sibling module inside core/watchdog/, so this keeps the core
+// pure and breaks no layering rule.
+import { isStale } from './select.ts';
 
 /** Spec §8, verbatim: 30 s, 60 s, 120 s, 240 s, 480 s, then clamped. */
 const OVERLOAD_BACKOFF_SECONDS = [30, 60, 120, 240, 480];
 
+/** Total over every `number` (G1, group-B audit round 1): a fractional, `NaN`, negative or
+ * out-of-range attempt must still land on a defined entry, never `undefined` — a non-finite
+ * attempt saturates to the first entry, everything else rounds to its nearest index and clamps
+ * into range (the table's last entry is the natural saturation point). */
 export function overloadBackoffSeconds(attempt: number): number {
-  const index = Math.min(Math.max(attempt, 0), OVERLOAD_BACKOFF_SECONDS.length - 1);
+  const safeAttempt = Number.isFinite(attempt) ? attempt : 0;
+  const index = Math.min(Math.max(Math.round(safeAttempt), 0), OVERLOAD_BACKOFF_SECONDS.length - 1);
   return OVERLOAD_BACKOFF_SECONDS[index] as number;
 }
 
@@ -26,7 +35,7 @@ export function decide(o: WatchdogObservation): WatchdogAction {
   // owns that) — it reports, and in follow mode hands the decision to a human.
   if (o.run?.alive) {
     const mtime = o.run.newestLogMtimeMs;
-    const stalled = mtime !== null && o.nowMs - mtime > o.limits.stallMinutes * 60_000;
+    const stalled = isStale(o.nowMs, mtime, o.limits.stallMinutes);
     if (stalled) {
       return {
         kind: 'stall',
@@ -36,7 +45,7 @@ export function decide(o: WatchdogObservation): WatchdogAction {
       };
     }
     if (o.mode === 'once') return { kind: 'exit', status: 'running', reason: 'runner_alive' };
-    return { kind: 'attach', runnerPid: o.run.runnerPid ?? 0 };
+    return { kind: 'attach', runnerPid: o.run.runnerPid };
   }
 
   // --- 2. Terminal runner outcomes (W-P1: these outrank a STOP file).

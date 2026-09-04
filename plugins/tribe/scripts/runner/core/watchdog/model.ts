@@ -77,7 +77,9 @@ export interface WatchdogObservation {
 
 export type WatchdogAction =
   | { kind: 'launch' }
-  | { kind: 'attach'; runnerPid: number }
+  /** G2 (group-B audit round 1): `number | null` because a live run's own pid is legally
+   * unknown (`WatchdogRunObservation.runnerPid: number | null`) — never fabricate a pid 0. */
+  | { kind: 'attach'; runnerPid: number | null }
   | { kind: 'wait_until'; untilMs: number; cause: 'quota' | 'overload' }
   | { kind: 'relaunch'; cause: 'quota' | 'overload' | 'crash' | 'lock_free'; model: string | null }
   | {

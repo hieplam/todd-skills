@@ -1320,7 +1320,8 @@ export function decide(o: WatchdogObservation): WatchdogAction {
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 ```
 
-Expected: `478 pass, 0 fail` (423 + 55 new: 48 table rows + 7); `tsc` silent.
+Expected: `484 pass, 0 fail` (430 + 55 new: 48 table rows + 7); `tsc` silent.
+<!-- Corrected in group-B audit (finding G6): measured, not derived. -->
 
 - [x] **Step 4: Commit** — `feat(runner): pure watchdog decision core over the frozen action table (task 4/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.

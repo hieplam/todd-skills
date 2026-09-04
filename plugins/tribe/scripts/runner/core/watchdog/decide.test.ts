@@ -168,6 +168,22 @@ describe('overloadBackoffSeconds — the frozen schedule (spec section 8)', () =
       30, 60, 120, 240, 480, 480, 480,
     ]);
   });
+
+  // G1 (group-B audit round 1): the table lookup must be TOTAL — a fractional, NaN, negative
+  // or out-of-range counter is a legally constructible `WatchdogCounters.overloadBackoffs`
+  // value (it is a plain `number`), and must never resolve to `undefined`.
+  test('a fractional attempt saturates to a defined second count, never undefined', () => {
+    expect(overloadBackoffSeconds(2.5)).toBe(240);
+  });
+  test('a NaN attempt saturates to a defined second count, never undefined', () => {
+    expect(overloadBackoffSeconds(Number.NaN)).toBe(30);
+  });
+  test('a negative attempt clamps to the first entry', () => {
+    expect(overloadBackoffSeconds(-1)).toBe(30);
+  });
+  test('an out-of-range attempt clamps to the last (saturation) entry', () => {
+    expect(overloadBackoffSeconds(100)).toBe(480);
+  });
 });
 
 const STALE_MS = NOW - 31 * 60 * 1000;
@@ -215,6 +231,52 @@ describe('decide — a live runner (follow mode)', () => {
 
   test('a STOP file never terminates a live runner (G4: never kills)', () => {
     expect(encode(decide(alive({ stopFilePresent: true })))).toBe('attach:4242');
+  });
+
+  // G3 (group-B audit round 1, class `agreed`): decide()'s stall check must delegate to
+  // select.ts's `isStale` rather than duplicate its `>` — a mutation to `>=` in a scratch
+  // copy left all pre-existing rows green, so the exact boundary is pinned here.
+  test('exactly at the stall threshold is NOT stale yet (boundary, G3)', () => {
+    const action = decide(
+      alive({
+        run: {
+          runId: 'r', runnerPid: 4242, alive: true, endedAt: null,
+          newestLogPath: '/h/logs/card-sid.log',
+          newestLogMtimeMs: NOW - LIMITS.stallMinutes * 60_000,
+        },
+      }),
+    );
+    expect(encode(action)).toBe('attach:4242');
+  });
+
+  test('one millisecond past the stall threshold IS stale (boundary, G3)', () => {
+    const action = decide(
+      alive({
+        run: {
+          runId: 'r', runnerPid: 4242, alive: true, endedAt: null,
+          newestLogPath: '/h/logs/card-sid.log',
+          newestLogMtimeMs: NOW - LIMITS.stallMinutes * 60_000 - 1,
+        },
+      }),
+    );
+    expect(encode(action)).toBe('stall:needs_human:stalled');
+  });
+
+  // G2 (group-B audit round 1): `runnerPid: null` is a legally constructible
+  // `WatchdogRunObservation` for an adopted live run — decide() must pass that unknown
+  // through honestly, never fabricate pid 0 (a real, meaningful target on POSIX) and never
+  // fall through to launch/relaunch (spec 2.1: a live runner is ALWAYS attach).
+  test('a live runner with an unknown pid attaches with runnerPid null, never pid 0', () => {
+    const action = decide(
+      alive({
+        run: {
+          runId: 'r', runnerPid: null, alive: true, endedAt: null,
+          newestLogPath: '/h/logs/card-sid.log', newestLogMtimeMs: NOW - 1000,
+        },
+      }),
+    );
+    expect(action.kind).toBe('attach');
+    expect(action.kind === 'attach' && action.runnerPid).toBe(null);
   });
 });
 
@@ -268,6 +330,25 @@ describe('decide — caps', () => {
   test('a repeated lock conflict parks rather than looping', () => {
     const action = decide(obs({ lastExitCode: 1, counters: { ...ZERO, lockRelaunches: 1 } }));
     expect(encode(action)).toBe('exit:needs_human:lock_conflict');
+  });
+});
+
+// G4 (group-B audit round 1): spec §2.1's "Runner exited 1 (lock held by a live process) |
+// attach if the holder is alive, else relaunch" row's `alive` arm is implemented, but was
+// never exercised under `lastExitCode: 1` — the only lockHolder alive/dead cases in this
+// file were under `lastExitCode: null` (the "nothing has run yet" branch).
+describe('decide — exit 1, lock held by a live process (spec section 2.1, G4)', () => {
+  test('holder alive under exit 1 attaches on the holder\'s pid', () => {
+    const action = decide(
+      obs({ lastExitCode: 1, lockHolder: { pid: 555, alive: true } }),
+    );
+    expect(encode(action)).toBe('attach:555');
+  });
+  test('holder dead under exit 1 relaunches (lock_free)', () => {
+    const action = decide(
+      obs({ lastExitCode: 1, lockHolder: { pid: 555, alive: false } }),
+    );
+    expect(encode(action)).toBe('relaunch:lock_free');
   });
 });
 

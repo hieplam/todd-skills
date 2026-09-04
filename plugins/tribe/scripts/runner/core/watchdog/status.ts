@@ -6,6 +6,14 @@ import {
   type WatchdogStatus,
 } from './model.ts';
 
+/** G1 (group-B audit round 1): a millisecond value arriving from `decide.ts` is not
+ * guaranteed finite by the type system alone — surface a non-finite value as a clearly
+ * invalid marker rather than letting `new Date(x).toISOString()` throw an uncaught
+ * `RangeError`, which would defeat the whole point of a process meant to survive crashes. */
+function isoOrInvalid(ms: number): string {
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : '(invalid-timestamp)';
+}
+
 export function exitCodeOf(action: Extract<WatchdogAction, { kind: 'exit' }>): number {
   switch (action.status) {
     case 'done': return WATCHDOG_EXIT_DONE;
@@ -45,10 +53,10 @@ export function buildStatus(input: BuildStatusInput): WatchdogStatus {
     runnerPid: input.runnerPid,
     runnerCommand: input.runnerCommand,
     counters: { ...input.counters },
-    nextWakeAt: input.nextWakeAtMs === null ? null : new Date(input.nextWakeAtMs).toISOString(),
+    nextWakeAt: input.nextWakeAtMs === null ? null : isoOrInvalid(input.nextWakeAtMs),
     stall: input.stall === null
       ? null
-      : { logPath: input.stall.logPath, lastMtime: new Date(input.stall.lastMtimeMs).toISOString() },
+      : { logPath: input.stall.logPath, lastMtime: isoOrInvalid(input.stall.lastMtimeMs) },
     terminal: input.terminal,
   };
 }
@@ -69,7 +77,7 @@ export function actionLine(action: WatchdogAction): string {
     case 'attach':
       return `attach: runner pid ${action.runnerPid} is already live — waiting on it`;
     case 'wait_until': {
-      const until = new Date(action.untilMs).toISOString();
+      const until = isoOrInvalid(action.untilMs);
       return action.cause === 'quota'
         ? `quota_wait: account limit — waiting until ${until}`
         : `overload_backoff: upstream overloaded — waiting until ${until}`;
@@ -80,7 +88,7 @@ export function actionLine(action: WatchdogAction): string {
         : `relaunch: cause ${action.cause} on fallback model ${action.model}`;
     case 'stall':
       return `stall: no log activity in ${action.logPath ?? '(no log yet)'} since ` +
-        `${new Date(action.lastMtimeMs ?? 0).toISOString()}`;
+        `${isoOrInvalid(action.lastMtimeMs ?? 0)}`;
     case 'exit':
       return `exit: ${action.status}:${action.reason}`;
   }
