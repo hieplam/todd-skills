@@ -205,11 +205,13 @@ The deliverables *are* tests, so TDD's "red" is the observed failure of the suit
 - C1's red is the **parse error** (`bash -n` exits 2; the suite exits 2 mid-run). Green is
   `bash -n` exit 0 and `47 passed, 0 failed`.
 - C2's red, once C1 has landed, is `47 passed, 2 failed` (`f1` and `f3` recover from C1; the two
-  `c:` assertions still fail on trailers). Green is `49 passed, 0 failed`.
+  `c:` assertions still fail on trailers). Green is `50 passed, 0 failed` — 49 existing
+  assertions all passing, plus one new assertion that the range walk actually found a candidate
+  (so an empty walk fails loudly instead of skipping the pass case silently).
 
 No assertion's *expectation* is weakened anywhere: C1 changes zero assertions, C2 changes only the
 input a passing assertion is fed, and both suites end with strictly more passing assertions than
-they start with (19 → 47; 45 → 49).
+they start with (19 → 47; 45 → 50).
 
 ## Evidence plan
 
