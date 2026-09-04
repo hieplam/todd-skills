@@ -78,7 +78,19 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
   // longer "alive" just because we have not polled it, and a run.json with `endedAt: null`
   // that we did NOT spawn (adopted from an earlier watchdog invocation) is legitimately alive
   // even though its pid may be unrecoverable — carried-forward requirement 3's exact shape.
-  const childAlive = state.child !== null && state.ownedExitCode === null && recordEndedAt === null;
+  //
+  // C1 (group-C audit round 1, class `critical` — the 'relaunch' half of "case 'launch': case
+  // 'relaunch':"): `record` here is read from `newestRunId`, which is not necessarily OUR
+  // child's own directory. Right after a relaunch, the PREVIOUS (already-ended) attempt's
+  // directory is still the newest one visible until the freshly-spawned child's own directory
+  // appears — the exact same no-await synchronous re-observe C1 already names. Trusting that
+  // stale, already-`endedAt`-set record unconditionally made a live, just-relaunched child
+  // read as dead, feeding its OLD exit code back into `decide()` and tripping the
+  // crash-relaunch cap a tick early. Only let a record's `endedAt` override ownership once the
+  // record's own `pid` proves it actually IS the child we hold.
+  const recordBelongsToOwnedChild = state.child !== null && recordPid === state.child.pid;
+  const childAlive = state.child !== null && state.ownedExitCode === null
+    && (recordEndedAt === null || !recordBelongsToOwnedChild);
   const recordAlive = record !== null && recordEndedAt === null;
   const alive = childAlive || recordAlive;
   const runnerPid = childAlive ? (state.child as RunnerHandle).pid : recordPid;
@@ -105,7 +117,15 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
     mode: config.mode,
     stopFilePresent: io.fileExists(join(homeDir, 'STOP')),
     lockHolder: lock === null ? null : { pid: lock.pid, alive: io.isProcessAlive(lock.pid) },
-    run: runId === null ? null : {
+    // C1 (group-C audit round 1, class `critical`): `runId === null` used to mean "nothing has
+    // run yet" unconditionally, discarding `childAlive` entirely — but a child this process
+    // JUST spawned and still holds (`childAlive`) is a live runner even before its
+    // `runs/<id>/` directory has had real wall-clock time to appear. Reporting `run: null`
+    // here made `decide()` read "nothing has run yet" and re-launch a SECOND child
+    // synchronously, unboundedly, on every cold `--follow` launch. `runId` itself stays
+    // legitimately unknown (`null`) until the directory is observed — decide() never reads
+    // `runId`, only `alive`/`runnerPid`, so this loses no decision-relevant information.
+    run: (runId === null && !childAlive) ? null : {
       runId,
       runnerPid,
       alive,
@@ -291,6 +311,10 @@ export async function runWatchdog(
       }
 
       case 'exit':
+        // C3: carry the once-mode pending exit's wake instant (if any) through to the
+        // published status BEFORE terminate()'s own publish() reads `state.nextWakeAtMs` —
+        // every other exit reason leaves `nextWakeAtMs` undefined, so this is a no-op there.
+        state.nextWakeAtMs = action.nextWakeAtMs ?? null;
         return terminate(action.status, action.reason, exitCodeOf(action));
     }
   }

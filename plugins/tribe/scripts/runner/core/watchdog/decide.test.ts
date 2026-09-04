@@ -411,3 +411,56 @@ describe('decide — --once mode never sleeps (W-P5)', () => {
     });
   }
 });
+
+// C3 (group-C audit round 1, class `critical`): W-P5 / spec §9 amendment 5 — "--once never
+// sleeps: it records nextWakeAt and exits 11 with reason quota_wait_pending /
+// overload_backoff_pending." The exit action used to carry no wake time at all, so
+// status.json's nextWakeAt stayed `null` on the one path cron/launchd has no other way to
+// learn when to come back (spec §8). The exit code and reason (frozen, already correct) must
+// stay byte-identical to ONCE_TABLE's rows above — only the new `nextWakeAtMs` field is
+// exercised here.
+describe('decide — C3: --once pending exits carry the same wake instant --follow would have waited until', () => {
+  test('once: exit 3 + quota -> exit:running:quota_wait_pending with nextWakeAtMs = (resetsAt + grace) * 1000', () => {
+    const action = decide(obs({
+      mode: 'once', lastExitCode: 3, quota: { resetsAtEpochS: FUTURE_RESET_S },
+    }));
+    if (action.kind !== 'exit') throw new Error(`expected an exit action, got ${action.kind}`);
+    expect(action.status).toBe('running');
+    expect(action.reason).toBe('quota_wait_pending');
+    expect(action.nextWakeAtMs).toBe((FUTURE_RESET_S + LIMITS.quotaGraceSeconds) * 1000);
+  });
+
+  test('once: exit 3 + 529 -> exit:running:overload_backoff_pending with nextWakeAtMs = the backoff deadline', () => {
+    const action = decide(obs({
+      mode: 'once', lastExitCode: 3, overload: { apiErrorStatus: 529 },
+    }));
+    if (action.kind !== 'exit') throw new Error(`expected an exit action, got ${action.kind}`);
+    expect(action.status).toBe('running');
+    expect(action.reason).toBe('overload_backoff_pending');
+    expect(action.nextWakeAtMs).toBe(NOW + overloadBackoffSeconds(ZERO.overloadBackoffs) * 1000);
+  });
+
+  test('the untilMs a --follow wait_until would have used is IDENTICAL to the once-mode nextWakeAtMs (same observation, quota)', () => {
+    const followAction = decide(obs({
+      mode: 'follow', lastExitCode: 3, quota: { resetsAtEpochS: FUTURE_RESET_S },
+    }));
+    const onceAction = decide(obs({
+      mode: 'once', lastExitCode: 3, quota: { resetsAtEpochS: FUTURE_RESET_S },
+    }));
+    if (followAction.kind !== 'wait_until') throw new Error('expected wait_until');
+    if (onceAction.kind !== 'exit') throw new Error('expected exit');
+    expect(onceAction.nextWakeAtMs).toBe(followAction.untilMs);
+  });
+
+  test('the untilMs a --follow wait_until would have used is IDENTICAL to the once-mode nextWakeAtMs (same observation, overload)', () => {
+    const followAction = decide(obs({
+      mode: 'follow', lastExitCode: 3, overload: { apiErrorStatus: 529 },
+    }));
+    const onceAction = decide(obs({
+      mode: 'once', lastExitCode: 3, overload: { apiErrorStatus: 529 },
+    }));
+    if (followAction.kind !== 'wait_until') throw new Error('expected wait_until');
+    if (onceAction.kind !== 'exit') throw new Error('expected exit');
+    expect(onceAction.nextWakeAtMs).toBe(followAction.untilMs);
+  });
+});

@@ -422,8 +422,23 @@ export function resolveWatchdogHome(
     fileExists(p: string): boolean;
   },
 ): { homeDir: string } | { error: string } {
-  const absHome = io.realpath(resolveHomeArg(rawHome, io.cwd()));
-  const tribeRoot = io.realpath(join(io.userHome(), '.tribe'));
+  // C2 (group-C audit round 1, class `critical`): these two `realpath` calls ran BEFORE B2's
+  // try/catch around `runWatchdog` — the real adapter degrades only `ENOENT`, so any other
+  // real I/O failure (`ENOTDIR`, `EACCES`, `ELOOP`) escaped as an uncaught traceback instead
+  // of the same typed `watchdog:`-prefixed containment refusal every other bad `--home` gets.
+  // Exit 1 (usage error), matching the other refusals `resolveWatchdogHome` already returns
+  // below: an unusable `--home` value IS a usage problem, not an internal failure.
+  let absHome: string;
+  let tribeRoot: string;
+  try {
+    absHome = io.realpath(resolveHomeArg(rawHome, io.cwd()));
+    tribeRoot = io.realpath(join(io.userHome(), '.tribe'));
+  } catch (err) {
+    return {
+      error: `watchdog: --home "${rawHome}" could not be resolved: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   const contained = containHome(absHome, tribeRoot);
   if (!contained.ok) return { error: contained.error };
   if (!io.fileExists(campaignStatePathOf(absHome))) {

@@ -659,3 +659,37 @@ describe('watchdog subcommand: an I/O failure inside runWatchdog never escapes a
     }
   }, 20_000);
 });
+
+// C2 (group-C audit round 1, class `critical`): `resolveWatchdogHome`'s two `io.realpath(...)`
+// calls run BEFORE the B2 try/catch above (they resolve `--home` itself), and the real
+// `realpath` adapter only degrades `ENOENT` — every other real I/O failure (`ENOTDIR`,
+// `EACCES`, `ELOOP`) still escaped as an uncaught Bun stack trace. This is a real subprocess
+// e2e test (CLAUDE.md: reproduce the way an end user would experience it) for the same reason
+// B2's is: `main()` wires its own real adapters and is not unit-tested.
+describe('watchdog subcommand: a realpath failure resolving --home is a typed usage error, never a traceback (C2)', () => {
+  test('a plain FILE where a directory component of --home must be produces a typed "watchdog:" stderr line and exit 1, never a stack trace', () => {
+    const homeParent = mkdtempSync(join(homedir(), '.tribe', 'i74-c2-repro-'));
+    try {
+      // Plant a plain FILE where `--home` needs a directory COMPONENT (not the leaf itself —
+      // ENOENT on the leaf is already handled) — `realpathSync` throws ENOTDIR, not ENOENT.
+      const fileBlocker = join(homeParent, 'notadir');
+      writeFileSync(fileBlocker, '');
+      const badHome = join(fileBlocker, 'subdir');
+
+      const result = spawnSync(
+        'bun',
+        ['cli/main.ts', 'watchdog', '--repo', '/tmp', '--model', 'x', '--home', badHome, '--once'],
+        { cwd: import.meta.dir + '/..', encoding: 'utf8' },
+      );
+
+      const combined = `${result.stdout}${result.stderr}`;
+      expect(combined).not.toContain('at realpath');
+      expect(combined).not.toContain('.ts:');
+      expect(combined).not.toContain('Bun v');
+      expect(result.stderr).toContain('watchdog:');
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(homeParent, { recursive: true, force: true });
+    }
+  }, 20_000);
+});

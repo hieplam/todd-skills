@@ -20,6 +20,11 @@ import type { LockInfo, RunnerHandle, WatchdogIO } from '../ports/ports.ts';
 const RUNNER_ENTRYPOINT = join(import.meta.dir, '..', 'run.ts');
 
 function isProcessAlive(pid: number): boolean {
+  // C5 (group-C audit round 1, class `minor`): `process.kill(0, 0)` and `process.kill(-1, 0)`
+  // signal a whole process GROUP under POSIX and never throw — so without this guard, a lock
+  // file this process does not own/trust reporting `pid: 0` would read back as "alive"
+  // forever. Any pid that is not a positive integer is never a real process id.
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -145,15 +150,27 @@ export function buildWatchdogIo(): WatchdogIO {
         cwd: opts.cwd,
         stdio: ['ignore', out, out],
       });
+      // C4 (group-C audit round 1, class `agreed`): `'error'` (the program never started, e.g.
+      // ENOENT on argv[0]) is a DIFFERENT event than `'exit'` — under Bun, `'exit'` never
+      // fires once `'error'` has — so closing `out` only on `'exit'` leaked the fd on every
+      // failed spawn. `closeOut` is idempotent (guarded by `closed`) so it is safe no matter
+      // which event(s) fire, and in which order, on any runtime.
+      let closed = false;
+      const closeOut = (): void => {
+        if (closed) return;
+        closed = true;
+        closeSync(out);
+      };
       let exited: number | null = null;
       const done = new Promise<number>((resolve) => {
         child.on('exit', (code, signal) => {
           exited = code ?? (signal ? 128 : 0);
-          closeSync(out);
+          closeOut();
           resolve(exited);
         });
         child.on('error', () => {
           exited = 127; // spawn failed (ENOENT on the program) — a runner that never ran
+          closeOut();
           resolve(127);
         });
       });

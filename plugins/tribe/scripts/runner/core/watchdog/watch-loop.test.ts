@@ -16,7 +16,18 @@ const CONFIG: WatchdogConfig = {
 interface Scripted { exitCode: number; runId: string; logTail?: string; endedAt?: string | null }
 
 /** A fake world: virtual files, a virtual clock that only advances when the loop sleeps, and
- * a scripted runner whose passes are consumed one per launch. */
+ * a scripted runner whose passes are consumed one per launch.
+ *
+ * C1 (group-C audit round 1, class `critical`): the REAL `spawnRunner` adapter never writes
+ * to the observed `runs/` directory — the CHILD process does, after real wall-clock time a
+ * fake's synchronous JS can't represent for free. The old version of this fake fabricated
+ * `run.json` and the directory entry SYNCHRONOUSLY inside `spawnRunner`, which hid a
+ * fork-bomb-shaped defect (unbounded synchronous re-launch, see `watch-loop.ts`'s `observe()`)
+ * under a green suite — the CI-reported bug that motivated this fix. Model reality instead: a
+ * spawned pass's directory/record/log become visible starting from the SECOND
+ * `listEntries(runsDir)` call after its own spawn, never the first — so the tick immediately
+ * following a spawn (the exact tick the loop re-observes on, with NO `await` in between) sees
+ * nothing yet, exactly like a real just-forked OS process that hasn't written to disk. */
 function fakeIo(passes: Scripted[]) {
   const files = new Map<string, string>();
   const entries = new Map<string, Array<{ name: string; mtimeMs: number; isDir: boolean }>>();
@@ -24,6 +35,26 @@ function fakeIo(passes: Scripted[]) {
   const spawns: string[][] = [];
   let nowMs = 1_800_000_000_000;
   let index = 0;
+  const runsDir = join(HOME, 'runs');
+  const pendingReveals: Array<{ pass: Scripted; attemptIndex: number; callsRemaining: number }> = [];
+
+  function materialize(pending: { pass: Scripted; attemptIndex: number }): void {
+    const { pass, attemptIndex } = pending;
+    const runDir = join(HOME, 'runs', pass.runId);
+    const prior = entries.get(runsDir) ?? [];
+    entries.set(runsDir, [...prior, { name: pass.runId, mtimeMs: nowMs, isDir: true }]);
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: pass.runId, pid: 9000 + attemptIndex, startedAt: new Date(nowMs).toISOString(),
+      endedAt: pass.endedAt === undefined ? new Date(nowMs).toISOString() : pass.endedAt,
+      exitCode: pass.exitCode, reason: 'x',
+    }));
+    if (pass.logTail !== undefined) {
+      entries.set(join(runDir, 'logs'), [{ name: 'card-sid.log', mtimeMs: nowMs, isDir: false }]);
+      files.set(join(runDir, 'logs', 'card-sid.log'), pass.logTail);
+    } else {
+      entries.set(join(runDir, 'logs'), []);
+    }
+  }
 
   const io: WatchdogIO = {
     fileExists: (p) => files.has(p),
@@ -31,7 +62,20 @@ function fakeIo(passes: Scripted[]) {
     appendFile: (p, content) => files.set(p, (files.get(p) ?? '') + content),
     ensureDir: () => {},
     writeFileAtomic: (p, content) => files.set(p, content),
-    listEntries: (dirPath) => entries.get(dirPath) ?? [],
+    listEntries: (dirPath) => {
+      if (dirPath === runsDir) {
+        for (let i = pendingReveals.length - 1; i >= 0; i--) {
+          const pending = pendingReveals[i] as
+            { pass: Scripted; attemptIndex: number; callsRemaining: number };
+          pending.callsRemaining -= 1;
+          if (pending.callsRemaining <= 0) {
+            materialize(pending);
+            pendingReveals.splice(i, 1);
+          }
+        }
+      }
+      return entries.get(dirPath) ?? [];
+    },
     readTail: (p) => files.get(p) ?? '',
     realpath: (p) => p,
     readLock: () => null,
@@ -44,21 +88,9 @@ function fakeIo(passes: Scripted[]) {
     spawnRunner: (argv): RunnerHandle => {
       spawns.push(argv);
       const pass = passes[index++] as Scripted;
-      const runDir = join(HOME, 'runs', pass.runId);
-      entries.set(join(HOME, 'runs'), passes.slice(0, index).map((p) => ({
-        name: p.runId, mtimeMs: nowMs, isDir: true,
-      })));
-      files.set(join(runDir, 'run.json'), JSON.stringify({
-        v: 1, runId: pass.runId, pid: 9000 + index, startedAt: new Date(nowMs).toISOString(),
-        endedAt: pass.endedAt === undefined ? new Date(nowMs).toISOString() : pass.endedAt,
-        exitCode: pass.exitCode, reason: 'x',
-      }));
-      if (pass.logTail !== undefined) {
-        entries.set(join(runDir, 'logs'), [{ name: 'card-sid.log', mtimeMs: nowMs, isDir: false }]);
-        files.set(join(runDir, 'logs', 'card-sid.log'), pass.logTail);
-      } else {
-        entries.set(join(runDir, 'logs'), []);
-      }
+      // Visible starting from the SECOND `listEntries(runsDir)` call since this spawn — never
+      // the first (the tick immediately after spawn, with no yield, must see nothing yet).
+      pendingReveals.push({ pass, attemptIndex: index, callsRemaining: 2 });
       return { pid: 9000 + index, waitFor: async () => pass.exitCode };
     },
     userHome: () => '/h',
@@ -199,6 +231,79 @@ describe('runWatchdog — --once acts at most once (W-P5)', () => {
     const outcome = await runWatchdog({ ...CONFIG, mode: 'once' }, HOME, io);
     expect(spawns.length).toBe(1);
     expect([outcome.exitCode, outcome.reason]).toEqual([11, 'launched']);
+  });
+});
+
+// C3 (group-C audit round 1, class `critical`): W-P5 / spec §9.5 — `--once` never sleeps, but
+// its quota/overload pending exits must still publish `status.json.nextWakeAt`, the only way
+// cron/launchd (the caller of `--once`) learns when to come back (spec §8).
+describe('runWatchdog — C3: --once publishes nextWakeAt on a pending exit (spec section 8, W-P5)', () => {
+  test('a quota-pending once-mode exit publishes nextWakeAt = resetsAt + quota-grace-seconds', async () => {
+    const { io, files, entries } = fakeIo([]); // adopted run, never spawns
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 4242, startedAt: new Date(0).toISOString(),
+      endedAt: new Date(0).toISOString(), exitCode: 3, reason: 'x',
+    }));
+    entries.set(join(runDir, 'logs'), [{ name: 'card-sid.log', mtimeMs: 1, isDir: false }]);
+    files.set(join(runDir, 'logs', 'card-sid.log'), quotaTail(1_800_000_000 + 600));
+
+    const outcome = await runWatchdog({ ...CONFIG, mode: 'once' }, HOME, io);
+    expect([outcome.exitCode, outcome.reason]).toEqual([11, 'quota_wait_pending']);
+    const status = JSON.parse(files.get(join(HOME, 'watchdog', 'status.json')) as string);
+    expect(status.nextWakeAt).toBe(new Date((1_800_000_000 + 600 + CONFIG.quotaGraceSeconds) * 1000).toISOString());
+  });
+
+  test('an overload-pending once-mode exit publishes nextWakeAt = the backoff deadline', async () => {
+    const { io, files, entries } = fakeIo([]); // adopted run, never spawns
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 4242, startedAt: new Date(0).toISOString(),
+      endedAt: new Date(0).toISOString(), exitCode: 3, reason: 'x',
+    }));
+    const overloadTail = `${JSON.stringify({ type: 'result', is_error: true, api_error_status: 529 })}\n`;
+    entries.set(join(runDir, 'logs'), [{ name: 'card-sid.log', mtimeMs: 1, isDir: false }]);
+    files.set(join(runDir, 'logs', 'card-sid.log'), overloadTail);
+
+    const outcome = await runWatchdog({ ...CONFIG, mode: 'once' }, HOME, io);
+    expect([outcome.exitCode, outcome.reason]).toEqual([11, 'overload_backoff_pending']);
+    const status = JSON.parse(files.get(join(HOME, 'watchdog', 'status.json')) as string);
+    expect(status.nextWakeAt).toBe(new Date(1_800_000_000_000 + 30_000).toISOString());
+  });
+});
+
+// C1 (group-C audit round 1, class `critical`): after a launch, the `for(;;)` loop's
+// 'launch'/'relaunch' case calls `observe()` again with NO `await` in between. Until the
+// just-spawned child creates its `runs/<id>/` directory — which a real OS process needs real
+// wall-clock time to do — `listEntries` returns nothing, `runId` is null, `observation.run`
+// used to be discarded to `null` entirely (`decide()` reads that as "nothing has run yet"),
+// and `decide()` returns `launch` AGAIN. Synchronously, unboundedly — a fork bomb on every
+// cold `--follow` launch. This fake now models that real delay (see `fakeIo`'s own doc
+// comment); the safety valve below turns an unbounded re-spawn into a fast, clear test
+// failure instead of a hang, exactly as the audit's own reproduction did.
+describe('runWatchdog — C1: a single --follow launch never re-spawns before the run directory is visible', () => {
+  test('exactly one spawnRunner call even when the run directory has not yet appeared on the very next tick', async () => {
+    const { io, spawns } = fakeIo([{ exitCode: 0, runId: 'r1' }]);
+    let spawnCount = 0;
+    const SAFETY_VALVE = 5; // a correct loop spawns exactly once; more IS the fork-bomb defect
+    const wrapped: WatchdogIO = {
+      ...io,
+      spawnRunner: (argv, opts) => {
+        spawnCount += 1;
+        if (spawnCount > SAFETY_VALVE) {
+          throw new Error(
+            `SAFETY VALVE: ${spawnCount} spawnRunner calls for one --follow launch — the C1 ` +
+              'fork-bomb defect is back',
+          );
+        }
+        return io.spawnRunner(argv, opts);
+      },
+    };
+    const outcome = await runWatchdog(CONFIG, HOME, wrapped);
+    expect(spawns.length).toBe(1);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
   });
 });
 

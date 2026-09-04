@@ -47,9 +47,16 @@ export interface WatchdogLimits {
   quotaGraceSeconds: number;
 }
 
-/** One observed runner pass — from a child the watchdog owns, or from an adopted run.json. */
+/** One observed runner pass — from a child the watchdog owns, or from an adopted run.json.
+ * C1 (group-C audit round 1, class `critical`): `runId` widened to `string | null` — a child
+ * the watchdog owns but whose `runs/<id>/` directory a real OS process has not yet had real
+ * wall-clock time to create is still a LIVE runner (`observe()`, `core/watchdog/watch-loop.ts`);
+ * its id is simply not yet knowable. `decide()` never reads `runId` itself (only
+ * `alive`/`runnerPid`), so this widening changes no decision logic — only what an
+ * owned-but-not-yet-visible child is allowed to report as `null` rather than being discarded
+ * into `run: null` entirely (which `decide()` reads as "nothing has run yet" and re-launches). */
 export interface WatchdogRunObservation {
-  runId: string;
+  runId: string | null;
   runnerPid: number | null;
   alive: boolean;
   endedAt: string | null;
@@ -88,7 +95,17 @@ export type WatchdogAction =
       lastMtimeMs: number | null;
       exit: { status: 'needs_human' | 'running'; reason: 'stalled' };
     }
-  | { kind: 'exit'; status: 'done' | 'needs_human' | 'running'; reason: string };
+  | {
+      kind: 'exit';
+      status: 'done' | 'needs_human' | 'running';
+      reason: string;
+      /** C3 (group-C audit round 1): W-P5 / spec §9.5 — `--once` never sleeps, but its
+       * quota/overload pending exits must still carry the wake instant `--follow` would have
+       * waited until, so `status.json.nextWakeAt` is populated on the one path cron/launchd
+       * has no other way to learn when to come back. `undefined` (never set) on every other
+       * exit reason — never a fabricated value. */
+      nextWakeAtMs?: number;
+    };
 
 export interface WatchdogStatus {
   v: 1;

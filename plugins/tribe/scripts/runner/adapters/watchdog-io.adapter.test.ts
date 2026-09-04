@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, statSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildWatchdogIo, withHome } from './watchdog-io.adapter.ts';
@@ -60,6 +61,24 @@ describe('buildWatchdogIo — the real edge', () => {
     expect(await handle.waitFor(10_000)).toBe(0);
   }, 20_000);
 
+  // C4 (group-C audit round 1, class `agreed`): `child.on('exit')` closes the stdout fd, but a
+  // program that never STARTS (e.g. ENOENT on argv[0]) only fires `child.on('error')`, which
+  // used to resolve with 127 and never close it — a leaked fd on every failed spawn. Verified
+  // the way one of the two Skinner reviewers did: `lsof` on this very process after the
+  // failure must show the descriptor gone.
+  test('C4: a failed spawn (ENOENT on argv[0]) closes the stdout fd exactly once — no leaked descriptor', async () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    const out = join(dir, 'attempt-1.log');
+    const handle = io.spawnRunner(['/nonexistent/binary/for/sure/c4-leak-test', '--x'], {
+      cwd: dir, stdoutPath: out,
+    });
+    expect(await handle.waitFor(10_000)).toBe(127);
+    const lsof = spawnSync('lsof', ['-p', String(process.pid)], { encoding: 'utf8' });
+    const openForThisFile = (lsof.stdout ?? '').split('\n').filter((line) => line.includes(out));
+    expect(openForThisFile).toEqual([]);
+  }, 15_000);
+
   // B1 (rules-gate fix): EPERM means "alive but foreign" (kill(0) reached a real process we
   // just lack permission to signal), never "gone" — conflating the two would let the watchdog
   // treat a live-but-foreign lock holder as dead and launch a competing runner (decide.ts's
@@ -78,6 +97,18 @@ describe('buildWatchdogIo — the real edge', () => {
     expect(await handle.waitFor(10_000)).toBe(0);
     expect(io.isProcessAlive(handle.pid)).toBe(false);
   }, 20_000);
+
+  // C5 (group-C audit round 1, class `minor`): `process.kill(0, 0)` / `process.kill(-1, 0)`
+  // signal a whole process GROUP under POSIX and never throw, so the naive EPERM/ESRCH
+  // dispatch above reads them as "alive". No writer in this repo ever produces `pid: 0` or a
+  // negative pid, but the watchdog reads a lock file it does not own and cannot trust
+  // (`fail-closed-edges`), so an untrusted `pid: 0` must never read back as a live holder.
+  test('isProcessAlive: pid 0, a negative pid, and a non-integer pid are never "alive" (untrusted lock input)', () => {
+    const io = buildWatchdogIo();
+    expect(io.isProcessAlive(0)).toBe(false);
+    expect(io.isProcessAlive(-1)).toBe(false);
+    expect(io.isProcessAlive(1.5)).toBe(false);
+  });
 
   test('runnerCommand names the real runner entrypoint, resolved from this file, not from cwd', () => {
     const io = buildWatchdogIo();

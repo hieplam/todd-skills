@@ -81,7 +81,12 @@ export function decide(o: WatchdogObservation): WatchdogAction {
         return { kind: 'exit', status: 'needs_human', reason: 'quota_cap' };
       }
       if (o.mode === 'once') {
-        return { kind: 'exit', status: 'running', reason: 'quota_wait_pending' };
+        // C3: the SAME instant a --follow wait_until would have used (quotaUntilMs is
+        // computed once above, from this same observation) — never recomputed differently.
+        return {
+          kind: 'exit', status: 'running', reason: 'quota_wait_pending',
+          nextWakeAtMs: quotaUntilMs as number,
+        };
       }
       return { kind: 'wait_until', untilMs: quotaUntilMs as number, cause: 'quota' };
     }
@@ -94,11 +99,18 @@ export function decide(o: WatchdogObservation): WatchdogAction {
         }
         return { kind: 'exit', status: 'needs_human', reason: 'overloaded' };
       }
-      if (o.mode === 'once') {
-        return { kind: 'exit', status: 'running', reason: 'overload_backoff_pending' };
-      }
+      // C3: computed BEFORE the mode branch so once-mode's `nextWakeAtMs` and follow-mode's
+      // `wait_until.untilMs` are provably the same instant — never two separate calculations
+      // that could drift apart.
       const seconds = overloadBackoffSeconds(o.counters.overloadBackoffs);
-      return { kind: 'wait_until', untilMs: o.nowMs + seconds * 1000, cause: 'overload' };
+      const overloadUntilMs = o.nowMs + seconds * 1000;
+      if (o.mode === 'once') {
+        return {
+          kind: 'exit', status: 'running', reason: 'overload_backoff_pending',
+          nextWakeAtMs: overloadUntilMs,
+        };
+      }
+      return { kind: 'wait_until', untilMs: overloadUntilMs, cause: 'overload' };
     }
 
     if (o.stopFilePresent) return STOP;
