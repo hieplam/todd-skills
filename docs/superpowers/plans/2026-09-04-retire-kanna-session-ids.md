@@ -191,7 +191,7 @@ modified plan file (`M`, its Task 1 checkboxes ticked). The trailers print exact
 `.c3/` facts are sealed. Hand-editing the markdown breaks the seal and is not a legal mutation —
 `c3x change apply` is the only path. Do not open `.c3/c3-2-plugins/c3-215-tribe.md` in an editor.
 
-- [ ] **Step 1: Re-read the live cite handle.**
+- [x] **Step 1: Re-read the live cite handle.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -204,7 +204,7 @@ The node number (`n1626`) is cache-assigned and may differ — **use whatever th
 right now**, never the number transcribed here. Copy the whole handle up to (not including) the
 opening double quote.
 
-- [ ] **Step 2: Author the ADR body and create the entity.**
+- [x] **Step 2: Author the ADR body and create the entity.**
 
 Read the required sections first, then write the body to a scratch file and hand it to `c3x add`:
 
@@ -248,7 +248,7 @@ Expected: the command reports the created entity and `ls` prints
 fix that section and re-run — do not weaken the schema and do not hand-write the file into
 `.c3/adr/`.
 
-- [ ] **Step 3: Scaffold the change-unit and author the one delete patch.**
+- [x] **Step 3: Scaffold the change-unit and author the one delete patch.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -275,7 +275,7 @@ Expected: `handle=c3-215#n<number>@v1:sha256:<64 hex chars>` (non-empty — if i
 the section or the row moved, and the anchor must be re-derived by hand), then a five-line file
 whose last line is `---` with no body after it.
 
-- [ ] **Step 4: Preview, then apply.**
+- [x] **Step 4: Preview, then apply.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -302,7 +302,7 @@ listing **four** entries: `M .c3/c3-2-plugins/c3-215-tribe.md` (wanted),
 `M .c3/adr/adr-20260821-explaining-illustration-scope.md` and
 `M .c3/c3-2-plugins/c3-201-explaining.md`.
 
-- [ ] **Step 5: Discard the unrelated reseal churn.**
+- [x] **Step 5: Discard the unrelated reseal churn.**
 
 That churn is destructive: `c3x` 11.6.3 re-serializes those two facts and drops the trailing
 `Governance review` cell of a table row in the 2026-08-21 ADR. Restore both files — content and
@@ -320,7 +320,7 @@ Expected: `git status --short` no longer mentions either file; `git diff --stat 
 exactly one modified tracked file, `.c3/c3-2-plugins/c3-215-tribe.md`, with 2 insertions and 3
 deletions (the seal line rewritten plus the removed Contract row).
 
-- [ ] **Step 6: Run the C3 gates and the G1 proof.**
+- [x] **Step 6: Run the C3 gates and the G1 proof.**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -340,7 +340,7 @@ check exits 0; `/tmp/g1-assert.sh` prints four `ok:` lines with `g1 exit=0`. `gi
 must show no stray `.c3/c3.db-shm` or `.c3/c3.db-wal`; delete them with
 `rm -f .c3/c3.db-shm .c3/c3.db-wal` if they appear.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/retire-kanna-session-ids
@@ -368,7 +368,7 @@ tree).
 ## Task checkboxes
 
 - [x] Task 1 — script, test and README (tick in Task 1's commit)
-- [ ] Task 2 — c3-215 Contract row via ADR change-unit (tick in Task 2's commit)
+- [x] Task 2 — c3-215 Contract row via ADR change-unit (tick in Task 2's commit)
 
 ## Report back
 
