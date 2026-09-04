@@ -184,6 +184,11 @@ if [ -x "$GATE" ]; then echo "ok: c: pre-gate.sh exists and is executable"; pass
 else echo "FAIL: c: pre-gate.sh exists and is executable"; fail=$((fail+1)); fi
 
 if [ "${PREGATE_INNER:-0}" != "1" ]; then
+  # fail-closed-edges obligation 2: neutralise host git config for every git subprocess below
+  # (including the pre-gate.sh children, which read %(trailers) themselves) — a legal global
+  # setting such as `[trailer] separators = "#"` otherwise empties %(trailers) and reds these
+  # assertions for reasons unrelated to the code under test.
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
   # Self-test 1 (pass case): sweep this repo's own suites over a 1-commit range, no fence.
   TMPD="$(mktemp -d)"; REPORT="$TMPD/pregate-report.md"
   # The range is *computed*, never hardcoded: the spec asks for "a range and fence chosen to
