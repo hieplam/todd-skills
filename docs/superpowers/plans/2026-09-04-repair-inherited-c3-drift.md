@@ -522,7 +522,7 @@ cannot round-trip — the F23 bug that ADR itself documents. That is unrelated, 
 and the standing constraint says discard it. Verified: discarding it still leaves `check` at
 exit 0.
 
-- [ ] **Step 1: Watch it fail**
+- [x] **Step 1: Watch it fail**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -532,7 +532,7 @@ bunx @c3x/cli@11.6.3 check > /tmp/red-task3.txt 2>&1; echo "exit=$?"; cat /tmp/r
 Expected: `exit=1`, `Checked 49 docs — all clear`, then `DIFFERS c3-2-plugins/c3-201-explaining.md`
 and `error: sync check failed: canonical markdown drift detected`. This is the RED proof.
 
-- [ ] **Step 2: Let the tool write the reseal**
+- [x] **Step 2: Let the tool write the reseal**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -548,7 +548,7 @@ failure and must be gone). `git status --short` shows exactly two modified track
 `.c3/adr/adr-20260821-explaining-illustration-scope.md`, plus possibly untracked `.c3/c3.db-shm`
 / `.c3/c3.db-wal`, which are never staged.
 
-- [ ] **Step 3: Discard the lossy ADR churn**
+- [x] **Step 3: Discard the lossy ADR churn**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -561,7 +561,7 @@ Expected: the `git diff --stat` first shows that file modified; after the `check
 from `git status --short`, leaving `.c3/c3-2-plugins/c3-201-explaining.md` as the only modified
 tracked file.
 
-- [ ] **Step 4: Confirm the fence held and the loss did not happen**
+- [x] **Step 4: Confirm the fence held and the loss did not happen**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -577,7 +577,7 @@ file. The `grep -c` prints `1`, proving the ADR cell the repair wanted to delete
 If the `c3-201` diff shows more than those two lines, or the grep prints `0`, stop and report
 `BLOCKED` rather than committing.
 
-- [ ] **Step 5: Prove the card's two goals**
+- [x] **Step 5: Prove the card's two goals**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -587,7 +587,7 @@ bunx @c3x/cli@11.6.3 check > /tmp/green-task3.txt 2>&1; echo "check-exit=$?"; ca
 Expected: `check-exit=0` (card G1) with `Checked 49 docs — all clear` and `OK: canonical markdown
 is in sync`. Paste this transcript into your report verbatim.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
