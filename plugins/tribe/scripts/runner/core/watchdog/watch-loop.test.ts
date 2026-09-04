@@ -137,8 +137,15 @@ describe('runWatchdog — G1: quota recovery with no LLM in the loop', () => {
     // assertions are mutually exclusive against any single implementation. The wake-up-loop
     // wall is spec-frozen and independently tested next, so this line is adjusted to check the
     // milestone ORDER the test's own name promises, without contradicting the sibling test.
+    // Audit round 2 (C7): the sequence also gained two `attach` steps once the fake became
+    // honest (spawnRunner no longer fabricates run.json synchronously, matching the real
+    // adapter) and the loop was fixed to recognise the child it just launched instead of
+    // re-spawning it. Per spec §2.1's frozen row — "Live runner (lock/pid alive) at start ->
+    // attach (wait on it; never a second launch)" — the watchdog attaches to that just-launched
+    // child both after `launch` and after `relaunch`; their absence in the earlier revision was
+    // exactly the unbounded-re-spawn defect (21 spawns in one tick) that round fixed.
     const milestones = events.filter((a) => a !== 'wait_slice');
-    expect(milestones).toEqual(['start', 'launch', 'wait_until', 'relaunch', 'exit']);
+    expect(milestones).toEqual(['start', 'launch', 'attach', 'wait_until', 'relaunch', 'attach', 'exit']);
     expect(spawns.length).toBe(2);
     expect(lines.some((l) => l.startsWith('quota_wait: account limit'))).toBe(true);
   });
