@@ -3523,7 +3523,7 @@ binary on this machine** — every wait is a poll loop with a bounded iteration 
 
 **Steps**
 
-- [ ] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-e2e.sh`:
+- [x] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-e2e.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -3683,7 +3683,7 @@ printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
 ```
 
-- [ ] **Step 2: Run it, and capture the evidence the PR needs.**
+- [x] **Step 2: Run it, and capture the evidence the PR needs.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -3696,7 +3696,7 @@ the absolute-`--home` probe by hand and pasting the command line, the resulting
 `docs/superpowers/evidence/2026-09-03-mechanical-heartbeat-g5.md` (created in this task) —
 the card's G5 asks for exactly "command lines + `status.json` + `events.jsonl` in the PR".
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -3708,7 +3708,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 Expected: e2e `0 failed`; `test-fresh-machine.sh` still `26 passed, 0 failed` (the watchdog adds
 no installable, so this must not move); full runner suite green; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `test(tribe): G5 e2e — real runner under the real watchdog from an empty home (task 12/15)`,
+- [x] **Step 4: Commit** — `test(tribe): G5 e2e — real runner under the real watchdog from an empty home (task 12/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
