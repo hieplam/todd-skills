@@ -52,8 +52,8 @@ that loop; they do not replace it.
 | P10 | `ANTHROPIC_API_KEY` env trap kills all sessions        | 13 sessions dead in 36s              | **SHIPPED** — PR #78, `177ca3a` → [spec](P10-anthropic-api-key-guard.md) |
 | P11 | Stale `baseSha` on hand-edited state resets            | 1 false-positive escalation (B13)    | **SHIPPED** — PR #85, `9d9b502` → [spec](P11-basesha-invariants.md) |
 | P12 | Skill doc claims sequential default; runner is parallel | Hand-authoring a 17-link dependsOn chain | **SHIPPED** — PR #87, `d57feeb` → [spec](P12-concurrency-truth.md) |
-| P13 | Harness externally kills background runner tasks       | ×2, ~2 min recovery each             | WON'T-FIX (ratified — mitigation works)      |
-| P14 | Quota pause kills the running session                  | 27 min dead time                     | WON'T-FIX (ratified — cron heartbeat = design) |
+| P13 | Harness externally kills background runner tasks       | ×2, ~2 min recovery each              | WON'T-FIX (ratified — mitigation works); **mitigation strengthened by #74**: the watchdog adopts a live runner on start (D74-7) instead of double-spawning, and Stage B now launches it double-forked so a harness tool timeout no longer reaches it |
+| P14 | Quota pause kills the running session                  | 27 min dead time                      | **SUPERSEDED by #74 (watchdog)** — the 15-minute LLM heartbeat is replaced by a zero-token supervisor that waits until the log's own `resetsAt` and relaunches; the "cron heartbeat = design" ruling is retired (card `i74-mechanical-heartbeat`, D74-1) |
 | P15 | Repo-wide pre-commit cost + `bun install` worktree trap | ~40s per docs commit; 1 failed commit | RATIFIED — tribe clause folded into [P3](P3-definition-of-done-brief.md); rest is ai-dict's |
 
 **Ratification note:** P10 (and an earlier P2 round) were ratified directly by the owner;
@@ -228,10 +228,18 @@ See [P10-anthropic-api-key-guard.md](P10-anthropic-api-key-guard.md) for the ful
 
 - **P13. External kills of background runner tasks** (×2, log lines 233–240): the harness
   stopped the background task; the cron heartbeat + stale-lock takeover recovered in
-  ~2 min. A detached launch would fix it at the cost of losing exit notifications.
+  ~2 min. A detached launch would fix it at the cost of losing exit notifications. **Note
+  (card #74):** the harness-kill case no longer needs a detached launch to recover — the
+  watchdog's adopt-on-start behaviour (D74-7) means a *relaunched* watchdog attaches to the
+  still-live runner instead of double-spawning a second one; Stage B's own detached launch
+  (double-fork, so the harness's tool timeout never reaches the watchdog) covers the *first*
+  launch surviving the session that started it. Both mitigations are recorded, and neither
+  contradicts the other.
 - **P14. Quota pause** (log lines 262–266): the 15-minute cron heartbeat resumed the run
   after the account limit reset — working as designed; the 27 min dead time is an account
-  limit, not a workflow defect.
+  limit, not a workflow defect. **Superseded by card #74:** that "cron heartbeat = design"
+  ruling is retired — the LLM heartbeat itself is replaced by a zero-token watchdog script
+  that waits on the log's own `resetsAt` and relaunches, at zero token cost.
 - **P15. Repo-wide pre-commit cost (~40s on docs-only diffs) + fresh-worktree
   `bun install` trap (UC-1)**: both are ai-dict hook-design issues (lint is not
   diff-scoped). Tribe-side, at most one generic brief clause: "after creating a worktree,

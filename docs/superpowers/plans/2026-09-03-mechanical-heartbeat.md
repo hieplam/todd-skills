@@ -3951,7 +3951,7 @@ deliberately **not** edited, and the docs say why.
 
 **Steps**
 
-- [ ] **Step 1: Runner README** — insert a `## Watchdog (card i74, issue #74)` section directly
+- [x] **Step 1: Runner README** — insert a `## Watchdog (card i74, issue #74)` section directly
   after `## Exit codes`, containing: what it is (one paragraph, D74-2's notification model), the
   invocation, the flag table, the exit-code table, the files it writes, the **frozen action
   table copied from the spec**, the counters/caps, the stall rule, and a "What it never does"
@@ -3973,12 +3973,12 @@ deliberately **not** edited, and the docs say why.
   card) is to treat a missing `answers.md` as "no rulings".
 ```
 
-- [ ] **Step 2: Tribe README** — add a `## Campaign watchdog` section immediately after
+- [x] **Step 2: Tribe README** — add a `## Campaign watchdog` section immediately after
   `## Campaign runner` (one paragraph plus the detached one-liner and the `status.json`/exit-code
   summary, pointing at the runner README for the full contract), and one Quick-reference row.
   Keep it short; the runner README is the reference.
 
-- [ ] **Step 3: Fixlist rows** — in `docs/tribe/fixlists/2026-08-08-outstanding-17/README.md`,
+- [x] **Step 3: Fixlist rows** — in `docs/tribe/fixlists/2026-08-08-outstanding-17/README.md`,
   edit exactly two table rows and their two narrative paragraphs (lines ~229 and ~232):
 
 ```markdown
@@ -3986,7 +3986,7 @@ deliberately **not** edited, and the docs say why.
 | P14 | Quota pause kills the running session                  | 27 min dead time                      | **SUPERSEDED by #74 (watchdog)** — the 15-minute LLM heartbeat is replaced by a zero-token supervisor that waits until the log's own `resetsAt` and relaunches; the "cron heartbeat = design" ruling is retired (card `i74-mechanical-heartbeat`, D74-1) |
 ```
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -4004,7 +4004,7 @@ identical to `master`'s (9 plugins, `tribe (agents: 6 skills: 2)`); the unknown-
 prints `watchdog: unknown flag: --nonsense` with `exit=1`. (`--help` is not implemented and need
 not be — the `||  true` keeps the gate honest about that.)
 
-- [ ] **Step 5: Commit** — `docs(tribe): document the watchdog and retire fixlist P14 (task 14/15)`,
+- [x] **Step 5: Commit** — `docs(tribe): document the watchdog and retire fixlist P14 (task 14/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---

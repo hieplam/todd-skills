@@ -719,6 +719,116 @@ Read from `EXIT_*` in `loop.ts`, plus `run.ts`'s own `EXIT_ERROR`:
 | `4` | `EXIT_ERROR` (`run.ts`, not a `loop.ts` constant) | An unhandled exception surfaced after `runLoop` was entered. The report's `run.reason` is `'error'` — per §O3, treat the report as authoritative over this numeric code. |
 | `5` | `EXIT_RULINGS_UNRATIFIED` | The rulings gate (see "Rulings gate" above): the pass would otherwise have concluded `done`, but `answers.md` carries ≥1 ruling with no recognized `ratified-as:` disposition. `campaign-report.json`'s `run.unratifiedRulings` names them. |
 
+## Watchdog (card i74, issue #74)
+
+A **script, not an LLM session**, that supervises one runner pass at **zero token cost**: it
+launches or adopts the runner, waits out an account-limit (quota) death until the log's own
+`resetsAt`, backs off an overload (HTTP 529) death, relaunches a crash once, detects a stall
+from log mtime, and exits **only** when a human must act (D74-2). Because it exits rather than
+sleeping forever, the harness's own "background command exited" notification IS the whole
+heartbeat — no periodic LLM wake-up is spent watching it. It is a **subcommand of this same
+runner CLI**, not a separate installable: `run.ts watchdog …`.
+
+```sh
+bun plugins/tribe/scripts/runner/run.ts watchdog \
+  --repo <target-repo> --model <model> --home <campaign-home> \
+  [--once | --follow] [own flags below] [runner pass-through flags]
+```
+
+`--repo`, `--model` and `--home` are required — no defaults, exactly like the runner itself.
+`--home` is resolved against `cwd` when relative, symlink-resolved on both sides, and refused
+(exit `1`, typed message) unless it sits inside `realpath("$HOME/.tribe")` and already contains
+a `campaign-state.json` (a campaign home is authored by `orchestrate-campaign` before either the
+runner or the watchdog ever starts).
+
+### Flags
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--follow` | on (implicit) | Keep supervising until a terminal state; the harness's own detached-launch + exit is the notification. |
+| `--once` | off | One observe→decide→act tick, then return — never sleeps. Mutually exclusive with `--follow`. Used from cron/launchd wake-ups (spec D74-6). |
+| `--stall-minutes` | `30` | No newest-log mtime change for this many minutes while the runner is alive is a stall. |
+| `--max-quota-waits` | `6` | Consecutive quota waits allowed before giving up (`needs_human:quota_cap`). |
+| `--max-overload-backoffs` | `5` | Consecutive 529 backoffs allowed before giving up (or one `--fallback-model` relaunch — see the action table). |
+| `--max-crash-relaunches` | `1` | Relaunches allowed for an exit `3` with no quota/overload signal before `needs_human:session_incomplete`. |
+| `--poll-seconds` | `30` | Wake-up slice for every bounded wait (capped at `60`, spec §7: "it sleeps in small wake-up loops"). |
+| `--quota-grace-seconds` | `30` | Added to the log's `resetsAt` before relaunching. |
+| `--fallback-model <tier>` | off (`null`) | After the overload cap, relaunch once on this model tier instead of parking `needs_human:overloaded`. |
+
+`--dry-run` is **rejected as an unknown flag** by name: a watchdog over a zero-side-effect run
+has nothing to observe. Every optional flag the runner itself accepts — `--cards`,
+`--max-cards`, `--session-timeout`, `--logs-dir`, `--max-concurrent`, `--include-escalated`, and
+`--remote` — is forwarded verbatim to the runner it spawns.
+
+### Exit codes
+
+| Code | Constant | Meaning |
+| --- | --- | --- |
+| `0` | `WATCHDOG_EXIT_DONE` | The supervised campaign reached a terminal state that needs no human (`runner_done` or `stop_requested`). |
+| `1` | `WATCHDOG_EXIT_USAGE` | A CLI argument error (bad/missing/unknown flag), or `--home` could not be resolved / is outside `$HOME/.tribe` / has no `campaign-state.json`. |
+| `10` | `WATCHDOG_EXIT_NEEDS_HUMAN` | A human must act. The exact reason is in `status.json`'s `terminal.reason` (`escalations_pending`, `rulings_unratified`, `error`, `quota_cap`, `overloaded`, `session_incomplete`, `lock_conflict`, `stalled`), or an unexpected internal I/O failure caught at the CLI edge. |
+| `11` | `WATCHDOG_EXIT_RUNNING` | `--once` only: the runner is still alive, or a quota/overload wait is pending — `status.json`'s `nextWakeAt` says when to re-invoke. |
+
+### Files (all under `<home>/watchdog/`)
+
+The watchdog writes **nowhere else** in the campaign home — never `campaign-state.json`,
+`answers.md`, or an escalation file:
+
+- **`status.json`** — rewritten atomically (write-to-temp then rename) on every state
+  transition; the shape a Monitor/`until` loop or the status viewer polls.
+- **`events.jsonl`** — append-only, one JSON line per action, each carrying its own ISO
+  timestamp (`at`) — a plain audit trail, never truncated or rewritten.
+- **`runner-stdout/attempt-<N>.log`** — the stdout+stderr of the `N`th runner process this
+  watchdog invocation spawned (attempt numbers start at 1 and never reset within one
+  invocation).
+
+### The action table (spec §2.1, as amended by §9 — §9 wins where they differ)
+
+| Observation | Action |
+| --- | --- |
+| No live runner, no prior run this invocation, no lock held | `launch` |
+| Live runner (lock/pid alive) at start, or right after a `launch`/`relaunch` | `attach` — wait on it; **never** a second launch. In `--follow` mode a `launch`/`relaunch` is always followed by an `attach` on the very next tick, since the loop re-observes the child it just spawned rather than spawning a second one (`--once` returns `exit(running)` immediately after the launch itself, before any such re-observe happens). |
+| Runner exited `0` | `exit(done:runner_done)` — watchdog exit `0` |
+| Runner exited `2` | `exit(needs_human:escalations_pending)` |
+| Runner exited `5` | `exit(needs_human:rulings_unratified)` |
+| Runner exited `4` | `exit(needs_human:error)` |
+| Runner exited `3` (or a crash with no exit code to read), newest log's **last** `rate_limit_event` is `rejected` with a **future** `resetsAt` | `wait_until(resetsAt + --quota-grace-seconds)` then `relaunch`; count a quota wait; at `--max-quota-waits` → `exit(needs_human:quota_cap)` |
+| Runner exited `3` (or crash), no quota signal, newest log's **last** `result` line carries an overload/5xx `api_error_status` | backoff-and-`relaunch` (`30s, 60s, 120s, 240s, 480s`, clamped); count an overload backoff; at `--max-overload-backoffs` → one `--fallback-model` relaunch if configured and not yet used, else `exit(needs_human:overloaded)` |
+| Runner exited `3` (or crash), no quota or overload signal | `relaunch` once; a second time → `exit(needs_human:session_incomplete)` |
+| Runner exited `1` (single-instance lock held) | `attach` if the lock holder is alive; else `relaunch` once, repeat → `exit(needs_human:lock_conflict)` |
+| Runner alive, newest log mtime unchanged for `> --stall-minutes` | record `stall`; `--follow` → `exit(needs_human:stalled)`; `--once` → `exit(running:stalled)` |
+| `--once`, runner alive, not stalled | `exit(running:runner_alive)` |
+| `STOP` file present | suppress only actions that would START work (`launch`/`relaunch`/`wait_until`); `exit(done:stop_requested)` |
+
+**Precedence (W-P1):** a terminal runner exit (`0`/`2`/`4`/`5`) always outranks a `STOP` file —
+it is a more informative answer than `stop_requested`. Within exit `3`, a quota signal always
+outranks an overload signal (a quota wall has a known reset instant; a 529 is transient).
+
+### What it never does
+
+- **Never kills the runner or a session.** The runner's own `--session-timeout` owns that; the
+  watchdog only ever observes, waits and relaunches.
+- **Never spawns an LLM session itself** — only the runner CLI, as a plain OS process.
+- **Never writes outside `<home>/watchdog/`** — never touches `campaign-state.json`,
+  `answers.md`, or an escalation file.
+- **Never sleeps past a wake instant without re-checking** — every wait, quota or overload, is
+  a loop of `min(remaining, --poll-seconds)` slices (never one long `sleep`), so a `STOP` file or
+  a manual relaunch is noticed within one slice.
+- **Installs nothing and needs no prerequisite beyond the runner's own** (`bun`, already
+  checked by `doctor.sh`; the watchdog shares the runner's `node_modules`) — which is exactly
+  why `plugins/tribe/scripts/doctor.sh` is **unchanged** by this card.
+
+### Known limitations (watchdog)
+
+- **A crash of the watchdog itself is not resumed automatically.** `status.json` is left with
+  `terminal: null` and a dead `pid` — exactly the shape the status viewer uses to detect a dead
+  runner. Relaunching the watchdog is safe and is the intended recovery: adopt-on-start (D74-7)
+  attaches to a live runner instead of starting a second one.
+- **A runner that dies with NO `answers.md` in the campaign home exits `4`, not `2`.** Measured
+  2026-09-03: the runner throws `ENOENT … answers.md` before it can escalate. The watchdog maps
+  that faithfully to `needs_human:error`; it does not paper over it. Follow-up FU-i74-1 (runner
+  card) is to treat a missing `answers.md` as "no rulings".
+
 ## Structure
 
 The directory is a visible hierarchy — `ls runner/` answers "where is the CLI entrypoint,

@@ -226,6 +226,37 @@ README's "Run record" section) — this is what the status viewer below reads.
 
 ---
 
+## Campaign watchdog
+
+A **zero-token supervisor script** (card i74, issue #74) — not an LLM session — that launches
+or adopts a runner pass, waits out an account-limit death until the log's own reset time, backs
+off an upstream overload, relaunches a crash once, and exits **only** when a human must act. The
+harness's own "background command exited" notification IS the heartbeat, so
+`orchestrate-campaign`'s Stage B launches it **detached** (double-forked, so a harness tool
+timeout never reaches it):
+
+```sh
+( nohup bun "$runner_dir/run.ts" watchdog \
+    --repo <target-repo> \
+    --model <model> \
+    --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
+    </dev/null >"$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>/watchdog/launch.log" 2>&1 & )
+```
+
+It writes `status.json` (rewritten atomically), `events.jsonl` (append-only), and
+`runner-stdout/attempt-<N>.log`, all under `<home>/watchdog/`, and never anything else in the
+campaign home (never `campaign-state.json`, `answers.md`, an escalation file):
+
+| Subcommand | Own flags (defaults) | Exit codes |
+| --- | --- | --- |
+| `run.ts watchdog` | `--follow` (on) \| `--once`, `--stall-minutes` (30), `--max-quota-waits` (6), `--max-overload-backoffs` (5), `--max-crash-relaunches` (1), `--poll-seconds` (30), `--quota-grace-seconds` (30), `--fallback-model <tier>` (off) | `0` done · `1` usage error · `10` needs_human (reason in `status.json`) · `11` running (`--once` only) |
+
+See
+[`scripts/runner/README.md`](scripts/runner/README.md#watchdog-card-i74-issue-74) for the full
+flag table, exit codes and the frozen action table — this section is only a pointer.
+
+---
+
 ## Status viewer
 
 [`scripts/viewer/`](scripts/viewer/) is a read-only local web page — a sibling capability to the
