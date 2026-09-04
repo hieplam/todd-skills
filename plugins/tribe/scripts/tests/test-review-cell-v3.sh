@@ -215,8 +215,15 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
   # Candidates: newest-first, non-merge, message contains a Tribe-Card: line (candidate PRE-FILTER
   # only — --grep matches the raw message, not the parsed trailer block; the confirmation loop
   # below re-checks Tribe-Card: presence against %(trailers) before ever selecting a candidate).
-  _wr_candidates="$(git -C "$WALK_REPO" log --no-merges -n 200 --format='%H %P' \
-      --grep='^Tribe-Card:')"
+  # fail-closed-edges obl. 1: guard the assignment explicitly (never `|| true`) so a
+  # non-zero `git log` (empty/unreadable WALK_REPO) yields an EMPTY candidate list under
+  # set -e instead of aborting the whole suite with a raw `fatal:` and exit 128 — the
+  # existing `if [ -z "$PASSRANGE" ]` branch below already handles the empty case
+  # gracefully, matching the old walk's degrade-to-empty behavior.
+  if ! _wr_candidates="$(git -C "$WALK_REPO" log --no-merges -n 200 --format='%H %P' \
+      --grep='^Tribe-Card:' 2>/dev/null)"; then
+    _wr_candidates=""
+  fi
   _wr_confirms=0
   while IFS= read -r _wr_line; do
     [ -n "$_wr_line" ] || continue
