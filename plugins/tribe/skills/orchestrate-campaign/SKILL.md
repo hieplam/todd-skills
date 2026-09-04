@@ -261,9 +261,52 @@ ruling UC-3).
      --dry-run
    ```
 
-2. **Then launch the real run in the background** (same flags, no `--dry-run`). Record the exact
-   command, the start time, and the log location in your own working notes — you will need them
-   if this session ends before the run does.
+2. **Then launch the WATCHDOG in the background** (the runner's `watchdog` subcommand, same
+   flags, no `--dry-run`). The watchdog supervises one runner pass at **zero token cost**: on an
+   account-limit death it waits until the recorded reset and relaunches; on an upstream-overload
+   death it backs off and relaunches; on a crash it relaunches once; and it exits ONLY when a
+   human decision is needed, and no `/loop` heartbeat is needed while a watchdog is attached —
+   that 15-minute LLM tick is exactly what this replaces (issue #74, fixlist P14).
+
+   Launch it **detached**, with this one-liner. The parenthesised subshell double-forks so the
+   process is reparented to pid 1 and survives both this shell and the harness's tool timeout;
+   `nohup` detaches it from the terminal; stdin comes from `/dev/null` so it can never block on
+   a read. (This double-fork is the portable form of process detachment on this stack — do not
+   substitute a process-group tool that may not be present on every machine.)
+
+   ```sh
+   ( nohup bun "$runner_dir/run.ts" watchdog \
+       --repo <target-repo> \
+       --model <model> \
+       --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
+       </dev/null >"$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>/watchdog/launch.log" 2>&1 & )
+   ```
+
+   Record the exact command, the start time, and the campaign home in your working notes — you
+   will need them if this session ends before the watchdog does.
+
+   Then arm a wake-up loop on the watchdog's own status file — it writes `status.json` within 5
+   seconds of starting, and fills in `terminal` only when it is done:
+
+   ```sh
+   until [ "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["terminal"] is not None)' \
+     "<campaign-home>/watchdog/status.json" 2>/dev/null)" = "True" ]; do sleep 60; done
+   ```
+
+   `status.json` answers "what is it doing right now" (including `nextWakeAt` while it is
+   waiting out an account limit) without costing a token; the harness's own "background command
+   exited" notification for the one-liner above is not the signal to act on — the wake-up loop
+   finishing is.
+
+   Before the first card's session spawns, the runner (running under the watchdog's supervision)
+   still prints its read-only live-viewer URL (`campaign viewer: http://127.0.0.1:4321/live?...`)
+   so the owner can watch the running card's transcript — now captured in the watchdog's own
+   `runner-stdout/<attempt>.log` under the campaign home rather than this shell's terminal, since
+   the launch above is detached; pass `--no-viewer` above to skip starting it.
+
+   The **bare runner** launch is still available when you deliberately want a single
+   unsupervised pass (a scoped `--cards … --max-cards 1` smoke run, say) — no watchdog, no
+   detachment, plain foreground-background as before:
 
    ```sh
    bun "$runner_dir/run.ts" \
@@ -272,16 +315,25 @@ ruling UC-3).
      --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>"
    ```
 
-   The harness notifies you when a background command exits — treat that notification itself as
-   the "report is ready" signal. Do not poll or guess; wait for it.
+   The harness notifies you when this bare-runner background command exits — treat that
+   notification itself as the "report is ready" signal for this fallback path. Do not poll or
+   guess; wait for it.
 
-   Before the first card's session spawns, the runner also prints a read-only live-viewer URL
-   on its own stdout (`campaign viewer: http://127.0.0.1:4321/live?...`) so the owner can watch
-   the running card's transcript; pass `--no-viewer` above to skip starting it.
+3. **On the wake-up, read `<campaign-home>/watchdog/status.json` FIRST, then
+   `campaign-report.json`.** The watchdog's `terminal.reason` says why supervision ended
+   (`runner_done` · `escalations_pending` · `rulings_unratified` · `session_incomplete` ·
+   `quota_cap` · `overloaded` · `stalled` · `lock_conflict` · `error` · `stop_requested`) and its
+   `counters` say what it already absorbed for you (quota waits, overload backoffs, crash
+   relaunches). Then read `campaign-report.json` for the campaign truth: **the exit code is a
+   hint, the report is the truth** — always read the report before deciding what to do next, even
+   if the exit code alone looks final.
 
-3. **On the exit notification, read `campaign-report.json`** under the campaign home. **The exit
-   code is a hint, the report is the truth** — always read the report before deciding what to do
-   next, even if the exit code alone looks final.
+   | Watchdog exit | Meaning |
+   | --- | --- |
+   | `0` | Reached `done` (or `STOP` was honoured) — read the report and go to Stage D. |
+   | `10` | A human decision is needed; `status.json`'s `terminal.reason` names which. Go to Stage C. |
+   | `11` | `--once` only: a pass is still in flight (or was just started). Not used by Stage B. |
+   | `1` | Usage error — the message on stderr names the flag or the refused `--home`. |
 
 #### The runner's CLI contract (flags, exit codes — the only interface this skill uses)
 
@@ -297,6 +349,7 @@ ruling UC-3).
 | `--max-cards` | no | Stop after processing this many cards this run. |
 | `--max-concurrent` | no | Integer ≥ 1 — how many cards' sessions may run at once this pass. Default `1` (today's one-card-at-a-time behavior); bounds WIDTH only, never ORDER — `dependsOn` still owns ordering (see "The runner's concurrency model" below). Only pass this when the owner's directive genuinely wants bounded parallelism; the default is correct for every other campaign. |
 | `--include-escalated` | no | Reconsider a card whose escalation file already exists. |
+| `watchdog` (subcommand) | — | `bun "$runner_dir/run.ts" watchdog <same flags>` supervises one runner pass at zero token cost: `--follow` (default) or `--once`, plus `--stall-minutes` (30), `--max-quota-waits` (6), `--max-overload-backoffs` (5), `--max-crash-relaunches` (1), `--quota-grace-seconds` (30), `--poll-seconds` (30), `--fallback-model <tier>`. Writes `<home>/watchdog/status.json` and `events.jsonl`; exits `0` done · `10` needs_human · `11` running (`--once`) · `1` usage. See `scripts/runner/README.md`'s "Watchdog" section. |
 
 The three required flags have **no default** — omitting any of them is a usage error, not a value
 worth guessing. An unrecognized flag (including the deleted `--state`/`--answers`/
@@ -379,23 +432,27 @@ On every exit notification where the report shows `pending` cards:
    arrive next cycle), or stop the run and re-trigger once the rule is load-bearing for
    correctness — e.g. a scope or data-shape ruling an in-flight card would otherwise ship
    without, the same class of stakes as the B14 trap cited above.
-2. **If you answered at least one card**, re-trigger the runner scoped to exactly the cards that
-   can now progress — the ones you just answered plus every `not_reached` card from the report
-   (so the rest of the sequence keeps moving, not just the answered card). Every card you just
-   archived above needs no flag at all now; `--include-escalated` is needed ONLY when this batch
-   also includes a card whose escalation file you deliberately left in place (still unanswered)
-   and you are choosing to force a retry of it anyway:
+2. **If you answered at least one card**, re-trigger THROUGH THE WATCHDOG, scoped to exactly the
+   cards that can now progress — the ones you just answered plus every `not_reached` card from
+   the report (so the rest of the sequence keeps moving, not just the answered card). Every card
+   you just archived above needs no flag at all now; `--include-escalated` is needed ONLY when
+   this batch also includes a card whose escalation file you deliberately left in place (still
+   unanswered) and you are choosing to force a retry of it anyway. Same detached one-liner as
+   Stage B step 2, plus `--cards` — Stage C re-triggers go through the watchdog too, so an
+   account limit hit mid-round-trip costs a wait instead of a dead campaign:
 
    ```sh
-   bun "$runner_dir/run.ts" \
-     --repo <target-repo> \
-     --model <model> \
-     --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
-     --cards <answered-card-id>,<...>,<not-reached-card-id>,<...>
+   ( nohup bun "$runner_dir/run.ts" watchdog \
+       --repo <target-repo> \
+       --model <model> \
+       --home "$(plugins/tribe/scripts/tribe-home.sh <target-repo>)/campaigns/<campaign-slug>" \
+       --cards <answered-card-id>,<...>,<not-reached-card-id>,<...> \
+       </dev/null >>"<campaign-home>/watchdog/launch.log" 2>&1 & )
    ```
    (`$runner_dir` — resolved once in Stage B; re-use it here rather than re-resolving. `--home`
    resolves to the SAME campaign home every time — it is re-computed rather than cached because
-   `tribe-home.sh` is a pure function of `<target-repo>`, so this is not a fresh value.)
+   `tribe-home.sh` is a pure function of `<target-repo>`, so this is not a fresh value.) The
+   bare-runner form from Stage B step 2 still works for a deliberate single unsupervised pass.
 
 3. **Track `autoAnswerRounds` per card and enforce the cap of 2** (wall W7). Before answering an
    escalation, check that card's `autoAnswerRounds` in the latest report: if it is already `2`,

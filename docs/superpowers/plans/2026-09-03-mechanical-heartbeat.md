@@ -3747,7 +3747,7 @@ retained as the documented fallback. No other stage's wording changes.
 
 **Steps**
 
-- [ ] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-detached.sh`:
+- [x] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-detached.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -3810,7 +3810,7 @@ printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
 ```
 
-- [ ] **Step 2: Edit `SKILL.md` Stage B step 2** — replace the bare-runner background launch
+- [x] **Step 2: Edit `SKILL.md` Stage B step 2** — replace the bare-runner background launch
   with the watchdog launch, keeping the runner invocation as the documented fallback:
 
 ```markdown
@@ -3898,7 +3898,7 @@ Also add one row to Stage B's "runner's CLI contract" table, immediately after `
 | `watchdog` (subcommand) | — | `bun "$runner_dir/run.ts" watchdog <same flags>` supervises one runner pass at zero token cost: `--follow` (default) or `--once`, plus `--stall-minutes` (30), `--max-quota-waits` (6), `--max-overload-backoffs` (5), `--max-crash-relaunches` (1), `--quota-grace-seconds` (30), `--poll-seconds` (30), `--fallback-model <tier>`. Writes `<home>/watchdog/status.json` and `events.jsonl`; exits `0` done · `10` needs_human · `11` running (`--once`) · `1` usage. See `scripts/runner/README.md`'s "Watchdog" section. |
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -3912,7 +3912,7 @@ Expected: `10 passed, 0 failed` from the detached test; the grep shows Stage B n
 watchdog as the primary launch (spec §6 step 5's check); `grep -c setsid` prints `0`;
 `test-fresh-machine.sh` still `26 passed, 0 failed`.
 
-- [ ] **Step 4: Commit** — `feat(tribe): Stage B launches the watchdog detached, with a proven one-liner (task 13/15)`,
+- [x] **Step 4: Commit** — `feat(tribe): Stage B launches the watchdog detached, with a proven one-liner (task 13/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
