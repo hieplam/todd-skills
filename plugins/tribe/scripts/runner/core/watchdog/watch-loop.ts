@@ -215,8 +215,14 @@ export async function runWatchdog(
   publish('starting', 'start', null, null);
   record('start', { mode: config.mode, home: homeDir, pollSeconds: config.pollSeconds });
 
-  const terminate = (status: string, reason: string, exitCode: number): WatchdogTerminal => {
-    publish('terminal', `exit:${status}:${reason}`, { status, reason, exitCode }, null);
+  // G2/G4 (Task 11 integration): a terminal exit that leaves a runner ALIVE behind it
+  // (`runner_alive`, `stalled`) must still publish that runner's real pid — a human reading
+  // `status.json` (or the G4 wall's own "never kills it" proof) needs the pid to check on it.
+  // `runnerPid` defaults to `null` for every OTHER terminal reason, unchanged from before.
+  const terminate = (
+    status: string, reason: string, exitCode: number, runnerPid: number | null = null,
+  ): WatchdogTerminal => {
+    publish('terminal', `exit:${status}:${reason}`, { status, reason, exitCode }, runnerPid);
     record('exit', { status, reason, exitCode });
     return { exitCode, status, reason, statusPath: paths.status };
   };
@@ -263,7 +269,10 @@ export async function runWatchdog(
         spawnRunnerNow(action);
         publish('runner_running', actionLine(action), null, state.child?.pid ?? null);
         if (config.mode === 'once') {
-          return terminate('running', action.kind === 'launch' ? 'launched' : 'relaunched', 11);
+          return terminate(
+            'running', action.kind === 'launch' ? 'launched' : 'relaunched', 11,
+            state.child?.pid ?? null,
+          );
         }
         break;
       }
@@ -307,7 +316,10 @@ export async function runWatchdog(
           ? null
           : { logPath: action.logPath, lastMtimeMs: action.lastMtimeMs };
         record('stall', { logPath: action.logPath, lastMtimeMs: action.lastMtimeMs });
-        return terminate(action.exit.status, action.exit.reason, action.exit.status === 'needs_human' ? 10 : 11);
+        return terminate(
+          action.exit.status, action.exit.reason, action.exit.status === 'needs_human' ? 10 : 11,
+          observation.run?.runnerPid ?? null,
+        );
       }
 
       case 'exit':
@@ -315,7 +327,7 @@ export async function runWatchdog(
         // published status BEFORE terminate()'s own publish() reads `state.nextWakeAtMs` —
         // every other exit reason leaves `nextWakeAtMs` undefined, so this is a no-op there.
         state.nextWakeAtMs = action.nextWakeAtMs ?? null;
-        return terminate(action.status, action.reason, exitCodeOf(action));
+        return terminate(action.status, action.reason, exitCodeOf(action), observation.run?.runnerPid ?? null);
     }
   }
 }

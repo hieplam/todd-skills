@@ -3352,7 +3352,7 @@ its last mtime.
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `watchdog-integration.test.ts`:
+- [x] **Step 1: Failing test** — append to `watchdog-integration.test.ts`:
 
 ```ts
 describe('G2 — skip when alive (D74-7 adopt, never duplicate)', () => {
@@ -3462,13 +3462,13 @@ Add `existsSync` to the file's `node:fs` import list.
 Run `bun test watchdog-integration.test.ts`. Expected: red on the new blocks first (the `env`
 option on the manual spawns and the stall wiring), green after step 2.
 
-- [ ] **Step 2: Make it green** — no new production behaviour should be required. If a test
+- [x] **Step 2: Make it green** — no new production behaviour should be required. If a test
   fails for a *product* reason (for example the stall check firing on a run whose log the double
   back-dated before the run record appeared), fix it in `core/watchdog/*` under the same rules
   and record the fix in the report. If a test fails because the frozen action table would have
   to change, **stop and report `NEEDS_CONTEXT`** — that is a spec question, not a bug.
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -3478,7 +3478,7 @@ bun test && bunx tsc --noEmit
 
 Expected: all integration tests pass; full suite `0 fail`; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `test(runner): integration proof of G2 skip-when-alive and G4 stall (task 11/15)`,
+- [x] **Step 4: Commit** — `test(runner): integration proof of G2 skip-when-alive and G4 stall (task 11/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---

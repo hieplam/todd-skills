@@ -5,7 +5,7 @@
  * tests validate logic, not invocations").
  */
 import { describe, expect, test } from 'bun:test';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runWatchdog } from './core/watchdog/watch-loop.ts';
@@ -142,4 +142,117 @@ describe('G3 — every terminal state surfaces to the lead', () => {
     expect(status(h.home).counters.fallbackUsed).toBe(true);
     expect(status(h.home).runnerCommand).toContain('test-fallback');
   }, 120_000);
+});
+
+describe('G2 — skip when alive (D74-7 adopt, never duplicate)', () => {
+  test('a --once tick against a live runner reports running and launches nothing', async () => {
+    const h = harness('0:none:6');
+    // Start a pass and leave it running: a --follow watchdog owns the child, so we launch the
+    // double directly, exactly as the real runner would have been launched by hand.
+    const base = buildWatchdogIo();
+    const handle = base.spawnRunner(['bash', DOUBLE, '--home', h.home], {
+      cwd: process.cwd(),
+      stdoutPath: join(h.home, 'watchdog', 'manual.log'),
+      env: { ...process.env, DOUBLE_PLAN: '0:none:6', DOUBLE_STATE: h.statePath },
+    } as Parameters<WatchdogIO['spawnRunner']>[1]);
+
+    // Wait for the in-flight run record to appear (poll — there is no `timeout` binary here).
+    for (let i = 0; i < 100 && !existsSync(join(h.home, 'runs')); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    writeFileSync(join(h.home, '.runner.lock'), JSON.stringify({
+      pid: handle.pid, startedAt: new Date().toISOString(),
+    }));
+
+    const outcome = await runWatchdog(config({ mode: 'once' }), h.home, h.io);
+    expect([outcome.exitCode, outcome.reason]).toEqual([11, 'runner_alive']);
+    expect(events(h.home).map((e) => e.action)).not.toContain('launch');
+    expect(readFileSync(h.statePath, 'utf8')).toBe('1'); // the double ran exactly once
+    expect(status(h.home).runnerPid).toBe(handle.pid);
+    await handle.waitFor(30_000);
+  }, 60_000);
+
+  test('a --follow watchdog started while a runner is live adopts it instead of relaunching', async () => {
+    const h = harness('0:none:4');
+    const base = buildWatchdogIo();
+    const handle = base.spawnRunner(['bash', DOUBLE, '--home', h.home], {
+      cwd: process.cwd(),
+      stdoutPath: join(h.home, 'watchdog', 'manual.log'),
+      env: { ...process.env, DOUBLE_PLAN: '0:none:4', DOUBLE_STATE: h.statePath },
+    } as Parameters<WatchdogIO['spawnRunner']>[1]);
+    for (let i = 0; i < 100 && !existsSync(join(h.home, 'runs')); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    writeFileSync(join(h.home, '.runner.lock'), JSON.stringify({
+      pid: handle.pid, startedAt: new Date().toISOString(),
+    }));
+
+    const outcome = await runWatchdog(config(), h.home, h.io);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    const actions = events(h.home).map((e) => e.action);
+    expect(actions).toContain('attach');
+    expect(actions).not.toContain('launch');
+    expect(readFileSync(h.statePath, 'utf8')).toBe('1');
+  }, 60_000);
+});
+
+describe('G4 — stall detection from log mtime, never a kill', () => {
+  test('a live runner whose newest log has not changed past the threshold parks for a human', async () => {
+    // Deviation from the brief (reported to the Warchief): the brief's literal plan
+    // '0:none:8' selects runner-double.sh's `none` fixture, which — unlike `quota`/`overload`
+    // — writes NO session log at all (`none)     : ;;`), so `newestLogMtimeMs` stays `null`
+    // for the run's whole life and `isStale()` (core/watchdog/select.ts) never fires BY DESIGN
+    // ("a pass that has not written its first log is starting"). The stall wall can only be
+    // exercised against a fixture that actually writes a log file to back-date. `overload` is
+    // the double's other zero-config fixture (no DOUBLE_RESET_S substitution needed to make
+    // sense), and its content is never even read for this decision — decide() checks
+    // `o.run.alive` and the log's mtime alone, before it ever inspects quota/overload signals
+    // (core/watchdog/decide.ts's stall branch runs before the exit-code switch).
+    const h = harness('0:overload:8', { DOUBLE_STALE_S: String(45 * 60) });
+    const outcome = await runWatchdog(config({ stallMinutes: 30 }), h.home, h.io);
+
+    expect([outcome.exitCode, outcome.reason]).toEqual([10, 'stalled']);
+    const stallEvent = events(h.home).find((e) => e.action === 'stall');
+    expect(String(stallEvent?.detail.logPath)).toContain('/logs/i-card-0000-1.log');
+    expect(typeof stallEvent?.detail.lastMtimeMs).toBe('number');
+
+    const published = status(h.home);
+    expect(published.stall.logPath).toContain('/logs/i-card-0000-1.log');
+    expect(published.terminal).toEqual({ status: 'needs_human', reason: 'stalled', exitCode: 10 });
+
+    // Never kills: the runner it left behind is still alive right after the watchdog exited.
+    expect(buildWatchdogIo().isProcessAlive(published.runnerPid)).toBe(true);
+  }, 60_000);
+
+  test('a fresh log keeps the wait going — no false stall', async () => {
+    const h = harness('0:none:3');
+    const outcome = await runWatchdog(config({ stallMinutes: 30 }), h.home, h.io);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    expect(events(h.home).map((e) => e.action)).not.toContain('stall');
+  }, 60_000);
+});
+
+describe('W-P9 — the watchdog writes nothing outside home/watchdog', () => {
+  test('after a full quota-recovery run, the only new home paths are the runner_s own', async () => {
+    const resetAt = Math.floor(Date.now() / 1000) + 2;
+    const h = harness('3:quota 0:none', { DOUBLE_RESET_S: String(resetAt) });
+    const written: string[] = [];
+    const spy: WatchdogIO = {
+      ...h.io,
+      writeFileAtomic: (p, c) => { written.push(p); h.io.writeFileAtomic(p, c); },
+      appendFile: (p, c) => { written.push(p); h.io.appendFile(p, c); },
+    };
+    await runWatchdog(config(), h.home, spy);
+    expect(written.length).toBeGreaterThan(3);
+    for (const path of written) {
+      expect(path.startsWith(join(h.home, 'watchdog'))).toBe(true);
+    }
+    // And nothing the runner owns was touched by the watchdog: `harness()` pre-creates an
+    // EMPTY answers.md as part of a valid minimal state (a file every real campaign home
+    // already has), so "does not exist" can never hold here — the correct proof that the
+    // watchdog never wrote to it is that its content is still the empty string it started as.
+    expect(readFileSync(join(h.home, 'answers.md'), 'utf8')).toBe('');
+    expect(JSON.parse(readFileSync(join(h.home, 'campaign-state.json'), 'utf8')).sequence)
+      .toEqual([]);
+  }, 60_000);
 });
