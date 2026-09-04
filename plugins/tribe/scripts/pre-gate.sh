@@ -7,6 +7,11 @@
 # --report, prints a JSON summary to stdout. Logs to stderr.
 # Exit: 0 = all green; 1 = at least one check red; 2 = setup error.
 set -euo pipefail
+# fail-closed-edges obligation 2: this gate's verdict must be a function of the repo's commits,
+# never of the machine's global/system git config (a legal `[trailer] separators = "#"` empties
+# %(trailers) for every commit and turns a clean range into all-violations). Exported once, so
+# every git subprocess below AND every test-*.sh suite swept by this gate inherit the isolation.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 LOG() { printf '[pre-gate] %s\n' "$*" >&2; }
 DIE() { LOG "ERROR: $*"; exit 2; }
 
