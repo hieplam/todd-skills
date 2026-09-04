@@ -1,6 +1,6 @@
 ---
 id: adr-20260801-campaign-state-home-migration
-c3-seal: 8fa55976cea4b0e7d04154d06c249b861a6e9edbed132911e9a866ddba6846ce
+c3-seal: 7fb5079bedee6956f3af1e0eddf3b0dea60c57a5a20ea719ec5edc0d8c173e21
 title: campaign-state-home-migration
 type: adr
 goal: |-
@@ -14,7 +14,7 @@ goal: |-
     says Stage A lands campaign state as part of the docs PR, and the Change Safety risk row still
     names the now-deleted `core/github.ts` (D6 retry/waiver) as an edit trigger. Fix all six via the
     change-unit flow so `c3-215` is factually accurate again.
-status: proposed
+status: accepted
 date: "2026-08-01"
 ---
 

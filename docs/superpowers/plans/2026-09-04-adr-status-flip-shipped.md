@@ -44,7 +44,7 @@ plan); Task 2 flips what Task 1 proved.
 **Contract:** spec section "C1". **Files:** none changed except this plan (the table goes into the
 Hunter report and the PR body).
 
-- [ ] **Step 1: Ancestry (oracle part a)**
+- [x] **Step 1: Ancestry (oracle part a)**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/adr-status-flip-shipped
@@ -53,7 +53,7 @@ for s in 3f52f03 67cc16b a1aa6ed 1edfba4 43a9b16 c43dce4 2eb2372 d1ec881; do git
 
 Expected: all eight `ancestor`.
 
-- [ ] **Step 2: Content presence (oracle part b)**
+- [x] **Step 2: Content presence (oracle part b)**
 
 For each of the six ADR ids, for each `.c3/changes/<adr-id>/*.patch.md`: read the patch, identify
 its target fact (the `→ c3-215` / `→ ref-plugin-layout` shown by
@@ -63,12 +63,12 @@ phrase of that after-state (for a delete, confirm the phrase is absent). Record 
 `adr · patch · target · phrase · present/absent · verdict`. An ADR is `realised` only when every
 one of its patches gets the verdict its kind expects.
 
-- [ ] **Step 3: Report the table**
+- [x] **Step 3: Report the table**
 
 Put the 14-row patch table and the 6-row ADR summary (ADR · evidence sha · patches · realised
 yes/no) in your report.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Tick this task's checkboxes and commit the plan file only. Subject
 `docs(c3): record realisation check for the six proposed ADRs`, `Tribe-Task: 1/2`.
@@ -79,7 +79,7 @@ Tick this task's checkboxes and commit the plan file only. Subject
 
 **Contract:** spec sections "C2", "C3".
 
-- [ ] **Step 1: Try the tool's own command first (card D1)**
+- [x] **Step 1: Try the tool's own command first (card D1)**
 
 For the first realised ADR: `bunx @c3x/cli@11.6.3 change accept <adr-id>; echo "rc=$?"` then
 `git status --porcelain` and `git diff`. Accept the mechanism only if the diff is exactly the
@@ -87,7 +87,7 @@ ADR's `status:` line and `c3-seal` line and nothing else changed. If `accept` re
 more, `git checkout -- .` and use the fallback for all six: edit `status: proposed` →
 `status: accepted` in the ADR's frontmatter, then `bunx @c3x/cli@11.6.3 repair`.
 
-- [ ] **Step 2: Apply to every realised ADR, check the shape**
+- [x] **Step 2: Apply to every realised ADR, check the shape**
 
 ```bash
 git status --porcelain            # only the flipped ADRs (never c3.db*, never anything else)
@@ -101,7 +101,7 @@ Expected: `other-lines rc=1` (no line other than status/seal), `still-proposed r
 Task 1 justified leaving one, check "all clear" rc 0. If porcelain lists any file outside the six,
 `git checkout -- <that file>` and note it in the report.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Stage the flipped ADRs and this plan. Subject `docs(c3): flip six shipped ADRs to accepted`,
 `Tribe-Task: 2/2`, plan checkboxes ticked, and the per-ADR mechanism named in the body.
