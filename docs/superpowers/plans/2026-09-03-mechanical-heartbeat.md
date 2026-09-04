@@ -1947,7 +1947,7 @@ and the card's G4, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `adapters/watchdog-io.adapter.test.ts`:
+- [x] **Step 1: Failing test** — `adapters/watchdog-io.adapter.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -2033,7 +2033,7 @@ describe('buildWatchdogIo — the real edge', () => {
 Run `cd plugins/tribe/scripts/runner && bun test adapters/watchdog-io.adapter.test.ts`.
 Expected: red (module missing).
 
-- [ ] **Step 2: Append the seams** to the END of `ports/ports.ts`:
+- [x] **Step 2: Append the seams** to the END of `ports/ports.ts`:
 
 ```ts
 // ---------------------------------------------------------------------------------------
@@ -2119,7 +2119,7 @@ export interface WatchdogIO
     LinePort {}
 ```
 
-- [ ] **Step 3: Implement** `adapters/watchdog-io.adapter.ts`:
+- [x] **Step 3: Implement** `adapters/watchdog-io.adapter.ts`:
 
 ```ts
 /**
@@ -2319,7 +2319,7 @@ layer `structure.test.ts` permits to name world modules, so there is no reason t
 dynamic import here. Run `bun test structure.test.ts` after writing it to confirm the layout
 contract still holds.
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -2333,7 +2333,7 @@ Expected: the adapter's 7 tests pass, `structure.test.ts` stays green (proving `
 is still type-only and the new adapter is the only new world-touching file), full suite
 `528 pass, 0 fail`, `tsc` silent.
 
-- [ ] **Step 5: Commit** — `feat(runner): watchdog IO seams and real adapter (task 7/15)`, boxes
+- [x] **Step 5: Commit** — `feat(runner): watchdog IO seams and real adapter (task 7/15)`, boxes
   ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---

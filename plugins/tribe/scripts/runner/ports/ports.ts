@@ -227,3 +227,85 @@ export interface LoopIO
     LockStorePort,
     SessionSpawnPort,
     RunHomePort {}
+
+// ---------------------------------------------------------------------------------------
+// Campaign watchdog seams (card i74). Type declarations only, same as the rest of this file.
+// ---------------------------------------------------------------------------------------
+
+/** A spawned runner process the watchdog OWNS. There is deliberately no `kill`: card G4 —
+ * "It never kills the runner (the runner's own --session-timeout owns that)". */
+export interface RunnerHandle {
+  pid: number;
+  /** Resolves with the child's exit code, or `null` when `waitMs` elapsed first (the child is
+   * still running). Never rejects, never kills. Bounded per call (W-P7). */
+  waitFor(waitMs: number): Promise<number | null>;
+}
+
+export interface RunnerSpawnPort {
+  /** `argv[0]` is the program. stdout+stderr are appended to `stdoutPath`. */
+  spawnRunner(argv: string[], opts: { cwd: string; stdoutPath: string }): RunnerHandle;
+  /** The command prefix that runs the real campaign runner, e.g. `['bun', '/abs/run.ts']` —
+   * resolved from the adapter's own file location, never from the shell's cwd (the same wall
+   * `resolve-runner.sh` holds for the skill). A test substitutes a double here. */
+  runnerCommand(): string[];
+}
+
+export interface DirScanPort {
+  /** Non-recursive listing; a missing or unreadable directory is `[]`, never a throw. */
+  listEntries(dirPath: string): Array<{ name: string; mtimeMs: number; isDir: boolean }>;
+  /** The last `maxBytes` bytes of a file as UTF-8; `''` for a missing/unreadable file. The
+   * first line of the result may be truncated mid-JSON — the parser expects that. */
+  readTail(filePath: string, maxBytes: number): string;
+  /** Symlink-resolved absolute path; returns its input unchanged when the path does not
+   * exist (containment still applies to the un-resolved form). */
+  realpath(path: string): string;
+}
+
+export interface EnvPort {
+  /** The user's `$HOME` — the containment root's parent (W-P10). */
+  userHome(): string;
+  cwd(): string;
+}
+
+/** READ-only lock access: the watchdog observes the runner's single-instance lock and must
+ * never write or remove it (spec §2.1 "Never"). Deliberately NOT `LockStorePort`. */
+export interface LockReadPort {
+  readLock(): LockInfo | null;
+}
+
+export interface MsClockPort {
+  /** Epoch milliseconds — the clock the pure decision core compares against. */
+  nowMs(): number;
+}
+
+export interface FileReadPort {
+  fileExists(resolvedPath: string): boolean;
+  /** `''` for a missing/unreadable file — the caller decides what absence means. */
+  readFile(resolvedPath: string): string;
+}
+
+export interface AppendFilePort {
+  /** Append-only, creating parent directories; the content is written verbatim. */
+  appendFile(resolvedPath: string, content: string): void;
+}
+
+export interface LinePort {
+  /** One human-readable line per action (spec §2.1 "Stdout: one human line per action").
+   * Injected so the loop stays a pure-ish orchestrator with no console dependency. */
+  printLine(line: string): void;
+}
+
+/** The full seam `core/watchdog/watch-loop.ts` needs, composed from the algebra above. */
+export interface WatchdogIO
+  extends FileReadPort,
+    AppendFilePort,
+    RunHomePort,
+    ProcessPort,
+    TimerPort,
+    ClockPort,
+    MsClockPort,
+    RunnerSpawnPort,
+    DirScanPort,
+    EnvPort,
+    LockReadPort,
+    LinePort {}

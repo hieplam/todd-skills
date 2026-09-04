@@ -1,0 +1,147 @@
+import { describe, expect, test } from 'bun:test';
+import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, statSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildWatchdogIo, readTailLines, withHome } from './watchdog-io.adapter.ts';
+import { parseSessionSignals } from '../core/watchdog/signals.ts';
+
+const tmp = () => mkdtempSync(join(tmpdir(), 'wd-adapter-'));
+
+describe('buildWatchdogIo — the real edge', () => {
+  test('listEntries reports files, dirs and mtimes; a missing dir is empty, never a throw', () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    mkdirSync(join(dir, 'runs'));
+    writeFileSync(join(dir, 'a.log'), 'x');
+    utimesSync(join(dir, 'a.log'), new Date(1_700_000_000_000), new Date(1_700_000_000_000));
+    const entries = io.listEntries(dir);
+    expect(entries.find((e) => e.name === 'runs')?.isDir).toBe(true);
+    expect(entries.find((e) => e.name === 'a.log')?.isDir).toBe(false);
+    expect(entries.find((e) => e.name === 'a.log')?.mtimeMs).toBe(1_700_000_000_000);
+    expect(io.listEntries(join(dir, 'nope'))).toEqual([]);
+  });
+
+  test('readTail returns at most maxBytes, and empty string for a missing file', () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    const file = join(dir, 'big.log');
+    writeFileSync(file, 'abcdefghij');
+    expect(io.readTail(file, 4)).toBe('ghij');
+    expect(io.readTail(file, 100)).toBe('abcdefghij');
+    expect(io.readTail(join(dir, 'missing.log'), 10)).toBe('');
+  });
+
+  test('realpath resolves symlinks and returns the input unchanged when it does not exist', () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    expect(io.realpath(join(dir, 'does-not-exist'))).toBe(join(dir, 'does-not-exist'));
+    expect(io.realpath(dir).endsWith(dir.split('/').pop() as string)).toBe(true);
+  });
+
+  test('spawnRunner runs a real process, captures stdout to a file and yields its exit code', async () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    const out = join(dir, 'stdout.log');
+    const handle = io.spawnRunner(['bash', '-c', 'echo hello-from-child; exit 7'], {
+      cwd: dir, stdoutPath: out,
+    });
+    expect(handle.pid).toBeGreaterThan(0);
+    expect(await handle.waitFor(10_000)).toBe(7);
+    expect(io.readTail(out, 1000)).toContain('hello-from-child');
+  }, 20_000);
+
+  test('waitFor returns null when the slice elapses first — a bounded wait, never a kill', async () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    const handle = io.spawnRunner(['bash', '-c', 'sleep 5'], {
+      cwd: dir, stdoutPath: join(dir, 'o.log'),
+    });
+    expect(await handle.waitFor(200)).toBe(null);
+    expect(io.isProcessAlive(handle.pid)).toBe(true);
+    expect(await handle.waitFor(10_000)).toBe(0);
+  }, 20_000);
+
+  test('runnerCommand names the real runner entrypoint, resolved from this file, not from cwd', () => {
+    const io = buildWatchdogIo();
+    expect(io.runnerCommand()[0]).toBe('bun');
+    expect((io.runnerCommand()[1] as string).endsWith('/run.ts')).toBe(true);
+    expect(io.fileExists(io.runnerCommand()[1] as string)).toBe(true);
+  });
+
+  test('appendFile is append-only and creates parents', () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    const events = join(dir, 'watchdog', 'events.jsonl');
+    io.appendFile(events, 'one\n');
+    io.appendFile(events, 'two\n');
+    expect(io.readTail(events, 100)).toBe('one\ntwo\n');
+  });
+
+  // Carried-forward audit constraint F3/F3b: the tail handed to parseSessionSignals must never
+  // end in a line cut by the READ WINDOW's own boundary. readTail (above) is a raw byte-bounded
+  // primitive on purpose (its own tests rely on exact byte slicing); readTailLines is the
+  // composed seam that discards a LEADING partial line — the one a mid-file window boundary can
+  // create — while never touching the TRAILING line, because a genuinely incomplete final write
+  // is parseSessionSignals's own finalLineUnparseable judgment to make, not this adapter's.
+  test('readTailLines discards a leading partial line at the window boundary, but never the ' +
+    'trailing line — complete lines reach the parser (audit F3/F3b)', () => {
+    const io = buildWatchdogIo();
+    const dir = tmp();
+    const file = join(dir, 'session.log');
+    const rejectedLine = JSON.stringify({
+      type: 'rate_limit_event',
+      rate_limit_info: { status: 'rejected', resetsAt: 1788392400 },
+    });
+    const lines = [
+      '{"type":"system","subtype":"init"}',
+      '{"type":"assistant","message":{}}',
+      rejectedLine,
+    ];
+    const content = lines.join('\n') + '\n';
+    writeFileSync(file, content);
+
+    // Position the window's start strictly inside the SECOND line, so the raw byte tail's
+    // first line is a partial fragment — e.g. `nt","message":{}}` instead of the full line.
+    const secondLineStart = content.indexOf(lines[1] as string);
+    const cutInsideSecondLine = secondLineStart + 5;
+    const maxBytes = content.length - cutInsideSecondLine;
+
+    const rawTail = io.readTail(file, maxBytes);
+    expect(rawTail.startsWith('{')).toBe(false); // proves the window really did cut mid-line
+
+    const tail = readTailLines(io.readTail, file, maxBytes);
+    expect(tail).toBe(`${rejectedLine}\n`); // only the complete trailing line survives
+    expect(parseSessionSignals(tail).quota).toEqual({ resetsAtEpochS: 1788392400 });
+
+    // A window smaller than a single line has no complete line to hand forward at all.
+    expect(readTailLines(io.readTail, file, 3)).toBe('');
+  });
+
+  // W-P9, asserted rather than promised: the watchdog's lock access is read-only — reading it
+  // must never mutate the file the runner's own single-instance lock lives in.
+  test('readLock (bound by withHome) never writes or removes the runner lock file', () => {
+    const home = tmp();
+    const lockPath = join(home, '.runner.lock');
+    const lockInfo = { pid: 4242, startedAt: '2026-09-04T00:00:00.000Z' };
+    writeFileSync(lockPath, JSON.stringify(lockInfo));
+    const fixedMtime = new Date(1_700_000_000_000);
+    utimesSync(lockPath, fixedMtime, fixedMtime);
+    const before = statSync(lockPath);
+
+    const io = withHome(buildWatchdogIo(), home);
+    expect(io.readLock()).toEqual(lockInfo);
+
+    const after = statSync(lockPath);
+    expect(after.mtimeMs).toBe(before.mtimeMs);
+    expect(after.size).toBe(before.size);
+  });
+
+  // W-P9: the adapter itself must be structurally incapable of writing/removing the lock or
+  // touching a campaign-domain path it was never handed — every write path is caller-supplied.
+  test('the adapter source never names a file-deletion primitive or a hardcoded campaign path', () => {
+    const src = readFileSync(join(import.meta.dir, 'watchdog-io.adapter.ts'), 'utf8');
+    for (const forbidden of ['rmSync', 'unlinkSync', 'rmdirSync', 'campaign-state.json', 'answers.md', 'escalat']) {
+      expect({ forbidden, present: src.includes(forbidden) }).toEqual({ forbidden, present: false });
+    }
+  });
+});
