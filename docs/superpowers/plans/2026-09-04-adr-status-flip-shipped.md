@@ -44,7 +44,7 @@ plan); Task 2 flips what Task 1 proved.
 **Contract:** spec section "C1". **Files:** none changed except this plan (the table goes into the
 Hunter report and the PR body).
 
-- [ ] **Step 1: Ancestry (oracle part a)**
+- [x] **Step 1: Ancestry (oracle part a)**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/adr-status-flip-shipped
@@ -53,7 +53,7 @@ for s in 3f52f03 67cc16b a1aa6ed 1edfba4 43a9b16 c43dce4 2eb2372 d1ec881; do git
 
 Expected: all eight `ancestor`.
 
-- [ ] **Step 2: Content presence (oracle part b)**
+- [x] **Step 2: Content presence (oracle part b)**
 
 For each of the six ADR ids, for each `.c3/changes/<adr-id>/*.patch.md`: read the patch, identify
 its target fact (the `→ c3-215` / `→ ref-plugin-layout` shown by
@@ -63,12 +63,12 @@ phrase of that after-state (for a delete, confirm the phrase is absent). Record 
 `adr · patch · target · phrase · present/absent · verdict`. An ADR is `realised` only when every
 one of its patches gets the verdict its kind expects.
 
-- [ ] **Step 3: Report the table**
+- [x] **Step 3: Report the table**
 
 Put the 14-row patch table and the 6-row ADR summary (ADR · evidence sha · patches · realised
 yes/no) in your report.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Tick this task's checkboxes and commit the plan file only. Subject
 `docs(c3): record realisation check for the six proposed ADRs`, `Tribe-Task: 1/2`.
