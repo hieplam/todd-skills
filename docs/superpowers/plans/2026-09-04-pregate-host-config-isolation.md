@@ -47,7 +47,7 @@ one-line isolation (GREEN). Both files are in `plugins/tribe/scripts/`.
 (modify: insert one self-test block between self-test 1 and self-test 2, inside the
 `PREGATE_INNER != 1` block).
 
-- [ ] **Step 1: Record the baseline**
+- [x] **Step 1: Record the baseline**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/pregate-host-config-isolation
@@ -57,7 +57,7 @@ bash plugins/tribe/scripts/tests/test-review-cell-v3.sh 2>&1 | tail -1
 Expected: `50 passed, 0 failed`. Paste the line into your report. If the number differs, record
 the actual number as the baseline and carry on — the goal is baseline + 1.
 
-- [ ] **Step 2: Add self-test 6**
+- [x] **Step 2: Add self-test 6**
 
 Immediately before the line `# Self-test 2 (red case): a fence that allows nothing must flag every changed file, exit 1.`
 insert:
@@ -83,7 +83,7 @@ insert:
 
 ```
 
-- [ ] **Step 3: Watch it fail (RED)**
+- [x] **Step 3: Watch it fail (RED)**
 
 ```bash
 bash -n plugins/tribe/scripts/tests/test-review-cell-v3.sh; echo "parse rc=$?"
@@ -94,7 +94,7 @@ Expected: `parse rc=0`, then `FAIL: c6: gate isolates itself from a hostile glob
 and `50 passed, 1 failed`. If `c6` passes here, the gate is already isolated by something else —
 stop and report `NEEDS_CONTEXT` with the output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 One commit: the file plus this plan's Task 1 checkboxes ticked. Message subject
 `test(tribe): assert pre-gate isolates itself from a hostile global git config`, trailers per
@@ -107,7 +107,7 @@ Global Constraints, `Tribe-Task: 1/2`.
 **Contract:** spec section "C1". **File:** `plugins/tribe/scripts/pre-gate.sh` (modify: insert five
 lines after line 9).
 
-- [ ] **Step 1: Reproduce at gate level (before)**
+- [x] **Step 1: Reproduce at gate level (before)**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/pregate-host-config-isolation
@@ -121,7 +121,7 @@ bash plugins/tribe/scripts/pre-gate.sh --repo . --range "$R^..$R" --tests-dir /t
 Expected: the hostile run prints `"trailers":"fail"` and `rc=1`; the clean run prints
 `"trailers":"pass"` and `rc=0`. Paste both JSON lines.
 
-- [ ] **Step 2: Insert the isolation**
+- [x] **Step 2: Insert the isolation**
 
 After the line `set -euo pipefail` (line 9) and before `LOG() {` insert exactly:
 
@@ -133,7 +133,7 @@ After the line `set -euo pipefail` (line 9) and before `LOG() {` insert exactly:
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 ```
 
-- [ ] **Step 3: Watch it pass (GREEN)**
+- [x] **Step 3: Watch it pass (GREEN)**
 
 Re-run the two Step 1 gate commands: both now print `"trailers":"pass"`, `rc=0`. Then:
 
@@ -143,7 +143,7 @@ bash plugins/tribe/scripts/tests/test-review-cell-v3.sh 2>&1 | grep -E 'c6:|pass
 
 Expected: the `ok: c6:` line and `51 passed, 0 failed`.
 
-- [ ] **Step 4: Sweep every suite under the isolated gate (spec D2)**
+- [x] **Step 4: Sweep every suite under the isolated gate (spec D2)**
 
 ```bash
 bash plugins/tribe/scripts/pre-gate.sh --repo . --range "origin/master..HEAD" --tests-dir plugins/tribe/scripts/tests --report /tmp/sweep.md; echo "rc=$?"; cat /tmp/sweep.md
@@ -155,7 +155,7 @@ those variables and red with them, it depends on host config: add `-c user.name=
 to that suite's own `git commit` call(s) only, re-run, and name the suite in your report. Any
 other cause: stop, report `NEEDS_CONTEXT` with the suite's output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 One commit: `pre-gate.sh` (plus any D2 suite edit) and this plan's Task 2 checkboxes. Subject
 `fix(tribe): pre-gate isolates itself from host git config (fail-closed-edges obl. 2)`,

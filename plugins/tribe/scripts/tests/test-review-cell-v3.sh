@@ -223,6 +223,24 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
     echo "FAIL: c: report names every suite it ran"; fail=$((fail+1))
   fi
 
+  # Self-test 6 (host-config isolation): the gate's verdict must not depend on the machine's
+  # global git config. A legal `[trailer] separators = "#"` empties %(trailers) for every commit;
+  # the gate must neutralise it itself, whatever its caller's environment says. The per-command
+  # GIT_CONFIG_GLOBAL below deliberately overrides this suite's own /dev/null export for that one
+  # child. A stub tests dir keeps this self-test from re-sweeping the real suites.
+  printf '[trailer]\n\tseparators = "#"\n' > "$TMPD/hostile.gitconfig"
+  mkdir -p "$TMPD/stub-tests"
+  printf '#!/usr/bin/env bash\necho "1 passed, 0 failed"\n' > "$TMPD/stub-tests/test-stub.sh"
+  chmod +x "$TMPD/stub-tests/test-stub.sh"
+  if [ -x "$GATE" ] && [ -n "$PASSRANGE" ] && HOSTILE_OUT="$(GIT_CONFIG_GLOBAL="$TMPD/hostile.gitconfig" \
+        PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." --range "$PASSRANGE" \
+        --tests-dir "$TMPD/stub-tests" --report "$TMPD/hostile.md" 2>/dev/null)" \
+     && echo "$HOSTILE_OUT" | grep -q '"trailers": *"pass"'; then
+    echo "ok: c6: gate isolates itself from a hostile global git config"; pass=$((pass+1))
+  else
+    echo "FAIL: c6: gate isolates itself from a hostile global git config"; fail=$((fail+1))
+  fi
+
   # Self-test 2 (red case): a fence that allows nothing must flag every changed file, exit 1.
   FENCE="$TMPD/fence.globs"; echo 'docs/never-matches-anything/**' > "$FENCE"
   if [ -x "$GATE" ]; then
