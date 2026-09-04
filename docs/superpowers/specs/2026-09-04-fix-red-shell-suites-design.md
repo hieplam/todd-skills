@@ -97,6 +97,34 @@ commits**, not one, because the second-parent side of the merged PR is included.
 suites. Reproduced: the report at `## Commit trailers (HEAD~1..HEAD)` lists those two as
 `trailer violation` and 40 as `ok`, ending `## Verdict: fail`.
 
+### R2c — the hardcoded range is *accidentally green* on a feature branch, and regresses on merge
+
+Discovered while auditing C1, and it changes how C2 must be proved. `HEAD~1..HEAD` is not
+statically red; it is red exactly when the tip is a merge commit. On this branch, after C1 landed,
+the tip's parent chain is linear and trailer-clean, so `git rev-list HEAD~1..HEAD` is **1 commit**
+and `test-review-cell-v3.sh` reports `49 passed, 0 failed` — green, by luck, with the defect fully
+intact.
+
+That is the most dangerous possible state for this card: C1 alone satisfies G1's letter ("every
+`test-*.sh` exits 0 on the branch") while leaving master red the instant this PR lands, because a
+regular merge gives master a merge-commit tip and `HEAD~1..HEAD` immediately spans it again.
+Verified two ways:
+
+1. **Simulated merge** (clone of master + `--no-ff` merge of this branch, C1 included):
+   `test-review-cell-v3.sh` → `45 passed, 4 failed` — all four original failures return.
+2. **Artifact-free probe**, run from this worktree against a real merge commit already on master:
+   `pre-gate.sh --range 'd63a7d2~1..d63a7d2'` → `verdict fail | trailers fail`, failing suites
+   `[]`. The trailer check alone is what is red; no suite is.
+
+(The simulated merge additionally showed `test-fresh-machine.sh` failing — that is an artifact of
+running from a *clone*, not a defect: the same suite exits 0 in this worktree. It is recorded here
+so a reader of the transcript is not misled by it.)
+
+So C2 is not optional polish on top of C1; it is the half of this card that makes the green
+durable. Its proof obligation is correspondingly different: a tally alone cannot demonstrate it,
+because the tally is already green. The proof is that the range the suite computes is *by
+construction* one commit and trailer-clean, whatever the tip is.
+
 ## D1 adjudication — which side is wrong, and the governing line
 
 Card D1: **spec wins over test wins over implementation.**
@@ -204,8 +232,11 @@ The deliverables *are* tests, so TDD's "red" is the observed failure of the suit
 
 - C1's red is the **parse error** (`bash -n` exits 2; the suite exits 2 mid-run). Green is
   `bash -n` exit 0 and `47 passed, 0 failed`.
-- C2's red, once C1 has landed, is `47 passed, 2 failed` (`f1` and `f3` recover from C1; the two
-  `c:` assertions still fail on trailers). Green is `50 passed, 0 failed` — 49 existing
+- C2's red is **not** a failing tally on this branch, and that fact is itself the finding
+  (see "R2c" below). It is the pre-gate verdict over any merge-spanning range:
+  `pre-gate.sh --range 'd63a7d2~1..d63a7d2'` returns `verdict fail | trailers fail` with **zero**
+  failing suites — the trailer check, isolated, with nothing else red. Green is
+  `50 passed, 0 failed` — 49 existing
   assertions all passing, plus one new assertion that the range walk actually found a candidate
   (so an empty walk fails loudly instead of skipping the pass case silently).
 

@@ -122,7 +122,8 @@ git diff --stat
 ```
 
 Expected: `parse rc=0`, a final tally line of exactly `47 passed, 0 failed`, `run rc=0`, and a
-`git diff --stat` showing one file changed with 3 insertions and 1 deletion. The 47/0 tally is the
+`git diff --stat` showing one file changed with 4 insertions and 2 deletions (each of Step 2's two
+edits collapses to a `-1/+2` hunk, the shared `PY` line staying as context). The 47/0 tally is the
 number the governing plan records for this suite
 (`docs/tribe/planning/idea-11-review-cell-v3/plan-cheapwins.md:64`: *"`test-input-asymmetry.sh`
 47/0"*), so a different tally means something else moved — stop and report it rather than adjusting
@@ -170,21 +171,44 @@ stays untouched (card D1).
 
 - [ ] **Step 1: Watch the test fail (RED)**
 
+**Read this carefully — the red here is NOT a failing tally, and if you go looking for one you will
+conclude, wrongly, that there is nothing to fix.**
+
+`HEAD~1..HEAD` is red exactly when the tip is a merge commit. Task 1's commit left this branch with
+a linear, trailer-clean tip, so the range happens to resolve to one good commit and the suite is
+green *by luck, with the defect fully intact*. Confirm that accidental green, so you know the
+starting state:
+
 ```bash
 cd /Users/hip/repo/todd-skills-wt/fix-red-shell-suites
-bash plugins/tribe/scripts/tests/test-review-cell-v3.sh 2>&1 | grep -E '^FAIL:|passed,'
+git rev-list HEAD~1..HEAD | wc -l
+bash plugins/tribe/scripts/tests/test-review-cell-v3.sh 2>&1 | tail -1
 ```
 
-Expected RED output — Task 1 has already recovered `f1` and `f3`, so exactly the two `c:`
-assertions remain, and the tally is 47 passed, 2 failed:
+Expected: `1` commit, and `49 passed, 0 failed`. That is the accidental green, not success.
+
+Now reproduce the actual defect, isolated. Point the gate at a range whose tip IS a merge commit —
+`d63a7d2` is one that is already on master, and it is exactly the shape master's tip takes the
+moment this card's PR merges:
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/fix-red-shell-suites
+PREGATE_INNER=1 bash plugins/tribe/scripts/pre-gate.sh --repo . \
+  --range 'd63a7d2~1..d63a7d2' --tests-dir plugins/tribe/scripts/tests \
+  --report /tmp/red-task2.md 2>/dev/null | python3 -c \
+  'import json,sys; d=json.load(sys.stdin); print("verdict",d["verdict"],"trailers",d["trailers"],\
+   "failing suites:",[x["suite"] for x in d["suites"] if x["status"]!="pass"])'
+```
+
+Expected RED output — the trailer check failing on its own, with no suite red:
 
 ```
-FAIL: c: self-test pass case verdict
-FAIL: c: report names every suite it ran
-47 passed, 2 failed
+verdict fail trailers fail failing suites: []
 ```
 
-If you see 4 failures, Task 1 is not committed in your worktree — stop and report `BLOCKED`.
+That is the red this task fixes: the pass-case self-test feeds the gate a range that spans merge
+commits, which by contract carry no `Tribe-Card:` trailer. Transcribe both outputs into your
+report before editing anything.
 
 - [ ] **Step 2: Choose a passing range (GREEN)**
 
@@ -260,6 +284,26 @@ for f in plugins/tribe/scripts/tests/test-*.sh; do bash "$f" >/dev/null 2>&1; \
 ```
 
 Expected: all 18 suites print `rc=0`.
+
+Finally, prove the fix is *durable* — that the computed range is one commit and trailer-clean no
+matter what the tip is. Print the range the suite now selects and check it directly:
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/fix-red-shell-suites
+PASSRANGE=""
+for _sha in $(git rev-list --no-merges -n 200 HEAD); do
+  _tr="$(git log -1 --format='%(trailers)' "$_sha")"
+  printf '%s' "$_tr" | grep -q 'Tribe-Card:' || continue
+  printf '%s' "$_tr" | grep -qi 'co-authored-by' && continue
+  git rev-parse -q --verify "$_sha^" >/dev/null || continue
+  PASSRANGE="$_sha^..$_sha"; break
+done
+echo "range=$PASSRANGE spans $(git rev-list "$PASSRANGE" | wc -l | tr -d ' ') commit(s)"
+git log -1 --format='%(trailers)' "${PASSRANGE##*..}"
+```
+
+Expected: a non-empty `range=`, `spans 1 commit(s)`, and trailers containing `Tribe-Card:` and no
+`Co-Authored-By`. This is the property that survives a merge tip; the tally alone cannot show it.
 
 - [ ] **Step 4: Commit**
 
