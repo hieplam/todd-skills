@@ -18,6 +18,7 @@ import {
 import { loadState, resetCard, serializeState } from '../core/state.ts';
 import { campaignStatePathOf, escalationPathOf, reportDirOf } from '../core/paths.ts';
 import { buildRealIo, unsetAnthropicApiKeyEnv } from '../adapters/run-io.adapter.ts';
+import { launchViewer } from '../adapters/viewer-launch.adapter.ts';
 import { deriveExitReason, shouldWriteReport, writeReport, type ReportRunInfo } from '../core/report.ts';
 import { EXIT_ERROR } from '../core/types.ts';
 import type { CampaignState } from '../core/types.ts';
@@ -25,6 +26,7 @@ import { finalizeRunRecord, generateRunId, runRecordPathOf, serializeRunRecord }
 import { scrubEnvContent } from '../core/env-guard.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
+const DEFAULT_VIEWER_PORT = 4321; // spec D11.
 
 function parseDurationMs(value: string): number | null {
   const trimmed = value.trim();
@@ -38,6 +40,11 @@ function parseDurationMs(value: string): number | null {
 
 export interface ParseArgsResult {
   config: RunLoopConfig;
+  /** Task 13 (spec D11): the live viewer's own two flags. Kept OUTSIDE `RunLoopConfig` —
+   * they steer `main()`'s viewer auto-start step only, never `runLoop`/`LoopIO`, so
+   * `RunLoopConfig`'s existing shape (and every test that constructs one) stays untouched. */
+  viewerPort: number;
+  viewerDisabled: boolean;
 }
 export interface ParseArgsError {
   error: string;
@@ -63,6 +70,8 @@ const KNOWN_FLAGS = new Set([
   '--dry-run',
   '--include-escalated',
   '--remote',
+  '--viewer-port',
+  '--no-viewer',
 ]);
 
 /** Parses `argv` into a `RunLoopConfig`. Pure — no filesystem/network access. Every
@@ -83,7 +92,7 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
     if (!KNOWN_FLAGS.has(token)) {
       return { error: `unknown flag: ${token}` };
     }
-    if (token === '--dry-run' || token === '--include-escalated') {
+    if (token === '--dry-run' || token === '--include-escalated' || token === '--no-viewer') {
       raw.set(token, true);
       continue;
     }
@@ -157,6 +166,23 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
   const includeEscalated = raw.get('--include-escalated') === true;
   const remote = typeof raw.get('--remote') === 'string' ? (raw.get('--remote') as string) : 'origin';
 
+  // Task 13 (spec D11): the runner's own two viewer flags. `--viewer-port` follows the same
+  // positive-integer validation as `--max-cards`/`--max-concurrent` above; `--no-viewer` is a
+  // boolean presence flag, same shape as `--dry-run`/`--include-escalated`.
+  let viewerPort = DEFAULT_VIEWER_PORT;
+  const viewerPortRaw = raw.get('--viewer-port');
+  if (typeof viewerPortRaw === 'string') {
+    const parsed = Number(viewerPortRaw);
+    // F41: bounded to the valid TCP port range (1-65535) so an oversized value fails loudly
+    // and early here, instead of failing deep inside the detached child where `stdio:
+    // 'ignore'` makes it invisible.
+    if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
+      return { error: `--viewer-port: expected an integer between 1 and 65535, got "${viewerPortRaw}"` };
+    }
+    viewerPort = parsed;
+  }
+  const viewerDisabled = raw.get('--no-viewer') === true;
+
   return {
     config: {
       repoRoot,
@@ -173,6 +199,8 @@ export function parseArgs(argv: string[], runId: string): ParseArgsResult | Pars
       dryRun,
       remote,
     },
+    viewerPort,
+    viewerDisabled,
   };
 }
 
@@ -418,6 +446,31 @@ export async function main(): Promise<void> {
   // — cli/main.ts only wires adapters, per structure.test.ts. See scrubTargetEnvLocal's doc
   // comment above for the best-effort contract (never throws).
   await scrubTargetEnvLocal(parsed.config.repoRoot, parsed.config.dryRun, io);
+
+  // Task 13 (spec D11/D12): bring the read-only live viewer up before the first card's
+  // session spawns, and print its URL on this process's own stdout (G3). `--dry-run` never
+  // reaches this code path at all — zero side effects stays a hard contract, so this whole
+  // step is skipped rather than merely short-circuited inside the adapter. Any failure
+  // (a stray exception, a rejected probe/spawn) degrades to one stderr line and the loop
+  // proceeds exactly as if `--no-viewer` had been passed — viewer failure must never affect
+  // the campaign run (the repo's "observability exhaust never kills a run" convention).
+  if (!parsed.config.dryRun) {
+    try {
+      const decision = await launchViewer({
+        dryRun: parsed.config.dryRun,
+        disabled: parsed.viewerDisabled,
+        port: parsed.viewerPort,
+        homeDir: parsed.config.homeDir,
+      });
+      if ((decision.kind === 'spawn' || decision.kind === 'reuse') && decision.url) {
+        console.log(`campaign viewer: ${decision.url} (read-only)`);
+      } else if (decision.note) {
+        console.error(`campaign viewer: ${decision.note}`);
+      }
+    } catch (err) {
+      console.error(`campaign viewer: failed to start (continuing): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   let result: LoopResult | undefined;
   let thrown: unknown;

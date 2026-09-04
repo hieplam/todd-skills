@@ -1,0 +1,36 @@
+{
+  "processes": [
+    {
+      "id": "card:C1",
+      "kind": "session",
+      "cardId": "C1",
+      "agentId": null,
+      "agentType": null,
+      "label": "C1",
+      "parentId": null,
+      "depth": 0,
+      "status": "active",
+      "startedAt": null,
+      "lastActivityAt": "2026-09-03T16:31:22.567Z",
+      "sizeBytes": 99550,
+      "toolUseId": null,
+      "transcriptPath": "/Users/hip/.claude/projects/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo/58e15aa1-d90f-4bba-a128-ed41955c9e41.jsonl"
+    },
+    {
+      "id": "agent:C1:ae7defa1c41124240",
+      "kind": "subagent",
+      "cardId": "C1",
+      "agentId": "ae7defa1c41124240",
+      "agentType": "tribe:hunter",
+      "label": "Add e2e fixture line to README.md",
+      "parentId": "card:C1",
+      "depth": 1,
+      "status": "active",
+      "startedAt": "2026-09-03T16:31:22.567Z",
+      "lastActivityAt": "2026-09-03T16:31:22.567Z",
+      "sizeBytes": 1867,
+      "toolUseId": "toolu_015GnLNC9M9c9vHN7387dXxC",
+      "transcriptPath": "/Users/hip/.claude/projects/-private-var-folders-t2-s0b8z5m947l7kdcvwtrtrt480000gn-T-tribe-e2e-PLbvI8-repo/58e15aa1-d90f-4bba-a128-ed41955c9e41/subagents/agent-ae7defa1c41124240.jsonl"
+    }
+  ]
+}
