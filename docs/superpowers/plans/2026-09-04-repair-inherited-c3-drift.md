@@ -41,6 +41,31 @@ tasks touch disjoint `.c3/` facts (`c3-213` vs `c3-216`) and disjoint new files.
 - **Never capture an exit code through a pipe.** `bunx ... check | tail` reports `tail`'s status.
   Always `bunx @c3x/cli@11.6.3 check > /tmp/out.txt 2>&1; echo "exit=$?"; cat /tmp/out.txt`.
 
+## Adjudication rule (`~/.claude/rules/brief-contracts.md` obligation 4)
+
+REFUTED IN ADVANCE — an auditor or implementer must NOT report these as defects of this card:
+
+- **The `c3-201` reseal carries no ADR.** Card goal G4 reads, verbatim: "No other component's
+  content changes except reseals the tool requires." The `c3-201` change IS that reseal — c3x's
+  own sync stage refuses exit 0 without it, and the bytes are written by `c3x repair`, never by
+  hand (card decision D2). Repo practice agrees for this class: `5bb5f72` ("restore the glob
+  patterns the c3 serializer ate") and `e721b1c` ("reseal c3-215-tribe.md") both landed with no
+  ADR. The per-component-ADR convention governs component *fixes*, not tool canonicalization of a
+  component nobody edited.
+- **Every applied change-unit in this repo reports `drifted`.** `c3x change status` says so for
+  every spent unit in the repo, not just this card's. It is the tool's normal post-apply state.
+- **`c3x check --include-adr` is red.** It is red on `adr-20260821-explaining-illustration-scope.md`
+  for a pre-existing reason this card did not create and cannot fix inside its fence. This card's
+  gate is plain `c3x check`; the two are different gates and only the first is claimed.
+- **`plugins/tribe/scripts/tests/test-fresh-machine.sh` fails one assertion.** Inherited from
+  `origin/master` (reproduced identically on a pristine archive of it) and untouched by this card,
+  whose diff contains zero files under `plugins/`.
+- **The two new ADRs are near-duplicates of each other.** Card goal G3 requires one ADR per
+  component fix; consolidating them into a single multi-target unit is a repo-wide convention
+  question, deliberately left to a follow-up rather than settled here.
+
+Everything else is in play and should be reported.
+
 ## Shared background: why the two cells fail
 
 The component canvas embedded in the c3x runtime marks `Goal`, `Parent Fit`, `Purpose`,
@@ -106,6 +131,11 @@ snippet break the hash. Therefore, in every cell you author in this card:
 
 - no `|` character, escaped or not;
 - no backtick;
+- no angle brackets either — a `<word>` placeholder that loses its backticks becomes a raw HTML
+  open tag to any GFM renderer (see the Task 3 correction note at the end of this plan);
+- `/` and `+` are **safe**. `adr-20260821-fix-c3-301-inputs-row-pipe-escaping` positively
+  prescribes a slash-separated list (`clean/mem/both`) as the zero-escaping-risk replacement for
+  a pipe, so do not treat them as hazards;
 - the ADR `Affected Topology` Evidence column cites the component's **Purpose paragraph**, never
   the offending table row (whose own text is full of pipes). This is the same workaround both
   precedent ADRs used and the reason `adr-20260904-retire-kanna-session-ids.md` says so out loud.
@@ -250,8 +280,10 @@ base: BASE_ANCHOR_213
 
 Note the replacement row deliberately writes "research repo and blog repo commits" rather than
 copying the Contract row's own "Research repo + blog repo commits" wording, and says "posts
-published to" rather than "pushed/published": both avoid characters that have bitten this repo
-before, and neither changes the meaning.
+published to" rather than "pushed/published". Neither changes the meaning, and either wording
+would have worked: **`+` and `/` are not hazards in this repo** — the only two evidenced hazards
+are `|` and the backtick, and `adr-20260821-fix-c3-301-inputs-row-pipe-escaping` prescribes `/`
+as the *safe* separator. Prose wording here is a style preference, not an escaping requirement.
 
 - [x] **Step 5: Apply the change unit and watch it go green**
 
@@ -360,7 +392,7 @@ error stands, so this cell denies the repair path to every component in the repo
 
 The derivation itself was never wrong, only under-cited. `c3-216`'s Contract section already
 carries the row "Final video file / OUT / Mathematically seamless loop at requested duration
-with audio" at `.c3/c3-2-plugins/c3-216-simple-image-video.md:63`, and the effects-and-lessons
+with audio" at `.c3/c3-2-plugins/c3-216-simple-image-video.md:62`, and the effects-and-lessons
 reference doc is the accumulated record of how to hold that contract.
 
 ## Decision
@@ -572,7 +604,15 @@ grep -c "This unit's three patches are the review" .c3/adr/adr-20260821-explaini
 
 Expected: the `c3-201` diff is exactly two changed lines — the `c3-seal:` frontmatter line and
 the one Contract table row (whose only difference is that the tool stripped the backticks around
-three paths; the paths themselves survive unchanged). `git diff --name-only` lists only that one
+three paths).
+
+**Correction (Warchief, post-audit): the reseal is not loss-free.** An earlier draft of this step
+said "the paths themselves survive unchanged". Two of the three do. The third does not: once its
+backticks are gone, `<draft>.review.jsonl` becomes a bare `<draft>` token, which GitHub-Flavoured
+Markdown parses as a raw HTML open tag and GitHub's sanitizer then drops — so the *rendered* cell
+reads ".review.jsonl" while the raw file still reads correctly. Nothing in this repo consumes
+`.c3/` through an HTML renderer (the CLI and the agents read it as plain text), so the reseal
+still lands, but it is recorded as a follow-up rather than described as lossless. `git diff --name-only` lists only that one
 file. The `grep -c` prints `1`, proving the ADR cell the repair wanted to delete is still there.
 If the `c3-201` diff shows more than those two lines, or the grep prints `0`, stop and report
 `BLOCKED` rather than committing.

@@ -71,10 +71,18 @@ are precisely that OUT surface's output.
 
 The added strict citation is true: `c3-216`'s Contract section carries
 `Final video file | OUT | Mathematically seamless loop at requested duration with audio`
-(`c3-216-simple-image-video.md:63`), and the effects-and-lessons doc is the record of how to
+(`c3-216-simple-image-video.md:62`), and the effects-and-lessons doc is the record of how to
 hold that contract.
 
-### Anchors (re-derive before authoring; ids proved stable across two cache rebuilds)
+### Anchors (re-derive before authoring — the `#nNNN` half is NOT stable)
+
+**Correction (Warchief, post-audit).** An earlier draft of this section claimed these node ids
+"proved stable across two cache rebuilds". That claim is false and must not be relied on:
+`.c3/c3.db` is untracked (`.gitignore:2`) and `nodes.id` is `INTEGER PRIMARY KEY AUTOINCREMENT`,
+so the `#nNNN` half of an anchor is a per-clone, per-rebuild cache id — it means something
+different on every machine, and adding documents renumbers it. The `sha256` half is the only
+durable part. Always re-derive an anchor immediately before authoring; never carry an `#nNNN`
+forward from a document, this spec included.
 
 | Entity | Target node | Base anchor |
 | --- | --- | --- |
