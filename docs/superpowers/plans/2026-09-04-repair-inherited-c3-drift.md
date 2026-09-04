@@ -430,7 +430,15 @@ base: BASE_ANCHOR_216
 | Effects-and-lessons reference doc | Contract section (the final video file OUT surface: a mathematically seamless loop at the requested duration with audio) and Change Safety section (loop-seam and template-drift risks it records) | Grows with experience | plugins/simple-image-video/skills/simple-image-video/references/effects-and-lessons.md |
 ```
 
-- [ ] **Step 5: Apply the change unit and watch the whole repository go green**
+- [x] **Step 5: Apply the change unit and watch the whole repository go green**
+
+> **Warchief amendment (2026-09-04).** This step's `c3-216` half is done and its
+> checkbox is ticked accordingly: the canvas stage now reports `Checked 49 docs — all
+> clear` with zero canvas errors. Its whole-repository half (`check` exit 0) is
+> discharged by **Task 3** below, not by this task: clearing the last canvas error
+> unmasked a later, previously unreachable check stage. The Hunter was right to leave
+> this box unticked at commit time; the trailer `Tribe-Task: 2/2` is the ground truth
+> that Task 2 itself is complete, so the file is corrected here to agree with it.
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -479,3 +487,118 @@ git log --format='%H%n%(trailers)' -1
 Expected: only those four paths staged, no `c3.db` entry of any kind, the commit succeeds, and
 `git log` prints both `Tribe-Card: repair-inherited-c3-drift` and `Tribe-Task: 2/2`. Tick this
 task's Step checkboxes in this same commit.
+
+---
+
+### Task 3: let the tool reseal `c3-201` so the whole-repo check reaches exit 0 (Warchief amendment, 2026-09-04)
+
+- Modify: `.c3/c3-2-plugins/c3-201-explaining.md` (seal + one Contract cell, **written by `c3x repair`, never by hand**)
+- Modify: `docs/superpowers/plans/2026-09-04-repair-inherited-c3-drift.md` (this task's checkboxes)
+
+**Why this task exists.** `c3x check` runs its canvas stage first and aborts before its
+canonical-sync stage while any canvas error stands. Tasks 1 and 2 cleared the last canvas error,
+so the sync stage ran for the first time and reported drift that was always there but never
+reachable:
+
+```
+Checked 49 docs — all clear
+DIFFERS c3-2-plugins/c3-201-explaining.md
+error: sync check failed: canonical markdown drift detected
+```
+
+`c3-201` is byte-identical to base here (`git diff d1ec881..HEAD -- .c3/c3-2-plugins/c3-201-explaining.md`
+is empty), so this drift is inherited, not caused by this card.
+
+**Why it is in fence.** Card G4 reads "No other component's content changes except **reseals the
+tool requires**". This is exactly such a reseal — `c3x` refuses its own sync check without it —
+and card G1 (`check` exits 0) cannot be met without it. Card D2 still holds: `c3x` writes it, you
+never do.
+
+**The one thing you must NOT commit.** `c3x repair` also rewrites
+`.c3/adr/adr-20260821-explaining-illustration-scope.md`, and that rewrite is **lossy**: it
+silently deletes the final cell of that ADR's Affected Topology row (`This unit's three patches
+are the review`), because the cell text contains a raw `|` that the c3x 11.6.3 table serializer
+cannot round-trip — the F23 bug that ADR itself documents. That is unrelated, destructive churn
+and the standing constraint says discard it. Verified: discarding it still leaves `check` at
+exit 0.
+
+- [ ] **Step 1: Watch it fail**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
+bunx @c3x/cli@11.6.3 check > /tmp/red-task3.txt 2>&1; echo "exit=$?"; cat /tmp/red-task3.txt
+```
+
+Expected: `exit=1`, `Checked 49 docs — all clear`, then `DIFFERS c3-2-plugins/c3-201-explaining.md`
+and `error: sync check failed: canonical markdown drift detected`. This is the RED proof.
+
+- [ ] **Step 2: Let the tool write the reseal**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
+bunx @c3x/cli@11.6.3 repair > /tmp/repair-task3.txt 2>&1; echo "repair-exit=$?"; cat /tmp/repair-task3.txt
+git status --short
+```
+
+Expected: `repair-exit=0`, the run completing through `Rebuilt local C3 cache`, `Resealed
+canonical .c3/ tree`, `Checked 49 docs — all clear`, `OK: canonical markdown is in sync` — and
+**no** `hint: fix the queued command error above` line (that hint is the card's G2 baseline
+failure and must be gone). `git status --short` shows exactly two modified tracked files:
+`.c3/c3-2-plugins/c3-201-explaining.md` and
+`.c3/adr/adr-20260821-explaining-illustration-scope.md`, plus possibly untracked `.c3/c3.db-shm`
+/ `.c3/c3.db-wal`, which are never staged.
+
+- [ ] **Step 3: Discard the lossy ADR churn**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
+git diff --stat -- .c3/adr/adr-20260821-explaining-illustration-scope.md
+git checkout -- .c3/adr/adr-20260821-explaining-illustration-scope.md
+git status --short
+```
+
+Expected: the `git diff --stat` first shows that file modified; after the `checkout` it is gone
+from `git status --short`, leaving `.c3/c3-2-plugins/c3-201-explaining.md` as the only modified
+tracked file.
+
+- [ ] **Step 4: Confirm the fence held and the loss did not happen**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
+git diff -- .c3/c3-2-plugins/c3-201-explaining.md
+git diff --name-only
+grep -c "This unit's three patches are the review" .c3/adr/adr-20260821-explaining-illustration-scope.md
+```
+
+Expected: the `c3-201` diff is exactly two changed lines — the `c3-seal:` frontmatter line and
+the one Contract table row (whose only difference is that the tool stripped the backticks around
+three paths; the paths themselves survive unchanged). `git diff --name-only` lists only that one
+file. The `grep -c` prints `1`, proving the ADR cell the repair wanted to delete is still there.
+If the `c3-201` diff shows more than those two lines, or the grep prints `0`, stop and report
+`BLOCKED` rather than committing.
+
+- [ ] **Step 5: Prove the card's two goals**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
+bunx @c3x/cli@11.6.3 check > /tmp/green-task3.txt 2>&1; echo "check-exit=$?"; cat /tmp/green-task3.txt
+```
+
+Expected: `check-exit=0` (card G1) with `Checked 49 docs — all clear` and `OK: canonical markdown
+is in sync`. Paste this transcript into your report verbatim.
+
+- [ ] **Step 6: Commit**
+
+```bash
+cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
+git add .c3/c3-2-plugins/c3-201-explaining.md \
+        docs/superpowers/plans/2026-09-04-repair-inherited-c3-drift.md
+git status --short
+git commit -m "fix(c3): reseal c3-201 canonical markdown so the repo check reaches exit 0" \
+  -m $'Tribe-Card: repair-inherited-c3-drift\nTribe-Task: 3/3'
+git log --format='%H%n%(trailers)' -1
+```
+
+Expected: only those two paths staged and no `c3.db` entry of any kind; the commit succeeds and
+`git log` prints both `Tribe-Card: repair-inherited-c3-drift` and `Tribe-Task: 3/3`. Tick this
+task's Step checkboxes in this same commit. No `Co-Authored-By` trailer of any kind.
