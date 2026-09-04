@@ -1,6 +1,6 @@
 ---
 id: adr-20260904-fix-c3-213-derived-materials-grounding
-c3-seal: b5de7777d4dca3ac10b8126f5abc19f09f38bd2f03233ba506474d7295816fd4
+c3-seal: 02287cd1c3b316e2c9a508fcd6c68fc170d46cb71ee019d7312e287ecc0c514f
 title: fix-c3-213-derived-materials-grounding
 type: adr
 goal: |-
@@ -8,7 +8,7 @@ goal: |-
     section it actually derives from, so the fact stops failing its own component canvas. The row
     today cites only the Business Flow section, which the canvas does not accept as a derivation
     source, and that one cell has blocked `c3x repair` for the whole repository for weeks.
-status: proposed
+status: accepted
 date: "2026-09-04"
 ---
 

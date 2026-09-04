@@ -1,6 +1,6 @@
 ---
 id: adr-20260904-fix-c3-216-derived-materials-grounding
-c3-seal: 0fd1320c96bc16493da7babe67b0373a394ff1bb18d2695783d2b430c48b1786
+c3-seal: 861da6cf53f0bd41de999bb309461c3a0465684271b6f04d6e182245234deedb
 title: fix-c3-216-derived-materials-grounding
 type: adr
 goal: |-
@@ -9,7 +9,7 @@ goal: |-
     The row today cites only the Change Safety section, which the canvas does not accept as a
     derivation source, and that one cell is the second of the two that have blocked `c3x repair`
     for the whole repository for weeks.
-status: proposed
+status: accepted
 date: "2026-09-04"
 ---
 
