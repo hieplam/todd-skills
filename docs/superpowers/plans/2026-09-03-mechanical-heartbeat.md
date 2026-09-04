@@ -2876,7 +2876,7 @@ still reads no `process.env` (`structure.test.ts` enforces both).
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `cli/main.test.ts`:
+- [x] **Step 1: Failing test** — append to `cli/main.test.ts`:
 
 ```ts
 import { resolveWatchdogHome } from './main.ts';
@@ -2917,7 +2917,7 @@ describe('resolveWatchdogHome — the watchdog subcommand gate (fail-closed)', (
 
 Run `bun test cli/main.test.ts`. Expected: red (`resolveWatchdogHome` not exported).
 
-- [ ] **Step 2: Implement** — in `cli/main.ts`, add the imports and the exported helper above
+- [x] **Step 2: Implement** — in `cli/main.ts`, add the imports and the exported helper above
   `main()`:
 
 ```ts
@@ -2980,7 +2980,7 @@ changes the other's behaviour):
   }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -2998,7 +2998,7 @@ silent. The three hand invocations each print ONE `watchdog: ...` line on stderr
 traceback and `exit=1`: respectively "is outside the tribe root", "missing required flag:
 --home", "unknown flag: --dry-run".
 
-- [ ] **Step 4: Commit** — `feat(runner): wire the watchdog subcommand into the composition root (task 9/15)`,
+- [x] **Step 4: Commit** — `feat(runner): wire the watchdog subcommand into the composition root (task 9/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---

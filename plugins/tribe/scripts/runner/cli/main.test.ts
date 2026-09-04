@@ -575,3 +575,44 @@ describe('performResetCard — the reset-card subcommand\'s execution (P11 follo
     expect(errors).toEqual([]);
   });
 });
+
+import { resolveWatchdogHome } from './main.ts';
+
+describe('resolveWatchdogHome — the watchdog subcommand gate (fail-closed)', () => {
+  // Anchored at path-START (not a bare first-occurrence replace): a real `realpathSync` is
+  // idempotent — realpathing an already-resolved path returns it unchanged — and `io.cwd()`
+  // below is itself given already pre-resolved (containing `/private/var/`), the way Node's
+  // real `process.cwd()` already is. A non-anchored `.replace('/var/', '/private/var/')`
+  // would match that PRE-RESOLVED `/private/var/` substring too and double-prefix the
+  // relative-home case, breaking idempotency the real adapter always has.
+  const io = {
+    realpath: (p: string) => p.replace(/^\/var\//, '/private/var/'),
+    userHome: () => '/var/t/home',
+    cwd: () => '/private/var/t/home/.tribe/k/campaigns',
+    fileExists: (p: string) => p === '/private/var/t/home/.tribe/k/campaigns/c/campaign-state.json',
+  };
+
+  test('an absolute home inside the realpathed tribe root is accepted (W-P10)', () => {
+    const got = resolveWatchdogHome('/var/t/home/.tribe/k/campaigns/c', io);
+    expect(got).toEqual({ homeDir: '/private/var/t/home/.tribe/k/campaigns/c' });
+  });
+
+  test('a RELATIVE home resolves against cwd — the shape a person types', () => {
+    const got = resolveWatchdogHome('c', io);
+    expect(got).toEqual({ homeDir: '/private/var/t/home/.tribe/k/campaigns/c' });
+  });
+
+  test('a home outside the tribe root is refused with a typed message, not a throw', () => {
+    const got = resolveWatchdogHome('/tmp/elsewhere', io);
+    expect('error' in got && got.error).toContain('is outside the tribe root');
+  });
+
+  test('a home with no campaign-state.json is refused by name', () => {
+    const got = resolveWatchdogHome('/var/t/home/.tribe/k/campaigns/other', io);
+    expect('error' in got && got.error).toBe(
+      'watchdog: --home "/private/var/t/home/.tribe/k/campaigns/other" has no ' +
+        'campaign-state.json — a campaign home is authored by the orchestrate-campaign ' +
+        'skill before any runner or watchdog is started',
+    );
+  });
+});

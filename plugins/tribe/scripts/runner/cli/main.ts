@@ -24,6 +24,10 @@ import { EXIT_ERROR } from '../core/types.ts';
 import type { CampaignState } from '../core/types.ts';
 import { finalizeRunRecord, generateRunId, runRecordPathOf, serializeRunRecord } from '../core/run-record.ts';
 import { scrubEnvContent } from '../core/env-guard.ts';
+import { containHome, parseWatchdogArgs, resolveHomeArg } from '../core/watchdog/args.ts';
+import { runWatchdog } from '../core/watchdog/watch-loop.ts';
+import { buildWatchdogIo, withHome } from '../adapters/watchdog-io.adapter.ts';
+import { WATCHDOG_EXIT_USAGE } from '../core/watchdog/model.ts';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // spec §2: 3h protocol default.
 const DEFAULT_VIEWER_PORT = 4321; // spec D11.
@@ -404,8 +408,56 @@ export async function performResetCard(
   return 0;
 }
 
+/** The watchdog's fail-closed gate (spec §8): resolve `--home` the way a person typed it,
+ * symlink-resolve BOTH it and the tribe root (W-P10 — a throwaway HOME under /var/folders
+ * realpaths to /private/var/folders, so a string-prefix test would refuse a legitimate home),
+ * prove containment, then prove the campaign actually exists. Exported for cli/main.test.ts;
+ * takes only the slice of the seam it needs, like `scrubTargetEnvLocal` above. */
+export function resolveWatchdogHome(
+  rawHome: string,
+  io: {
+    realpath(p: string): string;
+    userHome(): string;
+    cwd(): string;
+    fileExists(p: string): boolean;
+  },
+): { homeDir: string } | { error: string } {
+  const absHome = io.realpath(resolveHomeArg(rawHome, io.cwd()));
+  const tribeRoot = io.realpath(join(io.userHome(), '.tribe'));
+  const contained = containHome(absHome, tribeRoot);
+  if (!contained.ok) return { error: contained.error };
+  if (!io.fileExists(campaignStatePathOf(absHome))) {
+    return {
+      error:
+        `watchdog: --home "${absHome}" has no campaign-state.json — a campaign home is ` +
+        'authored by the orchestrate-campaign skill before any runner or watchdog is started',
+    };
+  }
+  return { homeDir: absHome };
+}
+
 export async function main(): Promise<void> {
   const argv = process.argv.slice(2);
+
+  if (argv[0] === 'watchdog') {
+    const parsed = parseWatchdogArgs(argv.slice(1));
+    if ('error' in parsed) {
+      console.error(`watchdog: ${parsed.error}`);
+      process.exit(WATCHDOG_EXIT_USAGE);
+      return;
+    }
+    const baseIo = buildWatchdogIo();
+    const home = resolveWatchdogHome(parsed.config.rawHome, baseIo);
+    if ('error' in home) {
+      console.error(home.error);
+      process.exit(WATCHDOG_EXIT_USAGE);
+      return;
+    }
+    const outcome = await runWatchdog(parsed.config, home.homeDir, withHome(baseIo, home.homeDir));
+    console.log(`status: ${outcome.statusPath}`);
+    process.exit(outcome.exitCode);
+    return;
+  }
 
   if (argv[0] === 'reset-card') {
     const parsed = parseResetCardArgs(argv.slice(1));
