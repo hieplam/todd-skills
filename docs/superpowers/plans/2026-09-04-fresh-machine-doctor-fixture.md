@@ -43,7 +43,7 @@ One task, one commit. The RED is captured from a git-archive copy, never by touc
 
 **Contract:** spec sections "C1", "C2", "C3". **File:** `plugins/tribe/scripts/tests/test-fresh-machine.sh`.
 
-- [ ] **Step 1: Reproduce the RED from an archive copy**
+- [x] **Step 1: Reproduce the RED from an archive copy**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/fresh-machine-doctor-fixture
@@ -55,7 +55,7 @@ Expected: `not ok - doctor passes on a fully-provisioned machine (got: 1, want: 
 `25 passed, 1 failed`. Also run the suite in the worktree itself and record its tally (`26 passed,
 0 failed` if the worktree's runner deps are installed, otherwise the same 25/1).
 
-- [ ] **Step 2: Add the fixture builder (spec C1)**
+- [x] **Step 2: Add the fixture builder (spec C1)**
 
 Next to the existing `fresh_home` helper add:
 
@@ -72,7 +72,7 @@ doctor_fixture() { # doctor_fixture DIR provisioned|unprovisioned
 }
 ```
 
-- [ ] **Step 3: Point the existing assertion at the built fixture (spec C2)**
+- [x] **Step 3: Point the existing assertion at the built fixture (spec C2)**
 
 Replace the block at "On this machine, with a full PATH, the doctor should pass." so it builds
 `"$TMP/doctor-provisioned"` with `doctor_fixture "$TMP/doctor-provisioned" provisioned` and runs
@@ -80,7 +80,7 @@ Replace the block at "On this machine, with a full PATH, the doctor should pass.
 capture as the file does today; the assertion becomes
 `check "doctor passes on a fully-provisioned fixture" "$drc" "0"`.
 
-- [ ] **Step 4: Add the empty-fixture assertion (spec C3)**
+- [x] **Step 4: Add the empty-fixture assertion (spec C3)**
 
 Immediately after Step 3's block: build `"$TMP/doctor-unprovisioned"` with `unprovisioned`, run its
 `doctor.sh` the same way, then:
@@ -91,7 +91,7 @@ Immediately after Step 3's block: build `"$TMP/doctor-unprovisioned"` with `unpr
   contains "doctor says how to install them" "$dout" "bun install"
 ```
 
-- [ ] **Step 5: GREEN from the archive copy and from the worktree**
+- [x] **Step 5: GREEN from the archive copy and from the worktree**
 
 ```bash
 bash -n plugins/tribe/scripts/tests/test-fresh-machine.sh; echo "parse rc=$?"
@@ -106,15 +106,15 @@ Expected: `parse rc=0`; both tallies `29 passed, 0 failed` (26 existing, one of 
 3 new; record the actual number if the arithmetic differs and explain why); `git diff --stat`
 names only the test file.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Subject `test(tribe): fresh-machine suite builds its own doctor fixtures instead of borrowing the checkout's install state`,
 `Tribe-Task: 1/1`, plan checkboxes ticked in the same commit.
 
 ## Definition of done for this plan
 
-- [ ] Task committed and pushed; pre-gate green over `origin/master..HEAD`; `doctor.sh` untouched.
-- [ ] Evidence per spec "Evidence plan" in the PR body (archive-copy RED transcript; GREEN from the
+- [x] Task committed and pushed; pre-gate green over `origin/master..HEAD`; `doctor.sh` untouched.
+- [x] Evidence per spec "Evidence plan" in the PR body (archive-copy RED transcript; GREEN from the
       copy and the worktree; full suite table; `git diff --stat`).
 - [ ] Two independent skinner audits PASS, tracker + scout recorded, PR merged with a regular merge,
       master fast-forwarded, worktree removed, `SHIPPED` returned.
