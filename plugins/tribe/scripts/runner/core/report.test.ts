@@ -564,6 +564,9 @@ describe('writeReport — W-F5: last-tick blocked reconciliation reaches the rep
     const loopIo: LoopIO = {
       exec: mock(async (cmd: string[]): Promise<ExecResult> => {
         if (cmd[0] === 'git' && cmd[1] === 'symbolic-ref') return { stdout: 'origin/master\n', stderr: '', exitCode: 0 };
+        // C2: the planning_needed escalation asks where the main checkout is; on the base branch here.
+        if (cmd[0] === 'git' && cmd[1] === 'rev-parse' && cmd.includes('--abbrev-ref'))
+          return { stdout: 'master\n', stderr: '', exitCode: 0 };
         if (cmd[0] === 'git' && cmd[1] === 'fetch') return { stdout: '', stderr: '', exitCode: 0 };
         if (cmd[0] === 'git' && cmd[1] === 'checkout') return { stdout: '', stderr: '', exitCode: 0 };
         if (cmd[0] === 'git' && cmd[1] === 'add') return { stdout: '', stderr: '', exitCode: 0 };

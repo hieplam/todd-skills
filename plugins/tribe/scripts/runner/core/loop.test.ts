@@ -7,6 +7,7 @@
 import { describe, expect, mock, test } from 'bun:test';
 import {
   acquireLock,
+  checkoutMismatchNote,
   deriveCardPhase,
   extractMergeSha,
   isStopRequested,
@@ -378,6 +379,38 @@ describe('resolveBaseBranch', () => {
 });
 
 // ===========================================================================================
+// checkoutMismatchNote — C2 (HARDENING-BACKLOG): `nextCard` resolves a card's spec/plan
+// against `--repo`'s WORKING TREE, so a main checkout left in detached HEAD (T27's `--adopt`
+// run left it on a release tag where docs/specs/ did not exist) makes every card read as
+// "missing spec, plan". The pure note names the real cause so the escalation is actionable.
+// ===========================================================================================
+
+describe('checkoutMismatchNote', () => {
+  test('detached HEAD names the detached state, the base branch, and the restore command', () => {
+    const note = checkoutMismatchNote('HEAD', 'master', '/repo');
+    expect(note).toContain('detached HEAD');
+    expect(note).toContain('master');
+    expect(note).toContain('git -C /repo checkout master');
+  });
+
+  test('a different branch names that branch and the base branch', () => {
+    const note = checkoutMismatchNote('feat/other', 'master', '/repo');
+    expect(note).toContain('feat/other');
+    expect(note).toContain('not master');
+    expect(note).toContain('git -C /repo checkout master');
+  });
+
+  test('on the base branch there is nothing to say', () => {
+    expect(checkoutMismatchNote('master\n', 'master', '/repo')).toBeNull();
+  });
+
+  test('an unknown ref (empty output) stays silent rather than guessing', () => {
+    expect(checkoutMismatchNote('', 'master', '/repo')).toBeNull();
+    expect(checkoutMismatchNote('   \n', 'master', '/repo')).toBeNull();
+  });
+});
+
+// ===========================================================================================
 // extractMergeSha
 // ===========================================================================================
 
@@ -493,6 +526,9 @@ function buildMockLoopIo(opts: MockLoopIoOptions): MockLoopIoResult {
     }
     // Default fallbacks for common read-only/mutating calls not explicitly scripted.
     if (cmd[0] === 'git' && cmd[1] === 'symbolic-ref') return ok('origin/master\n');
+    // C2: the main checkout's current ref — on the base branch unless a test scripts a
+    // detached HEAD / other branch via `execHandlers`.
+    if (cmd[0] === 'git' && cmd[1] === 'rev-parse' && cmd.includes('--abbrev-ref')) return ok('master\n');
     if (cmd[0] === 'git' && cmd[1] === 'rev-parse') return ok('basesha0\n');
     if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'view') return fail('no pull requests found');
     if (cmd[0] === 'git' && cmd[1] === 'worktree') return ok('');
@@ -594,6 +630,134 @@ function stateJsonWithTwoFreshCards(): string {
     }),
   );
 }
+
+// ===========================================================================================
+// C1 (HARDENING-BACKLOG): a card whose own merge deletes its plan file must still finalise.
+// T26's release commit removed docs/specs/ and docs/plans/; the runner merged the PR, then
+// crashed with ENOENT re-reading docs/plans/T26.plan.md for the D3 point-6 schema guard,
+// leaving the card `running` although the work had merged. Pre-flight (nextCard) still sees
+// the plan; only the post-merge verify read finds it gone.
+// ===========================================================================================
+
+describe('runLoop — C1: a card whose merge removed its own plan path finalises cleanly', () => {
+  test('is recorded shipped, not crashed, when the plan is gone at verify time', async () => {
+    const state = fixtureState({
+      sequence: ['C1'],
+      schemaLockPaths: ['packages/app/src/domain/'],
+      cards: { C1: fixtureCard({ branch: 'feat/c1-widget' }) },
+    });
+    let merged = false;
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      execHandlers: [
+        (cmd) => {
+          if (cmd[0] === 'gh' && cmd[1] === 'api') {
+            merged = true;
+            return ok(JSON.stringify({ merged: true, merge_commit_sha: 'deadbee' }));
+          }
+          if (cmd[0] === 'git' && cmd[1] === 'rev-list') return ok('deadbee parent1 parent2');
+          if (cmd[0] === 'git' && cmd[1] === 'merge-base') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'checks') return ok(JSON.stringify([{ name: 'ci', bucket: 'pass' }]));
+          if (cmd[0] === 'git' && cmd[1] === 'diff') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'fetch') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'checkout') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'add') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'commit') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'push') return ok('');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'create') return ok('https://example.invalid/o/r/pull/926\n');
+          if (cmd[0] === 'gh' && cmd[1] === 'pr' && cmd[2] === 'merge') return ok('');
+          if (cmd[0] === 'git' && cmd[1] === 'pull') return ok('');
+          return null;
+        },
+      ],
+      spawnQueue: [() => messages(shippedMessages(926, 'aaaaaaa', 'sess-c1'))],
+    });
+    // The plan exists at pre-flight and vanishes with the merge — exactly T26's shape. The
+    // mock's default `readFile` already throws for any un-fixtured path, so a post-merge read
+    // of the plan is the ENOENT the real fs would raise.
+    const planPath = '/repo/docs/plans/c1.md';
+    const baseFileExists = io.fileExists;
+    io.fileExists = ((p: string) => (merged && p === planPath ? false : baseFileExists(p))) as LoopIO['fileExists'];
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.processed[0]).toMatchObject({ kind: 'shipped', cardId: 'C1' });
+    const finalState = JSON.parse(writtenFiles.get('/th/campaign-state.json') as string);
+    expect(finalState.cards.C1.status).toBe('shipped');
+    expect(finalState.cards.C1.mergeSha).toBe('deadbee');
+  });
+});
+
+// ===========================================================================================
+// C2 (HARDENING-BACKLOG): a stray detached HEAD in the main checkout must be NAMED in the
+// planning_needed escalation (and the --dry-run plan), not reported as a bare "missing
+// spec, plan".
+// ===========================================================================================
+
+describe('runLoop — C2: planning_needed names a detached / off-base checkout', () => {
+  const detachedHandler = (cmd: string[]) => {
+    if (cmd[0] === 'git' && cmd[1] === 'rev-parse' && cmd.includes('--abbrev-ref')) return ok('HEAD\n');
+    return null;
+  };
+
+  test('the escalation file says the checkout is detached and how to restore it', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      missingSpecPlan: true,
+      execHandlers: [detachedHandler],
+      spawnQueue: [],
+    });
+
+    const result = await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    expect(result.exitCode).toBe(EXIT_ESCALATED);
+    expect(result.processed[0]).toMatchObject({ kind: 'escalated', cardId: 'C1', reason: 'planning_needed' });
+    const escalationContent = writtenFiles.get('/th/escalations/C1.md') as string;
+    expect(escalationContent).toContain('Missing on disk: spec, plan');
+    expect(escalationContent).toContain('detached HEAD');
+    expect(escalationContent).toContain('git -C /repo checkout master');
+  });
+
+  test('on the base branch the escalation carries no checkout note', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      missingSpecPlan: true,
+      spawnQueue: [],
+    });
+
+    await runLoop(baseLoopConfig({ maxCards: 1 }), io);
+
+    const escalationContent = writtenFiles.get('/th/escalations/C1.md') as string;
+    expect(escalationContent).toContain('Missing on disk: spec, plan');
+    expect(escalationContent).not.toContain('detached HEAD');
+    expect(escalationContent).not.toContain('checkout master');
+  });
+
+  test('--dry-run surfaces the same note in planningNeeded, still writing nothing', async () => {
+    const state = fixtureState({ sequence: ['C1'], cards: { C1: fixtureCard({ branch: null }) } });
+    const { io, atomicWrites, writtenFiles } = buildMockLoopIo({
+      stateJson: JSON.stringify(state),
+      answers: '',
+      missingSpecPlan: true,
+      execHandlers: [detachedHandler],
+      spawnQueue: [],
+    });
+
+    const result = await runLoop(baseLoopConfig({ dryRun: true }), io);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.dryRunPlan?.planningNeeded).toMatchObject({ cardId: 'C1', missing: ['spec', 'plan'] });
+    expect(result.dryRunPlan?.planningNeeded?.note).toContain('detached HEAD');
+    expect(atomicWrites).toHaveLength(0);
+    expect(writtenFiles.has('/th/escalations/C1.md')).toBe(false);
+  });
+});
 
 describe('runLoop — full happy path over two cards', () => {
   test('two fresh cards both ship: verify passes, state committed, exit 0', async () => {
