@@ -311,7 +311,7 @@ in this same commit.
 - Create: `.c3/changes/adr-20260904-fix-c3-216-derived-materials-grounding/01-reground-effects-and-lessons.patch.md`
 - Modify: `.c3/c3-2-plugins/c3-216-simple-image-video.md` (row 1 of Derived Materials, via `c3x change apply`)
 
-- [ ] **Step 1: Watch it fail**
+- [x] **Step 1: Watch it fail**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -322,14 +322,14 @@ bunx @c3x/cli@11.6.3 check --only c3-216 > /tmp/red-task2-only.txt 2>&1; echo "o
 Expected: `exit=1` with exactly one error, the `x c3-216:` ungrounded-derivation line (Task 1
 already cleared `c3-213`); `only-exit=1` naming `c3-216`.
 
-- [ ] **Step 2: Derive the two anchors for c3-216**
+- [x] **Step 2: Derive the two anchors for c3-216**
 
 Run the anchor script from "How to derive a cite anchor" above and keep the two `c3-216` lines.
 Expected: one anchor whose snippet starts
 `Effects-and-lessons reference doc | Change Safety section` (the patch base) and one whose
 snippet starts `Owns the still-image` (the ADR Evidence cite).
 
-- [ ] **Step 3: Author the ADR draft and import it with the tool**
+- [x] **Step 3: Author the ADR draft and import it with the tool**
 
 Write `/tmp/adr-c3-216-draft.md` with exactly this body, substituting `PURPOSE_CITE_216` with
 the `Owns the still-image...` anchor line from Step 2 (whole line, quoted snippet included):
@@ -407,7 +407,7 @@ Expected: `dryrun-exit=0`, then `add-exit=0`, and the `ls` prints the new ADR pa
 dry-run rejects the Evidence cite, re-derive the anchor (Step 2) and retry — never hand-edit a
 seal or a `.c3/` file to make it pass.
 
-- [ ] **Step 4: Scaffold the change unit and author the one block patch**
+- [x] **Step 4: Scaffold the change unit and author the one block patch**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -449,7 +449,7 @@ show only this task's own new/modified `.c3/` paths, plus possibly untracked `.c
 `.c3/c3.db-wal`, which are never staged. Any other tracked file modified by the reseal is
 unrelated churn: `git checkout -- <path>`, then re-run `check` to confirm it stays green.
 
-- [ ] **Step 6: Confirm the fence held**
+- [x] **Step 6: Confirm the fence held**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
@@ -462,7 +462,7 @@ Derived Materials row. The `--stat` shows only this task's ADR, change folder, a
 file (plus this plan file). If any other component file appears, stop and report `BLOCKED`
 rather than committing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/repair-c3-drift
