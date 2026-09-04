@@ -2370,7 +2370,7 @@ and spec §8, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `core/watchdog/watch-loop.test.ts`. The fake IO is a virtual
+- [x] **Step 1: Failing test** — `core/watchdog/watch-loop.test.ts`. The fake IO is a virtual
   filesystem plus a virtual clock, so these tests are deterministic and instant:
 
 ```ts
@@ -2581,7 +2581,7 @@ describe('signals are read from the newest log only', () => {
 
 Run `bun test core/watchdog/watch-loop.test.ts`. Expected: red (module missing).
 
-- [ ] **Step 2: Implement** `core/watchdog/watch-loop.ts`:
+- [x] **Step 2: Implement** `core/watchdog/watch-loop.ts`:
 
 ```ts
 /**
@@ -2831,7 +2831,7 @@ export async function runWatchdog(
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -2844,7 +2844,7 @@ Expected: the loop's 12 tests pass in under a second (virtual clock); `structure
 (no world specifier, no `process.exit`, no `process.env` in `core/watchdog/watch-loop.ts`); full
 suite `540 pass, 0 fail`; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(runner): watchdog supervision loop with bounded wake-up waits (task 8/15)`,
+- [x] **Step 4: Commit** — `feat(runner): watchdog supervision loop with bounded wake-up waits (task 8/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
