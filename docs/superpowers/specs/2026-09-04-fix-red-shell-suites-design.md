@@ -5,14 +5,14 @@
 ## Problem, grounded
 
 Two suites under `plugins/tribe/scripts/tests/` are red on `d63a7d2`. Everything else in the
-directory is green (16/18 suites, verified by running all 18 — see the before table below), so the
+directory is green (15/17 suites, verified by running all of them — see the before table below), so the
 red is narrow and its causes are separable.
 
 ### R1 — `test-input-asymmetry.sh` does not parse under the bash actually on PATH
 
 ```
 $ bash plugins/tribe/scripts/tests/test-input-asymmetry.sh
-... 19 assertions pass ...
+... 37 assertions pass ...
 test-input-asymmetry.sh: line 199: unexpected EOF while looking for matching `''
 $ echo $?    # 2
 ```
@@ -242,7 +242,7 @@ The deliverables *are* tests, so TDD's "red" is the observed failure of the suit
 
 No assertion's *expectation* is weakened anywhere: C1 changes zero assertions, C2 changes only the
 input a passing assertion is fed, and both suites end with strictly more passing assertions than
-they start with (19 → 47; 45 → 50).
+they start with (37 → 47; 45 → 50).
 
 ## Evidence plan
 
@@ -260,7 +260,7 @@ the shell suite itself, run by hand. Captured by the Warchief, not claimed by a 
 ## Risks and rollback
 
 - **The suite gets slower.** `test-review-cell-v3.sh` invokes `pre-gate.sh` five times and each
-  invocation sweeps all 18 suites; once every suite is green, the sweep no longer short-circuits on
+  invocation sweeps all 17 suites; once every suite is green, the sweep no longer short-circuits on
   a broken sibling. Accepted — it is the design the Delta-C spec asks for. Measured and reported in
   the after table so the number is on the record rather than a surprise.
 - **`test-review-cell-v3.sh` is now coupled to every sibling suite being green.** Also by design
@@ -284,3 +284,37 @@ the shell suite itself, run by hand. Captured by the Warchief, not claimed by a 
    made here.
 3. **Observation — the card's `61e87d7` attribution is incorrect**; the defect is original to the
    file (`d21724c`). Recorded so the roadmap's history stays true.
+
+## Follow-ups added by the final whole-branch audit (for the Shaman, not built here)
+
+4. **`pre-gate.sh` itself is not isolated from host git config.** This card hardened the *test*
+   that observes the gate (Task 2b), not the gate the Warchief actually runs. Reproduced by the
+   scout survey: under a legal global `[trailer] separators = "#"`, `pre-gate.sh` returns
+   `verdict fail`, exit 1, on a genuinely trailer-clean commit. Fixing it means editing
+   `pre-gate.sh`, which this card's fence forbids and whose blocking behaviour the card reserves
+   to the Shaman — so it is filed, not fixed. Highest-value follow-up on this list: it is a
+   false-red in the tribe's own audit gate.
+5. **`test-review-cell-v3.sh:8` carries only `set -u`, not `set -euo pipefail`** — the sole
+   violation of `.c3/rules/rule-bash-strict-mode.md` among the repo's 36 shell files
+   (tracker, rule-cited Should-fix). Pre-existing; hardening it may change how the suite's
+   `cmd; rc=$?` assertions behave, so it wants its own card with its own green run.
+6. **The suite reds in a shallow clone** (`git clone --depth 1`): the shallow boundary commit
+   reports zero parents, so `rev-list --no-merges` lets a merge commit through, it carries no
+   `Tribe-Card:`, and the walk finds no candidate (43/7). **Not a regression** — the pre-change
+   hardcoded `HEAD~1..HEAD` fails harder in the same clone (`pre-gate.sh` exits 2,
+   `invalid or unresolvable range`) — and the loud failure is what this spec's "Risks and
+   rollback" section specifies. Filed in case shallow clones ever become a supported path.
+7. **`GIT_CONFIG_GLOBAL`/`GIT_CONFIG_SYSTEM` silently no-op on git < 2.32.** Host git is 2.50.1,
+   so the isolation works today; on an older git it would fail open with no warning.
+8. **The range walk spawns up to 400 git subprocesses.** `git rev-list --no-merges
+   --min-parents=1 --max-count=1 --grep='^Tribe-Card:' HEAD` returns the identical sha in one
+   command (scout candidate R11) — a strict simplification, worth taking when someone next
+   touches this block.
+9. **Scout's rule candidates worth adopting now, because they cost nothing today:** *every shell
+   script must parse under the macOS system bash 3.2.57* (0 failures across 36 files) and *no
+   heredoc opened inside a command substitution* (0 instances — this card removed the last one).
+   Both are exactly the defect this card spent a task on; as written rules with a mechanical
+   `bash -n` sweep they would have caught it at authoring time. Other candidates (assertion
+   tallies unpinned in 18/18 suites; the `Tribe-Card:` predicate duplicated between
+   `pre-gate.sh:72-73` and `test-review-cell-v3.sh:203-204`; `mktemp -d` without a `trap`;
+   `PREGATE_INNER=1` silently dropping 9 of 50 assertions) are in the scout report.

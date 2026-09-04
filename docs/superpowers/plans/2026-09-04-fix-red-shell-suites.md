@@ -5,6 +5,9 @@
 
 Two tasks, one file each, one commit each. Task 2 depends on Task 1 (Task 1's green is a
 precondition for Task 2's red being the *right* red), so they run sequentially in one wave.
+(Amended after Task 2's audit: one fix round followed, recorded below as **Task 2b**. A fix round
+is not a new task — it is the audit loop doing its job — but it does produce a commit, so it is
+written down here rather than left to be discovered in the log.)
 
 ## Global Constraints
 
@@ -25,10 +28,16 @@ precondition for Task 2's red being the *right* red), so they run sequentially i
 - **Change no assertion's expectation.** Task 1 changes zero assertions. Task 2 changes only the
   *input* one assertion is fed. Both suites must end with strictly more passing assertions than
   they start with.
-- Shell rules: `#!/usr/bin/env bash` + `set -euo pipefail` stay as they are
-  (`.c3/rules/rule-bash-strict-mode.md`). The bash that must parse these files is the system
-  `bash` 3.2.57 on this machine — verify with `bash -n`, not with a newer bash.
-- Commit rules: each task ends in exactly ONE commit. Tick this plan's checkboxes for your task in
+- Shell rules: each file's existing shebang and `set` line stay **exactly as they are**; this
+  card changes neither. (Correction, recorded by the final whole-branch audit: an earlier draft of
+  this line claimed both files carry `set -euo pipefail`. They do not —
+  `test-input-asymmetry.sh:3` does, but `test-review-cell-v3.sh:8` carries only `set -u`, and has
+  since long before this branch. That is a pre-existing violation of
+  `.c3/rules/rule-bash-strict-mode.md`; hardening it is outside this card's fence and is recorded
+  as a follow-up for the Shaman, not fixed here.) The bash that must parse these files is the
+  system `bash` 3.2.57 on this machine — verify with `bash -n`, not with a newer bash.
+- Commit rules: each task ends in exactly ONE commit (an audit fix round on an already-committed
+  task adds its own single commit — see Task 2b). Tick this plan's checkboxes for your task in
   the SAME commit as the code. Stamp the commit with `Tribe-Card: fix-red-shell-suites` and
   `Tribe-Task: N/2` on two lines of the commit message's single final paragraph.
   **Never add a `Co-Authored-By` trailer of any kind** — `pre-gate.sh` blocks on it.
@@ -147,6 +156,12 @@ Tribe-Card: fix-red-shell-suites
 Tribe-Task: 1/2
 MSG
 ```
+
+**Correction (final whole-branch audit):** the message above says "19 partial" — the measured
+pre-fix count is **37** assertions executed before the parse death, not 19 (the last one is at
+`test-input-asymmetry.sh:143`; the broken construct is at `:153`; 37 + the 10 heredoc-gated
+eval-content assertions = the 47 that pass after the fix). The commit is already in history and is
+not rewritten; the true number is recorded here, in the spec, and in the PR body.
 
 Expected: one commit, two files (the suite and this plan with Task 1's boxes ticked). Verify the
 trailers landed with `git log -1 --format='%(trailers)'` — expected output is exactly the two
@@ -283,7 +298,7 @@ for f in plugins/tribe/scripts/tests/test-*.sh; do bash "$f" >/dev/null 2>&1; \
   printf '%-34s rc=%s\n' "$(basename "$f")" "$?"; done
 ```
 
-Expected: all 18 suites print `rc=0`.
+Expected: every suite prints `rc=0` (17 of them today).
 
 Finally, prove the fix is *durable* — that the computed range is one commit and trailer-clean no
 matter what the tip is. Print the range the suite now selects and check it directly:
@@ -330,11 +345,46 @@ is exactly the two `Tribe-Card:` and `Tribe-Task:` lines.
 
 ---
 
+---
+
+### Task 2b (audit fix round 1): isolate host git config across the pass-case self-test
+
+**Added by the Warchief after Task 2's audit, not part of the original two-task decomposition.**
+It is recorded here because this plan's Definition of Done counts commits, and this fix round
+produced a third `Tribe-Task:`-trailered commit (`7c3a855`) — the same way `2b6e16b` amended this
+plan for the R2c discovery. The final whole-branch audit's contract lens raised the undocumented
+commit as a Critical conformance finding against the DoD; this section, plus the DoD wording
+below, is the recorded remedy.
+
+**Finding F1 (`fail-closed-edges` obligation 2), reproduced before it was fixed:** Task 2's range
+walk shells out to `git log -1 --format='%(trailers)'`, and `pre-gate.sh`'s own child invocations
+read `%(trailers)` too. A *legal* host git setting — `[trailer] separators = "#"` in a global
+config — empties `%(trailers)` for every one of those calls, so the suite reds for reasons wholly
+unrelated to the code under test.
+
+**Fix (commit `7c3a855`, `plugins/tribe/scripts/tests/test-review-cell-v3.sh` only, +5 lines):**
+export `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null` once at the top of the
+`PREGATE_INNER != 1` self-test block, so the walk, every `pre-gate.sh` invocation, and the
+throwaway-repo git commands in self-tests 3-5 all inherit the isolation. No assertion's
+expectation changes.
+
+**Verification (run by the Warchief, not claimed by the Hunter)** — same command, same hostile
+config, only the source file differing:
+
+```
+pre-fix file (171dbf8) + hostile GIT_CONFIG_GLOBAL  ->  45 passed, 5 failed
+post-fix file (7c3a855) + hostile GIT_CONFIG_GLOBAL ->  50 passed, 0 failed
+post-fix file (7c3a855) + clean environment         ->  50 passed, 0 failed
+```
+
 ## Definition of done for this plan
 
 - `bash -n` exits 0 for both suites under the system bash 3.2.57.
-- All 18 `plugins/tribe/scripts/tests/test-*.sh` exit 0.
+- Every `plugins/tribe/scripts/tests/test-*.sh` exits 0 (17 suites today; the plan was drafted
+  against `d63a7d2`, when there were 18 — the concurrent `retire-kanna-session-ids` card retired
+  `test-list-session-ids.sh` into this card's own base).
 - `plugins/tribe/scripts/pre-gate.sh` has zero changed lines: `git diff d63a7d2..HEAD --
   plugins/tribe/scripts/pre-gate.sh` prints nothing.
-- Exactly two implementation commits, each carrying `Tribe-Card:` and `Tribe-Task:` trailers and
-  no `Co-Authored-By` trailer.
+- The two planned implementation commits, plus any audit fix-round commit recorded under
+  "Task 2b" below — each carrying `Tribe-Card:` and `Tribe-Task:` trailers and no
+  `Co-Authored-By` trailer.
