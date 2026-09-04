@@ -95,7 +95,7 @@ Subject `chore(tribe): test-review-cell-v3 runs under set -euo pipefail (rule-ba
 **Contract:** spec section "C2". **File:** `plugins/tribe/scripts/tests/test-review-cell-v3.sh`
 (the `PASSRANGE` block only).
 
-- [ ] **Step 1: Measure the old walk and record its choice**
+- [x] **Step 1: Measure the old walk and record its choice**
 
 Create a counting git shim and run the suite with it first on `PATH`:
 
@@ -111,7 +111,7 @@ grep -c "log -1 --format=%(trailers)" /tmp/git-calls-before.txt
 Also print the old walk's choice: add a temporary `echo "PASSRANGE=$PASSRANGE" >&2` after the
 block, run once, record it, remove the echo.
 
-- [ ] **Step 2: Write the throwaway-repo selection test (RED)**
+- [x] **Step 2: Write the throwaway-repo selection test (RED)**
 
 Build `/tmp/walkrepo`: `git init`, then four commits with `-c user.name=t -c user.email=t@t.com`:
 (1) `base`; (2) `qualifies` with `--trailer 'Tribe-Card: x'`; (3) `coauthored` with
@@ -121,7 +121,7 @@ walk into a small function you can point at a repo (the block already takes the 
 Expected selection on `/tmp/walkrepo`: commit (2). The old walk selects (2) as well — this test
 pins the predicate before you change the mechanism.
 
-- [ ] **Step 3: Replace the walk (GREEN)**
+- [x] **Step 3: Replace the walk (GREEN)**
 
 Implement spec C2's three-call design inside the same named block; keep `PASSRANGE` as the block's
 only output; bash 3.2 only (no `mapfile`, no associative arrays — a newline-separated exclude
@@ -129,21 +129,21 @@ string tested with `case` or `grep -qx` is fine). Cap confirmations at 20. Run t
 identical to Task 1's. Run the `/tmp/walkrepo` check: selects (2). Print the new walk's
 `PASSRANGE` on this repo: identical to Step 1's.
 
-- [ ] **Step 4: Measure the new walk**
+- [x] **Step 4: Measure the new walk**
 
 Repeat Step 1's counting run into `/tmp/git-calls-after.txt`. Expected: the
 `log -1 --format=%(trailers)` count is at most the number of confirmations (normally 1) and the
 total git calls made by the block are at most 3 + confirmations. Paste both counts.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Subject `perf(tribe): test-review-cell-v3 picks its pass range with three git calls, not one per commit`,
 `Tribe-Task: 2/2`, plan checkboxes ticked.
 
 ## Definition of done for this plan
 
-- [ ] Both tasks committed and pushed; pre-gate green over `origin/master..HEAD`; `pre-gate.sh` untouched.
-- [ ] Evidence per spec "Evidence plan" in the PR body (tallies; git-call counts before/after; both
+- [x] Both tasks committed and pushed; pre-gate green over `origin/master..HEAD`; `pre-gate.sh` untouched.
+- [x] Evidence per spec "Evidence plan" in the PR body (tallies; git-call counts before/after; both
       `PASSRANGE` values; the throwaway-repo transcript; full suite table).
-- [ ] Two independent skinner audits PASS, tracker + scout recorded, PR merged with a regular merge,
+- [x] Two independent skinner audits PASS, tracker + scout recorded, PR merged with a regular merge,
       master fast-forwarded, worktree removed, `SHIPPED` returned.

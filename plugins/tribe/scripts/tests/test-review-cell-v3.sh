@@ -197,14 +197,39 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
   # Tribe-Card: trailer and reds this assertion for reasons that have nothing to do with it.
   # Walk back for the newest non-merge commit that has a parent and satisfies the trailer
   # contract, and audit exactly that one commit.
+  # Bounded pass-range walk (spec C2): 3 fixed git calls total (2 --grep candidate scans + 1
+  # confirmation on the winner), never one `log -1` per commit, however deep -n 200 must search.
+  # WALK_REPO defaults to this repo but is overridable, so the identical block can be pointed at
+  # a throwaway fixture repo for verification (see Hunter report).
   PASSRANGE=""
-  for _sha in $(git -C "$HERE/../../../.." rev-list --no-merges -n 200 HEAD); do
-    _tr="$(git -C "$HERE/../../../.." log -1 --format='%(trailers)' "$_sha")"
-    printf '%s' "$_tr" | grep -q 'Tribe-Card:' || continue
-    printf '%s' "$_tr" | grep -qi 'co-authored-by' && continue
-    git -C "$HERE/../../../.." rev-parse -q --verify "$_sha^" >/dev/null || continue
-    PASSRANGE="$_sha^..$_sha"; break
-  done
+  WALK_REPO="${WALK_REPO:-$HERE/../../../..}"
+  # Candidates: newest-first, non-merge, message contains a Tribe-Card: line (candidate PRE-FILTER
+  # only — --grep matches the raw message, not the parsed trailer block).
+  _wr_candidates="$(git -C "$WALK_REPO" log --no-merges -n 200 --format='%H %P' \
+      --grep='^Tribe-Card:')"
+  # Exclude set: shas whose raw message mentions co-authored-by anywhere (same pre-filter caveat).
+  _wr_exclude="$(git -C "$WALK_REPO" log --no-merges -n 200 --format='%H' -i \
+      --grep='co-authored-by')"
+  _wr_confirms=0
+  while IFS= read -r _wr_line; do
+    [ -n "$_wr_line" ] || continue
+    [ "$_wr_confirms" -lt 20 ] || break
+    _wr_sha="${_wr_line%% *}"
+    _wr_parents="${_wr_line#* }"
+    [ -n "$_wr_parents" ] || continue                                  # empty parent list: skip
+    printf '%s\n' "$_wr_exclude" | grep -qFx "$_wr_sha" && continue    # in exclude set: skip
+    _wr_confirms=$((_wr_confirms+1))
+    # Confirmation: re-apply the EXACT original predicate via %(trailers) (the parsed trailer
+    # block, not the raw message) — this is what restores the semantics byte-for-byte, because
+    # --grep and %(trailers) can legally disagree (a prose line that merely LOOKS like a trailer
+    # matches --grep but is never in %(trailers); see Hunter report for the reproduction).
+    _wr_tr="$(git -C "$WALK_REPO" log -1 --format='%(trailers)' "$_wr_sha")"
+    printf '%s' "$_wr_tr" | grep -q 'Tribe-Card:' || continue
+    printf '%s' "$_wr_tr" | grep -qi 'co-authored-by' && continue
+    PASSRANGE="$_wr_sha^..$_wr_sha"; break
+  done <<WALK_CANDIDATES_EOF
+$_wr_candidates
+WALK_CANDIDATES_EOF
   if [ -z "$PASSRANGE" ]; then
     echo "FAIL: c: a trailer-clean 1-commit range was found for the pass case"; fail=$((fail+1))
   else
