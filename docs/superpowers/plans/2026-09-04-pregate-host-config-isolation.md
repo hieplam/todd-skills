@@ -47,7 +47,7 @@ one-line isolation (GREEN). Both files are in `plugins/tribe/scripts/`.
 (modify: insert one self-test block between self-test 1 and self-test 2, inside the
 `PREGATE_INNER != 1` block).
 
-- [ ] **Step 1: Record the baseline**
+- [x] **Step 1: Record the baseline**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/pregate-host-config-isolation
@@ -57,7 +57,7 @@ bash plugins/tribe/scripts/tests/test-review-cell-v3.sh 2>&1 | tail -1
 Expected: `50 passed, 0 failed`. Paste the line into your report. If the number differs, record
 the actual number as the baseline and carry on — the goal is baseline + 1.
 
-- [ ] **Step 2: Add self-test 6**
+- [x] **Step 2: Add self-test 6**
 
 Immediately before the line `# Self-test 2 (red case): a fence that allows nothing must flag every changed file, exit 1.`
 insert:
@@ -83,7 +83,7 @@ insert:
 
 ```
 
-- [ ] **Step 3: Watch it fail (RED)**
+- [x] **Step 3: Watch it fail (RED)**
 
 ```bash
 bash -n plugins/tribe/scripts/tests/test-review-cell-v3.sh; echo "parse rc=$?"
@@ -94,7 +94,7 @@ Expected: `parse rc=0`, then `FAIL: c6: gate isolates itself from a hostile glob
 and `50 passed, 1 failed`. If `c6` passes here, the gate is already isolated by something else —
 stop and report `NEEDS_CONTEXT` with the output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 One commit: the file plus this plan's Task 1 checkboxes ticked. Message subject
 `test(tribe): assert pre-gate isolates itself from a hostile global git config`, trailers per
