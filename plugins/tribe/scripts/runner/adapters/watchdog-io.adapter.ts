@@ -23,8 +23,10 @@ function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false; // ESRCH (gone) or EPERM (alive but foreign) — see below
+  } catch (err) {
+    // ESRCH (gone) is dead; EPERM reached a real process we just lack permission to signal —
+    // that is alive but foreign, never dead. Mirrors adapters/run-io.adapter.ts's isProcessAlive.
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 

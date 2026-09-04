@@ -6,8 +6,13 @@
 // two protocol-level defaults spec §2 itself documents; `--home` (Task 2, spec §4) is the
 // campaign's machine-local operational home — also a REQUIRED input, never derived here.
 import { describe, expect, test } from 'bun:test';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { parseArgs, parseResetCardArgs, performResetCard, scrubTargetEnvLocal } from './main.ts';
 import { campaignStatePathOf, escalationPathOf } from '../core/paths.ts';
+import { WATCHDOG_EXIT_NEEDS_HUMAN } from '../core/watchdog/model.ts';
 
 const RUN_ID = '2026-07-24T00-00-00-000Z-beef';
 
@@ -615,4 +620,42 @@ describe('resolveWatchdogHome — the watchdog subcommand gate (fail-closed)', (
         'skill before any runner or watchdog is started',
     );
   });
+});
+
+// B2 (rules-gate fix): `main()`'s watchdog dispatch has no try/catch around `await
+// runWatchdog(...)`, and `main()` is invoked with no `.catch()` — so a real I/O failure deep
+// in the watchdog's edge (`ensureDir`, `appendFile`, `writeFileAtomic` all throw narrow-only,
+// never swallow) escapes as an uncaught Bun stack trace instead of the typed
+// `watchdog: unexpected error: ...` message the card-loop path already produces for the same
+// class of failure (`cli/main.ts`'s `runLoop` try/catch). This is a real subprocess e2e test
+// (CLAUDE.md: reproduce a bug the way an end user would experience it) because `main()` wires
+// its own real adapters and is deliberately not unit-tested — forcing the failure any other
+// way would require restructuring the composition root, which this fix brief forbids.
+describe('watchdog subcommand: an I/O failure inside runWatchdog never escapes as a traceback', () => {
+  test('a blocked `<home>/watchdog` mkdir produces a typed stderr line and a defined exit code, never a stack trace', () => {
+    const homeDir = mkdtempSync(join(homedir(), '.tribe', 'i74-b2-repro-'));
+    try {
+      writeFileSync(join(homeDir, 'campaign-state.json'), '{}');
+      // `ensureDir(paths.dir)` is the FIRST thing `runWatchdog` does (before any observation
+      // or spawn) — planting a plain FILE at the directory's own path makes the real
+      // `mkdirSync(..., { recursive: true })` throw EEXIST, a genuine I/O failure with no
+      // stubbing.
+      writeFileSync(join(homeDir, 'watchdog'), 'not a directory');
+
+      const result = spawnSync(
+        'bun',
+        ['cli/main.ts', 'watchdog', '--repo', '/tmp', '--model', 'x', '--home', homeDir, '--once'],
+        { cwd: import.meta.dir + '/..', encoding: 'utf8' },
+      );
+
+      const combined = `${result.stdout}${result.stderr}`;
+      expect(combined).not.toContain('at ensureDir');
+      expect(combined).not.toContain('.ts:');
+      expect(combined).not.toContain('Bun v');
+      expect(result.stderr).toContain('watchdog: unexpected error:');
+      expect(result.status).toBe(WATCHDOG_EXIT_NEEDS_HUMAN);
+    } finally {
+      rmSync(homeDir, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

@@ -61,6 +61,25 @@ describe('buildWatchdogIo — the real edge', () => {
     expect(await handle.waitFor(10_000)).toBe(0);
   }, 20_000);
 
+  // B1 (rules-gate fix): EPERM means "alive but foreign" (kill(0) reached a real process we
+  // just lack permission to signal), never "gone" — conflating the two would let the watchdog
+  // treat a live-but-foreign lock holder as dead and launch a competing runner (decide.ts's
+  // sole gate on lockHolder.alive). pid 1 (launchd) is always present and always foreign on
+  // macOS, so it gives a genuine, deterministic EPERM with no stubbing. For the "really gone"
+  // side, a real spawned-and-awaited-to-exit child's pid gives a genuine, deterministic ESRCH
+  // (no guessing at an "unused" pid number, which risks collision with a real process).
+  test('isProcessAlive: EPERM (alive but foreign, e.g. pid 1) is alive; a reaped child (ESRCH) is dead', async () => {
+    const io = buildWatchdogIo();
+    expect(io.isProcessAlive(1)).toBe(true);
+
+    const dir = tmp();
+    const handle = io.spawnRunner(['bash', '-c', 'exit 0'], {
+      cwd: dir, stdoutPath: join(dir, 'o.log'),
+    });
+    expect(await handle.waitFor(10_000)).toBe(0);
+    expect(io.isProcessAlive(handle.pid)).toBe(false);
+  }, 20_000);
+
   test('runnerCommand names the real runner entrypoint, resolved from this file, not from cwd', () => {
     const io = buildWatchdogIo();
     expect(io.runnerCommand()[0]).toBe('bun');
