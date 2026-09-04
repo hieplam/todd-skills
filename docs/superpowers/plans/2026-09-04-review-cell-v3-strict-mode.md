@@ -143,7 +143,7 @@ Subject `perf(tribe): test-review-cell-v3 picks its pass range with three git ca
 ## Definition of done for this plan
 
 - [x] Both tasks committed and pushed; pre-gate green over `origin/master..HEAD`; `pre-gate.sh` untouched.
-- [x] Evidence per spec "Evidence plan" in the PR body (tallies; git-call counts before/after; both
+- [ ] Evidence per spec "Evidence plan" in the PR body (tallies; git-call counts before/after; both
       `PASSRANGE` values; the throwaway-repo transcript; full suite table).
-- [x] Two independent skinner audits PASS, tracker + scout recorded, PR merged with a regular merge,
+- [ ] Two independent skinner audits PASS, tracker + scout recorded, PR merged with a regular merge,
       master fast-forwarded, worktree removed, `SHIPPED` returned.
