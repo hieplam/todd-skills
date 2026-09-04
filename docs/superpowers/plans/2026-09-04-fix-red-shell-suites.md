@@ -169,7 +169,7 @@ the plan that realized it says *"sweep this repo's own suites over a 1-commit ra
 **test** is what contradicts the spec, so the test is what changes; `pre-gate.sh` is correct and
 stays untouched (card D1).
 
-- [ ] **Step 1: Watch the test fail (RED)**
+- [x] **Step 1: Watch the test fail (RED)**
 
 **Read this carefully — the red here is NOT a failing tally, and if you go looking for one you will
 conclude, wrongly, that there is nothing to fix.**
@@ -210,7 +210,7 @@ That is the red this task fixes: the pass-case self-test feeds the gate a range 
 commits, which by contract carry no `Tribe-Card:` trailer. Transcribe both outputs into your
 report before editing anything.
 
-- [ ] **Step 2: Choose a passing range (GREEN)**
+- [x] **Step 2: Choose a passing range (GREEN)**
 
 In the `# Self-test 1 (pass case)` block, insert a range-selection step before the `if` that
 invokes the gate, and feed its result to `--range` in place of the literal `HEAD~1..HEAD`.
@@ -263,7 +263,7 @@ Three things to be careful about, because `set -euo pipefail` is in force:
 3. Do NOT change self-test 2 (the red case) — it keeps `HEAD~1..HEAD`. Its assertion is exit 1
    under a fence that allows nothing, it is green today, and it is insensitive to range length.
 
-- [ ] **Step 3: Verify green**
+- [x] **Step 3: Verify green**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/fix-red-shell-suites
@@ -305,7 +305,7 @@ git log -1 --format='%(trailers)' "${PASSRANGE##*..}"
 Expected: a non-empty `range=`, `spans 1 commit(s)`, and trailers containing `Tribe-Card:` and no
 `Co-Authored-By`. This is the property that survives a merge tip; the tally alone cannot show it.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/fix-red-shell-suites

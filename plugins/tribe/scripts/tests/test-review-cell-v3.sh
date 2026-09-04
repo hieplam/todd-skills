@@ -186,8 +186,27 @@ else echo "FAIL: c: pre-gate.sh exists and is executable"; fail=$((fail+1)); fi
 if [ "${PREGATE_INNER:-0}" != "1" ]; then
   # Self-test 1 (pass case): sweep this repo's own suites over a 1-commit range, no fence.
   TMPD="$(mktemp -d)"; REPORT="$TMPD/pregate-report.md"
-  if [ -x "$GATE" ] && OUT="$(PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." \
-        --range 'HEAD~1..HEAD' --tests-dir "$HERE" --report "$REPORT" 2>/dev/null)"; then
+  # The range is *computed*, never hardcoded: the spec asks for "a range and fence chosen to
+  # pass", and a literal HEAD~1..HEAD spans the whole second-parent side whenever the tip is a
+  # merge commit (42 commits on d63a7d2), which drags in merge commits that carry no
+  # Tribe-Card: trailer and reds this assertion for reasons that have nothing to do with it.
+  # Walk back for the newest non-merge commit that has a parent and satisfies the trailer
+  # contract, and audit exactly that one commit.
+  PASSRANGE=""
+  for _sha in $(git -C "$HERE/../../../.." rev-list --no-merges -n 200 HEAD); do
+    _tr="$(git -C "$HERE/../../../.." log -1 --format='%(trailers)' "$_sha")"
+    printf '%s' "$_tr" | grep -q 'Tribe-Card:' || continue
+    printf '%s' "$_tr" | grep -qi 'co-authored-by' && continue
+    git -C "$HERE/../../../.." rev-parse -q --verify "$_sha^" >/dev/null || continue
+    PASSRANGE="$_sha^..$_sha"; break
+  done
+  if [ -z "$PASSRANGE" ]; then
+    echo "FAIL: c: a trailer-clean 1-commit range was found for the pass case"; fail=$((fail+1))
+  else
+    echo "ok: c: a trailer-clean 1-commit range was found for the pass case"; pass=$((pass+1))
+  fi
+  if [ -x "$GATE" ] && [ -n "$PASSRANGE" ] && OUT="$(PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." \
+        --range "$PASSRANGE" --tests-dir "$HERE" --report "$REPORT" 2>/dev/null)"; then
     echo "$OUT" | grep -q '"verdict": *"pass"' \
       && { echo "ok: c: self-test pass case verdict"; pass=$((pass+1)); } \
       || { echo "FAIL: c: self-test pass case verdict"; fail=$((fail+1)); }
