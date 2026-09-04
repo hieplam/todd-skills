@@ -17,7 +17,52 @@ export interface DryRunPlan {
   cardId: string | null;
   phase: CardPhase | null;
   done?: boolean;
-  planningNeeded?: { cardId: string; missing: Array<'spec' | 'plan'> };
+  /** `note` (C2) is present only when the main checkout is not on the base branch — the
+   * one condition that makes "missing spec, plan" misleading; see `checkoutMismatchNote`. */
+  planningNeeded?: { cardId: string; missing: Array<'spec' | 'plan'>; note?: string };
+}
+
+/** Pure (C2, HARDENING-BACKLOG). `nextCard` resolves a card's `spec`/`plan` against `--repo`'s
+ * WORKING TREE, so a main checkout parked on some other ref — T27's `--adopt` run left it in
+ * detached HEAD at a release tag where docs/specs/ did not exist — makes every card read as
+ * "missing spec, plan" and the campaign stalls on an error that names the wrong cause. This
+ * turns `git rev-parse --abbrev-ref HEAD`'s output (`HEAD` when detached, else the branch
+ * name) plus the resolved base branch into the one sentence the operator needs, or `null`
+ * when the checkout is on the base branch (or unknown — an empty output says nothing rather
+ * than guessing). The working-tree read itself is deliberately kept: switching the pre-flight
+ * check to `<remote>/<base>` would make a locally authored, not-yet-pushed plan fail
+ * pre-flight, a behaviour change a bug fix should not carry. */
+export function checkoutMismatchNote(headRef: string, baseBranch: string, repoRoot: string): string | null {
+  const ref = headRef.trim();
+  if (ref === '' || ref === baseBranch) return null;
+  const where = ref === 'HEAD' ? 'is in detached HEAD' : `is checked out at ${ref}`;
+  return (
+    `${repoRoot} ${where}, not ${baseBranch}; spec/plan paths are resolved against that working ` +
+    `tree, so files present on ${baseBranch} still read as missing. Restore it ` +
+    `(git -C ${repoRoot} checkout ${baseBranch}) before re-triggering.`
+  );
+}
+
+/** Impure edge for `checkoutMismatchNote`: one read-only `git rev-parse`, through the io
+ * seam. A failed query yields no note — the plain "missing" detail is still correct. */
+async function checkoutNoteFor(io: LoopIO, repoRoot: string, baseBranch: string): Promise<string | null> {
+  const head = await io.exec(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoRoot });
+  if (head.exitCode !== 0) return null;
+  return checkoutMismatchNote(head.stdout, baseBranch, repoRoot);
+}
+
+/** The `planning_needed` escalation detail, with the C2 checkout note appended when it
+ * applies. Shared by the serial pass, the N>1 pool, and `--dry-run` so all three name the
+ * same cause the same way. */
+async function planningNeededDetail(
+  io: LoopIO,
+  repoRoot: string,
+  baseBranch: string,
+  missing: Array<'spec' | 'plan'>,
+): Promise<{ detail: string; note: string | null }> {
+  const note = await checkoutNoteFor(io, repoRoot, baseBranch);
+  const base = `Missing on disk: ${missing.join(', ')}`;
+  return { detail: note ? `${base}. ${note}` : base, note };
 }
 
 export interface LoopResult {
@@ -121,13 +166,16 @@ async function runDryRun(config: RunLoopConfig, io: LoopIO): Promise<LoopResult>
     return { exitCode: EXIT_OK, processed: [], dryRunPlan: { cardId: null, phase: null, done: true } };
   }
   if (nc.kind === 'planning_needed') {
+    // C2: read-only `git` queries only — the zero-side-effects guarantee holds.
+    const baseBranch = await resolveBaseBranch(io, config.repoRoot, config.remote);
+    const { note } = await planningNeededDetail(io, config.repoRoot, baseBranch, nc.missing);
     return {
       exitCode: EXIT_OK,
       processed: [],
       dryRunPlan: {
         cardId: nc.cardId,
         phase: null,
-        planningNeeded: { cardId: nc.cardId, missing: nc.missing },
+        planningNeeded: { cardId: nc.cardId, missing: nc.missing, ...(note ? { note } : {}) },
       },
     };
   }
@@ -233,7 +281,8 @@ async function runPass(
 
     if (nc.kind === 'planning_needed') {
       attempted.add(nc.cardId);
-      const outcome = await escalateCard(ctx, 'planning_needed', `Missing on disk: ${nc.missing.join(', ')}`);
+      const { detail } = await planningNeededDetail(io, resolved.repoRoot, resolved.baseBranch, nc.missing);
+      const outcome = await escalateCard(ctx, 'planning_needed', detail);
       processed.push(outcome);
       worked += 1;
       continue;
@@ -396,7 +445,8 @@ async function runPassPool(
         if (nc.kind === 'planning_needed') {
           attempted.add(nc.cardId);
           const ctx: CardCtx = { cardId: nc.cardId, state, resolved, io };
-          const outcome = await escalateCard(ctx, 'planning_needed', `Missing on disk: ${nc.missing.join(', ')}`);
+          const { detail } = await planningNeededDetail(io, resolved.repoRoot, resolved.baseBranch, nc.missing);
+          const outcome = await escalateCard(ctx, 'planning_needed', detail);
           processed.push(outcome);
           worked += 1;
           continue;

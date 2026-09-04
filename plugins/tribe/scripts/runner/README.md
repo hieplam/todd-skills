@@ -177,7 +177,7 @@ byte-identical.
 | `planning` | `{ mode: "shaman" \| "warchief-fanout" }` | **optional** | Records which Stage-A authorship mode produced this campaign's specs/plans (design §O2) — `"shaman"` when the orchestrating session authored the How docs itself, `"warchief-fanout"` when it dispatched one planning-Warchief per card — so a session resuming the campaign later knows without re-deriving it. Not declared in `state.ts`'s `CampaignStateSchema`/`CardSchema` at all: both use `z.looseObject`, which preserves unknown top-level keys through a load→save cycle instead of stripping them (the same property that keeps the v1 byte-identical round-trip true), so `planning` — and any future campaign metadata a caller invents — survives even though the runner itself never reads or interprets it. |
 | `mergePolicy` | `string` | yes | Free-form; carried through into every executor brief, not itself interpreted by this runner. |
 | `sequence` | `string[]` | yes | Card ids, in build order. Every id **must** have a matching entry under `cards` — a dangling id is rejected at load (`UndefinedSequenceCardError`). |
-| `schemaLockPaths` | `string[]` | yes (`[]` is valid) | Paths whose diff from a card's `baseSha` must stay empty unless that card's plan front-matter declares `allowsSchemaChange: true` (D3 point 6). Campaign config, never hardcoded (W1). |
+| `schemaLockPaths` | `string[]` | yes (`[]` is valid) | Paths whose diff from a card's `baseSha` must stay empty unless that card's plan front-matter declares `allowsSchemaChange: true` (D3 point 6). The plan is read **after** the merge, and a card may delete its own planning docs as part of its work — a plan that is gone by then simply grants no waiver (the guard still passes on an empty diff, and names the missing plan when it fails); it never crashes the finalise step. Campaign config, never hardcoded (W1). |
 | `docsOnlyPaths` | `string[]` | yes (`[]` is valid) | Path prefixes that count as "docs-only" for the D6 flake waiver. **Fails CLOSED: an empty list means nothing counts as docs-only, so a code diff never auto-waives a red check.** Campaign config, never hardcoded (W1). |
 | `ownerOnlyEscalations` | `string[]` | yes (`[]` is valid) | Trigger names that always escalate to the human owner, regardless of what an executor session claims (D5). Campaign config, never hardcoded (W1). |
 | `cards` | `Record<string, Card>` | yes | Every card in the campaign, keyed by its id. |
@@ -192,7 +192,7 @@ the safe (fails-closed) default, not a silent free pass for code diffs.
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `status` | `"staged" \| "running" \| "shipped" \| "escalated" \| "blocked"` | yes | Author every card `staged`. `running`/`shipped`/`escalated` are written by the loop as it works the card. `blocked` is **derived** (see `dependsOn`/`blocked` below) — do not hand-author a card as `blocked`; the next `nextCard` call reconciles it back to `staged` if it has no unmet dependency. |
-| `spec` | `string \| null` | yes (nullable) | Path (relative to `--repo`) to the card's spec file. Missing on disk (or `null`) when the card is next up triggers `PLANNING_NEEDED`, which the loop escalates. |
+| `spec` | `string \| null` | yes (nullable) | Path (relative to `--repo`) to the card's spec file. Missing on disk (or `null`) when the card is next up triggers `PLANNING_NEEDED`, which the loop escalates. Resolved against `--repo`'s **working tree**, so if that checkout is parked on another ref (a detached HEAD at a release tag, say) every card reads as missing; the escalation — and `--dry-run`'s `planningNeeded.note` — then names the checkout and the `git -C <repo> checkout <base>` that restores it. |
 | `plan` | `string \| null` | yes (nullable) | Same, for the plan file. |
 | `branch` | `string \| null` | yes (nullable) | The card's git branch, once work starts. `null` at authoring time — this is exactly what makes the D4 resume matrix classify a freshly-authored card `fresh`. The loop fills it in from the card's own PR (`gh pr view --json headRefName`) as soon as a PR number is known, because the executor session picks the branch name itself and never reports it back. |
 | `baseSha` | `string \| null` | yes (nullable) | The commit the card's branch is built from; D3's schema-lock diff is taken from this. `null` at authoring time; the loop records `origin/<baseBranch>` into it immediately **before** spawning the card's session, and never overwrites an existing value (a resumed card keeps the base it originally started from) — except a blind-fresh spawn (no prior session/PR/digest), which always re-stamps it (P11, ruling R3). To retry a card from scratch, use the `reset-card` subcommand below — never hand-edit this field; a hand-reset card that keeps a stale `baseSha` is the exact incident R3 exists to prevent. |
@@ -513,7 +513,9 @@ existed.
 
 The runner escalates instead of deciding whenever: the executor reports
 `NEEDS_DIRECTION`, the D3 verify checks fail **twice** in a row for a card, or the next
-progressable card's spec/plan files are missing on disk (`PLANNING_NEEDED`). On escalation, the
+progressable card's spec/plan files are missing on disk (`PLANNING_NEEDED` — when the `--repo`
+checkout is not on the base branch, the escalation says so and how to restore it, since that is
+the usual reason files present on the base branch read as missing). On escalation, the
 runner:
 
 1. Writes `<home>/escalations/<card-id>.md` (question, context, options) — written **first,

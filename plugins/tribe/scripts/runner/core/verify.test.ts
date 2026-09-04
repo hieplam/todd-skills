@@ -43,6 +43,10 @@ interface MockOptions {
   remoteStillExists?: boolean;
   schemaDiffStdout?: string;
   planContent?: string;
+  /** When false, the card's plan path is reported absent (`fileExists` → false) and any
+   * `readFile` of it throws ENOENT — the shape a card leaves behind when its own merge
+   * deleted its planning docs (C1). Defaults to present. */
+  planExists?: boolean;
 }
 
 function ok(stdout: string): ExecResult {
@@ -59,8 +63,12 @@ function buildIo(opts: MockOptions = {}): VerifyIO {
   const remoteStillExists = opts.remoteStillExists ?? false;
   const schemaDiffStdout = opts.schemaDiffStdout ?? '';
   const planContent = opts.planContent ?? '# plan\n\nno front matter here.\n';
+  const planExists = opts.planExists ?? true;
 
   return {
+    fileExists(): boolean {
+      return planExists;
+    },
     async exec(cmd: string[]): Promise<ExecResult> {
       const [bin, ...rest] = cmd;
       if (bin === 'gh' && rest[0] === 'api') {
@@ -90,7 +98,12 @@ function buildIo(opts: MockOptions = {}): VerifyIO {
       }
       throw new Error(`unmocked exec call: ${cmd.join(' ')}`);
     },
-    readFile(): string {
+    readFile(resolvedPath: string): string {
+      if (!planExists) {
+        const err = new Error(`ENOENT: no such file or directory, open '${resolvedPath}'`) as NodeJS.ErrnoException;
+        err.code = 'ENOENT';
+        throw err;
+      }
       return planContent;
     },
   };
@@ -182,6 +195,31 @@ describe('verifyShipped — point 5: schema guard', () => {
     });
     const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
     expect(result.failedPoints).toContain('schemaGuard');
+  });
+
+  // C1 (HARDENING-BACKLOG): a card is permitted to delete its own planning docs as part of
+  // its work (T26's release commit removed docs/plans/), so at verify time the plan path can
+  // legitimately be gone. That must never throw out of verifyShipped — the merge already
+  // happened and the card would otherwise be left `running` forever.
+  test('plan file gone at verify time with an empty schema-lock diff passes without throwing', async () => {
+    const io = buildIo({ planExists: false, schemaDiffStdout: '' });
+    const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
+    expect(result.shipped).toBe(true);
+    const point = result.points.find((p) => p.id === 'schemaGuard');
+    expect(point?.passed).toBe(true);
+  });
+
+  test('plan file gone at verify time with a non-empty schema-lock diff fails closed and names the missing plan', async () => {
+    const io = buildIo({
+      planExists: false,
+      schemaDiffStdout: 'diff --git a/packages/app/src/domain/sample-types.ts ...\n',
+    });
+    const result = await verifyShipped(fixtureCard(), fixtureConfig(), io);
+    expect(result.shipped).toBe(false);
+    expect(result.failedPoints).toContain('schemaGuard');
+    const point = result.points.find((p) => p.id === 'schemaGuard');
+    expect(point?.detail).toContain(fixtureCard().plan as string);
+    expect(point?.detail).toContain('no longer on disk');
   });
 
   test('front-matter allowsSchemaChange: true waives a non-empty schema-lock diff', async () => {

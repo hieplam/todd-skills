@@ -29,4 +29,4 @@ export { deriveCardPhase, type CardPhase, type DerivePhaseConfig } from './loop/
 
 export { extractMergeSha, type CardOutcome } from './loop/card-actions.ts';
 
-export { resolveBaseBranch, runLoop, type DryRunPlan, type LoopResult } from './loop/run-loop.ts';
+export { checkoutMismatchNote, resolveBaseBranch, runLoop, type DryRunPlan, type LoopResult } from './loop/run-loop.ts';

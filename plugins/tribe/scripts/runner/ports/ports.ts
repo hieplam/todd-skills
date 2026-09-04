@@ -86,11 +86,16 @@ export interface ExecResult {
 // verify.ts's seam.
 // ---------------------------------------------------------------------------------------
 
-/** io seam for verify.ts. `exec` covers every gh/git call; `readFile` covers reading the
- * card's plan file for the D3 point-6 front-matter guard — both are injected so this
+/** io seam for verify.ts. `exec` covers every gh/git call; `fileExists` + `readFile` cover
+ * reading the card's plan file for the D3 point-6 front-matter guard — all injected so this
  * module stays pure TypeScript (test-first rule, global constraint). */
 export interface VerifyIO {
   exec(cmd: string[], options?: { cwd?: string }): Promise<ExecResult>;
+  /** C1 (HARDENING-BACKLOG): verify runs AFTER the merge, and a card may legitimately delete
+   * its own planning docs as part of its work — so the plan's presence is checked first and a
+   * missing plan is a reportable guard input, never a thrown ENOENT. `resolvedPath` is already
+   * joined against `config.repoRoot` by this module. */
+  fileExists(resolvedPath: string): boolean;
   /** `resolvedPath` is already joined against `config.repoRoot` by this module — callers
    * never see a bare relative path. */
   readFile(resolvedPath: string): Promise<string> | string;
