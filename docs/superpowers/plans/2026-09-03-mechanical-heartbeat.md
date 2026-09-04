@@ -4043,7 +4043,7 @@ and, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: File-context gate, then draft the ADR** (author the body OUTSIDE `.c3/`):
+- [x] **Step 1: File-context gate, then draft the ADR** (author the body OUTSIDE `.c3/`):
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -4062,7 +4062,7 @@ D74-1..7 and this plan's W-P1..W-P10), the consequences (fixlist P14 retired; P1
 strengthened; `--once` leaves a cron/launchd path open; the runner's core unchanged beyond
 additive exports), and the evidence (the four gate commands and their measured outputs).
 
-- [ ] **Step 2: Cite, scaffold, patch.**
+- [x] **Step 2: Cite, scaffold, patch.**
 
 ```sh
 eval "$C3X read c3-215 --section Contract --cite"
@@ -4090,7 +4090,7 @@ Author three patches into `.c3/changes/<adr-id>/`:
   48-row action-table test plus the double-driven integration tests"; required verification
   `cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit; bash plugins/tribe/scripts/tests/test-watchdog-e2e.sh`.
 
-- [ ] **Step 3: Preview, accept, apply, close.**
+- [x] **Step 3: Preview, accept, apply, close.**
 
 ```sh
 eval "$C3X change view <adr-id>"
@@ -4107,7 +4107,7 @@ grows by the ADR) with **exactly the same two errors** (`c3-213`, `c3-216`) and 
 If `apply` reports a landing mismatch, re-cite and re-author — **never hand-edit the sealed
 doc**; if a seal is already broken, run `eval "$C3X repair"` and re-apply.
 
-- [ ] **Step 4: Commit** — `docs(c3): ADR and c3-215 sync for the mechanical heartbeat (task 15/15)`,
+- [x] **Step 4: Commit** — `docs(c3): ADR and c3-215 sync for the mechanical heartbeat (task 15/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
