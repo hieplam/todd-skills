@@ -1,6 +1,6 @@
 ---
 id: rule-bash-strict-mode
-c3-seal: 3c9e8a316b5c56782c5028b811c720352479b297a8ffa5b59d6cd2332bf8dec9
+c3-seal: f0995afbce1fd26b8f8be2644feb00d50773bb22f5ff7d1c67ce8bb74778a62d
 title: bash-strict-mode
 type: rule
 goal: 'Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 14 tracked `.sh` files today.'
@@ -33,6 +33,7 @@ Every script follows this: the shebang is the first line (REQUIRED), `set -euo p
 | --- | --- | --- |
 | #!/bin/sh | #!/usr/bin/env bash | Scripts use bash-isms (arrays, local, [[); sh on macOS/Linux differs and breaks them |
 | No set line, or only set -e | set -euo pipefail | Installer moves user files (.bak backups) and verify-shipped rules on done-ness — an unset var or hidden pipe failure must abort, not continue |
+| A function whose last statement is cond && effect (e.g. [[ "$2" == provisioned ]] && mkdir -p …) | End the function with an explicit return 0, or write if cond; then effect; fi | Under set -e the function returns cond's non-zero status when cond is false, and the caller aborts — a later "cleanup" that removes a load-bearing return 0 silently kills the suite (test-fresh-machine.sh's doctor_fixture, PR #121) |
 
 ## Scope
 
