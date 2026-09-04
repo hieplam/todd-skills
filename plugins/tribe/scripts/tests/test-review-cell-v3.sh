@@ -236,7 +236,13 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
     # block, not the raw message) — this is what restores the semantics byte-for-byte, because
     # --grep and %(trailers) can legally disagree (a prose line that merely LOOKS like a trailer
     # matches --grep but is never in %(trailers); see Hunter report for the reproduction).
-    _wr_tr="$(git -C "$WALK_REPO" log -1 --format='%(trailers)' "$_wr_sha")"
+    # fail-closed-edges obl. 1: guard this assignment explicitly (never `|| true`) so a
+    # non-zero `git log` (an unreadable %(trailers) lookup) SKIPS this candidate via the
+    # empty-string `_wr_tr` falling through to the `grep -q 'Tribe-Card:' || continue` below,
+    # matching the old walk's degrade-to-skip behavior and the candidate-scan guard above.
+    if ! _wr_tr="$(git -C "$WALK_REPO" log -1 --format='%(trailers)' "$_wr_sha" 2>/dev/null)"; then
+      _wr_tr=""
+    fi
     printf '%s' "$_wr_tr" | grep -q 'Tribe-Card:' || continue
     printf '%s' "$_wr_tr" | grep -qi 'co-authored-by' && continue
     PASSRANGE="$_wr_sha^..$_wr_sha"; break
