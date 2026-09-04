@@ -1,6 +1,6 @@
 ---
 id: adr-20260904-retire-kanna-session-ids
-c3-seal: 11fc0c829431e5395e0e140729ead3b3692d8b5ee30cf8dfff7c3e8bbb12a326
+c3-seal: b3ebcad8ccceae1db2d8dfd7a9ba565042e50f783fdd625cc4ca45da72bdf1bd
 title: retire-kanna-session-ids
 type: adr
 goal: |-
@@ -9,7 +9,7 @@ goal: |-
     shell test under `plugins/tribe/scripts/tests/` — has been deleted from the repo (`chore(tribe):
     delete the Kanna session-id bridge script and test`, 2026-09-04). The fact must stop claiming a
     script that no longer exists.
-status: proposed
+status: accepted
 date: "2026-09-04"
 ---
 

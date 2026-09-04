@@ -79,7 +79,7 @@ Tick this task's checkboxes and commit the plan file only. Subject
 
 **Contract:** spec sections "C2", "C3".
 
-- [ ] **Step 1: Try the tool's own command first (card D1)**
+- [x] **Step 1: Try the tool's own command first (card D1)**
 
 For the first realised ADR: `bunx @c3x/cli@11.6.3 change accept <adr-id>; echo "rc=$?"` then
 `git status --porcelain` and `git diff`. Accept the mechanism only if the diff is exactly the
@@ -87,7 +87,7 @@ ADR's `status:` line and `c3-seal` line and nothing else changed. If `accept` re
 more, `git checkout -- .` and use the fallback for all six: edit `status: proposed` →
 `status: accepted` in the ADR's frontmatter, then `bunx @c3x/cli@11.6.3 repair`.
 
-- [ ] **Step 2: Apply to every realised ADR, check the shape**
+- [x] **Step 2: Apply to every realised ADR, check the shape**
 
 ```bash
 git status --porcelain            # only the flipped ADRs (never c3.db*, never anything else)
@@ -101,7 +101,7 @@ Expected: `other-lines rc=1` (no line other than status/seal), `still-proposed r
 Task 1 justified leaving one, check "all clear" rc 0. If porcelain lists any file outside the six,
 `git checkout -- <that file>` and note it in the report.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Stage the flipped ADRs and this plan. Subject `docs(c3): flip six shipped ADRs to accepted`,
 `Tribe-Task: 2/2`, plan checkboxes ticked, and the per-ADR mechanism named in the body.
