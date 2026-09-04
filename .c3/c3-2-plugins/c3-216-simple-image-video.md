@@ -1,6 +1,6 @@
 ---
 id: c3-216
-c3-seal: 625a9daf0c262d275fce4e862943bbbf5c07752adee23c0c7eb9eeb7214ac6d5
+c3-seal: f94bc2b1c989971ff00238f68c6ffa074b35302de9e1cecb7ab87eda52b71c1d
 title: simple-image-video
 type: component
 category: feature
@@ -72,4 +72,4 @@ Owns the still-image→looping-video pipeline: effect vocabulary, mathematically
 
 | Material | Must derive from | Allowed variance | Evidence |
 | --- | --- | --- | --- |
-| Effects-and-lessons reference doc | Change Safety section (loop-seam and template-drift risks it records) | Grows with experience | plugins/simple-image-video/skills/simple-image-video/references/effects-and-lessons.md |
+| Effects-and-lessons reference doc | Contract section (the final video file OUT surface: a mathematically seamless loop at the requested duration with audio) and Change Safety section (loop-seam and template-drift risks it records) | Grows with experience | plugins/simple-image-video/skills/simple-image-video/references/effects-and-lessons.md |

@@ -1,6 +1,6 @@
 ---
 id: c3-201
-c3-seal: 872f7d6e6da54158e34c119e356e26050ef66cca7d0cec293415c31769fb5162
+c3-seal: 67f17d2c3115052fd6aef111cf4a8a3affbdd406bc5b529af6e937ef1e3c43bd
 title: explaining
 type: component
 category: feature
@@ -62,7 +62,7 @@ Owns the `explaining` skill definition (`skills/explaining/SKILL.md`) and its re
 
 | Surface | Direction | Contract | Boundary | Evidence |
 | --- | --- | --- | --- | --- |
-| skills/explaining/SKILL.md | OUT | Frontmatter description triggers only on explanation-shaped tasks; body carries five eval-backed rules — term discipline (Rule 1), grounding (Rule 2), name a concept instead of the behaviour (Rule 3), illustrate a flow instead of narrating it (Rule 4, evidence eval case tribe-overall-flow-illustrated), and blind-reader review before delivery (Rule 5: dispatch a fresh subagent per round against `references/blind-reader-brief.md`, logged to `<draft>.review.jsonl`, gated by `scripts/check-review-log.ts`) — + self-check + evidence note | Claude Code skill loader | SKILL.md content; eval case tribe-overall-flow-illustrated and eval case write-ahead-log-explained-and-blind-read in skills/explaining/evals/evals.json |
+| skills/explaining/SKILL.md | OUT | Frontmatter description triggers only on explanation-shaped tasks; body carries five eval-backed rules — term discipline (Rule 1), grounding (Rule 2), name a concept instead of the behaviour (Rule 3), illustrate a flow instead of narrating it (Rule 4, evidence eval case tribe-overall-flow-illustrated), and blind-reader review before delivery (Rule 5: dispatch a fresh subagent per round against references/blind-reader-brief.md, logged to <draft>.review.jsonl, gated by scripts/check-review-log.ts) — + self-check + evidence note | Claude Code skill loader | SKILL.md content; eval case tribe-overall-flow-illustrated and eval case write-ahead-log-explained-and-blind-read in skills/explaining/evals/evals.json |
 | evals/evals.json | OUT | Shared fixture shape (skill_name/kind/evals[].prompt/expected_output) executable by the harness unmodified | c3-3 eval harness | python3 scripts/evals/run_evals.py --evals plugins/explaining/evals/evals.json |
 
 ## Change Safety
