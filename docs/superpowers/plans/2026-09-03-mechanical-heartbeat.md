@@ -4226,13 +4226,18 @@ Done-state for the delivering Warchief is **PR OPEN**, not merged. Concretely, b
 
 **Scope-fence self-check before opening the PR** (`git diff --name-only master...HEAD` must be a
 subset of):
-`plugins/tribe/scripts/runner/{core/watchdog/**,ports/ports.ts,adapters/watchdog-io.adapter.ts,cli/main.ts,cli/main.test.ts,fixtures/watchdog/**,watchdog-integration.test.ts,README.md}`
+`plugins/tribe/scripts/runner/{core/watchdog/**,ports/ports.ts,adapters/watchdog-io.adapter.ts,adapters/watchdog-io.adapter.test.ts,cli/main.ts,cli/main.test.ts,fixtures/watchdog/**,watchdog-integration.test.ts,README.md}`
 (note what is NOT there: `core/types.ts` and `core/state.ts`, this campaign's two schemaLockPaths),
 `plugins/tribe/scripts/tests/{test-watchdog-e2e.sh,test-watchdog-detached.sh}`,
 `plugins/tribe/skills/orchestrate-campaign/SKILL.md`, `plugins/tribe/README.md`,
 `docs/tribe/fixlists/2026-08-08-outstanding-17/README.md`,
 `docs/superpowers/{specs,plans,evidence}/**`, `.c3/**`.
 Anything else in that list is a fence breach — stop and report, do not "just tidy it".
+<!-- Corrected during the group-C audit: this enumeration omitted
+`adapters/watchdog-io.adapter.test.ts`, which Task 7 (line ~1918) explicitly mandates as a
+file to create. The plan contradicted itself, and pre-gate's fence check flagged the file as a
+violation. The test file was always in scope; the enumeration was wrong, so the enumeration is
+what changed. No new path was admitted. -->
 
 ## 9. Size and wall-clock estimate
 
