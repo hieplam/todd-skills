@@ -242,8 +242,15 @@ export interface RunnerHandle {
 }
 
 export interface RunnerSpawnPort {
-  /** `argv[0]` is the program. stdout+stderr are appended to `stdoutPath`. */
-  spawnRunner(argv: string[], opts: { cwd: string; stdoutPath: string }): RunnerHandle;
+  /** `argv[0]` is the program. stdout+stderr are appended to `stdoutPath`. `env` is optional
+   * and production never passes it (the runner inherits the watchdog's own environment
+   * exactly as before, which matters: the runner's `ANTHROPIC_API_KEY` guard runs inside the
+   * spawned process and must keep seeing the real environment) — only a test substitutes a
+   * scripted double here that needs its own env vars threaded through. */
+  spawnRunner(
+    argv: string[],
+    opts: { cwd: string; stdoutPath: string; env?: Record<string, string | undefined> },
+  ): RunnerHandle;
   /** The command prefix that runs the real campaign runner, e.g. `['bun', '/abs/run.ts']` —
    * resolved from the adapter's own file location, never from the shell's cwd (the same wall
    * `resolve-runner.sh` holds for the skill). A test substitutes a double here. */

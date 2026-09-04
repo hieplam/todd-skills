@@ -149,6 +149,7 @@ export function buildWatchdogIo(): WatchdogIO {
       const child = spawn(argv[0] as string, argv.slice(1), {
         cwd: opts.cwd,
         stdio: ['ignore', out, out],
+        env: opts.env ?? process.env,
       });
       // C4 (group-C audit round 1, class `agreed`): `'error'` (the program never started, e.g.
       // ENOENT on argv[0]) is a DIFFERENT event than `'exit'` — under Bun, `'exit'` never

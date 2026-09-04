@@ -3037,7 +3037,7 @@ meaning. The double's own bookkeeping lives outside the campaign home entirely.
 
 **Steps**
 
-- [ ] **Step 1: Write the double** — `fixtures/watchdog/runner-double.sh`:
+- [x] **Step 1: Write the double** — `fixtures/watchdog/runner-double.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -3150,7 +3150,7 @@ Expected: `exit=3`; the find lists exactly one `run.json` and one `logs/i-card-0
 `exitCode: 3`, `reason: 'session_incomplete'`, a non-null `endedAt`, and **nothing** under
 `watchdog/`.
 
-- [ ] **Step 2: Failing test** — `watchdog-integration.test.ts` at the runner root:
+- [x] **Step 2: Failing test** — `watchdog-integration.test.ts` at the runner root:
 
 ```ts
 /**
@@ -3294,7 +3294,7 @@ itself.**
 Run `bun test watchdog-integration.test.ts`. Expected: red (the double's `env` option is not
 part of the port yet — see step 3).
 
-- [ ] **Step 3: Extend the spawn seam for env** — the double is env-scripted, so
+- [x] **Step 3: Extend the spawn seam for env** — the double is env-scripted, so
   `spawnRunner`'s options gain one optional field in `ports/ports.ts`, and the adapter passes it
   through:
 
@@ -3310,7 +3310,7 @@ nothing, so the runner inherits the watchdog's environment exactly as before —
 the runner's own `ANTHROPIC_API_KEY` guard (fix-list P10) runs inside the spawned process and
 must keep seeing the real environment.
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -3321,7 +3321,7 @@ bun test structure.test.ts && bun test && bunx tsc --noEmit
 Expected: 9 integration tests pass (elapsed roughly 100-150 s, dominated by the two frozen
 overload backoffs); `structure.test.ts` green; the full suite green with `0 fail`; `tsc` silent.
 
-- [ ] **Step 5: Commit** — `test(runner): integration proof of G1 and G3 against a runner double (task 10/15)`,
+- [x] **Step 5: Commit** — `test(runner): integration proof of G1 and G3 against a runner double (task 10/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
