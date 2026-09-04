@@ -43,7 +43,7 @@ Two tasks, one commit each, sequential (Task 2's measurement must be taken on a 
 
 **Contract:** spec section "C1". **File:** `plugins/tribe/scripts/tests/test-review-cell-v3.sh`.
 
-- [ ] **Step 1: Baseline**
+- [x] **Step 1: Baseline**
 
 ```bash
 cd /Users/hip/repo/todd-skills-wt/review-cell-v3-strict-mode
@@ -54,13 +54,13 @@ grep -n '^set ' plugins/tribe/scripts/tests/test-review-cell-v3.sh
 Expected: `51 passed, 0 failed` and `8:set -u`. Record the tally; it is the number Task 1 must
 reproduce exactly.
 
-- [ ] **Step 2: Change the header and watch the suite break (RED)**
+- [x] **Step 2: Change the header and watch the suite break (RED)**
 
 Change line 8 to `set -euo pipefail`. Run the suite. Expected: it aborts early (exit non-zero, no
 final tally or a short one). Paste the last lines of output — this is the RED that proves strict
 mode is live.
 
-- [ ] **Step 3: Restructure every failure-expected site (GREEN)**
+- [x] **Step 3: Restructure every failure-expected site (GREEN)**
 
 List them: `grep -n '\$?' plugins/tribe/scripts/tests/test-review-cell-v3.sh` (on the base these
 are the self-test 2, 3, F1, F2, F3 sites) plus any plain-statement command that may legitimately
@@ -78,12 +78,12 @@ PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." --range 'HEAD~1..HEAD' --test
 Never `set +e`, never `|| true` on an assertion. Re-run until the suite prints the Step 1 tally
 exactly, with exit 0. Verify parse under the system bash: `bash -n <file>; echo $?` → `0`.
 
-- [ ] **Step 4: Prove strict mode is live**
+- [x] **Step 4: Prove strict mode is live**
 
 Temporarily insert `false` as a plain statement right after the header, run the suite, confirm it
 exits non-zero immediately, then remove the line. Paste the transcript.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Subject `chore(tribe): test-review-cell-v3 runs under set -euo pipefail (rule-bash-strict-mode)`,
 `Tribe-Task: 1/2`, plan checkboxes ticked in the same commit.
