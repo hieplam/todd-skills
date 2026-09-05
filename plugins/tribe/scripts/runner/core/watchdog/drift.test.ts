@@ -32,6 +32,11 @@ describe('selectDriftCards — spec 2.1: running AND baseSha set', () => {
       .toEqual([{ cardId: 'a', baseSha: 'aaa', branch: null }]);
   });
 
+  test('baseSha and branch are trimmed before returning (F1: own doc says "non-empty after trimming")', () => {
+    expect(selectDriftCards(stateJson({ a: { status: 'running', baseSha: '  aaa  ', branch: '  feat/x  ' } })).cards)
+      .toEqual([{ cardId: 'a', baseSha: 'aaa', branch: 'feat/x' }]);
+  });
+
   test('a missing or unreadable state file selects nothing and warns (W75-10 fail closed)', () => {
     expect(selectDriftCards('')).toEqual({ cards: [], warn: 'campaign-state.json is missing or unreadable' });
   });
@@ -60,6 +65,10 @@ describe('remoteFromPassthrough — W75-9: no new flag, read the runner pass-thr
     expect(remoteFromPassthrough(['--cards', 'x'])).toBe('origin');
     expect(remoteFromPassthrough(['--remote'])).toBe('origin');
   });
+
+  test('does not swallow a following flag token as the remote value (F3 flag-collision guard)', () => {
+    expect(remoteFromPassthrough(['--remote', '--cards', 'x'])).toBe('origin');
+  });
 });
 
 describe('parseBaseBranch — the remote HEAD parse (duplicated on purpose, see drift.ts)', () => {
@@ -69,5 +78,10 @@ describe('parseBaseBranch — the remote HEAD parse (duplicated on purpose, see 
     expect(parseBaseBranch('trunk\n', 0, 'origin')).toBe('trunk');
     expect(parseBaseBranch('', 128, 'origin')).toBe('master');
     expect(parseBaseBranch('   \n', 0, 'origin')).toBe('master');
+  });
+
+  test('falls back to master when trimmed stdout is exactly "<remote>/" (F2: empty branch after prefix strip)', () => {
+    expect(parseBaseBranch('origin/', 0, 'origin')).toBe('master');
+    expect(parseBaseBranch('origin/\n', 0, 'origin')).toBe('master');
   });
 });

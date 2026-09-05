@@ -20,9 +20,13 @@ export type SelectDriftCardsResult = {
   warn: string | null;
 };
 
-/** A non-empty string after trimming; `undefined`/`null`/blank all read as absent. */
+/** A non-empty string after trimming; `undefined`/`null`/blank all read as absent. Returns the
+ * TRIMMED value (F1) — a padded value handed to git as a rev/branch name would fail far from
+ * this function's caller (W75-10 fail-closed). */
 function nonBlankString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() !== '' ? value : null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 /** Spec §2.1's selection condition, applied defensively over an untrusted JSON document
@@ -65,13 +69,16 @@ export function selectDriftCards(rawStateJson: string): SelectDriftCardsResult {
 }
 
 /** W75-9: no new watchdog flag — read the remote name out of the runner's already-existing
- * `--remote` pass-through, defaulting to `origin` when absent or dangling (the last element
- * of argv). */
+ * `--remote` pass-through, defaulting to `origin` when absent, dangling (the last element of
+ * argv), or when the "value" is actually another flag token (F3: `['--remote', '--cards']`
+ * must not read `--cards` as the remote name — mirrors the flag-collision guard in this same
+ * directory's `args.ts`). */
 export function remoteFromPassthrough(argv: string[]): string {
   const idx = argv.indexOf('--remote');
   if (idx === -1) return 'origin';
   const value = argv[idx + 1];
-  return value === undefined ? 'origin' : value;
+  if (value === undefined || value.startsWith('--')) return 'origin';
+  return value;
 }
 
 /** Pure parse of `git symbolic-ref --short refs/remotes/<remote>/HEAD`, with the runner's own
@@ -83,5 +90,8 @@ export function parseBaseBranch(stdout: string, exitCode: number, remote: string
   if (exitCode !== 0) return 'master';
   const trimmed = stdout.trim();
   const prefix = `${remote}/`;
-  return trimmed.startsWith(prefix) ? trimmed.slice(prefix.length) : trimmed || 'master';
+  if (!trimmed.startsWith(prefix)) return trimmed || 'master';
+  // F2: stdout trimming to exactly "<remote>/" strips to "" here too — fall back rather than
+  // hand git an empty branch name.
+  return trimmed.slice(prefix.length) || 'master';
 }
