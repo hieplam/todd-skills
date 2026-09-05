@@ -62,6 +62,16 @@ export interface WatchdogRunObservation {
   endedAt: string | null;
   newestLogPath: string | null;
   newestLogMtimeMs: number | null;
+  /** FIX F-C5 (audit round 2): the `nowMs` at which THIS invocation first observed this run
+   * alive with `newestLogMtimeMs === null` (i.e. no log line at all) — the fallback silence-clock
+   * `isStale()` (`select.ts`) uses in that case, so a run that dies before writing its first log
+   * line still converges to `stalled` instead of attaching forever (a reviewer reproduced the
+   * unbounded runaway: it ran until `RangeError: Out of memory`). Deliberately NOT the record's
+   * own `startedAt` — see `watch-loop.ts`'s `LoopState.noLogSince` for why. `null` whenever this
+   * run currently has a log line (real or none-yet-observed-as-persistently-silent). Optional so
+   * no existing `decide.test.ts` fixture needs to set it; `isStale()`'s own 3-arg call sites
+   * (including its own "never stale" test) are unaffected either way. */
+  noLogSinceMs?: number | null;
 }
 
 export interface WatchdogObservation {
@@ -74,6 +84,20 @@ export interface WatchdogObservation {
   lastExitCode: number | null;
   /** Run present, not alive, run.json never finalized — a crash with no code to read. */
   crashSuspected: boolean;
+  /** FIX F-C4 (audit round 2, CRITICAL): whether `lastExitCode` (when 1 or 3) is evidence THIS
+   * invocation actually experienced the event — captured directly (an owned child's real exit),
+   * independently confirmed via a dead pid THIS tick (`crashSuspected`), or read from a record
+   * whose `runId` this invocation actually tracked. Gates ONLY the two "no other signal" plain
+   * relaunch fallbacks (`decide()` section 3's `lock_free`, section 4's `crash`) — every
+   * quota/overload signal-bearing branch stays self-correcting regardless of provenance, exactly
+   * as before, because the cross-invocation `--once` `quota_wait_pending`/
+   * `overload_backoff_pending` recheck (spec §9.5) depends on that. Optional and defaults to
+   * `true` when omitted, so every pre-existing `decide.test.ts` fixture (all of which predate
+   * this concept and always describe a genuine this-tick event, including the frozen 48-row
+   * action table) is unaffected — `watch-loop.ts` is the only caller that ever sets it
+   * explicitly, and it is the only place an unprovenanced read was ever unsafe (see its own
+   * comment on `recordExitCodeSelfCorrects`). */
+  lastExitCodeProvenanced?: boolean;
   /** W-P2: already validated as a FUTURE reset by the edge's clock-free parser + decide(). */
   quota: { resetsAtEpochS: number } | null;
   overload: { apiErrorStatus: number } | null;

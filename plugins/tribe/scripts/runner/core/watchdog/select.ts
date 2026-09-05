@@ -22,9 +22,27 @@ export function newestLog(entries: LogEntry[]): LogEntry | null {
   return newest;
 }
 
-export function isStale(nowMs: number, mtimeMs: number | null, stallMinutes: number): boolean {
-  if (mtimeMs === null) return false; // a pass that has not written its first log is starting
-  return nowMs - mtimeMs > stallMinutes * 60_000;
+/**
+ * FIX F-C5 (audit round 2): `mtimeMs === null` used to mean "never stale" UNCONDITIONALLY — a
+ * run that dies before writing its first log line had no bound at all, only the false comfort
+ * of a `--stall-minutes` timeout measured against a signal that never existed (a reviewer
+ * reproduced the runaway: it ran until `RangeError: Out of memory`). `sinceMs` is an optional
+ * fallback silence-clock, used ONLY when no finer-grained `mtimeMs` signal exists yet — the
+ * caller (`decide.ts`) feeds it `WatchdogRunObservation.noLogSinceMs`: THIS invocation's own
+ * "first observed alive with no log" instant, never the run record's own `startedAt` (see that
+ * field's doc comment in `model.ts` for why an external, unvalidated timestamp is the wrong
+ * clock here). `sinceMs === null` (every 3-arg call site, including this file's own "never
+ * stale" test) preserves the old behaviour exactly.
+ */
+export function isStale(
+  nowMs: number,
+  mtimeMs: number | null,
+  stallMinutes: number,
+  sinceMs: number | null = null,
+): boolean {
+  if (mtimeMs !== null) return nowMs - mtimeMs > stallMinutes * 60_000;
+  if (sinceMs === null) return false; // a pass that has not written its first log is starting
+  return nowMs - sinceMs > stallMinutes * 60_000;
 }
 
 export interface WatchdogPaths {

@@ -36,6 +36,27 @@ describe('isStale', () => {
   test('a run with no log yet is never stale', () => {
     expect(isStale(1_000, null, 30)).toBe(false);
   });
+
+  // FIX F-C5 (audit round 2): `mtimeMs === null` used to mean "never stale" UNCONDITIONALLY —
+  // a run that dies before writing its first log line had no bound at all (a reviewer
+  // reproduced the runaway attach loop until `RangeError: Out of memory`). The 4th argument
+  // lets a caller supply the record's own `startedAt` as a fallback silence-clock.
+  describe('FIX F-C5: a defined answer when no log line has ever been written', () => {
+    test('with no fallback clock supplied, stays never-stale (3-arg call sites unchanged)', () => {
+      const now = 1_000 * 60 * 60;
+      expect(isStale(now, null, 30, null)).toBe(false);
+    });
+    test('past the threshold since startedAt, with no log ever written, IS stale', () => {
+      const now = 1_000 * 60 * 60;
+      const startedAtMs = now - 31 * 60_000;
+      expect(isStale(now, null, 30, startedAtMs)).toBe(true);
+    });
+    test('within the threshold since startedAt, with no log ever written, is not yet stale', () => {
+      const now = 1_000 * 60 * 60;
+      const startedAtMs = now - 29 * 60_000;
+      expect(isStale(now, null, 30, startedAtMs)).toBe(false);
+    });
+  });
 });
 
 describe('watchdogPathsOf (W-P9: the watchdog writes only under home/watchdog)', () => {

@@ -45,6 +45,16 @@ interface LoopState {
   /** FIX F-C1/F-C2: the deadline of the most recently ORDERED `wait_until`, cleared the moment
    * any new attempt is spawned — see `model.ts`'s `WatchdogObservation.pendingWait`. */
   pendingWait: { cause: 'quota' | 'overload'; untilMs: number } | null;
+  /** FIX F-C5 (audit round 2): THIS invocation's own clock for "how long has the currently-alive
+   * run gone with no log line at all" — the `nowMs` this invocation FIRST observed the given
+   * `runId` alive with `newestLogMtimeMs === null`. Deliberately never the record's own
+   * `startedAt`: that value is untrusted external content the runner wrote (mirroring FIX S3's
+   * `MAX_QUOTA_WAIT_MS` clamp on `resetsAtEpochS` for the same reason), and several pre-existing
+   * fixtures set it to an unrealistic placeholder that was never meant to be read as a real
+   * elapsed-time signal — reading it here would misreport those otherwise-legitimate scenarios
+   * as instantly stale. Reset to `null` the moment the run stops being "alive with no log" (a
+   * log appears, the run ends, or a different run becomes the observed one). */
+  noLogSince: { runId: string | null; sinceMs: number } | null;
 }
 
 /** The tick's raw signal read, carried alongside the pure `WatchdogObservation` purely so the
@@ -111,25 +121,63 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
   if (runId !== null && (state.child !== null || recordNotFinalized)) {
     state.trackedRunId = runId;
   }
-  // Exit codes 1 (lock refused) and 3 (recoverable: crash/quota/overload) are BY DESIGN
-  // re-evaluated fresh from this same tick's other signals (lock holder liveness, counters
-  // that reset to 0 each invocation, the log's own quota/overload content) every single time
-  // they are read — including the cross-invocation `--once` re-check `quota_wait_pending`
-  // exists to serve (spec §9.5). Reading one from a record this invocation never watched run
-  // costs at most one bounded extra retry; it can never reproduce the terminal-code lockup
-  // above, so only 0/2/4/5 (a human-facing, one-shot verdict) need the provenance gate.
+  // FIX F-C4 (audit round 2, CRITICAL — corrects the comment this replaces): exit codes 1 (lock
+  // refused) and 3 (recoverable: crash/quota/overload) are DELIBERATELY still read from a
+  // record this invocation never watched — the log's own quota/overload content is re-parsed
+  // fresh every tick regardless of provenance, and the cross-invocation `--once` re-check
+  // `quota_wait_pending`/`overload_backoff_pending` exists to serve exactly that (spec §9.5;
+  // `watch-loop.test.ts`'s "C3: --once publishes nextWakeAt" tests pin it). The comment this
+  // replaces claimed reading one "costs at most one bounded extra retry" and "can never
+  // reproduce the terminal-code lockup" — BOTH FALSE: with no quota/overload signal at all, an
+  // untracked finalized record used to fall straight through to the PLAIN relaunch fallback
+  // below (section 3/4 of `decide()`), phantom-spending the ONE crashRelaunches/lockRelaunches
+  // budget on an event this invocation never experienced — so a GENUINE crash/lock-conflict
+  // later in THIS SAME invocation found the budget already gone and escalated instead of
+  // retrying (`watch-loop.test.ts`'s "FIX F-C4" tests reproduce both the exit-3 and exit-1
+  // shape). The fix is `lastExitCodeProvenanced` below: it does NOT change what `lastExitCode`
+  // itself may read (still self-correcting, still needed for the quota/overload continuation
+  // above) — it gates ONLY the two "no other signal" plain-relaunch fallbacks in `decide()`,
+  // which is the one place an unprovenanced read was ever unsafe.
   const recordExitCodeSelfCorrects = recordExitCode === 1 || recordExitCode === 3;
+  const recordProvenanceMatches = runId !== null && runId === state.trackedRunId;
   const thisInvocationsFinalizedRecord = recordEndedAt !== null
-    && (recordExitCodeSelfCorrects || (runId !== null && runId === state.trackedRunId));
+    && (recordExitCodeSelfCorrects || recordProvenanceMatches);
 
   const childAlive = state.child !== null && state.ownedExitCode === null;
   const recordAlive = recordNotFinalized;
   const alive = childAlive || recordAlive;
   const runnerPid = childAlive ? (state.child as RunnerHandle).pid : recordPid;
+  // FIX F-C5 (audit round 2, carried forward from S2): a dead-pid-confirmed, unfinalized record
+  // is independently validated THIS tick (a fresh `io.isProcessAlive` probe), never inferred
+  // from provenance — so it counts as provenanced too, exactly like an owned exit code.
+  const crashSuspected = runId !== null && !alive && recordEndedAt === null
+    && state.ownedExitCode === null;
+  // FIX F-C4: whether `lastExitCode` (below) is evidence THIS invocation actually experienced a
+  // crash/lock-refusal worth spending a relaunch budget on — as opposed to merely being
+  // self-corrected from a record this invocation never tracked (above). See `model.ts`'s doc
+  // comment on `WatchdogObservation.lastExitCodeProvenanced` for what this gates.
+  const lastExitCodeProvenanced = state.ownedExitCode !== null
+    || crashSuspected
+    || (recordEndedAt !== null && recordProvenanceMatches);
 
   const logs = runId === null ? [] : io.listEntries(join(runsDir, runId, 'logs')).filter((e) => !e.isDir);
   const newest = newestLog(logs.map((e) => ({ name: e.name, mtimeMs: e.mtimeMs })));
   const newestLogPath = newest === null || runId === null ? null : join(runsDir, runId, 'logs', newest.name);
+
+  // FIX F-C5 (audit round 2, Important): a run that dies before writing its first log line used
+  // to read as "never stale" forever — `select.ts`'s `isStale()` returned `false` unconditionally
+  // whenever `mtimeMs === null`, and a bare `io.isProcessAlive` probe (`recordConfirmedDeadPid`
+  // above) has no defence against the OS reusing that pid for an unrelated live process either —
+  // both doors led to the SAME unbounded `attach` loop (a reviewer reproduced it running until
+  // `RangeError: Out of memory`). See `LoopState.noLogSince`'s own comment for why this tracks
+  // THIS invocation's own clock rather than the record's `startedAt`.
+  if (alive && newest === null) {
+    if (state.noLogSince === null || state.noLogSince.runId !== runId) {
+      state.noLogSince = { runId, sinceMs: nowMs };
+    }
+  } else {
+    state.noLogSince = null;
+  }
   // `io.readTail` (adapters/watchdog-io.adapter.ts) is the RAW byte-bounded primitive, fed
   // straight to the parser with no wrapping: it reads to the file's true EOF, so the tail's
   // final line is always complete, and the only possible cut is a truncated LEADING line when
@@ -164,9 +212,15 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
       endedAt: recordEndedAt,
       newestLogPath,
       newestLogMtimeMs: newest?.mtimeMs ?? null,
+      // FIX F-C5: `null` unless this run is CURRENTLY alive with no log line at all — see
+      // `LoopState.noLogSince`'s comment for why this is this invocation's own observation
+      // clock, never the record's `startedAt`.
+      noLogSinceMs: state.noLogSince?.sinceMs ?? null,
     },
     lastExitCode: state.ownedExitCode ?? (thisInvocationsFinalizedRecord ? recordExitCode : null),
-    crashSuspected: runId !== null && !alive && recordEndedAt === null && state.ownedExitCode === null,
+    // FIX F-C4: see `lastExitCodeProvenanced` above for what this gates in `decide()`.
+    lastExitCodeProvenanced,
+    crashSuspected,
     quota: signals?.quota ?? null,
     overload: signals?.overload ?? null,
     counters: state.counters,
@@ -200,6 +254,7 @@ export async function runWatchdog(
   const state: LoopState = {
     child: null, ownedExitCode: null, attempt: 0, model: config.model, runId: null,
     nextWakeAtMs: null, stall: null, runnerCommand: null, trackedRunId: null, pendingWait: null,
+    noLogSince: null,
     counters: {
       quotaWaits: 0, overloadBackoffs: 0, crashRelaunches: 0, lockRelaunches: 0,
       fallbackUsed: false,

@@ -43,7 +43,9 @@ export function decide(o: WatchdogObservation): WatchdogAction {
   // owns that) — it reports, and in follow mode hands the decision to a human.
   if (o.run?.alive) {
     const mtime = o.run.newestLogMtimeMs;
-    const stalled = isStale(o.nowMs, mtime, o.limits.stallMinutes);
+    // FIX F-C5: falls back to this invocation's own "alive with no log" clock when no log has
+    // ever been written (`mtime === null`) — otherwise this branch attaches forever.
+    const stalled = isStale(o.nowMs, mtime, o.limits.stallMinutes, o.run.noLogSinceMs ?? null);
     if (stalled) {
       return {
         kind: 'stall',
@@ -73,11 +75,18 @@ export function decide(o: WatchdogObservation): WatchdogAction {
       if (o.mode === 'once') return { kind: 'exit', status: 'running', reason: 'runner_alive' };
       return { kind: 'attach', runnerPid: o.lockHolder.pid };
     }
-    if (o.stopFilePresent) return STOP;
-    if (o.counters.lockRelaunches >= 1) {
-      return { kind: 'exit', status: 'needs_human', reason: 'lock_conflict' };
+    // FIX F-C4: with no live foreign holder to explain it, an exit-1 record is otherwise "no
+    // other signal" — spending the lockRelaunches budget on it requires THIS invocation to have
+    // actually tracked the event (`lastExitCodeProvenanced`; defaults to `true` when the caller
+    // never sets it — see `model.ts`). An unprovenanced record falls through to section 5's
+    // fresh launch instead, exactly as if `lastExitCode` were `null`.
+    if (o.lastExitCodeProvenanced ?? true) {
+      if (o.stopFilePresent) return STOP;
+      if (o.counters.lockRelaunches >= 1) {
+        return { kind: 'exit', status: 'needs_human', reason: 'lock_conflict' };
+      }
+      return { kind: 'relaunch', cause: 'lock_free', model: null };
     }
-    return { kind: 'relaunch', cause: 'lock_free', model: null };
   }
 
   // --- 4. Exit 3, or a crash with no code to read (W-P6): the recoverable deaths.
@@ -150,11 +159,19 @@ export function decide(o: WatchdogObservation): WatchdogAction {
       return { kind: 'wait_until', untilMs: overloadUntilMs, cause: 'overload' };
     }
 
-    if (o.stopFilePresent) return STOP;
-    if (o.counters.crashRelaunches >= o.limits.maxCrashRelaunches) {
-      return { kind: 'exit', status: 'needs_human', reason: 'session_incomplete' };
+    // FIX F-C4: with no quota/overload signal at all, this is otherwise "no other signal" — the
+    // plain crash fallback below may only spend the crashRelaunches budget when THIS invocation
+    // actually tracked the event (`lastExitCodeProvenanced`; `true` when omitted — see
+    // `model.ts`). This is always true for the genuine `crashSuspected` case (a dead pid
+    // confirmed THIS tick), so it changes nothing there. An unprovenanced record falls through
+    // to section 5's fresh launch instead, exactly as if `lastExitCode` were `null`.
+    if (o.lastExitCodeProvenanced ?? true) {
+      if (o.stopFilePresent) return STOP;
+      if (o.counters.crashRelaunches >= o.limits.maxCrashRelaunches) {
+        return { kind: 'exit', status: 'needs_human', reason: 'session_incomplete' };
+      }
+      return { kind: 'relaunch', cause: 'crash', model: null };
     }
-    return { kind: 'relaunch', cause: 'crash', model: null };
   }
 
   // --- 5. Nothing has run yet this invocation.

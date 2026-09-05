@@ -568,3 +568,120 @@ describe('runWatchdog — FIX F-C2: a served quota-wait relaunch never drains th
     expect(status.counters.quotaWaits).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------------------
+// FIX F-C4 (audit round 2, CRITICAL): `recordExitCodeSelfCorrects` made a finalized record's
+// exit code (1 or 3) readable as THIS tick's `lastExitCode` unconditionally — completely
+// bypassing the `runId === state.trackedRunId` provenance gate that 0/2/4/5 must pass. A stale
+// `run.json` left behind by an earlier, UNRELATED invocation of the same home (itself having
+// exhausted its OWN budget and exited needs_human) then phantom-spends this invocation's
+// crashRelaunches/lockRelaunches budget on a tick before this invocation has launched anything
+// — so when a GENUINE crash/lock-conflict happens later in THIS invocation, the budget is
+// already gone and it escalates instead of getting its one retry.
+// ---------------------------------------------------------------------------------------
+describe('runWatchdog — FIX F-C4: a stale finalized record this invocation never watched must not phantom-spend a relaunch budget', () => {
+  test('a stale exit-3 record from an unrelated prior invocation does not consume the crash-relaunch budget a genuine crash THIS invocation needs', async () => {
+    const { io, files, entries, spawns } = fakeIo([
+      { exitCode: 3, runId: 'r2' }, // THIS invocation's own genuine crash, no signal
+      { exitCode: 0, runId: 'r3' }, // recovers after its own one relaunch
+    ]);
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    // The residue an EARLIER invocation leaves behind after exhausting its own
+    // maxCrashRelaunches=1 budget and exiting needs_human:session_incomplete — finalized,
+    // exitCode 3, no quota/overload signal in its log.
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 5555, startedAt: new Date(0).toISOString(),
+      endedAt: new Date(1).toISOString(), exitCode: 3, reason: 'x',
+    }));
+    entries.set(join(runDir, 'logs'), []);
+
+    const outcome = await runWatchdog(CONFIG, HOME, io);
+    // Before the fix: the stale record is read as this tick's lastExitCode on the very first
+    // tick (before any launch), spending the ONE crashRelaunches budget on a phantom event —
+    // spawns.length stays 1, r3 never runs, outcome is [10, 'session_incomplete'].
+    expect(spawns.length).toBe(2);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    const status = JSON.parse(files.get(join(HOME, 'watchdog', 'status.json')) as string);
+    expect(status.counters.crashRelaunches).toBe(1); // the genuine crash only, never the stale one
+    const events = (files.get(join(HOME, 'watchdog', 'events.jsonl')) as string)
+      .trim().split('\n').map((l) => JSON.parse(l).action);
+    expect(events).toContain('launch'); // a fresh launch, never a phantom relaunch first
+    expect(events.filter((a) => a === 'relaunch').length).toBe(1);
+  });
+
+  test('the exit-1 variant: a stale lock-refused record from an unrelated prior invocation does not consume the lock-relaunch budget a genuine conflict THIS invocation needs', async () => {
+    const { io, files, entries, spawns } = fakeIo([
+      { exitCode: 1, runId: 'r2' }, // THIS invocation's own genuine lock refusal
+      { exitCode: 0, runId: 'r3' },
+    ]);
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 5555, startedAt: new Date(0).toISOString(),
+      endedAt: new Date(1).toISOString(), exitCode: 1, reason: 'x',
+    }));
+    entries.set(join(runDir, 'logs'), []);
+
+    const outcome = await runWatchdog(CONFIG, HOME, io);
+    // Before the fix: spawns.length stays 1 and the outcome is [10, 'lock_conflict'] — the
+    // phantom relaunch at tick 1 consumes the ONE lockRelaunches budget before this invocation
+    // ever makes its own attempt.
+    expect(spawns.length).toBe(2);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    const status = JSON.parse(files.get(join(HOME, 'watchdog', 'status.json')) as string);
+    expect(status.counters.lockRelaunches).toBe(1);
+    const events = (files.get(join(HOME, 'watchdog', 'events.jsonl')) as string)
+      .trim().split('\n').map((l) => JSON.parse(l).action);
+    expect(events).toContain('launch');
+    expect(events.filter((a) => a === 'relaunch').length).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// FIX F-C5 (audit round 2, Important): `recordConfirmedDeadPid` is a bare single-shot
+// `io.isProcessAlive` probe with no defence against pid reuse, AND the S2 stall safety-net it
+// assumes exists does not: `select.ts`'s `isStale()` returned `false` forever when
+// `mtimeMs === null` ("a pass that has not written its first log is starting"), so a runner
+// that died BEFORE writing its first log line had no fallback detector at all — `attach` on
+// every tick, indefinitely. A reviewer reproduced the runaway: it ran until
+// `RangeError: Out of memory` instead of ever converging.
+// ---------------------------------------------------------------------------------------
+describe('runWatchdog — FIX F-C5: an adopted run that dies before writing its first log line still converges to stalled', () => {
+  test('a pid that reads alive forever, with no log ever written, stalls out via the record\'s own startedAt instead of attaching forever', async () => {
+    const { io, files, entries, setProcessAlive } = fakeIo([]); // adopted only, this loop never spawns
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    const startedAt = new Date(1_800_000_000_000).toISOString(); // == the fake clock's t0
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 4321, startedAt, endedAt: null, exitCode: null, reason: null,
+    }));
+    entries.set(join(runDir, 'logs'), []); // NEVER wrote a single log line
+    // Reads alive on every probe for the whole test — e.g. a reused pid masquerading as the
+    // original process, or simply a genuinely-alive-but-permanently-silent one; either shape
+    // hits the exact same gap this fix closes.
+    setProcessAlive(4321, true);
+
+    let sleepCalls = 0;
+    // stallMinutes=30, pollSeconds=30 -> the deadline is served within ~61 poll slices. A
+    // correct fix converges well inside that; more IS the reviewer's unbounded-attach defect
+    // reproduced as a fast, clear test failure instead of an actual OOM.
+    const SAFETY_VALVE = 90;
+    const wrapped: WatchdogIO = {
+      ...io,
+      sleep: async (ms) => {
+        sleepCalls += 1;
+        if (sleepCalls > SAFETY_VALVE) {
+          throw new Error(
+            `SAFETY VALVE: ${sleepCalls} sleeps attached to a runner that never wrote a log — `
+              + 'the F-C5 unbounded-attach defect is back',
+          );
+        }
+        await io.sleep(ms);
+      },
+    };
+    const outcome = await runWatchdog(CONFIG, HOME, wrapped);
+    expect([outcome.exitCode, outcome.reason]).toEqual([10, 'stalled']);
+    expect(sleepCalls).toBeLessThanOrEqual(SAFETY_VALVE);
+  });
+});
