@@ -31,6 +31,17 @@ fresh_home() { # fresh_home HOME_DIR
   CLAUDE_DIR="$1/.claude" bash "$REPO_ROOT/install.sh" tribe
 }
 
+# doctor_fixture — a throwaway scripts/ tree for doctor.sh: $1 is the dir, $2 is
+# "provisioned" (runner/node_modules/ present) or "unprovisioned" (absent). doctor.sh is COPIED,
+# not symlinked, because it resolves its own directory with `pwd -P`; a symlink would point it
+# back at this checkout and the fixture would silently become the host's install state again.
+doctor_fixture() { # doctor_fixture DIR provisioned|unprovisioned
+  mkdir -p "$1/runner"
+  cp "$DOCTOR" "$1/doctor.sh"
+  [[ "$2" == provisioned ]] && mkdir -p "$1/runner/node_modules"
+  return 0
+}
+
 # resolve_as — run the resolver as if on a machine whose HOME is $1, from the
 # foreign target repo, with CLAUDE_PLUGIN_ROOT unset. HOME is isolated because the
 # expression this replaced dereferenced `~/.claude` directly: without overriding
@@ -177,11 +188,23 @@ if [[ -x "$DOCTOR" ]]; then
   contains "doctor names bun as the missing prerequisite" "$dout" "bun"
   contains "doctor says how to install it" "$dout" "https://bun.sh"
 
-  # On this machine, with a full PATH, the doctor should pass.
+  # On this machine, with a full PATH, the doctor should pass — against a fixture
+  # this suite built itself, never against the host checkout's own install state.
+  doctor_fixture "$TMP/doctor-provisioned" provisioned
   set +e
-  dout="$(cd "$FOREIGN" && bash "$DOCTOR" 2>&1)"; drc=$?
+  dout="$(cd "$FOREIGN" && bash "$TMP/doctor-provisioned/doctor.sh" 2>&1)"; drc=$?
   set -e
-  check "doctor passes on a fully-provisioned machine" "$drc" "0"
+  check "doctor passes on a fully-provisioned fixture" "$drc" "0"
+
+  # A fresh machine has no runner/node_modules/ — the doctor must name the gap and
+  # how to fix it, not silently borrow whatever state this checkout happens to be in.
+  doctor_fixture "$TMP/doctor-unprovisioned" unprovisioned
+  set +e
+  dout="$(cd "$FOREIGN" && bash "$TMP/doctor-unprovisioned/doctor.sh" 2>&1)"; drc=$?
+  set -e
+  check "doctor exits non-zero when runner dependencies are absent" "$drc" "1"
+  contains "doctor names runner dependencies as the gap" "$dout" "runner dependencies"
+  contains "doctor says how to install them" "$dout" "bun install"
 
   # --- Probe 7b: P10 fix round — ANTHROPIC_API_KEY-only is never reported "ok" ------------
   # A machine whose ONLY credential source is ANTHROPIC_API_KEY (no Claude Code login) must

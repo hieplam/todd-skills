@@ -5,7 +5,7 @@
 # the pre-gate script exists and behaves; behavior is proved by evals.json ids added by task 5.
 # Offline, no network. Idea 11 is a DELTA on shipped ideas 01/02/03/04/05 — the dependency
 # assertions below fail loudly if run before those baselines are present.
-set -u
+set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTS="$HERE/../../agents"
 SKIN="$(tr '\n' ' ' < "$AGENTS/skinner.md" | tr -s ' ')"
@@ -184,10 +184,78 @@ if [ -x "$GATE" ]; then echo "ok: c: pre-gate.sh exists and is executable"; pass
 else echo "FAIL: c: pre-gate.sh exists and is executable"; fail=$((fail+1)); fi
 
 if [ "${PREGATE_INNER:-0}" != "1" ]; then
+  # fail-closed-edges obligation 2: neutralise host git config for every git subprocess below
+  # (including the pre-gate.sh children, which read %(trailers) themselves) — a legal global
+  # setting such as `[trailer] separators = "#"` otherwise empties %(trailers) and reds these
+  # assertions for reasons unrelated to the code under test.
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
   # Self-test 1 (pass case): sweep this repo's own suites over a 1-commit range, no fence.
   TMPD="$(mktemp -d)"; REPORT="$TMPD/pregate-report.md"
-  if [ -x "$GATE" ] && OUT="$(PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." \
-        --range 'HEAD~1..HEAD' --tests-dir "$HERE" --report "$REPORT" 2>/dev/null)"; then
+  # The range is *computed*, never hardcoded: the spec asks for "a range and fence chosen to
+  # pass", and a literal HEAD~1..HEAD spans the whole second-parent side whenever the tip is a
+  # merge commit (42 commits on d63a7d2), which drags in merge commits that carry no
+  # Tribe-Card: trailer and reds this assertion for reasons that have nothing to do with it.
+  # Walk back for the newest non-merge commit that has a parent and satisfies the trailer
+  # contract, and audit exactly that one commit.
+  # Bounded pass-range walk (spec C2): 1 fixed git call for the candidate scan, plus up to 20
+  # %(trailers) confirmations on those candidates (never one `log -1` per commit, however deep
+  # -n 200 must search) — call count stays bounded independent of -n 200.
+  # WALK_REPO defaults to this repo but is overridable, so the identical block can be pointed at
+  # a throwaway fixture repo for verification (see Hunter report).
+  #
+  # cold-lens audit fix (Finding 1): %(trailers) is the SOLE authority for BOTH inclusion
+  # (Tribe-Card: present) and exclusion (co-authored-by absent) — exactly as the OLD walk
+  # decided both from the parsed trailer block alone. There is deliberately no raw-message
+  # `--grep='co-authored-by'` exclude set here: --grep matches message PROSE, not the parsed
+  # trailer block, so a commit whose prose merely mentions "co-authored-by" (with no such
+  # trailer) would be hard-skipped before its %(trailers) confirmation ever ran, diverging
+  # from the old predicate (see Hunter report for the reproduction).
+  PASSRANGE=""
+  WALK_REPO="${WALK_REPO:-$HERE/../../../..}"
+  # Candidates: newest-first, non-merge, message contains a Tribe-Card: line (candidate PRE-FILTER
+  # only — --grep matches the raw message, not the parsed trailer block; the confirmation loop
+  # below re-checks Tribe-Card: presence against %(trailers) before ever selecting a candidate).
+  # fail-closed-edges obl. 1: guard the assignment explicitly (never `|| true`) so a
+  # non-zero `git log` (empty/unreadable WALK_REPO) yields an EMPTY candidate list under
+  # set -e instead of aborting the whole suite with a raw `fatal:` and exit 128 — the
+  # existing `if [ -z "$PASSRANGE" ]` branch below already handles the empty case
+  # gracefully, matching the old walk's degrade-to-empty behavior.
+  if ! _wr_candidates="$(git -C "$WALK_REPO" log --no-merges -n 200 --format='%H %P' \
+      --grep='^Tribe-Card:' 2>/dev/null)"; then
+    _wr_candidates=""
+  fi
+  _wr_confirms=0
+  while IFS= read -r _wr_line; do
+    [ -n "$_wr_line" ] || continue
+    [ "$_wr_confirms" -lt 20 ] || break
+    _wr_sha="${_wr_line%% *}"
+    _wr_parents="${_wr_line#* }"
+    [ -n "$_wr_parents" ] || continue                                  # empty parent list: skip
+    _wr_confirms=$((_wr_confirms+1))
+    # Confirmation: re-apply the EXACT original predicate via %(trailers) (the parsed trailer
+    # block, not the raw message) — this is what restores the semantics byte-for-byte, because
+    # --grep and %(trailers) can legally disagree (a prose line that merely LOOKS like a trailer
+    # matches --grep but is never in %(trailers); see Hunter report for the reproduction).
+    # fail-closed-edges obl. 1: guard this assignment explicitly (never `|| true`) so a
+    # non-zero `git log` (an unreadable %(trailers) lookup) SKIPS this candidate via the
+    # empty-string `_wr_tr` falling through to the `grep -q 'Tribe-Card:' || continue` below,
+    # matching the old walk's degrade-to-skip behavior and the candidate-scan guard above.
+    if ! _wr_tr="$(git -C "$WALK_REPO" log -1 --format='%(trailers)' "$_wr_sha" 2>/dev/null)"; then
+      _wr_tr=""
+    fi
+    printf '%s' "$_wr_tr" | grep -q 'Tribe-Card:' || continue
+    printf '%s' "$_wr_tr" | grep -qi 'co-authored-by' && continue
+    PASSRANGE="$_wr_sha^..$_wr_sha"; break
+  done <<WALK_CANDIDATES_EOF
+$_wr_candidates
+WALK_CANDIDATES_EOF
+  if [ -z "$PASSRANGE" ]; then
+    echo "FAIL: c: a trailer-clean 1-commit range was found for the pass case"; fail=$((fail+1))
+  else
+    echo "ok: c: a trailer-clean 1-commit range was found for the pass case"; pass=$((pass+1))
+  fi
+  if [ -x "$GATE" ] && [ -n "$PASSRANGE" ] && OUT="$(PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." \
+        --range "$PASSRANGE" --tests-dir "$HERE" --report "$REPORT" 2>/dev/null)"; then
     echo "$OUT" | grep -q '"verdict": *"pass"' \
       && { echo "ok: c: self-test pass case verdict"; pass=$((pass+1)); } \
       || { echo "FAIL: c: self-test pass case verdict"; fail=$((fail+1)); }
@@ -199,12 +267,31 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
     echo "FAIL: c: report names every suite it ran"; fail=$((fail+1))
   fi
 
+  # Self-test 6 (host-config isolation): the gate's verdict must not depend on the machine's
+  # global git config. A legal `[trailer] separators = "#"` empties %(trailers) for every commit;
+  # the gate must neutralise it itself, whatever its caller's environment says. The per-command
+  # GIT_CONFIG_GLOBAL below deliberately overrides this suite's own /dev/null export for that one
+  # child. A stub tests dir keeps this self-test from re-sweeping the real suites.
+  printf '[trailer]\n\tseparators = "#"\n' > "$TMPD/hostile.gitconfig"
+  mkdir -p "$TMPD/stub-tests"
+  printf '#!/usr/bin/env bash\necho "1 passed, 0 failed"\n' > "$TMPD/stub-tests/test-stub.sh"
+  chmod +x "$TMPD/stub-tests/test-stub.sh"
+  if [ -x "$GATE" ] && [ -n "$PASSRANGE" ] && HOSTILE_OUT="$(GIT_CONFIG_GLOBAL="$TMPD/hostile.gitconfig" \
+        PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." --range "$PASSRANGE" \
+        --tests-dir "$TMPD/stub-tests" --report "$TMPD/hostile.md" 2>/dev/null)" \
+     && echo "$HOSTILE_OUT" | grep -q '"trailers": *"pass"'; then
+    echo "ok: c6: gate isolates itself from a hostile global git config"; pass=$((pass+1))
+  else
+    echo "FAIL: c6: gate isolates itself from a hostile global git config"; fail=$((fail+1))
+  fi
+
   # Self-test 2 (red case): a fence that allows nothing must flag every changed file, exit 1.
   FENCE="$TMPD/fence.globs"; echo 'docs/never-matches-anything/**' > "$FENCE"
   if [ -x "$GATE" ]; then
+    rc=0
     PREGATE_INNER=1 "$GATE" --repo "$HERE/../../../.." --range 'HEAD~1..HEAD' --tests-dir "$HERE" \
-            --report "$TMPD/red.md" --fence "$FENCE" >/dev/null 2>&1
-    [ $? -eq 1 ] && { echo "ok: c: fence violation exits 1"; pass=$((pass+1)); } \
+            --report "$TMPD/red.md" --fence "$FENCE" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 1 ] && { echo "ok: c: fence violation exits 1"; pass=$((pass+1)); } \
                  || { echo "FAIL: c: fence violation exits 1"; fail=$((fail+1)); }
     grep -qi 'fence' "$TMPD/red.md" \
       && { echo "ok: c: violation named in the report"; pass=$((pass+1)); } \
@@ -220,16 +307,18 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
   git init -q "$F1REPO"
   git -C "$F1REPO" -c user.email=t@t.com -c user.name=t commit -q --allow-empty -m init
   if [ -x "$GATE" ]; then
+    rc=0
     PREGATE_INNER=1 "$GATE" --repo "$F1REPO" --range 'nonexistent-ref-xyz..HEAD' --tests-dir "$HERE" \
-      --report "$TMPD/f1-bad.md" >/dev/null 2>"$TMPD/f1-bad.err"
-    F1BADCODE=$?
+      --report "$TMPD/f1-bad.md" >/dev/null 2>"$TMPD/f1-bad.err" || rc=$?
+    F1BADCODE=$rc
     [ "$F1BADCODE" -eq 2 ] && grep -qi 'unresolvable range' "$TMPD/f1-bad.err" \
       && { echo "ok: f1: unresolvable range is a setup error (exit 2)"; pass=$((pass+1)); } \
       || { echo "FAIL: f1: unresolvable range is a setup error (exit 2)"; fail=$((fail+1)); }
 
+    rc=0
     PREGATE_INNER=1 "$GATE" --repo "$F1REPO" --range 'HEAD..HEAD' --tests-dir "$HERE" \
-      --report "$TMPD/f1-empty.md" >/dev/null 2>&1
-    [ $? -eq 0 ] && { echo "ok: f1: valid empty range still exits 0"; pass=$((pass+1)); } \
+      --report "$TMPD/f1-empty.md" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] && { echo "ok: f1: valid empty range still exits 0"; pass=$((pass+1)); } \
                  || { echo "FAIL: f1: valid empty range still exits 0"; fail=$((fail+1)); }
   else
     echo "FAIL: f1: unresolvable range is a setup error (exit 2)"; fail=$((fail+1))
@@ -249,9 +338,10 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
     && git -c user.email=t@t.com -c user.name=t commit -q -m changes --trailer "Tribe-Card: x" )
   F2FENCE="$TMPD/f2fence.globs"; printf 'plugins/tribe/scripts/*.sh\n' > "$F2FENCE"
   if [ -x "$GATE" ]; then
+    rc=0
     PREGATE_INNER=1 "$GATE" --repo "$F2REPO" --range 'HEAD~1..HEAD' --tests-dir "$HERE" \
-      --report "$TMPD/f2.md" --fence "$F2FENCE" >/dev/null 2>&1
-    F2CODE=$?
+      --report "$TMPD/f2.md" --fence "$F2FENCE" >/dev/null 2>&1 || rc=$?
+    F2CODE=$rc
     grep -q 'plugins/tribe/scripts/goodfile.sh — in fence' "$TMPD/f2.md" \
       && grep -q 'plugins/tribe/scripts/tests/nested.sh — FENCE VIOLATION' "$TMPD/f2.md" \
       && [ "$F2CODE" -eq 1 ] \
@@ -275,9 +365,10 @@ if [ "${PREGATE_INNER:-0}" != "1" ]; then
   F3FENCE="$TMPD/f3fence.globs"
   printf 'docs/**\nplugins/tribe/scripts/*.sh' > "$F3FENCE"   # deliberately NO trailing newline
   if [ -x "$GATE" ]; then
+    rc=0
     PREGATE_INNER=1 "$GATE" --repo "$F3REPO" --range 'HEAD~1..HEAD' --tests-dir "$HERE" \
-      --report "$TMPD/f3.md" --fence "$F3FENCE" >/dev/null 2>&1
-    F3CODE=$?
+      --report "$TMPD/f3.md" --fence "$F3FENCE" >/dev/null 2>&1 || rc=$?
+    F3CODE=$rc
     grep -q 'plugins/tribe/scripts/lastglobfile.sh — in fence' "$TMPD/f3.md" && [ "$F3CODE" -eq 0 ] \
       && { echo "ok: f3: fence file's unterminated last line still applies its glob"; pass=$((pass+1)); } \
       || { echo "FAIL: f3: fence file's unterminated last line still applies its glob"; fail=$((fail+1)); }
