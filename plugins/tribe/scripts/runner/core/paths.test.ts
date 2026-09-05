@@ -23,3 +23,13 @@ describe('campaign-home path helpers', () => {
     expect(campaignStatePathOf('a/b')).toBe('a/b/campaign-state.json');
   });
 });
+
+import { driftDirOf, driftPathOf } from './paths.ts';
+
+describe('drift digest paths (card i75)', () => {
+  test('the digest for a card lives at home/drift/cardId.md', () => {
+    expect(driftDirOf('/h/.tribe/k/campaigns/c')).toBe('/h/.tribe/k/campaigns/c/drift');
+    expect(driftPathOf('/h/.tribe/k/campaigns/c', 'i75-upstream-drift'))
+      .toBe('/h/.tribe/k/campaigns/c/drift/i75-upstream-drift.md');
+  });
+});

@@ -271,7 +271,7 @@ and card §Measurable goals G5, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `core/paths.test.ts`:
+- [x] **Step 1: Failing test** — append to `core/paths.test.ts`:
 
 ```ts
 import { driftDirOf, driftPathOf } from './paths.ts';
@@ -366,7 +366,7 @@ describe('parseBaseBranch — the remote HEAD parse (duplicated on purpose, see 
 Run `cd plugins/tribe/scripts/runner && bun test core/watchdog/drift.test.ts core/paths.test.ts`.
 Expected: fails to resolve `./drift.ts` and the two new `paths.ts` exports.
 
-- [ ] **Step 2: Minimal implementation** — append to `core/paths.ts`:
+- [x] **Step 2: Minimal implementation** — append to `core/paths.ts`:
 
 ```ts
 export const DRIFT_DIRNAME = 'drift';
@@ -396,7 +396,7 @@ refusal). `parseBaseBranch` carries this comment verbatim:
  * preference. Four lines of pure string math is the cheaper side of that trade. */
 ```
 
-- [ ] **Step 3: Gates** — from `plugins/tribe/scripts/runner`:
+- [x] **Step 3: Gates** — from `plugins/tribe/scripts/runner`:
 
 ```sh
 bun test core/watchdog/drift.test.ts core/paths.test.ts && bun test && bunx tsc --noEmit
@@ -405,7 +405,7 @@ bun test core/watchdog/drift.test.ts core/paths.test.ts && bun test && bunx tsc 
 Expected: the new tests pass; the whole suite reports `0 fail` with the baseline 645 plus the new
 tests; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(watchdog): drift digest paths and running-card selection` with
+- [x] **Step 4: Commit** — `feat(watchdog): drift digest paths and running-card selection` with
   the `Campaign: gh-issues-2026-09` trailer, this task's checkboxes ticked in the same commit,
   then `git push`.
 

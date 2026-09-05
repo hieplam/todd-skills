@@ -33,3 +33,15 @@ export function escalationPathOf(homeDir: string, cardId: string): string {
 export function reportDirOf(homeDir: string): string {
   return homeDir;
 }
+
+export const DRIFT_DIRNAME = 'drift';
+
+/** `<home>/drift` — card i75: one digest file per card, written only by the watchdog. */
+export function driftDirOf(homeDir: string): string {
+  return join(homeDir, DRIFT_DIRNAME);
+}
+
+/** `<home>/drift/<cardId>.md` */
+export function driftPathOf(homeDir: string, cardId: string): string {
+  return join(driftDirOf(homeDir), `${cardId}.md`);
+}
