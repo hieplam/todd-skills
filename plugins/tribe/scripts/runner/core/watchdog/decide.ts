@@ -17,6 +17,14 @@ import { isStale } from './select.ts';
 /** Spec §8, verbatim: 30 s, 60 s, 120 s, 240 s, 480 s, then clamped. */
 const OVERLOAD_BACKOFF_SECONDS = [30, 60, 120, 240, 480];
 
+/** FIX S3 (audit round, final): `resetsAtEpochS` is untrusted log content, validated only by
+ * `Number.isFinite` before it reaches here — a corrupted or hostile value (a millisecond-scale
+ * timestamp landing in a field documented as seconds; `+058647-09-15…` was the reproduction)
+ * must never compute an unbounded wait. Real account-limit windows are hours
+ * (`rate_limit_info.rateLimitType`, e.g. `five_hour`); a week is a generous outer bound that
+ * still rejects a decades-long bogus deadline. */
+export const MAX_QUOTA_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Total over every `number` (G1, group-B audit round 1): a fractional, `NaN`, negative or
  * out-of-range attempt must still land on a defined entry, never `undefined` — a non-finite
  * attempt saturates to the first entry, everything else rounds to its nearest index and clamps
@@ -59,7 +67,12 @@ export function decide(o: WatchdogObservation): WatchdogAction {
 
   // --- 3. Exit 1: the single-instance lock refused the start.
   if (o.lastExitCode === 1) {
-    if (o.lockHolder?.alive) return { kind: 'attach', runnerPid: o.lockHolder.pid };
+    // FIX F-C3: mirrors section 1's mode guard — a foreign live holder is exactly the "a
+    // runner is alive" case W-P5 forbids `--once` from sleeping on (spec 2.1 Never).
+    if (o.lockHolder?.alive) {
+      if (o.mode === 'once') return { kind: 'exit', status: 'running', reason: 'runner_alive' };
+      return { kind: 'attach', runnerPid: o.lockHolder.pid };
+    }
     if (o.stopFilePresent) return STOP;
     if (o.counters.lockRelaunches >= 1) {
       return { kind: 'exit', status: 'needs_human', reason: 'lock_conflict' };
@@ -70,8 +83,11 @@ export function decide(o: WatchdogObservation): WatchdogAction {
   // --- 4. Exit 3, or a crash with no code to read (W-P6): the recoverable deaths.
   if (o.lastExitCode === 3 || (o.lastExitCode === null && o.crashSuspected)) {
     // W-P2: a missing or already-elapsed reset is NOT a quota signal (spec §7).
-    const quotaUntilMs =
-      o.quota === null ? null : (o.quota.resetsAtEpochS + o.limits.quotaGraceSeconds) * 1000;
+    // FIX S3: clamp the computed deadline — untrusted log content must never produce an
+    // unbounded wait (`MAX_QUOTA_WAIT_MS`, defined above beside `OVERLOAD_BACKOFF_SECONDS`).
+    const quotaUntilMs = o.quota === null
+      ? null
+      : Math.min((o.quota.resetsAtEpochS + o.limits.quotaGraceSeconds) * 1000, o.nowMs + MAX_QUOTA_WAIT_MS);
     const quotaIsFuture = quotaUntilMs !== null && o.quota !== null
       && o.quota.resetsAtEpochS * 1000 > o.nowMs;
 
@@ -91,8 +107,29 @@ export function decide(o: WatchdogObservation): WatchdogAction {
       return { kind: 'wait_until', untilMs: quotaUntilMs as number, cause: 'quota' };
     }
 
+    // FIX F-C2: the quota deadline decayed into the past (or was never future), but if a
+    // quota wait was ORDERED and its own deadline has now been served, this is a quota
+    // recovery continuing — never the generic crash path (which mislabels it `cause: crash`
+    // and drains the independent crash budget for a run that never crashed).
+    const servedQuotaWait = o.quota !== null && o.pendingWait !== null
+      && o.pendingWait.cause === 'quota' && o.nowMs >= o.pendingWait.untilMs;
+    if (servedQuotaWait) {
+      if (o.stopFilePresent) return STOP;
+      return { kind: 'relaunch', cause: 'quota', model: null };
+    }
+
     if (o.overload !== null) {
       if (o.stopFilePresent) return STOP;
+      // FIX F-C1: the overload signal has no time-based decay of its own (a dead runner's log
+      // never changes), so without this check every re-observation of the SAME still-529 log
+      // re-entered this branch and ordered ANOTHER, longer wait — never a relaunch. Once the
+      // wait we ordered has been served, retry now; the counter bumped when the wait was
+      // ordered already makes the schedule escalate on the NEXT fresh occurrence.
+      const servedOverloadWait = o.pendingWait !== null && o.pendingWait.cause === 'overload'
+        && o.nowMs >= o.pendingWait.untilMs;
+      if (servedOverloadWait) {
+        return { kind: 'relaunch', cause: 'overload', model: null };
+      }
       if (o.counters.overloadBackoffs >= o.limits.maxOverloadBackoffs) {
         if (o.fallbackModel !== null && !o.counters.fallbackUsed) {
           return { kind: 'relaunch', cause: 'overload', model: o.fallbackModel };
@@ -121,7 +158,11 @@ export function decide(o: WatchdogObservation): WatchdogAction {
   }
 
   // --- 5. Nothing has run yet this invocation.
-  if (o.lockHolder?.alive) return { kind: 'attach', runnerPid: o.lockHolder.pid };
+  // FIX F-C3: same mode guard as sections 1 and 3 — see their comments.
+  if (o.lockHolder?.alive) {
+    if (o.mode === 'once') return { kind: 'exit', status: 'running', reason: 'runner_alive' };
+    return { kind: 'attach', runnerPid: o.lockHolder.pid };
+  }
   if (o.stopFilePresent) return STOP;
   return { kind: 'launch' };
 }

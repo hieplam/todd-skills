@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { decide, overloadBackoffSeconds } from './decide.ts';
+import { decide, MAX_QUOTA_WAIT_MS, overloadBackoffSeconds } from './decide.ts';
 import type { WatchdogObservation } from './model.ts';
 
 const NOW = 1_800_000_000_000; // fixed clock, ms
@@ -34,6 +34,7 @@ function obs(over: Partial<WatchdogObservation> = {}): WatchdogObservation {
     counters: { ...ZERO },
     limits: { ...LIMITS },
     fallbackModel: null,
+    pendingWait: null,
     ...over,
   };
 }
@@ -462,5 +463,150 @@ describe('decide — C3: --once pending exits carry the same wake instant --foll
     if (followAction.kind !== 'wait_until') throw new Error('expected wait_until');
     if (onceAction.kind !== 'exit') throw new Error('expected exit');
     expect(onceAction.nextWakeAtMs).toBe(followAction.untilMs);
+  });
+});
+
+// FIX F-C1 (audit round, final): "overloadBackoffs=0..4 -> wait_until; overloadBackoffs=5 ->
+// exit needs_human:overloaded. Not one relaunch." The overload branch had NO time decay of its
+// own (unlike quota, whose resetsAt eventually passes) so every re-observation of the same
+// dead runner's still-529 log re-entered the wait branch and ordered ANOTHER, longer wait
+// instead of ever retrying. `pendingWait` (model.ts) is the explicit "has the ordered backoff
+// already elapsed" signal the finding calls for.
+describe('decide — FIX F-C1: a served overload wait relaunches instead of waiting again', () => {
+  test('a served overload wait relaunches with cause overload, never a second wait for the same 529', () => {
+    const action = decide(obs({
+      lastExitCode: 3, overload: { apiErrorStatus: 529 },
+      counters: { ...ZERO, overloadBackoffs: 1 },
+      pendingWait: { cause: 'overload', untilMs: NOW },
+    }));
+    expect(encode(action)).toBe('relaunch:overload');
+  });
+
+  test('a served overload wait relaunches even once the counter has JUST reached the cap — the ' +
+    'wait that reached it is still honoured; only the NEXT fresh occurrence hits the cap', () => {
+    const action = decide(obs({
+      lastExitCode: 3, overload: { apiErrorStatus: 529 },
+      counters: { ...ZERO, overloadBackoffs: 5 },
+      pendingWait: { cause: 'overload', untilMs: NOW },
+    }));
+    expect(encode(action)).toBe('relaunch:overload');
+  });
+
+  test('STOP still wins over a served overload-wait relaunch', () => {
+    const action = decide(obs({
+      lastExitCode: 3, overload: { apiErrorStatus: 529 }, stopFilePresent: true,
+      counters: { ...ZERO, overloadBackoffs: 1 },
+      pendingWait: { cause: 'overload', untilMs: NOW },
+    }));
+    expect(encode(action)).toBe('exit:done:stop_requested');
+  });
+
+  test('a pendingWait not yet due (nowMs < untilMs) is never treated as served', () => {
+    const action = decide(obs({
+      lastExitCode: 3, overload: { apiErrorStatus: 529 },
+      counters: { ...ZERO, overloadBackoffs: 0 },
+      pendingWait: { cause: 'overload', untilMs: NOW + 1000 },
+    }));
+    expect(encode(action)).toBe(OVERLOAD_WAIT);
+  });
+
+  test('a pending QUOTA wait never satisfies an overload serve (cause must match)', () => {
+    const action = decide(obs({
+      lastExitCode: 3, overload: { apiErrorStatus: 529 },
+      counters: { ...ZERO, overloadBackoffs: 0 },
+      pendingWait: { cause: 'quota', untilMs: NOW },
+    }));
+    expect(encode(action)).toBe(OVERLOAD_WAIT);
+  });
+});
+
+// FIX F-C2 (audit round, final): a completed quota recovery used to fall through to the
+// generic crash-relaunch branch once `resetsAt` decayed into the past, mislabelling the
+// relaunch `cause: 'crash'` and draining `maxCrashRelaunches` (budget 1) for a recovery that
+// was never a crash — starving a LATER genuine crash of its one relaunch.
+describe('decide — FIX F-C2: a served quota wait relaunches as cause quota, never crash', () => {
+  test('a served quota wait relaunches with cause quota once the reset has passed', () => {
+    const action = decide(obs({
+      lastExitCode: 3, quota: { resetsAtEpochS: Math.floor(NOW / 1000) - 10 },
+      pendingWait: { cause: 'quota', untilMs: NOW },
+    }));
+    expect(encode(action)).toBe('relaunch:quota');
+  });
+
+  test('a served quota-wait relaunch never consumes the crash budget: it still fires with the ' +
+    'crash budget already exhausted', () => {
+    const action = decide(obs({
+      lastExitCode: 3, quota: { resetsAtEpochS: Math.floor(NOW / 1000) - 10 },
+      pendingWait: { cause: 'quota', untilMs: NOW },
+      counters: { ...ZERO, crashRelaunches: 1 },
+    }));
+    expect(encode(action)).toBe('relaunch:quota');
+  });
+
+  test('STOP still wins over a served quota-wait relaunch', () => {
+    const action = decide(obs({
+      lastExitCode: 3, quota: { resetsAtEpochS: Math.floor(NOW / 1000) - 10 },
+      pendingWait: { cause: 'quota', untilMs: NOW }, stopFilePresent: true,
+    }));
+    expect(encode(action)).toBe('exit:done:stop_requested');
+  });
+
+  test('a stale reset with no wait ever ordered still takes the plain crash path (unchanged)', () => {
+    const action = decide(
+      obs({ lastExitCode: 3, quota: { resetsAtEpochS: Math.floor(NOW / 1000) - 10 } }),
+    );
+    expect(encode(action)).toBe('relaunch:crash');
+  });
+});
+
+// FIX F-C3 (audit round, final): sections 3 (exit 1, lock refused) and 5 (nothing run yet) both
+// did a bare `if (o.lockHolder?.alive) return attach` with no mode check, so `--once` slept on
+// a foreign live lock exactly like `--follow` — violating W-P5 ("--once never sleeps"). Section
+// 1 (a live runner of our own) already guarded this correctly; sections 3 and 5 now match it.
+describe('decide — FIX F-C3: --once never attaches to a foreign live lock holder (W-P5)', () => {
+  test('once: exit 1, lock held by a live process -> exit running runner_alive, never attach', () => {
+    const action = decide(
+      obs({ mode: 'once', lastExitCode: 1, lockHolder: { pid: 777, alive: true } }),
+    );
+    expect(encode(action)).toBe('exit:running:runner_alive');
+  });
+
+  test('once: nothing has run yet, but a live lock holder exists -> exit running runner_alive, never attach', () => {
+    const action = decide(
+      obs({ mode: 'once', run: null, lastExitCode: null, lockHolder: { pid: 777, alive: true } }),
+    );
+    expect(encode(action)).toBe('exit:running:runner_alive');
+  });
+
+  test('follow mode is unaffected: exit 1, lock held by a live process still attaches', () => {
+    const action = decide(
+      obs({ mode: 'follow', lastExitCode: 1, lockHolder: { pid: 777, alive: true } }),
+    );
+    expect(encode(action)).toBe('attach:777');
+  });
+
+  test('follow mode is unaffected: nothing run yet, live lock holder still attaches', () => {
+    const action = decide(
+      obs({ mode: 'follow', run: null, lastExitCode: null, lockHolder: { pid: 777, alive: true } }),
+    );
+    expect(encode(action)).toBe('attach:777');
+  });
+});
+
+// FIX S3 (audit round, final): `resetsAtEpochS` is untrusted log content validated only by
+// `Number.isFinite` — a corrupted value (e.g. a millisecond-scale number landing in a field
+// documented as seconds) must not compute a decades-long wait. The deadline is now clamped to
+// `nowMs + MAX_QUOTA_WAIT_MS`, a named constant beside `OVERLOAD_BACKOFF_SECONDS`.
+describe('decide — FIX S3: a corrupt/huge resetsAtEpochS clamps to a bounded wait', () => {
+  test('an absurdly large resetsAtEpochS clamps the wait to MAX_QUOTA_WAIT_MS, never decades', () => {
+    const hugeResetsAtEpochS = FUTURE_RESET_S * 1000; // e.g. ms mistakenly landed in the s field
+    const action = decide(obs({ lastExitCode: 3, quota: { resetsAtEpochS: hugeResetsAtEpochS } }));
+    if (action.kind !== 'wait_until') throw new Error(`expected wait_until, got ${action.kind}`);
+    expect(action.untilMs).toBe(NOW + MAX_QUOTA_WAIT_MS);
+  });
+
+  test('a normal, near-term reset is NOT clamped (still exact grace-adjusted math)', () => {
+    const action = decide(obs({ lastExitCode: 3, quota: { resetsAtEpochS: FUTURE_RESET_S } }));
+    expect(encode(action)).toBe(QUOTA_WAIT);
   });
 });

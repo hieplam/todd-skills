@@ -126,15 +126,17 @@ describe('G3 — every terminal state surfaces to the lead', () => {
   }
 
   test('--fallback-model relaunches once on the cheaper tier instead of parking', async () => {
-    // Deviation from the brief's original plan (`'3:overload 3:overload 3:overload 0:none'`,
-    // 4 entries): decide.ts's frozen, unit-tested behaviour (decide.test.ts "the fallback is
-    // used at most once") never resets `overloadBackoffs` on a relaunch, and the two
-    // `wait_until` cycles that exhaust `maxOverloadBackoffs: 2` both read the SAME still-
-    // overloaded run.json from the FIRST double process — they spawn no new process. So the
-    // fallback relaunch is only the SECOND double invocation; a plan with a third `3:overload`
-    // entry would never be reached (the second attempt's overload alone parks needs_human,
-    // since the fallback is exhausted). Confirmed against the real double: see report.
-    const h = harness('3:overload 0:none');
+    // FIX F-C1 (audit round, final): this plan is restored to the brief's ORIGINAL 4-entry
+    // design (`'3:overload 3:overload 3:overload 0:none'`). It had been shortened to 2
+    // entries as a workaround for the exact defect F-C1 fixes: an overload death used to never
+    // relaunch at all, so ALL of `maxOverloadBackoffs`'s waits played out back-to-back against
+    // the SAME still-overloaded run.json from the FIRST double process, with the fallback
+    // relaunch the only second spawn ever made. Now each served backoff wait relaunches
+    // immediately (`decide.ts`'s new `pendingWait`-served check), so reaching the cap
+    // genuinely takes 3 separate `3:overload` double invocations — one per wait — before the
+    // 3rd overload finally trips `maxOverloadBackoffs: 2` and relaunches on the fallback tier;
+    // the 4th (final) entry is that fallback-tier invocation succeeding.
+    const h = harness('3:overload 3:overload 3:overload 0:none');
     const outcome = await runWatchdog(
       config({ maxOverloadBackoffs: 2, fallbackModel: 'test-fallback' }), h.home, h.io,
     );

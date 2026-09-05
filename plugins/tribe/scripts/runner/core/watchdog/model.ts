@@ -80,6 +80,14 @@ export interface WatchdogObservation {
   counters: WatchdogCounters;
   limits: WatchdogLimits;
   fallbackModel: string | null;
+  /** FIX F-C1/F-C2 (audit round, final): the deadline of the most recently ORDERED
+   * `wait_until`, carried forward by the loop until it is consumed by a relaunch — so
+   * `decide()` can tell "the ordered backoff/quota wait has already been served; retry now"
+   * from "a fresh instance of this same still-present log signal", rather than inferring it
+   * from decayed state (the quota case) or never detecting it at all (the overload case, which
+   * has no time-based decay of its own). `null` whenever no wait is currently outstanding —
+   * cleared the moment any new attempt (launch or relaunch) is spawned. */
+  pendingWait: { cause: 'quota' | 'overload'; untilMs: number } | null;
 }
 
 export type WatchdogAction =

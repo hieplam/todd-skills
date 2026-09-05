@@ -37,6 +37,12 @@ function fakeIo(passes: Scripted[]) {
   let index = 0;
   const runsDir = join(HOME, 'runs');
   const pendingReveals: Array<{ pass: Scripted; attemptIndex: number; callsRemaining: number }> = [];
+  // FIX F-C3/S2 (audit round, final): the old fake hardcoded `readLock: () => null` and
+  // `isProcessAlive: () => false`, so neither a foreign live lock holder nor a dead-but-still
+  // "not-finalized" adopted pid could ever be represented — precisely why those two defects
+  // shipped unnoticed (fixtures-mirror-reality.md). Both are now scriptable per test.
+  let lockHolder: { pid: number; startedAt: string } | null = null;
+  const alivePids = new Set<number>();
 
   function materialize(pending: { pass: Scripted; attemptIndex: number }): void {
     const { pass, attemptIndex } = pending;
@@ -78,8 +84,11 @@ function fakeIo(passes: Scripted[]) {
     },
     readTail: (p) => files.get(p) ?? '',
     realpath: (p) => p,
-    readLock: () => null,
-    isProcessAlive: () => false,
+    readLock: () => lockHolder,
+    // Default false (dead) for any pid never explicitly marked alive — unchanged from the old
+    // constant-`false` behaviour for every existing test; `setProcessAlive` only ever ADDS a
+    // pid that should report alive.
+    isProcessAlive: (pid) => alivePids.has(pid),
     currentPid: () => 4242,
     now: () => new Date(nowMs).toISOString(),
     nowMs: () => nowMs,
@@ -97,7 +106,15 @@ function fakeIo(passes: Scripted[]) {
     cwd: () => '/cwd',
     printLine: (line) => { lines.push(line); },
   };
-  return { io, files, lines, spawns, setNow: (ms: number) => { nowMs = ms; }, entries };
+  return {
+    io, files, lines, spawns, setNow: (ms: number) => { nowMs = ms; }, entries,
+    setLockHolder: (pid: number | null) => {
+      lockHolder = pid === null ? null : { pid, startedAt: new Date(nowMs).toISOString() };
+    },
+    setProcessAlive: (pid: number, alive: boolean) => {
+      if (alive) alivePids.add(pid); else alivePids.delete(pid);
+    },
+  };
 }
 
 const quotaTail = (resetsAtEpochS: number) =>
@@ -388,5 +405,166 @@ describe('runWatchdog — carried-forward requirement 3: an unknown attach pid n
       .trim().split('\n').map((l) => JSON.parse(l));
     const attachEvent = events.find((e) => e.action === 'attach');
     expect(attachEvent?.detail?.runnerPid ?? null).toBe(null); // never fabricated as 0
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// FIX S1 (audit round, final): a cold start used to read a PREVIOUS invocation's finalized
+// run.json as if it were THIS tick's answer, so an answered escalation (or any completed
+// campaign) could never be re-triggered in the same home — the Stage C re-trigger scenario the
+// finding reproduced end-to-end.
+// ---------------------------------------------------------------------------------------
+describe('runWatchdog — FIX S1: a cold start ignores a PREVIOUS invocation\'s finalized run.json', () => {
+  test('an already-ended record from a prior invocation does not block a fresh launch (D74-7: "no prior run THIS invocation" -> launch)', async () => {
+    const { io, files, entries, spawns } = fakeIo([{ exitCode: 0, runId: 'r2' }]);
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 8888, startedAt: new Date(0).toISOString(),
+      endedAt: new Date(1).toISOString(), exitCode: 2, reason: 'escalations_pending',
+    }));
+    entries.set(join(runDir, 'logs'), []);
+
+    const outcome = await runWatchdog(CONFIG, HOME, io);
+    // Before the fix: lastExitCode read straight from the stale record -> immediate
+    // exit(needs_human:escalations_pending), spawns.length stays 0, NO 'launch' event ever.
+    expect(spawns.length).toBe(1);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    const events = (files.get(join(HOME, 'watchdog', 'events.jsonl')) as string)
+      .trim().split('\n').map((l) => JSON.parse(l).action);
+    expect(events).toContain('launch');
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// FIX S2 (audit round, final): `recordAlive` trusted `endedAt === null` with no pid probe, so a
+// SIGKILLed runner (whose run.json is never finalized) read as ALIVE forever — the crash path
+// was unreachable until the unrelated `--stall-minutes` timeout finally fired.
+// ---------------------------------------------------------------------------------------
+describe('runWatchdog — FIX S2: a confirmed-dead pid with an unfinalized record is not "alive"', () => {
+  test('a known, confirmed-dead pid with endedAt still null takes the crash path instead of waiting for --stall-minutes', async () => {
+    const { io, files, entries, spawns } = fakeIo([{ exitCode: 0, runId: 'r2' }]);
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 6543, startedAt: new Date(0).toISOString(),
+      endedAt: null, exitCode: null, reason: null,
+    }));
+    entries.set(join(runDir, 'logs'), []);
+    // pid 6543 is never registered alive — the fake's default ("dead unless marked otherwise")
+    // is exactly the reproduction: a killed process the OS confirms is gone.
+
+    const outcome = await runWatchdog(CONFIG, HOME, io);
+    expect(spawns.length).toBe(1); // relaunched instead of "attaching" to a dead pid forever
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    const events = (files.get(join(HOME, 'watchdog', 'events.jsonl')) as string)
+      .trim().split('\n').map((l) => JSON.parse(l));
+    const kinds = events.map((e) => e.action);
+    expect(kinds).toContain('relaunch');
+    expect(kinds).not.toContain('stall'); // never waited out the unrelated stall timeout
+    expect(events.find((e) => e.action === 'relaunch')?.detail?.cause).toBe('crash');
+  });
+
+  test('regression guard: the SAME record with the pid genuinely alive is attached to, never relaunched', async () => {
+    const { io, files, entries, spawns, setProcessAlive } = fakeIo([]);
+    const runDir = join(HOME, 'runs', 'r1');
+    entries.set(join(HOME, 'runs'), [{ name: 'r1', mtimeMs: 1, isDir: true }]);
+    files.set(join(runDir, 'run.json'), JSON.stringify({
+      v: 1, runId: 'r1', pid: 6543, startedAt: new Date(0).toISOString(),
+      endedAt: null, exitCode: null, reason: null,
+    }));
+    entries.set(join(runDir, 'logs'), []);
+    setProcessAlive(6543, true);
+
+    let sleepCalls = 0;
+    const wrapped: WatchdogIO = {
+      ...io,
+      sleep: async (ms) => {
+        sleepCalls += 1;
+        if (sleepCalls === 1) {
+          files.set(join(runDir, 'run.json'), JSON.stringify({
+            v: 1, runId: 'r1', pid: 6543, startedAt: new Date(0).toISOString(),
+            endedAt: new Date(0).toISOString(), exitCode: 0, reason: 'x',
+          }));
+        }
+        await io.sleep(ms);
+      },
+    };
+    const outcome = await runWatchdog(CONFIG, HOME, wrapped);
+    expect(spawns.length).toBe(0); // never launches a second runner while genuinely alive
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// FIX F-C3 (audit round, final): `decide()`'s sections 3 and 5 attached to a foreign live lock
+// holder with no mode check, so a `--once` tick could sleep on it — the exact violation of
+// W-P5 ("--once never sleeps") this fake could not previously represent (`readLock` was
+// hardcoded to `() => null`).
+// ---------------------------------------------------------------------------------------
+describe('runWatchdog — FIX F-C3: --once never sleeps on a foreign live lock holder', () => {
+  test('once mode with a live lock holder present exits running/runner_alive without sleeping or spawning', async () => {
+    const { io, spawns, setLockHolder, setProcessAlive } = fakeIo([]);
+    setLockHolder(777);
+    setProcessAlive(777, true);
+    let sleepCalls = 0;
+    const wrapped: WatchdogIO = { ...io, sleep: async (ms) => { sleepCalls += 1; await io.sleep(ms); } };
+    const outcome = await runWatchdog({ ...CONFIG, mode: 'once' }, HOME, wrapped);
+    expect(spawns.length).toBe(0);
+    expect(sleepCalls).toBe(0); // W-P5: --once never sleeps
+    expect([outcome.exitCode, outcome.reason]).toEqual([11, 'runner_alive']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// FIX F-C1 (audit round, final): the overload branch had no time-based decay of its own, so a
+// dead runner's still-529 log re-entered the wait branch forever — never a relaunch.
+// ---------------------------------------------------------------------------------------
+describe('runWatchdog — FIX F-C1: a served overload-backoff wait relaunches instead of waiting again', () => {
+  test('overload wait then relaunch then done — a second wait for the SAME 529 never happens', async () => {
+    const overloadTail = `${JSON.stringify({ type: 'result', is_error: true, api_error_status: 529 })}\n`;
+    const { io, files, spawns } = fakeIo([
+      { exitCode: 3, runId: 'r1', logTail: overloadTail },
+      { exitCode: 0, runId: 'r2' },
+    ]);
+    const outcome = await runWatchdog(CONFIG, HOME, io);
+    // Before the fix: this hangs the pattern of wait -> wait -> wait -> ... -> needs_human at
+    // the cap, spawns.length stays 1, outcome is [10, 'overloaded'], never [0, 'runner_done'].
+    expect(spawns.length).toBe(2);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    const events = (files.get(join(HOME, 'watchdog', 'events.jsonl')) as string)
+      .trim().split('\n').map((l) => JSON.parse(l));
+    expect(events.filter((e) => e.action === 'wait_until').length).toBe(1); // exactly one wait
+    expect(events.find((e) => e.action === 'relaunch')?.detail?.cause).toBe('overload');
+    const status = JSON.parse(files.get(join(HOME, 'watchdog', 'status.json')) as string);
+    expect(status.counters.overloadBackoffs).toBe(1); // one wait served, one relaunch
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// FIX F-C2 (audit round, final): a completed quota recovery relaunched with `cause: crash`,
+// draining the independent crash-relaunch budget (max 1) so a LATER genuine crash got no
+// relaunch at all.
+// ---------------------------------------------------------------------------------------
+describe('runWatchdog — FIX F-C2: a served quota-wait relaunch never drains the crash budget', () => {
+  test('quota relaunch, then a genuine crash still gets its own one relaunch (budgets stay independent)', async () => {
+    const { io, files, spawns } = fakeIo([
+      { exitCode: 3, runId: 'r1', logTail: quotaTail(1_800_000_000 + 30) },
+      { exitCode: 3, runId: 'r2' }, // genuine crash, no signal
+      { exitCode: 0, runId: 'r3' },
+    ]);
+    const outcome = await runWatchdog(CONFIG, HOME, io);
+    // Before the fix: the quota relaunch is mislabelled cause:'crash' and consumes the
+    // maxCrashRelaunches=1 budget, so r2's genuine crash gets exit(needs_human:
+    // session_incomplete) instead of its own relaunch — spawns.length stays 2, r3 never runs.
+    expect(spawns.length).toBe(3);
+    expect([outcome.exitCode, outcome.reason]).toEqual([0, 'runner_done']);
+    const events = (files.get(join(HOME, 'watchdog', 'events.jsonl')) as string)
+      .trim().split('\n').map((l) => JSON.parse(l));
+    const relaunches = events.filter((e) => e.action === 'relaunch');
+    expect(relaunches.map((e) => e.detail.cause)).toEqual(['quota', 'crash']);
+    const status = JSON.parse(files.get(join(HOME, 'watchdog', 'status.json')) as string);
+    expect(status.counters.crashRelaunches).toBe(1); // the genuine crash only
+    expect(status.counters.quotaWaits).toBe(1);
   });
 });

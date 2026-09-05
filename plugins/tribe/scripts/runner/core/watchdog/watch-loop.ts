@@ -39,6 +39,12 @@ interface LoopState {
   stall: { logPath: string; lastMtimeMs: number } | null;
   runnerCommand: string[] | null;
   counters: WatchdogCounters;
+  /** FIX S1: the runId THIS invocation has actually observed running (owned or adopted while
+   * alive) — see `observe()`'s comment. */
+  trackedRunId: string | null;
+  /** FIX F-C1/F-C2: the deadline of the most recently ORDERED `wait_until`, cleared the moment
+   * any new attempt is spawned — see `model.ts`'s `WatchdogObservation.pendingWait`. */
+  pendingWait: { cause: 'quota' | 'overload'; untilMs: number } | null;
 }
 
 /** The tick's raw signal read, carried alongside the pure `WatchdogObservation` purely so the
@@ -74,24 +80,50 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
 
   // `run.json` — written by the runner itself on exit — is the ground truth for whether a
   // pass has finished, independent of whether THIS process has gotten around to collecting a
-  // `waitFor()` result yet: a child we own but whose record already shows `endedAt` is no
-  // longer "alive" just because we have not polled it, and a run.json with `endedAt: null`
-  // that we did NOT spawn (adopted from an earlier watchdog invocation) is legitimately alive
-  // even though its pid may be unrecoverable — carried-forward requirement 3's exact shape.
+  // `waitFor()` result yet: a child we own is alive until we have directly captured its own
+  // exit via `waitFor()` (`state.ownedExitCode`) — never inferred from a record that might
+  // belong to a DIFFERENT attempt (see C1's history below) — and a run.json with `endedAt:
+  // null` that we did NOT spawn (adopted from an earlier watchdog invocation) is legitimately
+  // alive even though its pid may be unrecoverable — carried-forward requirement 3's shape.
   //
-  // C1 (group-C audit round 1, class `critical` — the 'relaunch' half of "case 'launch': case
-  // 'relaunch':"): `record` here is read from `newestRunId`, which is not necessarily OUR
-  // child's own directory. Right after a relaunch, the PREVIOUS (already-ended) attempt's
-  // directory is still the newest one visible until the freshly-spawned child's own directory
-  // appears — the exact same no-await synchronous re-observe C1 already names. Trusting that
-  // stale, already-`endedAt`-set record unconditionally made a live, just-relaunched child
-  // read as dead, feeding its OLD exit code back into `decide()` and tripping the
-  // crash-relaunch cap a tick early. Only let a record's `endedAt` override ownership once the
-  // record's own `pid` proves it actually IS the child we hold.
-  const recordBelongsToOwnedChild = state.child !== null && recordPid === state.child.pid;
-  const childAlive = state.child !== null && state.ownedExitCode === null
-    && (recordEndedAt === null || !recordBelongsToOwnedChild);
-  const recordAlive = record !== null && recordEndedAt === null;
+  // FIX S2 (audit round, final): `recordEndedAt === null` alone is NOT liveness — a SIGKILLed
+  // process never gets to write its own finalization, so an unfinalized record with a KNOWN,
+  // confirmed-dead pid must not read as alive (it used to, reading "alive" until the unrelated
+  // `--stall-minutes` timeout eventually fired). An UNKNOWN pid (`null` — unrecoverable, never
+  // fabricated) is not evidence of anything and still trusts `endedAt === null` as before
+  // (carried-forward requirement 3's whole point).
+  const recordConfirmedDeadPid = recordPid !== null && !io.isProcessAlive(recordPid);
+  const recordNotFinalized = record !== null && recordEndedAt === null && !recordConfirmedDeadPid;
+
+  // FIX S1 (audit round, final): a record's FINALIZED (`endedAt` set) exit code may only
+  // resolve `lastExitCode` once THIS invocation has actually seen that same `runId` running —
+  // either because we spawned it ourselves, or because we adopted it while it was still alive
+  // (`recordNotFinalized` above). A record whose FIRST sighting this invocation is already
+  // terminal belongs to some earlier watchdog invocation's campaign home and must never gate
+  // this tick's decision — that is D74-7's "no prior run THIS invocation" launch case, and
+  // reading it anyway is exactly why an answered escalation (or any finished campaign) could
+  // never be re-triggered in the same home. Deletes the old pid-matching
+  // `recordBelongsToOwnedChild` / three-clause `childAlive` complexity: `childAlive` no longer
+  // needs to special-case "is this record's pid actually MY child's pid", because it never
+  // consults the record at all — only `state.child`/`state.ownedExitCode`, which are always
+  // this invocation's own truth regardless of what stale directory happens to be newest on
+  // disk mid-relaunch (C1's original race).
+  if (runId !== null && (state.child !== null || recordNotFinalized)) {
+    state.trackedRunId = runId;
+  }
+  // Exit codes 1 (lock refused) and 3 (recoverable: crash/quota/overload) are BY DESIGN
+  // re-evaluated fresh from this same tick's other signals (lock holder liveness, counters
+  // that reset to 0 each invocation, the log's own quota/overload content) every single time
+  // they are read — including the cross-invocation `--once` re-check `quota_wait_pending`
+  // exists to serve (spec §9.5). Reading one from a record this invocation never watched run
+  // costs at most one bounded extra retry; it can never reproduce the terminal-code lockup
+  // above, so only 0/2/4/5 (a human-facing, one-shot verdict) need the provenance gate.
+  const recordExitCodeSelfCorrects = recordExitCode === 1 || recordExitCode === 3;
+  const thisInvocationsFinalizedRecord = recordEndedAt !== null
+    && (recordExitCodeSelfCorrects || (runId !== null && runId === state.trackedRunId));
+
+  const childAlive = state.child !== null && state.ownedExitCode === null;
+  const recordAlive = recordNotFinalized;
   const alive = childAlive || recordAlive;
   const runnerPid = childAlive ? (state.child as RunnerHandle).pid : recordPid;
 
@@ -133,7 +165,7 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
       newestLogPath,
       newestLogMtimeMs: newest?.mtimeMs ?? null,
     },
-    lastExitCode: state.ownedExitCode ?? (recordEndedAt !== null ? recordExitCode : null),
+    lastExitCode: state.ownedExitCode ?? (thisInvocationsFinalizedRecord ? recordExitCode : null),
     crashSuspected: runId !== null && !alive && recordEndedAt === null && state.ownedExitCode === null,
     quota: signals?.quota ?? null,
     overload: signals?.overload ?? null,
@@ -146,6 +178,7 @@ function observe(config: WatchdogConfig, homeDir: string, io: WatchdogIO, state:
       quotaGraceSeconds: config.quotaGraceSeconds,
     },
     fallbackModel: config.fallbackModel,
+    pendingWait: state.pendingWait,
   };
 
   const signalDetail = signals === null ? null : {
@@ -166,7 +199,7 @@ export async function runWatchdog(
   const startedAt = io.now();
   const state: LoopState = {
     child: null, ownedExitCode: null, attempt: 0, model: config.model, runId: null,
-    nextWakeAtMs: null, stall: null, runnerCommand: null,
+    nextWakeAtMs: null, stall: null, runnerCommand: null, trackedRunId: null, pendingWait: null,
     counters: {
       quotaWaits: 0, overloadBackoffs: 0, crashRelaunches: 0, lockRelaunches: 0,
       fallbackUsed: false,
@@ -250,6 +283,10 @@ export async function runWatchdog(
     state.child = io.spawnRunner(argv, { cwd: config.repoRoot, stdoutPath });
     state.ownedExitCode = null;
     state.nextWakeAtMs = null;
+    // FIX F-C1/F-C2: any new attempt (launch OR relaunch, whatever its cause) starts a fresh
+    // cycle — a wait ordered for a PREVIOUS attempt's signal must never be read as "served" by
+    // some later, unrelated signal.
+    state.pendingWait = null;
   };
 
   for (;;) {
@@ -278,6 +315,17 @@ export async function runWatchdog(
       }
 
       case 'attach': {
+        // FIX F-C3 defense-in-depth: `decide()` must never return `attach` while
+        // `config.mode === 'once'` (W-P5, sections 1/3/5 all now mode-gate their lockHolder/
+        // live-run attach) — a once-mode tick sleeping even one slice here would break "at most
+        // one action, then exit 11" for the cron/launchd caller `--once` exists to serve. This
+        // is a should-never-happen backstop, not a reachable path.
+        if (config.mode === 'once') {
+          throw new Error(
+            'watchdog invariant violated: --once reached the attach/sleep path (W-P5); '
+              + 'decide() must never return attach while mode is once',
+          );
+        }
         record('attach', { runnerPid: action.runnerPid });
         publish('runner_running', actionLine(action), null, action.runnerPid);
         if (state.child !== null && state.ownedExitCode === null) {
@@ -296,6 +344,10 @@ export async function runWatchdog(
         if (action.cause === 'quota') state.counters.quotaWaits += 1;
         else state.counters.overloadBackoffs += 1;
         state.nextWakeAtMs = action.untilMs;
+        // FIX F-C1/F-C2: remember this wait's deadline so the NEXT observation can tell
+        // "already served" from "a fresh occurrence" — cleared by `spawnRunnerNow` the moment
+        // it is consumed by a relaunch (or superseded by any other new attempt).
+        state.pendingWait = { cause: action.cause, untilMs: action.untilMs };
         record('wait_until', { cause: action.cause, untilMs: action.untilMs });
         publish(action.cause === 'quota' ? 'quota_wait' : 'overload_backoff', actionLine(action), null, null);
         // A wake-up LOOP, never one long sleep (spec §2.1 Never): a STOP file or a manual

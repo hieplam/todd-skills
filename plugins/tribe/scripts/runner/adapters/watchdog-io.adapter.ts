@@ -104,8 +104,13 @@ export function buildWatchdogIo(): WatchdogIO {
         if (length === 0) return '';
         fd = openSync(filePath, 'r');
         const buffer = Buffer.alloc(length);
-        readSync(fd, buffer, 0, length, start);
-        return buffer.toString('utf8');
+        // FIX S5 (audit round, final): `readSync` returns the NUMBER OF BYTES actually read,
+        // which can be less than `length` (a short read — e.g. the file shrank between the
+        // `statSync` above and this call). Stringifying the full, untouched `Buffer.alloc`
+        // baked the unwritten tail in as literal NUL bytes, corrupting/truncating whatever
+        // fell there — including the newest, most authoritative log line.
+        const bytesRead = readSync(fd, buffer, 0, length, start);
+        return buffer.subarray(0, bytesRead).toString('utf8');
       } catch (err) {
         const code = (err as { code?: string }).code;
         if (code === 'ENOENT' || code === 'EACCES' || code === 'EISDIR') return '';
