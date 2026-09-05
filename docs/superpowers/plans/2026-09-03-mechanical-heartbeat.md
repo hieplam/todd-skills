@@ -77,14 +77,17 @@ the Shaman under §7 "Spec amendments proposed" for ratification into the spec t
   `fail-closed-edges` "every spawn carries a timeout" obligation: G4 freezes the reason — "It
   never kills the runner (the runner's own `--session-timeout` owns that)". This is written as a
   code comment at the spawn seam, per that rule's own escape clause.
-- **W-P8 Two new flags beyond spec §2.1's list**, both protocol defaults in the shape of
-  `--stall-minutes`: `--poll-seconds` (default 30, the wake-up slice) and
+- **W-P8 Three new flags beyond spec §2.1's list** (amended in audit round 1, finding M1: a
+  third flag was implemented from the start but never declared here), all three protocol
+  defaults in the shape of `--stall-minutes`: `--poll-seconds` (default 30, the wake-up slice),
   `--quota-grace-seconds` (default 30, spec §2.1's frozen "`resetsAt` + 30 s" made
-  configurable so the G1 integration test runs in seconds instead of a minute). Defaults
-  reproduce the frozen behaviour exactly. `--remote` joins the pass-through set (the runner has
-  it; omitting it silently mis-targets any repo whose upstream is not `origin`).
-  `--dry-run` is **rejected** as an unknown flag: a watchdog over a zero-side-effect run has
-  nothing to observe.
+  configurable so the G1 integration test runs in seconds instead of a minute), and
+  `--max-overload-backoffs` (default 5, bounds 0-100, same shape as `--max-quota-waits` — the
+  cap on consecutive overload (5xx) backoffs before the watchdog gives up and exits
+  `needs_human`). Defaults reproduce the frozen behaviour exactly. `--remote` joins the
+  pass-through set (the runner has it; omitting it silently mis-targets any repo whose upstream
+  is not `origin`). `--dry-run` is **rejected** as an unknown flag: a watchdog over a
+  zero-side-effect run has nothing to observe.
 - **W-P9 The watchdog writes only under `<home>/watchdog/`.** `status.json`, `events.jsonl`, and
   `runner-stdout/<attempt>.log`. Spec §7's risk row is asserted as a test, not a promise.
 - **W-P10 Containment realpaths both sides.** `--home` is resolved against cwd, symlink-resolved,
@@ -232,7 +235,7 @@ file, `core/watchdog/model.ts`. `core/types.ts` stays byte-identical — it is a
 
 **Steps**
 
-- [ ] **Step 1: Failing test.** Create `core/watchdog/args.test.ts`:
+- [x] **Step 1: Failing test.** Create `core/watchdog/args.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -335,7 +338,7 @@ describe('parseWatchdogArgs', () => {
 Run `cd plugins/tribe/scripts/runner && bun test core/watchdog/args.test.ts`. Expected: the file
 fails to resolve `./args.ts` — that is the red.
 
-- [ ] **Step 2: Create the vocabulary** as a new file, `core/watchdog/model.ts` (a leaf core
+- [x] **Step 2: Create the vocabulary** as a new file, `core/watchdog/model.ts` (a leaf core
   module: it imports nothing local, so it is legal under `structure.test.ts` exactly as
   `core/types.ts` is):
 
@@ -455,7 +458,9 @@ export interface WatchdogEvent {
 }
 ```
 
-- [ ] **Step 3: Implement** `core/watchdog/args.ts`:
+- [x] **Step 3: Implement** `core/watchdog/args.ts`:
+
+<!-- Amended in audit round 1 (finding F1): value-taking flags now refuse a flag-shaped value. -->
 
 ```ts
 /**
@@ -482,6 +487,14 @@ const OWN_VALUE_FLAGS = new Set([
 ]);
 const OWN_BOOLEAN_FLAGS = new Set(['--once', '--follow']);
 
+/** Every recognized flag token, own or passthrough, value-taking or boolean — used to refuse a
+ * value-taking flag being handed another flag's token as its "value" (audit F1): without this,
+ * `--fallback-model --once` would silently swallow `--once` as the fallback model string and
+ * leave `mode` at its default, with zero error. */
+const ALL_FLAG_TOKENS = new Set<string>([
+  ...PASSTHROUGH_VALUE_FLAGS, ...PASSTHROUGH_BOOLEAN_FLAGS, ...OWN_VALUE_FLAGS, ...OWN_BOOLEAN_FLAGS,
+]);
+
 interface Bound { min: number; max: number }
 const BOUNDS: Record<string, Bound> = {
   '--stall-minutes': { min: 1, max: 24 * 60 },
@@ -493,10 +506,18 @@ const BOUNDS: Record<string, Bound> = {
   '--poll-seconds': { min: 1, max: 60 },
 };
 
+// A plain non-negative decimal integer literal — no sign, no whitespace, no hex/scientific
+// notation, never empty (audit F2: `Number(raw)` alone silently coerces "", "0x10", "3e1" and
+// " 5 " into valid integers; the contract's direction is strictness, never leniency).
+const INT_LITERAL = /^\d+$/;
+
 function parseBoundedInt(flag: string, raw: string): number | string {
   const bound = BOUNDS[flag] as Bound;
+  if (!INT_LITERAL.test(raw)) {
+    return `${flag}: must be between ${bound.min} and ${bound.max}, got "${raw}"`;
+  }
   const value = Number(raw);
-  if (!Number.isInteger(value) || value < bound.min || value > bound.max) {
+  if (value < bound.min || value > bound.max) {
     return `${flag}: must be between ${bound.min} and ${bound.max}, got "${raw}"`;
   }
   return value;
@@ -514,6 +535,9 @@ export function parseWatchdogArgs(argv: string[]): ParseWatchdogArgsResult | Par
     if (PASSTHROUGH_VALUE_FLAGS.has(token)) {
       const value = argv[i + 1];
       if (value === undefined) return { error: `${token} requires a value` };
+      if (ALL_FLAG_TOKENS.has(value)) {
+        return { error: `${token} requires a value, got flag "${value}"` };
+      }
       passthrough.push(token, value);
       i += 1;
       continue;
@@ -522,6 +546,9 @@ export function parseWatchdogArgs(argv: string[]): ParseWatchdogArgsResult | Par
     if (OWN_VALUE_FLAGS.has(token)) {
       const value = argv[i + 1];
       if (value === undefined) return { error: `${token} requires a value` };
+      if (ALL_FLAG_TOKENS.has(value)) {
+        return { error: `${token} requires a value, got flag "${value}"` };
+      }
       own.set(token, value);
       i += 1;
       continue;
@@ -573,7 +600,7 @@ export function parseWatchdogArgs(argv: string[]): ParseWatchdogArgsResult | Par
 }
 ```
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -586,7 +613,7 @@ Expected: the new file's tests pass; the full suite reports `404 pass, 0 fail` (
 12 new); `tsc` prints nothing; `structure.test.ts` stays green (proving `core/watchdog/args.ts`
 names no world module and declares no `*IO`/`*Port`).
 
-- [ ] **Step 5: Commit** — `feat(runner): watchdog vocabulary and CLI parsing (task 1/15)`, with
+- [x] **Step 5: Commit** — `feat(runner): watchdog vocabulary and CLI parsing (task 1/15)`, with
   this task's boxes ticked in the same commit and the trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -625,7 +652,7 @@ and `plugins/tribe/rules/fail-closed-edges.md` obligation 4, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `core/watchdog/args.test.ts`:
+- [x] **Step 1: Failing test** — append to `core/watchdog/args.test.ts`:
 
 ```ts
 import { containHome, resolveHomeArg } from './args.ts';
@@ -673,7 +700,7 @@ describe('containHome (pure, root supplied by the edge)', () => {
 Run `bun test core/watchdog/args.test.ts`. Expected: red — `containHome`/`resolveHomeArg` are not
 exported yet.
 
-- [ ] **Step 2: Implement** — append to `core/watchdog/args.ts`:
+- [x] **Step 2: Implement** — append to `core/watchdog/args.ts`:
 
 ```ts
 import { join, normalize, isAbsolute, sep } from 'node:path';
@@ -718,7 +745,7 @@ export function containHome(absHome: string, absTribeRoot: string): ContainHomeR
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -727,7 +754,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 Expected: `413 pass, 0 fail` (404 + 9 new); `tsc` silent. The `…/campaigns/<slug>` text inside
 the error string is prose in a template literal — it is not a path the code builds.
 
-- [ ] **Step 4: Commit** — `feat(runner): contain the watchdog --home to the tribe root (task 2/15)`,
+- [x] **Step 4: Commit** — `feat(runner): contain the watchdog --home to the tribe root (task 2/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -767,7 +794,7 @@ and spec §8, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Build the fixtures** (commands, run from the worktree root; the source campaign
+- [x] **Step 1: Build the fixtures** (commands, run from the worktree root; the source campaign
   home is machine-local and is never committed — only these copies are):
 
 ```sh
@@ -812,7 +839,7 @@ no `"rejected"`; `overload-529.log` is 1 line containing exactly one `529` and n
 | `overload-529.log` | DERIVED, not captured: the real `result` line above with `"api_error_status":429` replaced by `529`, and no `rate_limit_event`. No HTTP 529 session log exists on this machine (`grep -rl 'api_error_status":529' ~/.tribe` finds none); spec §8 records the shape from the live 2026-09-03 incident and instructs exactly this derivation. |
 ```
 
-- [ ] **Step 2: Failing test** — `core/watchdog/signals.test.ts`:
+- [x] **Step 2: Failing test** — `core/watchdog/signals.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -897,7 +924,7 @@ describe('parseSessionSignals — against real captured logs', () => {
 
 Run `bun test core/watchdog/signals.test.ts`. Expected: red (module missing).
 
-- [ ] **Step 3: Implement** `core/watchdog/signals.ts`:
+- [x] **Step 3: Implement** `core/watchdog/signals.ts`:
 
 ```ts
 /**
@@ -965,7 +992,7 @@ export function parseSessionSignals(tail: string): SessionSignals {
 }
 ```
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -975,7 +1002,7 @@ git status --short   # only the intended new files; no campaign-home path staged
 Expected: `423 pass, 0 fail` (413 + 10 new); `tsc` silent; `git status` lists only
 `core/watchdog/signals.*` and `fixtures/watchdog/*`.
 
-- [ ] **Step 5: Commit** — `feat(runner): parse quota and overload signals from real session logs (task 3/15)`,
+- [x] **Step 5: Commit** — `feat(runner): parse quota and overload signals from real session logs (task 3/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -1017,7 +1044,7 @@ and spec §8, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `core/watchdog/decide.test.ts`:
+- [x] **Step 1: Failing test** — `core/watchdog/decide.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -1195,7 +1222,7 @@ describe('overloadBackoffSeconds — the frozen schedule (spec section 8)', () =
 
 Run `bun test core/watchdog/decide.test.ts`. Expected: red (module missing).
 
-- [ ] **Step 2: Implement** `core/watchdog/decide.ts`:
+- [x] **Step 2: Implement** `core/watchdog/decide.ts`:
 
 ```ts
 /**
@@ -1287,15 +1314,16 @@ export function decide(o: WatchdogObservation): WatchdogAction {
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 ```
 
-Expected: `478 pass, 0 fail` (423 + 55 new: 48 table rows + 7); `tsc` silent.
+Expected: `484 pass, 0 fail` (430 + 55 new: 48 table rows + 7); `tsc` silent.
+<!-- Corrected in group-B audit (finding G6): measured, not derived. -->
 
-- [ ] **Step 4: Commit** — `feat(runner): pure watchdog decision core over the frozen action table (task 4/15)`,
+- [x] **Step 4: Commit** — `feat(runner): pure watchdog decision core over the frozen action table (task 4/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -1330,7 +1358,7 @@ and the card's G4, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `core/watchdog/decide.test.ts`:
+- [x] **Step 1: Failing test** — append to `core/watchdog/decide.test.ts`:
 
 ```ts
 const STALE_MS = NOW - 31 * 60 * 1000;
@@ -1498,7 +1526,7 @@ describe('decide — --once mode never sleeps (W-P5)', () => {
 Run `bun test core/watchdog/decide.test.ts`. Expected: red on the stall, once-mode and cap rows;
 Task 4's 48 rows still green.
 
-- [ ] **Step 2: Implement** — edit `decide.ts`'s section 1 and add the once-mode guards:
+- [x] **Step 2: Implement** — edit `decide.ts`'s section 1 and add the once-mode guards:
 
 ```ts
   // --- 1. A live runner: never launch a second one (D74-7). Stall is the only thing that can
@@ -1535,7 +1563,7 @@ pending wake-up and returns; it never sleeps):
         }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -1543,7 +1571,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 
 Expected: `509 pass, 0 fail` (478 + 31 new); Task 4's rows unchanged; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(runner): watchdog stall, adopt, caps and --once semantics (task 5/15)`,
+- [x] **Step 4: Commit** — `feat(runner): watchdog stall, adopt, caps and --once semantics (task 5/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -1577,7 +1605,7 @@ arguments), no fs, no `process`.
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `core/watchdog/select.test.ts`:
+- [x] **Step 1: Failing test** — `core/watchdog/select.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -1726,7 +1754,7 @@ describe('actionLine — one human stdout line per action', () => {
 Run `bun test core/watchdog/select.test.ts core/watchdog/status.test.ts`. Expected: red (both
 modules missing).
 
-- [ ] **Step 2: Implement** `core/watchdog/select.ts`:
+- [x] **Step 2: Implement** `core/watchdog/select.ts`:
 
 ```ts
 /** Pure selection and path math for the watchdog. No fs: the edge lists directories and hands
@@ -1870,7 +1898,7 @@ export function actionLine(action: WatchdogAction): string {
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
@@ -1878,7 +1906,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 
 Expected: `521 pass, 0 fail` (509 + 12 new); `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(runner): watchdog selectors, status/event shaping and exit codes (task 6/15)`,
+- [x] **Step 4: Commit** — `feat(runner): watchdog selectors, status/event shaping and exit codes (task 6/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -1919,7 +1947,7 @@ and the card's G4, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `adapters/watchdog-io.adapter.test.ts`:
+- [x] **Step 1: Failing test** — `adapters/watchdog-io.adapter.test.ts`:
 
 ```ts
 import { describe, expect, test } from 'bun:test';
@@ -2005,7 +2033,7 @@ describe('buildWatchdogIo — the real edge', () => {
 Run `cd plugins/tribe/scripts/runner && bun test adapters/watchdog-io.adapter.test.ts`.
 Expected: red (module missing).
 
-- [ ] **Step 2: Append the seams** to the END of `ports/ports.ts`:
+- [x] **Step 2: Append the seams** to the END of `ports/ports.ts`:
 
 ```ts
 // ---------------------------------------------------------------------------------------
@@ -2091,7 +2119,7 @@ export interface WatchdogIO
     LinePort {}
 ```
 
-- [ ] **Step 3: Implement** `adapters/watchdog-io.adapter.ts`:
+- [x] **Step 3: Implement** `adapters/watchdog-io.adapter.ts`:
 
 ```ts
 /**
@@ -2291,7 +2319,7 @@ layer `structure.test.ts` permits to name world modules, so there is no reason t
 dynamic import here. Run `bun test structure.test.ts` after writing it to confirm the layout
 contract still holds.
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -2305,7 +2333,7 @@ Expected: the adapter's 7 tests pass, `structure.test.ts` stays green (proving `
 is still type-only and the new adapter is the only new world-touching file), full suite
 `528 pass, 0 fail`, `tsc` silent.
 
-- [ ] **Step 5: Commit** — `feat(runner): watchdog IO seams and real adapter (task 7/15)`, boxes
+- [x] **Step 5: Commit** — `feat(runner): watchdog IO seams and real adapter (task 7/15)`, boxes
   ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -2342,7 +2370,7 @@ and spec §8, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — `core/watchdog/watch-loop.test.ts`. The fake IO is a virtual
+- [x] **Step 1: Failing test** — `core/watchdog/watch-loop.test.ts`. The fake IO is a virtual
   filesystem plus a virtual clock, so these tests are deterministic and instant:
 
 ```ts
@@ -2553,7 +2581,7 @@ describe('signals are read from the newest log only', () => {
 
 Run `bun test core/watchdog/watch-loop.test.ts`. Expected: red (module missing).
 
-- [ ] **Step 2: Implement** `core/watchdog/watch-loop.ts`:
+- [x] **Step 2: Implement** `core/watchdog/watch-loop.ts`:
 
 ```ts
 /**
@@ -2803,7 +2831,7 @@ export async function runWatchdog(
 }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -2816,7 +2844,7 @@ Expected: the loop's 12 tests pass in under a second (virtual clock); `structure
 (no world specifier, no `process.exit`, no `process.env` in `core/watchdog/watch-loop.ts`); full
 suite `540 pass, 0 fail`; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `feat(runner): watchdog supervision loop with bounded wake-up waits (task 8/15)`,
+- [x] **Step 4: Commit** — `feat(runner): watchdog supervision loop with bounded wake-up waits (task 8/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -2848,7 +2876,7 @@ still reads no `process.env` (`structure.test.ts` enforces both).
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `cli/main.test.ts`:
+- [x] **Step 1: Failing test** — append to `cli/main.test.ts`:
 
 ```ts
 import { resolveWatchdogHome } from './main.ts';
@@ -2889,7 +2917,7 @@ describe('resolveWatchdogHome — the watchdog subcommand gate (fail-closed)', (
 
 Run `bun test cli/main.test.ts`. Expected: red (`resolveWatchdogHome` not exported).
 
-- [ ] **Step 2: Implement** — in `cli/main.ts`, add the imports and the exported helper above
+- [x] **Step 2: Implement** — in `cli/main.ts`, add the imports and the exported helper above
   `main()`:
 
 ```ts
@@ -2952,7 +2980,7 @@ changes the other's behaviour):
   }
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -2970,7 +2998,7 @@ silent. The three hand invocations each print ONE `watchdog: ...` line on stderr
 traceback and `exit=1`: respectively "is outside the tribe root", "missing required flag:
 --home", "unknown flag: --dry-run".
 
-- [ ] **Step 4: Commit** — `feat(runner): wire the watchdog subcommand into the composition root (task 9/15)`,
+- [x] **Step 4: Commit** — `feat(runner): wire the watchdog subcommand into the composition root (task 9/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -3009,7 +3037,7 @@ meaning. The double's own bookkeeping lives outside the campaign home entirely.
 
 **Steps**
 
-- [ ] **Step 1: Write the double** — `fixtures/watchdog/runner-double.sh`:
+- [x] **Step 1: Write the double** — `fixtures/watchdog/runner-double.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -3122,7 +3150,7 @@ Expected: `exit=3`; the find lists exactly one `run.json` and one `logs/i-card-0
 `exitCode: 3`, `reason: 'session_incomplete'`, a non-null `endedAt`, and **nothing** under
 `watchdog/`.
 
-- [ ] **Step 2: Failing test** — `watchdog-integration.test.ts` at the runner root:
+- [x] **Step 2: Failing test** — `watchdog-integration.test.ts` at the runner root:
 
 ```ts
 /**
@@ -3266,7 +3294,7 @@ itself.**
 Run `bun test watchdog-integration.test.ts`. Expected: red (the double's `env` option is not
 part of the port yet — see step 3).
 
-- [ ] **Step 3: Extend the spawn seam for env** — the double is env-scripted, so
+- [x] **Step 3: Extend the spawn seam for env** — the double is env-scripted, so
   `spawnRunner`'s options gain one optional field in `ports/ports.ts`, and the adapter passes it
   through:
 
@@ -3282,7 +3310,7 @@ nothing, so the runner inherits the watchdog's environment exactly as before —
 the runner's own `ANTHROPIC_API_KEY` guard (fix-list P10) runs inside the spawned process and
 must keep seeing the real environment.
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -3293,7 +3321,7 @@ bun test structure.test.ts && bun test && bunx tsc --noEmit
 Expected: 9 integration tests pass (elapsed roughly 100-150 s, dominated by the two frozen
 overload backoffs); `structure.test.ts` green; the full suite green with `0 fail`; `tsc` silent.
 
-- [ ] **Step 5: Commit** — `test(runner): integration proof of G1 and G3 against a runner double (task 10/15)`,
+- [x] **Step 5: Commit** — `test(runner): integration proof of G1 and G3 against a runner double (task 10/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -3324,7 +3352,7 @@ its last mtime.
 
 **Steps**
 
-- [ ] **Step 1: Failing test** — append to `watchdog-integration.test.ts`:
+- [x] **Step 1: Failing test** — append to `watchdog-integration.test.ts`:
 
 ```ts
 describe('G2 — skip when alive (D74-7 adopt, never duplicate)', () => {
@@ -3434,13 +3462,13 @@ Add `existsSync` to the file's `node:fs` import list.
 Run `bun test watchdog-integration.test.ts`. Expected: red on the new blocks first (the `env`
 option on the manual spawns and the stall wiring), green after step 2.
 
-- [ ] **Step 2: Make it green** — no new production behaviour should be required. If a test
+- [x] **Step 2: Make it green** — no new production behaviour should be required. If a test
   fails for a *product* reason (for example the stall check firing on a run whose log the double
   back-dated before the run record appeared), fix it in `core/watchdog/*` under the same rules
   and record the fix in the report. If a test fails because the frozen action table would have
   to change, **stop and report `NEEDS_CONTEXT`** — that is a spec question, not a bug.
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd plugins/tribe/scripts/runner
@@ -3450,7 +3478,7 @@ bun test && bunx tsc --noEmit
 
 Expected: all integration tests pass; full suite `0 fail`; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `test(runner): integration proof of G2 skip-when-alive and G4 stall (task 11/15)`,
+- [x] **Step 4: Commit** — `test(runner): integration proof of G2 skip-when-alive and G4 stall (task 11/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -3495,7 +3523,7 @@ binary on this machine** — every wait is a poll loop with a bounded iteration 
 
 **Steps**
 
-- [ ] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-e2e.sh`:
+- [x] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-e2e.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -3655,7 +3683,7 @@ printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
 ```
 
-- [ ] **Step 2: Run it, and capture the evidence the PR needs.**
+- [x] **Step 2: Run it, and capture the evidence the PR needs.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -3668,7 +3696,7 @@ the absolute-`--home` probe by hand and pasting the command line, the resulting
 `docs/superpowers/evidence/2026-09-03-mechanical-heartbeat-g5.md` (created in this task) —
 the card's G5 asks for exactly "command lines + `status.json` + `events.jsonl` in the PR".
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -3680,7 +3708,7 @@ cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit
 Expected: e2e `0 failed`; `test-fresh-machine.sh` still `26 passed, 0 failed` (the watchdog adds
 no installable, so this must not move); full runner suite green; `tsc` silent.
 
-- [ ] **Step 4: Commit** — `test(tribe): G5 e2e — real runner under the real watchdog from an empty home (task 12/15)`,
+- [x] **Step 4: Commit** — `test(tribe): G5 e2e — real runner under the real watchdog from an empty home (task 12/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -3719,7 +3747,7 @@ retained as the documented fallback. No other stage's wording changes.
 
 **Steps**
 
-- [ ] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-detached.sh`:
+- [x] **Step 1: Write the test** — `plugins/tribe/scripts/tests/test-watchdog-detached.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -3782,7 +3810,7 @@ printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
 ```
 
-- [ ] **Step 2: Edit `SKILL.md` Stage B step 2** — replace the bare-runner background launch
+- [x] **Step 2: Edit `SKILL.md` Stage B step 2** — replace the bare-runner background launch
   with the watchdog launch, keeping the runner invocation as the documented fallback:
 
 ```markdown
@@ -3870,7 +3898,7 @@ Also add one row to Stage B's "runner's CLI contract" table, immediately after `
 | `watchdog` (subcommand) | — | `bun "$runner_dir/run.ts" watchdog <same flags>` supervises one runner pass at zero token cost: `--follow` (default) or `--once`, plus `--stall-minutes` (30), `--max-quota-waits` (6), `--max-overload-backoffs` (5), `--max-crash-relaunches` (1), `--quota-grace-seconds` (30), `--poll-seconds` (30), `--fallback-model <tier>`. Writes `<home>/watchdog/status.json` and `events.jsonl`; exits `0` done · `10` needs_human · `11` running (`--once`) · `1` usage. See `scripts/runner/README.md`'s "Watchdog" section. |
 ```
 
-- [ ] **Step 3: Gates.**
+- [x] **Step 3: Gates.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -3884,7 +3912,7 @@ Expected: `10 passed, 0 failed` from the detached test; the grep shows Stage B n
 watchdog as the primary launch (spec §6 step 5's check); `grep -c setsid` prints `0`;
 `test-fresh-machine.sh` still `26 passed, 0 failed`.
 
-- [ ] **Step 4: Commit** — `feat(tribe): Stage B launches the watchdog detached, with a proven one-liner (task 13/15)`,
+- [x] **Step 4: Commit** — `feat(tribe): Stage B launches the watchdog detached, with a proven one-liner (task 13/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -3923,7 +3951,7 @@ deliberately **not** edited, and the docs say why.
 
 **Steps**
 
-- [ ] **Step 1: Runner README** — insert a `## Watchdog (card i74, issue #74)` section directly
+- [x] **Step 1: Runner README** — insert a `## Watchdog (card i74, issue #74)` section directly
   after `## Exit codes`, containing: what it is (one paragraph, D74-2's notification model), the
   invocation, the flag table, the exit-code table, the files it writes, the **frozen action
   table copied from the spec**, the counters/caps, the stall rule, and a "What it never does"
@@ -3945,12 +3973,12 @@ deliberately **not** edited, and the docs say why.
   card) is to treat a missing `answers.md` as "no rulings".
 ```
 
-- [ ] **Step 2: Tribe README** — add a `## Campaign watchdog` section immediately after
+- [x] **Step 2: Tribe README** — add a `## Campaign watchdog` section immediately after
   `## Campaign runner` (one paragraph plus the detached one-liner and the `status.json`/exit-code
   summary, pointing at the runner README for the full contract), and one Quick-reference row.
   Keep it short; the runner README is the reference.
 
-- [ ] **Step 3: Fixlist rows** — in `docs/tribe/fixlists/2026-08-08-outstanding-17/README.md`,
+- [x] **Step 3: Fixlist rows** — in `docs/tribe/fixlists/2026-08-08-outstanding-17/README.md`,
   edit exactly two table rows and their two narrative paragraphs (lines ~229 and ~232):
 
 ```markdown
@@ -3958,7 +3986,7 @@ deliberately **not** edited, and the docs say why.
 | P14 | Quota pause kills the running session                  | 27 min dead time                      | **SUPERSEDED by #74 (watchdog)** — the 15-minute LLM heartbeat is replaced by a zero-token supervisor that waits until the log's own `resetsAt` and relaunches; the "cron heartbeat = design" ruling is retired (card `i74-mechanical-heartbeat`, D74-1) |
 ```
 
-- [ ] **Step 4: Gates.**
+- [x] **Step 4: Gates.**
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -3976,7 +4004,7 @@ identical to `master`'s (9 plugins, `tribe (agents: 6 skills: 2)`); the unknown-
 prints `watchdog: unknown flag: --nonsense` with `exit=1`. (`--help` is not implemented and need
 not be — the `||  true` keeps the gate honest about that.)
 
-- [ ] **Step 5: Commit** — `docs(tribe): document the watchdog and retire fixlist P14 (task 14/15)`,
+- [x] **Step 5: Commit** — `docs(tribe): document the watchdog and retire fixlist P14 (task 14/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -4015,7 +4043,7 @@ and, verbatim:
 
 **Steps**
 
-- [ ] **Step 1: File-context gate, then draft the ADR** (author the body OUTSIDE `.c3/`):
+- [x] **Step 1: File-context gate, then draft the ADR** (author the body OUTSIDE `.c3/`):
 
 ```sh
 cd /Users/hip/repo/todd-skills-wt/i74-watchdog
@@ -4034,7 +4062,7 @@ D74-1..7 and this plan's W-P1..W-P10), the consequences (fixlist P14 retired; P1
 strengthened; `--once` leaves a cron/launchd path open; the runner's core unchanged beyond
 additive exports), and the evidence (the four gate commands and their measured outputs).
 
-- [ ] **Step 2: Cite, scaffold, patch.**
+- [x] **Step 2: Cite, scaffold, patch.**
 
 ```sh
 eval "$C3X read c3-215 --section Contract --cite"
@@ -4062,7 +4090,7 @@ Author three patches into `.c3/changes/<adr-id>/`:
   48-row action-table test plus the double-driven integration tests"; required verification
   `cd plugins/tribe/scripts/runner && bun test && bunx tsc --noEmit; bash plugins/tribe/scripts/tests/test-watchdog-e2e.sh`.
 
-- [ ] **Step 3: Preview, accept, apply, close.**
+- [x] **Step 3: Preview, accept, apply, close.**
 
 ```sh
 eval "$C3X change view <adr-id>"
@@ -4079,7 +4107,7 @@ grows by the ADR) with **exactly the same two errors** (`c3-213`, `c3-216`) and 
 If `apply` reports a landing mismatch, re-cite and re-author — **never hand-edit the sealed
 doc**; if a seal is already broken, run `eval "$C3X repair"` and re-apply.
 
-- [ ] **Step 4: Commit** — `docs(c3): ADR and c3-215 sync for the mechanical heartbeat (task 15/15)`,
+- [x] **Step 4: Commit** — `docs(c3): ADR and c3-215 sync for the mechanical heartbeat (task 15/15)`,
   boxes ticked in the same commit, trailer `Campaign: gh-issues-2026-09`.
 
 ---
@@ -4198,13 +4226,18 @@ Done-state for the delivering Warchief is **PR OPEN**, not merged. Concretely, b
 
 **Scope-fence self-check before opening the PR** (`git diff --name-only master...HEAD` must be a
 subset of):
-`plugins/tribe/scripts/runner/{core/watchdog/**,ports/ports.ts,adapters/watchdog-io.adapter.ts,cli/main.ts,cli/main.test.ts,fixtures/watchdog/**,watchdog-integration.test.ts,README.md}`
+`plugins/tribe/scripts/runner/{core/watchdog/**,ports/ports.ts,adapters/watchdog-io.adapter.ts,adapters/watchdog-io.adapter.test.ts,cli/main.ts,cli/main.test.ts,fixtures/watchdog/**,watchdog-integration.test.ts,README.md}`
 (note what is NOT there: `core/types.ts` and `core/state.ts`, this campaign's two schemaLockPaths),
 `plugins/tribe/scripts/tests/{test-watchdog-e2e.sh,test-watchdog-detached.sh}`,
 `plugins/tribe/skills/orchestrate-campaign/SKILL.md`, `plugins/tribe/README.md`,
 `docs/tribe/fixlists/2026-08-08-outstanding-17/README.md`,
 `docs/superpowers/{specs,plans,evidence}/**`, `.c3/**`.
 Anything else in that list is a fence breach — stop and report, do not "just tidy it".
+<!-- Corrected during the group-C audit: this enumeration omitted
+`adapters/watchdog-io.adapter.test.ts`, which Task 7 (line ~1918) explicitly mandates as a
+file to create. The plan contradicted itself, and pre-gate's fence check flagged the file as a
+violation. The test file was always in scope; the enumeration was wrong, so the enumeration is
+what changed. No new path was admitted. -->
 
 ## 9. Size and wall-clock estimate
 

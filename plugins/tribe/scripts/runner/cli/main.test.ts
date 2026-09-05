@@ -6,8 +6,13 @@
 // two protocol-level defaults spec §2 itself documents; `--home` (Task 2, spec §4) is the
 // campaign's machine-local operational home — also a REQUIRED input, never derived here.
 import { describe, expect, test } from 'bun:test';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { parseArgs, parseResetCardArgs, performResetCard, scrubTargetEnvLocal } from './main.ts';
 import { campaignStatePathOf, escalationPathOf } from '../core/paths.ts';
+import { WATCHDOG_EXIT_NEEDS_HUMAN } from '../core/watchdog/model.ts';
 
 const RUN_ID = '2026-07-24T00-00-00-000Z-beef';
 
@@ -574,4 +579,117 @@ describe('performResetCard — the reset-card subcommand\'s execution (P11 follo
     const { errors } = await captureConsole(() => performResetCard(home, 'C1', io));
     expect(errors).toEqual([]);
   });
+});
+
+import { resolveWatchdogHome } from './main.ts';
+
+describe('resolveWatchdogHome — the watchdog subcommand gate (fail-closed)', () => {
+  // Anchored at path-START (not a bare first-occurrence replace): a real `realpathSync` is
+  // idempotent — realpathing an already-resolved path returns it unchanged — and `io.cwd()`
+  // below is itself given already pre-resolved (containing `/private/var/`), the way Node's
+  // real `process.cwd()` already is. A non-anchored `.replace('/var/', '/private/var/')`
+  // would match that PRE-RESOLVED `/private/var/` substring too and double-prefix the
+  // relative-home case, breaking idempotency the real adapter always has.
+  const io = {
+    realpath: (p: string) => p.replace(/^\/var\//, '/private/var/'),
+    userHome: () => '/var/t/home',
+    cwd: () => '/private/var/t/home/.tribe/k/campaigns',
+    fileExists: (p: string) => p === '/private/var/t/home/.tribe/k/campaigns/c/campaign-state.json',
+  };
+
+  test('an absolute home inside the realpathed tribe root is accepted (W-P10)', () => {
+    const got = resolveWatchdogHome('/var/t/home/.tribe/k/campaigns/c', io);
+    expect(got).toEqual({ homeDir: '/private/var/t/home/.tribe/k/campaigns/c' });
+  });
+
+  test('a RELATIVE home resolves against cwd — the shape a person types', () => {
+    const got = resolveWatchdogHome('c', io);
+    expect(got).toEqual({ homeDir: '/private/var/t/home/.tribe/k/campaigns/c' });
+  });
+
+  test('a home outside the tribe root is refused with a typed message, not a throw', () => {
+    const got = resolveWatchdogHome('/tmp/elsewhere', io);
+    expect('error' in got && got.error).toContain('is outside the tribe root');
+  });
+
+  test('a home with no campaign-state.json is refused by name', () => {
+    const got = resolveWatchdogHome('/var/t/home/.tribe/k/campaigns/other', io);
+    expect('error' in got && got.error).toBe(
+      'watchdog: --home "/private/var/t/home/.tribe/k/campaigns/other" has no ' +
+        'campaign-state.json — a campaign home is authored by the orchestrate-campaign ' +
+        'skill before any runner or watchdog is started',
+    );
+  });
+});
+
+// B2 (rules-gate fix): `main()`'s watchdog dispatch has no try/catch around `await
+// runWatchdog(...)`, and `main()` is invoked with no `.catch()` — so a real I/O failure deep
+// in the watchdog's edge (`ensureDir`, `appendFile`, `writeFileAtomic` all throw narrow-only,
+// never swallow) escapes as an uncaught Bun stack trace instead of the typed
+// `watchdog: unexpected error: ...` message the card-loop path already produces for the same
+// class of failure (`cli/main.ts`'s `runLoop` try/catch). This is a real subprocess e2e test
+// (CLAUDE.md: reproduce a bug the way an end user would experience it) because `main()` wires
+// its own real adapters and is deliberately not unit-tested — forcing the failure any other
+// way would require restructuring the composition root, which this fix brief forbids.
+describe('watchdog subcommand: an I/O failure inside runWatchdog never escapes as a traceback', () => {
+  test('a blocked `<home>/watchdog` mkdir produces a typed stderr line and a defined exit code, never a stack trace', () => {
+    const homeDir = mkdtempSync(join(homedir(), '.tribe', 'i74-b2-repro-'));
+    try {
+      writeFileSync(join(homeDir, 'campaign-state.json'), '{}');
+      // `ensureDir(paths.dir)` is the FIRST thing `runWatchdog` does (before any observation
+      // or spawn) — planting a plain FILE at the directory's own path makes the real
+      // `mkdirSync(..., { recursive: true })` throw EEXIST, a genuine I/O failure with no
+      // stubbing.
+      writeFileSync(join(homeDir, 'watchdog'), 'not a directory');
+
+      const result = spawnSync(
+        'bun',
+        ['cli/main.ts', 'watchdog', '--repo', '/tmp', '--model', 'x', '--home', homeDir, '--once'],
+        { cwd: import.meta.dir + '/..', encoding: 'utf8' },
+      );
+
+      const combined = `${result.stdout}${result.stderr}`;
+      expect(combined).not.toContain('at ensureDir');
+      expect(combined).not.toContain('.ts:');
+      expect(combined).not.toContain('Bun v');
+      expect(result.stderr).toContain('watchdog: unexpected error:');
+      expect(result.status).toBe(WATCHDOG_EXIT_NEEDS_HUMAN);
+    } finally {
+      rmSync(homeDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+});
+
+// C2 (group-C audit round 1, class `critical`): `resolveWatchdogHome`'s two `io.realpath(...)`
+// calls run BEFORE the B2 try/catch above (they resolve `--home` itself), and the real
+// `realpath` adapter only degrades `ENOENT` — every other real I/O failure (`ENOTDIR`,
+// `EACCES`, `ELOOP`) still escaped as an uncaught Bun stack trace. This is a real subprocess
+// e2e test (CLAUDE.md: reproduce the way an end user would experience it) for the same reason
+// B2's is: `main()` wires its own real adapters and is not unit-tested.
+describe('watchdog subcommand: a realpath failure resolving --home is a typed usage error, never a traceback (C2)', () => {
+  test('a plain FILE where a directory component of --home must be produces a typed "watchdog:" stderr line and exit 1, never a stack trace', () => {
+    const homeParent = mkdtempSync(join(homedir(), '.tribe', 'i74-c2-repro-'));
+    try {
+      // Plant a plain FILE where `--home` needs a directory COMPONENT (not the leaf itself —
+      // ENOENT on the leaf is already handled) — `realpathSync` throws ENOTDIR, not ENOENT.
+      const fileBlocker = join(homeParent, 'notadir');
+      writeFileSync(fileBlocker, '');
+      const badHome = join(fileBlocker, 'subdir');
+
+      const result = spawnSync(
+        'bun',
+        ['cli/main.ts', 'watchdog', '--repo', '/tmp', '--model', 'x', '--home', badHome, '--once'],
+        { cwd: import.meta.dir + '/..', encoding: 'utf8' },
+      );
+
+      const combined = `${result.stdout}${result.stderr}`;
+      expect(combined).not.toContain('at realpath');
+      expect(combined).not.toContain('.ts:');
+      expect(combined).not.toContain('Bun v');
+      expect(result.stderr).toContain('watchdog:');
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(homeParent, { recursive: true, force: true });
+    }
+  }, 20_000);
 });
