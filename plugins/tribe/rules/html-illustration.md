@@ -35,8 +35,8 @@ Both must hold:
 
 - An Artifact published for the user to read (report, memo, audit, plan, explainer).
 - A standalone `.html` written to disk for the user to open in a browser.
-- A rendered mermaid illustration page — including the output of the `explaining` skill's
-  `render-illustration.ts` (its Rule 4: illustrate a flow instead of narrating it).
+- A rendered mermaid illustration page — including any page a renderer script emits by wrapping
+  a mermaid graph in `class="mermaid"` markup so a browser draws the flow.
 - A one-off dashboard, comparison table, benchmark write-up, or diff walkthrough.
 - HTML emitted from a template in another language (a `.ts` renderer, a heredoc in a
   shell script): the rule governs the **emitted document**, not the host file.

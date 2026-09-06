@@ -40,13 +40,13 @@ fi
 # already use). Unlike `readlink -f`, a failure here is a non-zero cd, never a
 # half-resolved path — and `set -e` plus the explicit guard both stop it.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || here=""
-[ -n "$here" ] || die "cannot locate this skill's own directory — the install symlink is broken. Re-run ./install.sh from the todd-skills repo."
+[ -n "$here" ] || die "cannot locate this skill's own directory — the install symlink is broken. Re-run ./install.sh from the tribe repo."
 
 # skills/orchestrate-campaign -> up 2 -> the plugin root.
 plugin_root="$(cd "$here/../.." 2>/dev/null && pwd -P)" || plugin_root=""
-[ -n "$plugin_root" ] || die "resolved this skill to '$here' but its plugin root is unreachable. Re-run ./install.sh from the todd-skills repo."
+[ -n "$plugin_root" ] || die "resolved this skill to '$here' but its plugin root is unreachable. Re-run ./install.sh from the tribe repo."
 
 runner_dir="$plugin_root/scripts/runner"
-[ -f "$runner_dir/run.ts" ] || die "no campaign runner at '$runner_dir'. The skill resolved to '$plugin_root', which does not look like a complete tribe plugin checkout. If the todd-skills repo moved, re-run ./install.sh from its new location."
+[ -f "$runner_dir/run.ts" ] || die "no campaign runner at '$runner_dir'. The skill resolved to '$plugin_root', which does not look like a complete tribe plugin checkout. If the tribe repo moved, re-run ./install.sh from its new location."
 
 printf '%s\n' "$runner_dir"

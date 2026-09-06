@@ -330,7 +330,7 @@ repo — never committed:
 ```
 
 `<repo-key>` = the canonical main-worktree path with `/` → `-` (e.g.
-`-Users-home-repos-todd-skills`). All linked worktrees of one repo share the same key and
+`-Users-home-repos-tribe`). All linked worktrees of one repo share the same key and
 therefore the same home. Derive it via `bash plugins/tribe/scripts/tribe-home.sh [repo-dir]`.
 
 **What lives here vs. in `docs/tribe/`:**

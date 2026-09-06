@@ -390,8 +390,8 @@ later wave's worktrees are not created until its predecessor wave has merged bac
 commit has been updated to point at that merge, so later waves build on earlier waves' file
 changes instead of on pre-wave-1 code.
 
-**If `splitting-plans` produced 2+ dependency-independent sub-plans**, its README's dependency
-waves diagram and each sub-plan's `owns_files` already tell you which bundles can run at once (a
+**If the plan was split into 2+ dependency-independent sub-plans**, the split's dependency-waves
+diagram and each sub-plan's `owns_files` already tell you which bundles can run at once (a
 wave containing ≥2 bundles with disjoint `owns_files`). For the wave you are about to dispatch,
 set up **one additional worktree per sub-plan in that wave** — but do **not** re-invoke the
 using-git-worktrees skill or `EnterWorktree` for these. You are already inside your own isolated
@@ -693,8 +693,8 @@ its returned ledger (below) — not, by default, a fresh dual-skinner dispatch. 
 leaves the audit unclosed, **stop looping** and return `NEEDS_DIRECTION` to the Shaman with **both
 lenses' reports** and the **full disposition ledger** attached verbatim. An audit that survives 3
 fix rounds without closing usually isn't a code bug you can fix alone — e.g. a spec ambiguity
-masquerading as a test failure — so it belongs back with the Shaman, not another round (same shape
-as `check-diff-coverage`'s remediation loop: a fixed round cap, then stop and hand back rather than
+masquerading as a test failure — so it belongs back with the Shaman, not another round (the shape
+every bounded remediation loop takes: a fixed round cap, then stop and hand back rather than
 grind past the stopping condition).
 
 You hold the authoring context, so you adjudicate any finding that conflicts with what the plan
@@ -1237,10 +1237,10 @@ suspicious one — do not go hunting for something to change in order to feel li
 - **Wait for CI green — block, don't poll.** This blocking wait is the **pre-merge check
   gate**: every PR check must have CONCLUDED green before `gh pr merge` — pending is not
   green. Do not spend turns manually re-checking run status.
-  The mechanism is `gh run watch <run-id> --exit-status` — the exact command `research-to-blog`
-  uses to block on CI. Warchief targets arbitrary repos that commonly run several workflows
-  (lint/test/build) per push, unlike `research-to-blog`'s one pinned `deploy.yml`, so loop the
-  same command over every run already attached to the head SHA instead of hardcoding one ID.
+  The mechanism is `gh run watch <run-id> --exit-status`: it blocks until that one run concludes
+  and exits non-zero if the run failed. A pipeline with a single pinned workflow can hardcode one
+  run ID; Warchief targets arbitrary repos that commonly run several workflows (lint/test/build)
+  per push, so loop the same command over every run already attached to the head SHA instead.
   Bound each watch to 20 minutes and retry on timeout, so a single long-running run can never
   push your report file (`REPORT_FILE` below — your report-file path from dispatch) past the
   Shaman's 30-minute staleness threshold (Channels, above) without a fresh heartbeat line:
@@ -1261,7 +1261,7 @@ suspicious one — do not go hunting for something to change in order to feel li
   ```
   Each `gh run watch` call now blocks for at most 20 minutes at a stretch (bounded comfortably
   under the 30-minute heartbeat threshold on purpose) without spending a turn on manual
-  re-checking — the same blocking mechanism `research-to-blog` uses, just looped and bounded.
+  re-checking — the same blocking mechanism, just looped and bounded.
   `timeout`'s exit code `124` means the run itself is still going, not that it failed: append a
   heartbeat line to your report file and re-enter `gh run watch` on the same run ID. Read the
   loop's own exit status when it finishes: **`0` means every run watched above finished green,
