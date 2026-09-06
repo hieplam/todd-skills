@@ -1,7 +1,13 @@
-# todd-skills
+# tribe
 
-Todd Lam's personal Claude Code agents and skills, packaged as installable plugins. The repo is
-the single source of truth; `.claude-plugin/marketplace.json` is the authoritative registry.
+The Tribe: a chain-of-command agent ecosystem for Claude Code, packaged as installable plugins.
+The repo is the single source of truth; `.claude-plugin/marketplace.json` is the authoritative
+registry.
+
+> **Repo name.** This repo is `hieplam/tribe`. It was previously `hieplam/todd-skills`, and
+> GitHub keeps that old name working as a redirect, so both clone URLs resolve. The seven
+> general-purpose plugins that used to live here now live in
+> [`hieplam/agent-plugins`](https://github.com/hieplam/agent-plugins).
 
 ## Install
 
@@ -10,12 +16,12 @@ the single source of truth; `.claude-plugin/marketplace.json` is the authoritati
 The repo is public, so no clone and no auth are needed:
 
 ```
-/plugin marketplace add hieplam/todd-skills
-/plugin install tribe@todd-skills
+/plugin marketplace add hieplam/tribe
+/plugin install tribe@tribe
 ```
 
-Run those inside a Claude Code session. `tribe@todd-skills` is `<plugin>@<marketplace>` — the
-marketplace is named `todd-skills`, and any plugin from the table below works in its place.
+Run those inside a Claude Code session. `tribe@tribe` is `<plugin>@<marketplace>` — the
+marketplace is named `tribe`, and any plugin from the table below works in its place.
 
 ### From a checkout (symlink install)
 
@@ -24,8 +30,8 @@ edit here takes effect in every session immediately — there is no marketplace 
 refresh.
 
 ```bash
-git clone https://github.com/hieplam/todd-skills.git
-cd todd-skills
+git clone https://github.com/hieplam/tribe.git
+cd tribe
 ./install.sh --list          # show available plugins and their components
 ./install.sh tribe           # install named plugins
 ./install.sh                 # install all of them
@@ -44,14 +50,17 @@ them.
 | Plugin | Kind | What it does |
 | --- | --- | --- |
 | `tribe` | agents | Six agents under a strict chain of command (Owner ⇄ Shaman ⇄ Warchief ⇄ Hunter, plus Tracker and Skinner reviewers and the read-only Scout code-analyzer). Questions flow up as statuses, decisions flow down as cards and briefs. |
-| `research-to-blog` | agents | Turn a session insight or a bare topic into a bilingual EN+VI research note and published blog posts. |
-| `splitting-plans` | skills | Split a large plan into isolated, dependency-aware sub-plans for parallel subagents. |
-| `check-diff-coverage` | skills | Measure uncovered diff vs main and drive a remediation loop (.NET, Go). |
-| `refactor-for-testability` | skills | Reshape untestable code before changing its behaviour. |
 | `verify-shipped` | skills | Mechanically verify a SHIPPED claim against GitHub and git. |
-| `workflow-journal` | skills | Render each Workflow run to a readable Markdown record. |
-| `simple-image-video` | skills | Animate a still image into a short video. |
-| `explaining` | skills | Two eval-proven writing rules (term discipline + grounding) for explanatory prose; refuted rule candidates excluded by A/B data. |
+
+The seven general-purpose plugins this repo used to carry — coverage measurement, testability
+refactoring, research-to-post publishing, image-to-video rendering, plan splitting, workflow
+journalling, and the explanatory-writing rules — now live in
+[`hieplam/agent-plugins`](https://github.com/hieplam/agent-plugins), which lists each of them by
+name. Install them from there:
+
+```
+/plugin marketplace add hieplam/agent-plugins
+```
 
 ## The campaign runner (not installed — run it from a checkout)
 
@@ -65,8 +74,8 @@ after a crash, at zero token cost for the loop itself.
 runtime. It also needs its own dependencies, since `node_modules/` is not committed:
 
 ```bash
-git clone https://github.com/hieplam/todd-skills.git
-cd todd-skills/plugins/tribe/scripts/runner && bun install && cd -
+git clone https://github.com/hieplam/tribe.git
+cd tribe/plugins/tribe/scripts/runner && bun install && cd -
 
 # always dry-run first — it derives each card's phase from live GitHub with zero side effects
 bun plugins/tribe/scripts/runner/run.ts \
