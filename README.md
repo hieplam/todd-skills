@@ -4,9 +4,11 @@ The Tribe: a chain-of-command agent ecosystem for Claude Code, packaged as insta
 The repo is the single source of truth; `.claude-plugin/marketplace.json` is the authoritative
 registry.
 
-> **Repo name.** This repo is `hieplam/tribe`. It was previously `hieplam/todd-skills`, and
-> GitHub keeps that old name working as a redirect, so both clone URLs resolve. The seven
-> general-purpose plugins that used to live here now live in
+> **Repo name.** This repo is being renamed to `hieplam/tribe`; the rename itself lands in a
+> follow-up unit of the same campaign, and the commands below already use the new name so they
+> are correct the moment it does. Until then the working clone URL is
+> `https://github.com/hieplam/todd-skills.git`, and GitHub's rename redirect will keep it working
+> afterwards. The seven general-purpose plugins that used to live here now live in
 > [`hieplam/agent-plugins`](https://github.com/hieplam/agent-plugins).
 
 ## Install
@@ -60,6 +62,7 @@ name. Install them from there:
 
 ```
 /plugin marketplace add hieplam/agent-plugins
+/plugin install <name>@agent-plugins
 ```
 
 ## The campaign runner (not installed — run it from a checkout)

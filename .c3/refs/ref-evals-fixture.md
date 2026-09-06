@@ -1,14 +1,14 @@
 ---
 id: ref-evals-fixture
-c3-seal: ad448851d3a98d2bfab18794d4618332b46d3eb447a6a4f14ff9cda8aebc827c
+c3-seal: 5777131f667d03e00b8fe823f4586d8e84e53d75001dd15a61c649991b64cc5e
 title: evals-fixture
 type: ref
-goal: 'One eval fixture format for every role-behavior and skill-trigger eval in the repo — cases shaped as a prompt plus a prose grading rubric — so a single runner can benchmark all of them and results are comparable across plugins. The recurring need: four plugins ship eval cases; without a shared shape each would need its own runner.'
+goal: 'One eval fixture format for every role-behavior and skill-trigger eval in the repo — cases shaped as a prompt plus a prose grading rubric — so a single runner can benchmark all of them and results stay comparable as plugins are added. The recurring need: two tribe-owned fixtures ship eval cases today; without a shared shape each would need its own runner.'
 ---
 
 ## Goal
 
-One eval fixture format for every role-behavior and skill-trigger eval in the repo — cases shaped as a prompt plus a prose grading rubric — so a single runner can benchmark all of them and results are comparable across plugins. The recurring need: four plugins ship eval cases; without a shared shape each would need its own runner.
+One eval fixture format for every role-behavior and skill-trigger eval in the repo — cases shaped as a prompt plus a prose grading rubric — so a single runner can benchmark all of them and results stay comparable as plugins are added. The recurring need: two tribe-owned fixtures ship eval cases today; without a shared shape each would need its own runner.
 
 Scope boundary (adr-20260820-detection-eval-standalone-harness): capability benchmarks that grade per seeded convention over a fixture codebase — an answer-key manifest held outside the sandbox, clean/mem arm assembly, recall/precision gates over repetition cells — sit outside this format by owner decision. The one instance is the detection eval at `plugins/tribe/evals/detection/` (own bun runner, `benchmark.json` contract). A future capability benchmark reuses that harness's shape; everything prompt-plus-rubric shaped stays here.
 
