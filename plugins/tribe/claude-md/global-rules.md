@@ -1,5 +1,5 @@
 # NON-NEGOTIABLE RULES
-- Always use the C3 skill, no exceptions.
+- C3 skill is a layer of project documents, use it when you need to know about the project codebase 
 - Prefer quality, simplicity, robustness, scalability, and long-term maintainability over development cost in technical decisions.
 - Bug fixes start by reproducing the bug in an E2E setting as closely aligned with how an end user would experience it as possible — find the real problem so the fixactually solves it.
 - NEVER auto-add an agent name as co-author in commit messages.
