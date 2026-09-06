@@ -1,14 +1,14 @@
 ---
 id: rule-bash-strict-mode
-c3-seal: f0995afbce1fd26b8f8be2644feb00d50773bb22f5ff7d1c67ce8bb74778a62d
+c3-seal: e18f5dac2aa820c1d58d65be6f9fd6a3b75f0c50201cd12b1c09502a58265951
 title: bash-strict-mode
 type: rule
-goal: 'Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 14 tracked `.sh` files today.'
+goal: 'Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 34 tracked `.sh` files today.'
 ---
 
 ## Goal
 
-Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 14 tracked `.sh` files today.
+Every shell script in the repo fails fast and loud: unset variables, failed commands, and broken pipelines abort the script instead of silently producing half-done installs, false eval results, or bogus "shipped" verdicts. This holds across all 34 tracked `.sh` files today.
 
 ## Rule
 
@@ -20,7 +20,7 @@ From `install.sh:1` and `install.sh:25` (literal):
 
 ```bash
 #!/usr/bin/env bash
-# install.sh — install todd-skills plugins into ~/.claude via symlinks.
+# install.sh — install the tribe repo's plugins into ~/.claude via symlinks.
 # ... (header comment)                                   // OPTIONAL
 set -euo pipefail                                        # REQUIRED — before any logic runs
 ```

@@ -1,6 +1,6 @@
 ---
 id: ref-evals-fixture
-c3-seal: c04d8a15cb532e780d76d662e462b1cc2a9b21f20906845327fda23330d44094
+c3-seal: ad448851d3a98d2bfab18794d4618332b46d3eb447a6a4f14ff9cda8aebc827c
 title: evals-fixture
 type: ref
 goal: 'One eval fixture format for every role-behavior and skill-trigger eval in the repo — cases shaped as a prompt plus a prose grading rubric — so a single runner can benchmark all of them and results are comparable across plugins. The recurring need: four plugins ship eval cases; without a shared shape each would need its own runner.'
@@ -18,7 +18,7 @@ Scope boundary (adr-20260820-detection-eval-standalone-harness): capability benc
 
 ## Why
 
-This mirrors the official skill-creator eval loop (`evals.json` → isolated-subagent run → `grading.json` with evidence → `benchmark.json` with/without comparison) instead of inventing a new harness — `scripts/evals/README.md` states this as the design premise. `refactor-for-testability` shipped 3 well-formed cases in this shape before any runner existed; the runner was built to that shape, and the `kind: "agent"` extension let tribe's 5 agent definitions join the same harness with one extra field instead of a second format.
+This mirrors the official skill-creator eval loop (`evals.json` → isolated-subagent run → `grading.json` with evidence → `benchmark.json` with/without comparison) instead of inventing a new harness — `scripts/evals/README.md` states this as the design premise. The first fixture written in this shape shipped 3 well-formed cases before any runner existed; the runner was built to that shape, and the `kind: "agent"` extension let tribe's agent definitions join the same harness with one extra field instead of a second format.
 
 ## How
 

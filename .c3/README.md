@@ -1,20 +1,20 @@
 ---
 id: c3-0
-c3-seal: 7115e325c957955f5b85bedcb597688ae997fa25b0ef111347deea9018396567
-title: todd-skills
-goal: Package Todd Lam's personal Claude Code agents and skills as installable plugins, keep the repo the single source of truth via symlink installs, and benchmark each skill/agent with a repo-wide with/without-skill eval harness.
+c3-seal: 6dc32fa3970d30a35be58724d9569ae16b143314e5b73327b4134fc0102802ab
+title: tribe
+goal: Package the Tribe agent ecosystem — the chain-of-command delivery agents and the mechanical done-ness checker that grades their claims — as installable Claude Code plugins, keep the repo the single source of truth via symlink installs, and benchmark each agent/skill with a repo-wide with/without-skill eval harness.
 ---
 
 ## Goal
 
-Package Todd Lam's personal Claude Code agents and skills as installable plugins, keep the repo the single source of truth via symlink installs, and benchmark each skill/agent with a repo-wide with/without-skill eval harness.
+Package the Tribe agent ecosystem — the chain-of-command delivery agents and the mechanical done-ness checker that grades their claims — as installable Claude Code plugins, keep the repo the single source of truth via symlink installs, and benchmark each agent/skill with a repo-wide with/without-skill eval harness.
 
 ## Containers
 
 | ID | Name | Boundary | Status | Responsibilities | Goal Contribution |
 | --- | --- | --- | --- | --- | --- |
 | c3-1 | distribution | service | active | Marketplace manifest + idempotent symlink installer with post-install hooks | Gets repo content into ~/.claude without copies, so edits propagate instantly |
-| c3-2 | plugins | service | active | The 8 installable plugins: agents, skills, helper scripts, templates, eval fixtures | The product itself — the capabilities each Claude Code session gains |
+| c3-2 | plugins | service | active | The 2 installable plugins: the tribe agent set and the verify-shipped skill, with their helper scripts and eval fixtures | The product itself — the delivery capabilities each Claude Code session gains |
 | c3-3 | eval-harness | service | active | Runs plugins/**/evals/evals.json, grades transcripts, rolls up benchmarks | Proves each skill/agent earns its tokens vs a --safe-mode baseline |
 
 ## Abstract Constraints
