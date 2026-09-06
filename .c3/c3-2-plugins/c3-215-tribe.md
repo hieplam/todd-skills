@@ -1,6 +1,6 @@
 ---
 id: c3-215
-c3-seal: 975639903f4c6810632f96bca6325f351076b6f5dd481e664763a91b41025d97
+c3-seal: a463f9b638bdf7f3672a94f98510d2de17ca3a2a10e357cc342c5b964b575bc0
 title: tribe
 type: component
 category: feature
@@ -25,7 +25,7 @@ Deliver features through a 5-agent chain of command — Shaman (What/Why) → Wa
 | Container | c3-2 plugins — Claude Code runtime content |
 | Category | Feature — delivery orchestration, the container's complex member |
 | Role in parent | Agent-flavored plugin: 5 agent definitions + heartbeat/resume/plan-validation scripts with shell tests + agent-kind evals + CLAUDE.md snippet appended by install hook |
-| Depends on siblings | verify-shipped encodes its Definition of Done as mechanical checks; splitting-plans complements Warchief planning |
+| Depends on siblings | verify-shipped encodes its Definition of Done as mechanical checks — the only other plugin in the repo |
 
 ## Purpose
 

@@ -1,14 +1,14 @@
 ---
 id: ref-plugin-layout
-c3-seal: fc82ade4c80ddd83845592cc094e78f40e3e5dd871c14ab6ca62744c28c6061f
+c3-seal: 06cb8cf6ff23ad0469982b6f2e2854973f8be5fe9721005076f8c949e726559b
 title: plugin-layout
 type: ref
-goal: 'Standardize the directory shape of every plugin so the installer, the marketplace manifest, and the eval harness can walk any plugin without per-plugin logic. The recurring need: 8 plugins, one install code path.'
+goal: 'Standardize the directory shape of every plugin so the installer, the marketplace manifest, and the eval harness can walk any plugin without per-plugin logic. The recurring need: 2 plugins, one install code path — and any plugin added later walks the same path without new code.'
 ---
 
 ## Goal
 
-Standardize the directory shape of every plugin so the installer, the marketplace manifest, and the eval harness can walk any plugin without per-plugin logic. The recurring need: 8 plugins, one install code path.
+Standardize the directory shape of every plugin so the installer, the marketplace manifest, and the eval harness can walk any plugin without per-plugin logic. The recurring need: 2 plugins, one install code path — and any plugin added later walks the same path without new code.
 
 ## Choice
 

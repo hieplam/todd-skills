@@ -58,7 +58,7 @@ Read the top-level `verdict` field (`PASS` only when all three checks pass) and 
 ## Example
 
 ```
-$ bash ~/.claude/skills/verify-shipped/scripts/verify-shipped.sh --pr 37 --worktree /tmp/wt-card4 --repo hieplam/todd-skills
+$ bash ~/.claude/skills/verify-shipped/scripts/verify-shipped.sh --pr 37 --worktree /tmp/wt-card4 --repo hieplam/tribe
 {
   "pr_number": "37",
   "base_branch": "master",
@@ -75,7 +75,7 @@ $ bash ~/.claude/skills/verify-shipped/scripts/verify-shipped.sh --pr 37 --workt
 ## When this skill should NOT trigger
 
 - Verifying a claim that isn't about a merged-PR end-state (e.g. "is this function correct?",
-  "did the tests pass?") — those are `check-diff-coverage`'s or the test suite's job, not this
+  "did the tests pass?") — those are a coverage tool's or the test suite's job, not this
   one.
 - The PR doesn't exist yet, or is still open — there is nothing to verify; `pr_merged` will
   correctly report `fail`, but running the script before a PR exists is premature.

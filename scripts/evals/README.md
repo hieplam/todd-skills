@@ -7,11 +7,10 @@ with/without comparison) instead of inventing a new one.
 
 ## Why this exists
 
-`refactor-for-testability/skills/refactor-for-testability/evals/evals.json` shipped with
-3 well-formed cases and no runner. `run_evals.py` is that runner, and it applies to any
-`plugins/**/evals/evals.json` in this shape — currently `check-diff-coverage`,
-`splitting-plans`, `tribe` (agent-flavored: see `kind` below), and
-`refactor-for-testability`.
+The first `evals/evals.json` in this repo shipped 3 well-formed cases and no runner.
+`run_evals.py` is that runner, and it applies to any `plugins/**/evals/evals.json` in
+this shape — currently `tribe` (agent-flavored: see `kind` below) and the
+`mammoth-hunt` skill fixture inside it.
 
 ## evals.json shape
 
@@ -135,7 +134,7 @@ inspect after the run. The per-run output path now carries an arm segment:
 
 ```bash
 # One evals.json
-scripts/evals/run_evals.py --evals plugins/splitting-plans/skills/splitting-plans/evals/evals.json
+scripts/evals/run_evals.py --evals plugins/tribe/skills/mammoth-hunt/evals/evals.json
 
 # Every evals.json in the repo
 scripts/evals/run_evals.py --all

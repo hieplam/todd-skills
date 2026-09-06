@@ -1,14 +1,14 @@
 ---
 id: rule-marketplace-registration
-c3-seal: e17342c6e8943cf0d03d431a71abfd0a25e7f3b7de530521ddbb1f3bd25477dc
+c3-seal: 20400dcf7983a6bf3f0a73bd9e520e7e07125261ef3ae3c9935cd8d1f58c5706
 title: marketplace-registration
 type: rule
-goal: 'Every plugin that exists in the tree is discoverable and installable: the marketplace manifest is the authoritative registry, and it must never drift from the `plugins/` directory listing — across all 8 plugins today.'
+goal: 'Every plugin that exists in the tree is discoverable and installable: the marketplace manifest is the authoritative registry, and it must never drift from the `plugins/` directory listing — across both plugins today.'
 ---
 
 ## Goal
 
-Every plugin that exists in the tree is discoverable and installable: the marketplace manifest is the authoritative registry, and it must never drift from the `plugins/` directory listing — across all 8 plugins today.
+Every plugin that exists in the tree is discoverable and installable: the marketplace manifest is the authoritative registry, and it must never drift from the `plugins/` directory listing — across both plugins today.
 
 ## Rule
 

@@ -24,15 +24,16 @@ _spec.loader.exec_module(run_evals)
 class SubjectResolution(unittest.TestCase):
     """Every fixture in the repo must resolve to a subject that actually exists.
 
-    The `explaining` fixture used to resolve to `plugins/explaining` (the plugin
-    root, no SKILL.md there), so its with_skill leg silently compared baseline to
-    baseline. Discovery goes through the runner's own discover_evals_json() so a
-    future fixture placed wrongly fails here without anyone updating a list.
+    A fixture placed at a plugin root (no SKILL.md there) resolves to a subject
+    directory that does not hold the prompt under test, so its with_skill leg
+    silently compares baseline to baseline. Discovery goes through the runner's
+    own discover_evals_json() so a future fixture placed wrongly fails here
+    without anyone updating a list.
     """
 
     def test_every_evals_json_resolves_to_a_real_subject(self):
         paths = run_evals.discover_evals_json()
-        self.assertGreaterEqual(len(paths), 5, "fixture discovery found suspiciously few files")
+        self.assertGreaterEqual(len(paths), 2, "fixture discovery found suspiciously few files")
         for evals_path in paths:
             with self.subTest(evals=str(evals_path.relative_to(REPO_ROOT))):
                 data = json.loads(evals_path.read_text())
@@ -426,89 +427,6 @@ class ArtifactCollection(unittest.TestCase):
                         str(path.resolve()).startswith(str(dest.resolve()) + "/")
                         or path.resolve() == dest.resolve(),
                         f"artifact landed outside dest: {path}")
-
-
-MEMORY_FIXTURE = (REPO_ROOT
-                  / "plugins/explaining/skills/explaining/evals/memory-fixture/CLAUDE.md")
-
-# The mem arm measures whether realistic ambient memory SUPPRESSES the behavior. If the
-# fixture names the vocabulary of the behavior it would seed it instead, and the arm
-# would measure the fixture rather than the skill. Following the zero-lexical-overlap
-# meta-test at plugins/tribe/evals/detection/core/memory-overlap.test.ts.
-BANNED_VOCABULARY = ("mermaid", "diagram", "illustration", "illustrate", "chart",
-                     "graph", "visual", "html", "render", "draw", "picture", "image")
-
-
-class MemoryFixture(unittest.TestCase):
-    def test_exists(self):
-        self.assertTrue(MEMORY_FIXTURE.is_file(), f"missing fixture: {MEMORY_FIXTURE}")
-
-    def test_never_mentions_the_illustration_vocabulary(self):
-        import re as _re
-        text = MEMORY_FIXTURE.read_text().lower()
-        hits = [w for w in BANNED_VOCABULARY if _re.search(rf"\b{w}\w*", text)]
-        self.assertEqual(hits, [], f"memory fixture leaks the answer: {hits}")
-
-    def test_is_substantial_enough_to_be_realistic_ambient_memory(self):
-        self.assertGreater(len(MEMORY_FIXTURE.read_text().split()), 80)
-
-
-EXPLAINING_EVALS = (REPO_ROOT
-                    / "plugins/explaining/skills/explaining/evals/evals.json")
-
-
-class ExplainingIllustrationCase(unittest.TestCase):
-    def setUp(self):
-        self.data = json.loads(EXPLAINING_EVALS.read_text())
-        self.case = next(c for c in self.data["evals"]
-                          if c["name"] == "tribe-overall-flow-illustrated")
-
-    def test_fixture_declares_its_memory_fixture(self):
-        self.assertEqual(self.data["memory_fixture"], "memory-fixture/CLAUDE.md")
-        self.assertTrue(
-            (EXPLAINING_EVALS.parent / self.data["memory_fixture"]).is_file())
-
-    def test_uses_the_real_tribe_readme_by_source_not_an_inlined_copy(self):
-        self.assertEqual(self.case["files"],
-                          [{"path": "tribe-README.md",
-                            "source": "plugins/tribe/README.md"}])
-
-    def test_prompt_never_asks_for_the_artifact(self):
-        prompt = self.case["prompt"].lower()
-        for word in ("diagram", "mermaid", "html", "chart", "picture", "image",
-                      "illustrate", "illustration", "draw", "visual", "render"):
-            self.assertNotIn(word, prompt,
-                              f"prompt leaks the behavior under test: {word!r}")
-
-    def test_declares_a_machine_check_and_collects_the_artifact(self):
-        self.assertEqual(len(self.case["checks"]), 1)
-        command = self.case["checks"][0]["command"]
-        self.assertIn("{skill_dir}", command)
-        self.assertIn("validate-mermaid.ts", command)
-        self.assertEqual(self.case["artifacts"], ["*.html"])
-
-    def test_the_planned_check_argv_points_at_a_real_script(self):
-        _, skill_dir, _ = run_evals.derive_kind_and_dirs(
-            EXPLAINING_EVALS, self.data.get("kind"))
-        planned = run_evals.plan_checks(self.case, skill_dir, Path("/tmp/scratch"))
-        self.assertTrue(Path(planned[0]["argv"][1]).is_file(),
-                         f"check points at a missing script: {planned[0]['argv']}")
-
-    def test_existing_cases_are_untouched(self):
-        self.assertEqual([c["id"] for c in self.data["evals"]][:3], [1, 2, 3])
-
-    def test_expected_output_is_gradeable_from_the_transcript_alone(self):
-        """The grader (run_evals.grade()) only ever sees parsed["transcript"] and
-        parsed["final_result"] — extract_metrics() never captures a tool_result's
-        content, so text read from tribe-README.md via the agent's Read call never
-        reaches the grader (GRADER_INSTRUCTIONS even says "you have no tools —
-        judge only from the text given below"). expected_output must not ask the
-        grader to fact-check claims against a source it is never shown (F22); it
-        must still require the deterministic .html/mermaid artifact."""
-        expected_output = self.case["expected_output"]
-        self.assertNotIn("anchored in what tribe-README.md", expected_output)
-        self.assertIn("self-contained .html file", expected_output)
-        self.assertIn('class="mermaid"', expected_output)
 
 
 if __name__ == "__main__":

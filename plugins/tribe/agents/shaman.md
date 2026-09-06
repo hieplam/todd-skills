@@ -139,7 +139,7 @@ allowed only for cards with no dependency edge between them, each in its own wor
   `alive`/`stale`/`unknown` plus the exact last heartbeat line as JSON, so the 30-minute rule is
   applied the same way every time. Recent progress (`alive`) → leave it alone. **No new heartbeat
   line for 30 minutes while mid-milestone = dead** (`stale`; the tribe's one committed staleness
-  threshold — same number `splitting-plans` uses for a stale lock). **`unknown` (no parseable
+  threshold). **`unknown` (no parseable
   ISO-8601 timestamp found on any line) is treated the same as `stale`, not as a third
   do-nothing case** — a report file with no readable heartbeat is exactly as unusable as a dead
   one. In both `stale` and `unknown` cases, re-dispatch a fresh Warchief pointed at the saved

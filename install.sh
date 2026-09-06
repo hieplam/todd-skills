@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — install todd-skills plugins into ~/.claude via symlinks.
+# install.sh — install the tribe repo's plugins into ~/.claude via symlinks.
 #
 # Symlink install means the repo stays the single source of truth: edit a file
 # here and every session picks it up immediately — no marketplace snapshot to
@@ -8,7 +8,7 @@
 #
 # Usage:
 #   ./install.sh                 install ALL plugins
-#   ./install.sh tribe workflow-journal    install only the named plugins
+#   ./install.sh tribe verify-shipped      install only the named plugins
 #   ./install.sh --list          show available plugins and their components
 #
 # Behavior:

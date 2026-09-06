@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Repo-level eval runner for todd-skills.
+"""Repo-level eval runner for the tribe repo.
 
-Executes an `evals/evals.json` file (the shape already used by
-`refactor-for-testability`: skill_name, evals[].id/name/prompt/expected_output/files)
+Executes an `evals/evals.json` file (the shape every fixture in this repo uses:
+skill_name, evals[].id/name/prompt/expected_output/files)
 against isolated `claude -p` subprocesses — one clean-context process per case per
 configuration, mirroring the official skill-creator eval loop's own runner
 (`skill-creator/scripts/run_eval.py` spawns one `claude -p` per query rather than
@@ -35,9 +35,9 @@ For every case, up to two configurations are run:
                      throwaway command we just wrote there — and excludes the
                      user-scope settings source entirely, so every other
                      locally-installed marketplace plugin/skill (this repo's
-                     own tribe/splitting-plans/check-diff-coverage/
-                     refactor-for-testability included, plus anything else
-                     symlink-installed at user scope) is invisible for this
+                     own tribe and verify-shipped plugins included, plus
+                     anything else symlink-installed at user scope) is
+                     invisible for this
                      run; `--strict-mcp-config` with no `--mcp-config` drops
                      every user-configured MCP server the same way. Verified
                      empirically: registering a throwaway command and running
@@ -69,7 +69,7 @@ This script only reads skill/agent files and shells out to `claude -p` in a
 scratch working directory — it never edits a skill's or agent's runtime files.
 
 Usage:
-    scripts/evals/run_evals.py --evals plugins/splitting-plans/skills/splitting-plans/evals/evals.json
+    scripts/evals/run_evals.py --evals plugins/tribe/skills/mammoth-hunt/evals/evals.json
     scripts/evals/run_evals.py --evals plugins/tribe/evals/evals.json --eval-id 3,6
     scripts/evals/run_evals.py --all                      # every evals.json under plugins/
     scripts/evals/run_evals.py --all --mode with_skill     # skip the baseline, just prove it runs
@@ -667,7 +667,7 @@ def run_case(case: dict, kind: str, skill_dir: Path | None, agents_dir: Path | N
              grader_model: str | None, out_dir: Path, verbose: bool, run_idx: int = 0,
              permission_mode: str | None = None, arm: str = "clean",
              memory_fixture: Path | None = None) -> dict:
-    scratch = Path(tempfile.mkdtemp(prefix="todd-skills-eval-"))
+    scratch = Path(tempfile.mkdtemp(prefix="tribe-eval-"))
     try:
         try:
             fixtures = materialize_files(scratch, case.get("files"))
@@ -1240,9 +1240,8 @@ def main() -> int:
 
     # Exit code reflects whether the harness itself ran cleanly, never whether
     # individual cases passed/failed grading (that's data, in benchmark.json, not a
-    # process-failure signal) — same convention this repo's own
-    # check-diff-coverage/scripts/measure.sh documents ("exit code 0 regardless of
-    # pass/fail, 2 only on setup error"). A caller (CI, a wrapper script) gating on
+    # process-failure signal) — the same convention a measurement script follows:
+    # exit code 0 regardless of pass/fail, 2 only on setup error. A caller (CI, a wrapper script) gating on
     # exit code must be able to tell "ran, everything graded on its merits" apart
     # from "claude CLI missing/broken/misconfigured, 0 cases actually executed" —
     # which a bare `return 0` here could never distinguish.
